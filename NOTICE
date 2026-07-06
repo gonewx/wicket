@@ -1,0 +1,36 @@
+wicket
+Copyright 2026 Decker
+
+This product contains code derived from the following projects:
+
+==========================================================================
+Bucket A — ASP.NET Core / Microsoft.IdentityModel (MIT License)
+==========================================================================
+
+Portions of wicket are derived from ASP.NET Core and
+Microsoft.IdentityModel libraries, originally developed by Microsoft.
+
+  Copyright (c) .NET Foundation and Contributors
+  Licensed under the MIT License
+  https://github.com/dotnet/aspnetcore
+  https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet
+
+Affected modules: auth/ (authentication middleware, handlers, scheme
+providers), options/, protocol validators. See individual file headers
+and PROVENANCE.md for per-file attribution.
+
+==========================================================================
+Bucket B — IdentityServer4 ≤4.1.x (Apache License 2.0)
+==========================================================================
+
+Portions of wicket are derived from IdentityServer4 version 4.1.x
+and earlier, originally developed by Brock Allen & Dominick Baier.
+
+  Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+  Licensed under the Apache License, Version 2.0
+  https://github.com/IdentityServer/IdentityServer4
+
+These portions were released under the Apache License 2.0 — a perpetual,
+irrevocable grant that cannot be retroactively withdrawn by subsequent
+relicensing of later versions. See PROVENANCE.md for per-file/subsystem
+attribution tracing each file to its IdentityServer4 ≤4.1.x origin.
