@@ -20,7 +20,7 @@ func AddMessageCookie[T any](r *godi.Registry) *godi.Registry {
 	return godi.AddTransientFactory[*infrastructure.MessageCookie[T]](r, func(p godi.Provider) *infrastructure.MessageCookie[T] {
 		return infrastructure.NewMessageCookie[T](
 			godi.GetRequired[*slog.Logger](p),
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			requestFromProvider(p),
 			responseFromProvider(p),
 			godi.GetRequired[services.ServerUrls](p),

@@ -26,7 +26,7 @@ var (
 
 type accessTokenValidationTest struct {
 	clients storage.ClientStore
-	options *config_options.IdentityServerOptions
+	options *config_options.WicketOptions
 	clock   *test_common.StubClock
 }
 
@@ -37,7 +37,7 @@ func getNow() time.Time {
 func newAccessTokenValidationTest() *accessTokenValidationTest {
 	clients, _ := createClientStore()
 
-	options := config_options.NewIdentityServerOptions()
+	options := config_options.NewWicketOptions()
 	clock := test_common.NewStubClock()
 	clock.NowFunc = getNow
 
@@ -135,7 +135,7 @@ func TestReference_Token_Too_Long(t *testing.T) {
 	r := require.New(t)
 
 	validator := createTokenValidator()
-	options := config_options.NewIdentityServerOptions()
+	options := config_options.NewWicketOptions()
 
 	longToken := strings.Repeat("x", options.InputLengthRestrictions.TokenHandle+1)
 	result := validator.ValidateAccessToken(longToken, "")
@@ -214,7 +214,7 @@ func TestJWT_Token_with_scopes_have_expected_claims(t *testing.T) {
 			name = "true"
 		}
 		t.Run(name, func(t *testing.T) {
-			options := config_options.NewIdentityServerOptions()
+			options := config_options.NewWicketOptions()
 			options.EmitScopesAsSpaceDelimitedStringInJwt = flag
 
 			signer := createDefaultTokenCreator(options)

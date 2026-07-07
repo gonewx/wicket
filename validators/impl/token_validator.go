@@ -34,7 +34,7 @@ import (
 // TokenValidator  for the token validator
 type TokenValidator struct {
 	logger                     *slog.Logger
-	options                    *config_options.IdentityServerOptions
+	options                    *config_options.WicketOptions
 	issuerNameService          services.IssuerNameService
 	referenceTokenStore        storage.ReferenceTokenStore
 	customValidator            validators.CustomTokenValidator
@@ -47,7 +47,7 @@ type TokenValidator struct {
 
 func NewTokenValidator(
 	logger *slog.Logger,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	issuerNameService services.IssuerNameService,
 	referenceTokenStore storage.ReferenceTokenStore,
 	customValidator validators.CustomTokenValidator,

@@ -10,17 +10,17 @@ import (
 )
 
 const (
-	IdentityServerName                 = "YouChengCloudIdentityServer"
+	WicketName                         = "wicket"
 	LocalIdentityProvider              = "local"
-	DefaultCookieAuthenticationScheme  = "idsrv"
-	SignoutScheme                      = "idsrv"
-	ExternalCookieAuthenticationScheme = "idsrv.external"
+	DefaultCookieAuthenticationScheme  = "wicket"
+	SignoutScheme                      = "wicket"
+	ExternalCookieAuthenticationScheme = "wicket.external"
 	OpenIdConnectAuthenticationScheme  = "OpenIdConnect"
 	GoogleAuthenticationScheme         = "Google"
 	FacebookAuthenticationScheme       = "Facebook"
 	JwtBearerAuthenticationScheme      = "Bearer"
 	AccessTokenAudience                = "%sresources"
-	DefaultCheckSessionCookieName      = "idsrv.session"
+	DefaultCheckSessionCookieName      = "wicket.session"
 
 	ExternalAuthenticationMethod = "external"
 )
@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	IdentityServerAuthenticationType = IdentityServerName
+	WicketAuthenticationType = WicketName
 )
 
 type ResponseTypes string
@@ -823,7 +823,7 @@ const (
 )
 
 const (
-	EnvironmentKeysIdentityServerBasePath = "idsvr:IdentityServerBasePath"
-	EnvironmentKeysIdentityServerOrigin   = "idsvr:IdentityServerOrigin" // todo: deprecate
-	EnvironmentKeysSignOutCalled          = "idsvr:IdentityServerSignOutCalled"
+	EnvironmentKeysWicketBasePath      = "wicket:BasePath"
+	EnvironmentKeysWicketOrigin        = "wicket:Origin" // todo: deprecate
+	EnvironmentKeysWicketSignOutCalled = "wicket:SignOutCalled"
 )

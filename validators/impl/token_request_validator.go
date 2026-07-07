@@ -29,7 +29,7 @@ import (
 )
 
 type TokenRequestValidator struct {
-	Options                        *config_options.IdentityServerOptions
+	Options                        *config_options.WicketOptions
 	IssuerNameService              services.IssuerNameService
 	ResourceStore                  storage.ResourceStore
 	AuthorizationCodeStore         storage.AuthorizationCodeStore
@@ -49,7 +49,7 @@ type TokenRequestValidator struct {
 }
 
 func NewTokenRequestValidator(
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	issuerNameService services.IssuerNameService,
 	authorizationCodeStore storage.AuthorizationCodeStore,
 	extensionGrantValidator *ExtensionGrantValidator,

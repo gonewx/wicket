@@ -19,7 +19,7 @@ import (
 type ConsentPageResult struct {
 	request *validators_models.ValidatedAuthorizeRequest
 
-	options                             *options.IdentityServerOptions
+	options                             *options.WicketOptions
 	urls                                services.ServerUrls
 	authorizationParametersMessageStore storage.AuthorizationParametersMessageStore
 }
@@ -35,7 +35,7 @@ func NewConsentPageResult(
 func (cpr *ConsentPageResult) init(ctx context.Context) {
 	if cpr.options == nil {
 		// AD-10: ConsentPageResult resolves options from RequestServices.
-		cpr.options = godi.GetRequired[*options.IdentityServerOptions](hosting.ScopeFrom(ctx))
+		cpr.options = godi.GetRequired[*options.WicketOptions](hosting.ScopeFrom(ctx))
 	}
 
 	if cpr.urls == nil {

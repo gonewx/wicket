@@ -14,7 +14,7 @@ import (
 	"github.com/gonewx/wicket/utils"
 )
 
-type IdentityServerUser struct {
+type LocalUser struct {
 	SubjectId             string
 	DisplayName           string
 	IdentityProvider      string
@@ -24,20 +24,20 @@ type IdentityServerUser struct {
 	AdditionalClaims      []*claimspkg.Claim
 }
 
-func WithIdentityServerUserSubjectId(subjectId string) gois.Option[IdentityServerUser] {
-	return func(u *IdentityServerUser) {
+func WithLocalUserSubjectId(subjectId string) gois.Option[LocalUser] {
+	return func(u *LocalUser) {
 		u.SubjectId = subjectId
 	}
 }
-func NewIdentityServerUser(opts ...gois.Option[IdentityServerUser]) *IdentityServerUser {
-	i := &IdentityServerUser{}
+func NewLocalUser(opts ...gois.Option[LocalUser]) *LocalUser {
+	i := &LocalUser{}
 	for _, opt := range opts {
 		opt(i)
 	}
 	return i
 }
 
-func (u *IdentityServerUser) CreatePrincipal() (*claimspkg.ClaimsPrincipal, error) {
+func (u *LocalUser) CreatePrincipal() (*claimspkg.ClaimsPrincipal, error) {
 	if u.SubjectId == "" {
 		return nil, fmt.Errorf("SubjectId is mandatory")
 	}
@@ -75,7 +75,7 @@ func (u *IdentityServerUser) CreatePrincipal() (*claimspkg.ClaimsPrincipal, erro
 
 	id := claimspkg.NewClaimsIdentity(
 		claimspkg.WithClaims(claims),
-		claimspkg.WithAuthenticationType(gois.IdentityServerAuthenticationType),
+		claimspkg.WithAuthenticationType(gois.WicketAuthenticationType),
 		claimspkg.WithNameClaimType(gois.JwtClaimTypesName),
 		claimspkg.WithRoleClaimType(gois.JwtClaimTypesRole),
 	)

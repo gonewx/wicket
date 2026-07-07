@@ -19,7 +19,7 @@ import (
 )
 
 type OidcReturnUrlParser struct {
-	options   *config_options.IdentityServerOptions
+	options   *config_options.WicketOptions
 	validator validators.AuthorizeRequestValidator
 	// httpContextAccessor accessor.HttpContextAccessor
 	userSession                         services.UserSession
@@ -29,7 +29,7 @@ type OidcReturnUrlParser struct {
 }
 
 func NewOidcReturnUrlParser(
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	validator validators.AuthorizeRequestValidator,
 	// httpContextAccessor accessor.HttpContextAccessor,
 	userSession services.UserSession,

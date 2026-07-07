@@ -23,12 +23,12 @@ import (
 )
 
 type ResourceTests struct {
-	mockPipeline *integration_common.IdentityServerPipeline
+	mockPipeline *integration_common.WicketPipeline
 	client1      *storage_models.Client
 }
 
 func newResourceTests() *ResourceTests {
-	pipeline := integration_common.NewIdentityServerPipeline()
+	pipeline := integration_common.NewWicketPipeline()
 
 	client1 := storage_models.NewClient()
 	client1.ClientId = "client1"

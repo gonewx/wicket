@@ -31,7 +31,7 @@ import (
 type AuthorizeResult struct {
 	Response *responses_models.AuthorizeResponse
 
-	options           *config_options.IdentityServerOptions
+	options           *config_options.WicketOptions
 	userSession       services.UserSession
 	errorMessageStore storage.MessageStore[messages.ErrorMessage]
 	urls              services.ServerUrls
@@ -48,7 +48,7 @@ func NewAuthorizeResult(
 
 func newAuthorizeResult(
 	response *responses_models.AuthorizeResponse,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	userSession services.UserSession,
 	errorMessageStore storage.MessageStore[messages.ErrorMessage],
 	urls services.ServerUrls,
@@ -67,7 +67,7 @@ func newAuthorizeResult(
 func (ar *AuthorizeResult) init(ctx context.Context) {
 	if ar.options == nil {
 		// AD-10: AuthorizeResult resolves options from RequestServices.
-		ar.options = godi.GetRequired[*config_options.IdentityServerOptions](hosting.ScopeFrom(ctx))
+		ar.options = godi.GetRequired[*config_options.WicketOptions](hosting.ScopeFrom(ctx))
 	}
 
 	if ar.userSession == nil {
@@ -113,7 +113,7 @@ func (ar *AuthorizeResult) processError(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (ar *AuthorizeResult) ToQueryValues(options *config_options.IdentityServerOptions) url.Values {
+func (ar *AuthorizeResult) ToQueryValues(options *config_options.WicketOptions) url.Values {
 	values := url.Values{}
 	if ar.Response.Error != nil {
 		values.Set("error", ar.Response.Error.Error())

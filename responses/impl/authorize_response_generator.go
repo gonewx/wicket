@@ -25,14 +25,14 @@ import (
 type AuthorizeResponseGenerator struct {
 	logger                 *slog.Logger
 	clock                  services.SystemClock
-	options                *config_options.IdentityServerOptions
+	options                *config_options.WicketOptions
 	TokenService           services.TokenService
 	KeyMaterialService     services.KeyMaterialService
 	AuthorizationCodeStore storage.AuthorizationCodeStore
 }
 
 func NewAuthorizeResponseGenerator(
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	clock services.SystemClock,
 	tokenService services.TokenService,
 	keyMaterialService services.KeyMaterialService,

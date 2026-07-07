@@ -30,11 +30,11 @@ const (
 )
 
 type tokenTests struct {
-	mockPipeline *integration_common.IdentityServerPipeline
+	mockPipeline *integration_common.WicketPipeline
 }
 
 func newTokenTests() *tokenTests {
-	pipeline := integration_common.NewIdentityServerPipeline()
+	pipeline := integration_common.NewWicketPipeline()
 
 	client1 := storage_models.NewClient()
 	client1.ClientId = client_id

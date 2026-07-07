@@ -20,7 +20,7 @@ func TestBucketBApacheCopyProvenanceE2E(t *testing.T) {
 		if row.Bucket != "B" {
 			continue
 		}
-		bucketBRefs[row.Path] = row.RefPath
+		bucketBRefs[currentBucketBPath(row.Path)] = row.RefPath
 		switch row.Kind {
 		case "business":
 			business++
@@ -85,7 +85,7 @@ func TestBucketBFromCommentsAndForbiddenCodeE2E(t *testing.T) {
 	bucketBRefs := map[string]string{}
 	for _, row := range rows {
 		if row.Bucket == "B" {
-			bucketBRefs[row.Path] = row.RefPath
+			bucketBRefs[currentBucketBPath(row.Path)] = row.RefPath
 		}
 	}
 
@@ -198,4 +198,21 @@ func goFiles(t *testing.T) []string {
 		t.Fatalf("walk project Go files: %v", err)
 	}
 	return files
+}
+
+func currentBucketBPath(ledgerPath string) string {
+	switch ledgerPath {
+	case "config/options/identity_server_options.go":
+		return "config/options/wicket_options.go"
+	case "config/options/mock/test_identity_server_options.go":
+		return "config/options/mock/test_wicket_options.go"
+	case "models/identity_server_user.go":
+		return "models/local_user.go"
+	case "test/integration/common/identity_server_pipeline.go":
+		return "test/integration/common/wicket_pipeline.go"
+	case "tools/identity_server_tools.go":
+		return "tools/token_tools.go"
+	default:
+		return ledgerPath
+	}
 }

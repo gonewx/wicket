@@ -23,7 +23,7 @@ func ToValidationResult(client *storage_models.Client, secret *models.ParsedSecr
 	}
 }
 
-func ValidateOptions(options *config_options.IdentityServerOptions, logger *slog.Logger) error {
+func ValidateOptions(options *config_options.WicketOptions, logger *slog.Logger) error {
 	if options.IssuerUri == "" {
 		logger.Debug("Custom IssuerUri set ", slog.String("issuerUri", options.IssuerUri))
 	}

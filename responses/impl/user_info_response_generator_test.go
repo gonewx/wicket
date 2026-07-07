@@ -37,8 +37,8 @@ func newUserInfoResponseGeneratorTests(t *testing.T) *userInfoResponseGeneratorT
 	client := storage_models.NewClient()
 	client.ClientId = "client"
 
-	iduser := models.NewIdentityServerUser(
-		models.WithIdentityServerUserSubjectId("bob"),
+	iduser := models.NewLocalUser(
+		models.WithLocalUserSubjectId("bob"),
 	)
 	iduser.AdditionalClaims = []*claimspkg.Claim{
 		claimspkg.NewClaim(

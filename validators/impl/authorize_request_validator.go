@@ -26,7 +26,7 @@ import (
 type AuthorizeRequestValidator struct {
 	logger *slog.Logger
 
-	options                 *config_options.IdentityServerOptions
+	options                 *config_options.WicketOptions
 	issuerNameService       services.IssuerNameService
 	clients                 storage.ClientStore
 	jwtRequestUriHttpClient services.JwtRequestUriHttpClient
@@ -40,7 +40,7 @@ type AuthorizeRequestValidator struct {
 
 func NewAuthorizeRequestValidator(
 	logger *slog.Logger,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	issuerNameService services.IssuerNameService,
 	clients storage.ClientStore,
 	jwtRequestUriHttpClient services.JwtRequestUriHttpClient,

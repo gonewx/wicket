@@ -22,11 +22,11 @@ import (
 )
 
 type ConsentTests struct {
-	mockPipeline *integration_common.IdentityServerPipeline
+	mockPipeline *integration_common.WicketPipeline
 }
 
 func newConsentTests() *ConsentTests {
-	pipiline := integration_common.NewIdentityServerPipeline()
+	pipiline := integration_common.NewWicketPipeline()
 
 	client1 := storage_models.NewClient()
 	client1.ClientId = "client1"
@@ -147,7 +147,7 @@ func TestConsent_page_should_have_authorization_params(t *testing.T) {
 				// TODO:
 			}
 
-			user := models.NewIdentityServerUser(models.WithIdentityServerUserSubjectId("bob"))
+			user := models.NewLocalUser(models.WithLocalUserSubjectId("bob"))
 			user.Tenant = "tenant_value"
 
 			subject, err := user.CreatePrincipal()

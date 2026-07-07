@@ -26,7 +26,7 @@ import (
 // endSessionRequestValidatorTests  Validates end session requests.
 type endSessionRequestValidatorTests struct {
 	subject                       *EndSessionRequestValidator
-	options                       *config_options.IdentityServerOptions
+	options                       *config_options.WicketOptions
 	userSession                   *svcmock.MockUserSession
 	stubTokenValidator            *mock.StubTokenValidator
 	stubRedirectUriValidator      *mock.StubRedirectUriValidator
@@ -37,7 +37,7 @@ type endSessionRequestValidatorTests struct {
 
 func newEndSessionRequestValidatorTests() *endSessionRequestValidatorTests {
 
-	options := optmock.NewTestIdentityServerOptions().Create()
+	options := optmock.NewTestWicketOptions().Create()
 	stubTokenValidator := mock.NewStubTokenValidator()
 	stubRedirectUriValidator := mock.NewStubRedirectUriValidator()
 	mockLogoutNotificationService := svcmock.NewMockLogoutNotificationService()
@@ -63,8 +63,8 @@ func newEndSessionRequestValidatorTests() *endSessionRequestValidatorTests {
 		mockLogoutNotificationService: mockLogoutNotificationService,
 		mockEndSessionMessageStore:    mockEndSessionMessageStore,
 	}
-	instance.user, _ = models.NewIdentityServerUser(
-		models.WithIdentityServerUserSubjectId("alice"),
+	instance.user, _ = models.NewLocalUser(
+		models.WithLocalUserSubjectId("alice"),
 	).CreatePrincipal()
 
 	return instance

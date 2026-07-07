@@ -47,7 +47,7 @@ func WithLogger(logger *slog.Logger) gois.Option[Server] {
 // From: IdentityServer4/src/IdentityServer/Configuration/IdentityServerApplicationBuilderExtensions.cs
 func DefaultServer(p godi.Provider, opts ...gois.Option[Server]) (*Server, error) {
 	if p == nil {
-		return nil, fmt.Errorf("identity server provider is required")
+		return nil, fmt.Errorf("wicket provider is required")
 	}
 
 	s := &Server{provider: p}
@@ -62,10 +62,10 @@ func DefaultServer(p godi.Provider, opts ...gois.Option[Server]) (*Server, error
 	return s, nil
 }
 
-func (s *Server) UseIdentityServer() func(http.Handler) http.Handler {
+func (s *Server) UseWicket() func(http.Handler) http.Handler {
 	s.Validate()
 
-	opts := godi.GetRequired[*config_options.IdentityServerOptions](s.provider)
+	opts := godi.GetRequired[*config_options.WicketOptions](s.provider)
 	dynamicProviders := opts.CleanRoomProviderGap
 
 	schemeAuthMiddleware := dynamicschemes.UseSchemeAuthMiddleware(s.Logger, dynamicProviders)
@@ -77,7 +77,7 @@ func (s *Server) UseIdentityServer() func(http.Handler) http.Handler {
 	// matching dotnet app.ApplicationServices.
 	router := godi.GetRequired[hosting.EndpointRouter](s.provider)
 
-	idsrvMiddleware := hosting.NewMiddleware(
+	wicketMiddleware := hosting.NewMiddleware(
 		s.Logger,
 		router,
 	)
@@ -85,7 +85,7 @@ func (s *Server) UseIdentityServer() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return schemeAuthMiddleware(
 			authCoreMiddleware(
-				idsrvMiddleware.Use(next),
+				wicketMiddleware.Use(next),
 			),
 		)
 	}
@@ -94,12 +94,12 @@ func (s *Server) UseIdentityServer() func(http.Handler) http.Handler {
 func (s *Server) Validate() {
 	logger := s.Logger
 
-	logger.Info("Starting gois IdentityServer version {version} ({netversion})")
+	logger.Info("Starting wicket authorization server version {version} ({netversion})")
 
-	// From: Configuration/IdentityServerApplicationBuilderExtensions.cs#L57
+	// Validation dependencies are resolved from the injected provider.
 	// AD-10: startup assembly resolves validation dependencies from the injected
 	// Provider, matching dotnet app.ApplicationServices.
-	opts := godi.GetRequired[*config_options.IdentityServerOptions](s.provider)
+	opts := godi.GetRequired[*config_options.WicketOptions](s.provider)
 
 	persistedGrantStore := s.TestService(
 		s.provider,
@@ -127,11 +127,11 @@ func (s *Server) Validate() {
 }
 
 func (s *Server) ValidateSchemes(logger *slog.Logger) error {
-	opts := godi.GetRequired[*config_options.IdentityServerOptions](s.provider)
+	opts := godi.GetRequired[*config_options.WicketOptions](s.provider)
 	schemes := godi.GetRequired[auth.SchemeProvider](s.provider)
 
 	if schemes.GetDefaultAuthenticateScheme() == nil && opts.Authentication.CookieAuthenticationScheme != "" {
-		logger.Warn("No authentication scheme has been set. Setting either a default authentication scheme or a CookieAuthenticationScheme on IdentityServerOptions is required.")
+		logger.Warn("No authentication scheme has been set. Setting either a default authentication scheme or a CookieAuthenticationScheme on WicketOptions is required.")
 
 		return nil
 	}
@@ -141,10 +141,10 @@ func (s *Server) ValidateSchemes(logger *slog.Logger) error {
 
 	// if opts.Authentication.CookieAuthenticationScheme != "" {
 	// 	authenticationScheme = schemes.GetScheme(opts.Authentication.CookieAuthenticationScheme)
-	// 	logger.Infof("Using explicitly configured authentication scheme  for IdentityServer", slog.String("scheme", opts.Authentication.CookieAuthenticationScheme))
+	// 	logger.Infof("Using explicitly configured authentication scheme", slog.String("scheme", opts.Authentication.CookieAuthenticationScheme))
 	// } else {
 	// 	authenticationScheme = schemes.GetDefaultAuthenticateScheme()
-	// 	logger.Infof("Using the default authentication scheme for IdentityServer", slog.String("scheme", opts.Authentication.CookieAuthenticationScheme))
+	// 	logger.Infof("Using the default authentication scheme", slog.String("scheme", opts.Authentication.CookieAuthenticationScheme))
 	// }
 
 	logger.Debug("Using as default scheme for authentication", slog.String("scheme", schemes.GetDefaultAuthenticateScheme().Name))
@@ -156,7 +156,7 @@ func (s *Server) ValidateSchemes(logger *slog.Logger) error {
 	return nil
 }
 
-func (s *Server) ValidateOptions(opts *config_options.IdentityServerOptions, logger *slog.Logger) {
+func (s *Server) ValidateOptions(opts *config_options.WicketOptions, logger *slog.Logger) {
 	if strings.TrimSpace(opts.IssuerUri) != "" {
 		logger.Debug("Custom IssuerUri set to", slog.String("uri", opts.IssuerUri))
 	}

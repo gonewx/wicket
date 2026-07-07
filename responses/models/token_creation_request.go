@@ -11,7 +11,7 @@ import (
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
-//From: src/IdentityServer/Models/TokenCreationRequest.cs
+// From: IdentityServer4/src/IdentityServer/Models/TokenCreationRequest.cs
 // should be placed in the mudule
 
 // TokenCreationRequest Models the data to create a token from a validated request.

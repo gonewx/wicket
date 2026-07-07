@@ -24,7 +24,7 @@ type EndSessionCallbackResult struct {
 	Result *validators_models.EndSessionCallbackValidationResult
 
 	logger  *slog.Logger
-	options *config_options.IdentityServerOptions
+	options *config_options.WicketOptions
 }
 
 func NewEndSessionCallbackResult(
@@ -38,7 +38,7 @@ func NewEndSessionCallbackResult(
 
 func newEndSessionCallbackResult(
 	result *validators_models.EndSessionCallbackValidationResult,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 ) *EndSessionCallbackResult {
 	h := &EndSessionCallbackResult{
 		Result:  result,
@@ -50,7 +50,7 @@ func newEndSessionCallbackResult(
 func (escr *EndSessionCallbackResult) init(ctx context.Context) {
 	if escr.options == nil {
 		// AD-10: EndSessionCallbackResult resolves options from RequestServices.
-		escr.options = godi.GetRequired[*config_options.IdentityServerOptions](hosting.ScopeFrom(ctx))
+		escr.options = godi.GetRequired[*config_options.WicketOptions](hosting.ScopeFrom(ctx))
 	}
 }
 

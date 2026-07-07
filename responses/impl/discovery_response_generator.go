@@ -24,7 +24,7 @@ import (
 
 type DiscoveryResponseGenerator struct {
 	// The options
-	options *config_options.IdentityServerOptions
+	options *config_options.WicketOptions
 
 	// The extension grants validator
 	extensionGrants *validators_impl.ExtensionGrantValidator
@@ -46,7 +46,7 @@ type DiscoveryResponseGenerator struct {
 }
 
 func NewDiscoveryResponseGenerator(
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	extensionGrants *validators_impl.ExtensionGrantValidator,
 	keys services.KeyMaterialService,
 	resourceOwnerValidator validators.ResourceOwnerPasswordValidator,

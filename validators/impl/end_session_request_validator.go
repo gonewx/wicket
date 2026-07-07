@@ -25,7 +25,7 @@ import (
 // EndSessionRequestValidator  Validates end session requests.
 type EndSessionRequestValidator struct {
 	logger                    *slog.Logger
-	options                   *config_options.IdentityServerOptions
+	options                   *config_options.WicketOptions
 	TokenValidator            validators.TokenValidator
 	UriValidator              validators.RedirectUriValidator
 	UserSession               services.UserSession
@@ -35,7 +35,7 @@ type EndSessionRequestValidator struct {
 
 func NewEndSessionRequestValidator(
 	logger *slog.Logger,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	tokenValidator validators.TokenValidator,
 	uriValidator validators.RedirectUriValidator,
 	userSession services.UserSession,

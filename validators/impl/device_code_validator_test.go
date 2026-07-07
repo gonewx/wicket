@@ -31,8 +31,8 @@ func newDeviceCodeValidatorTests() *deviceCodeValidatorTests {
 	deviceCode := storage_models.NewDeviceCode()
 	deviceCode.ClientId = "device_flow"
 	deviceCode.IsAuthorized = true
-	deviceCode.Subject, _ = models.NewIdentityServerUser(
-		models.WithIdentityServerUserSubjectId("alice"),
+	deviceCode.Subject, _ = models.NewLocalUser(
+		models.WithLocalUserSubjectId("alice"),
 	).CreatePrincipal()
 	deviceCode.IsOpenId = true
 	deviceCode.Lifetime = 300

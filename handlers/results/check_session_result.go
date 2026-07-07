@@ -16,7 +16,7 @@ import (
 )
 
 type CheckSessionResult struct {
-	options                    *config_options.IdentityServerOptions
+	options                    *config_options.WicketOptions
 	formattedHtml              string
 	lastCheckSessionCookieName string
 	mu                         *sync.RWMutex
@@ -30,7 +30,7 @@ func NewCheckSessionResult() *CheckSessionResult {
 }
 
 func newCheckSessionResult(
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 ) *CheckSessionResult {
 	h := &CheckSessionResult{
 		options: options,
@@ -42,7 +42,7 @@ func newCheckSessionResult(
 func (csr *CheckSessionResult) init(ctx context.Context) {
 	if csr.options == nil {
 		// AD-10: CheckSessionResult resolves options from RequestServices.
-		csr.options = godi.GetRequired[*config_options.IdentityServerOptions](hosting.ScopeFrom(ctx))
+		csr.options = godi.GetRequired[*config_options.WicketOptions](hosting.ScopeFrom(ctx))
 	}
 }
 
@@ -260,7 +260,7 @@ if (typeof module != 'undefined' && module.exports) module.exports = Sha256; // 
 if (typeof define == 'function' && define.amd) define([], function() { return Sha256; }); // AMD
 
 ////////////////////////////////////////////////////////////////////
-///////////// IdentityServer JS Code Starts here ///////////////////
+///////////// Check-session JS code starts here ////////////////////
 ////////////////////////////////////////////////////////////////////
 
         function getCookies() {

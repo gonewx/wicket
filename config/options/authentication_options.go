@@ -17,7 +17,7 @@ type AuthenticationOptions struct {
 	//  This setting is typically used when AddPolicyScheme is used in the host as the default scheme.
 	CookieAuthenticationScheme string
 
-	//  Sets the cookie lifetime (only effective if the IdentityServer-provided cookie handler is used)
+	//  Sets the cookie lifetime (only effective if the built-in cookie handler is used)
 	CookieLifetime time.Duration
 
 	//  Specified if the cookie should be sliding or not (only effective if the built-in cookie middleware is used)

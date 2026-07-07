@@ -23,7 +23,7 @@ import (
 
 type MessageCookie[T any] struct {
 	logger    *slog.Logger
-	options   *config_options.IdentityServerOptions
+	options   *config_options.WicketOptions
 	request   *http.Request
 	response  http.ResponseWriter
 	urls      services.ServerUrls
@@ -35,7 +35,7 @@ type MessageCookie[T any] struct {
 
 func NewMessageCookie[T any](
 	logger *slog.Logger,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	request *http.Request,
 	response http.ResponseWriter,
 	urls services.ServerUrls,

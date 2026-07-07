@@ -19,7 +19,7 @@ import (
 
 // DeviceAuthorizationResponseGenerator The device authorization response generator
 type DeviceAuthorizationResponseGenerator struct {
-	options               *config_options.IdentityServerOptions
+	options               *config_options.WicketOptions
 	userCodeService       services.UserCodeService
 	deviceFlowCodeService services.DeviceFlowCodeService
 	clock                 services.SystemClock
@@ -27,7 +27,7 @@ type DeviceAuthorizationResponseGenerator struct {
 }
 
 func NewDeviceAuthorizationResponseGenerator(
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	userCodeService services.UserCodeService,
 	deviceFlowCodeService services.DeviceFlowCodeService,
 	clock services.SystemClock,

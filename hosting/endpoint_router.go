@@ -20,13 +20,13 @@ type EndpointRouter interface {
 
 type endpointRouter struct {
 	endpoints []*Endpoint
-	options   *config_options.IdentityServerOptions
+	options   *config_options.WicketOptions
 	logger    *slog.Logger
 }
 
 func NewEndpointRouter(
 	endpoints []*Endpoint,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	logger *slog.Logger,
 ) EndpointRouter {
 	return &endpointRouter{

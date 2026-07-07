@@ -22,9 +22,10 @@ func TestBucketBProvenanceTableMatchesCorrectionLedgerE2E(t *testing.T) {
 		}
 		bucketBRows++
 
-		got, ok := provenanceRows[row.Path]
+		currentPath := currentBucketBPath(row.Path)
+		got, ok := provenanceRows[currentPath]
 		if !ok {
-			t.Fatalf("PROVENANCE.md missing bucket B ledger path %s", row.Path)
+			t.Fatalf("PROVENANCE.md missing bucket B current path %s for ledger path %s", currentPath, row.Path)
 		}
 		if got.kind != row.Kind {
 			t.Fatalf("PROVENANCE.md kind for %s = %q, want %q", row.Path, got.kind, row.Kind)

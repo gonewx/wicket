@@ -20,13 +20,13 @@ import (
 
 // DeviceAuthorizationRequestValidator
 type DeviceAuthorizationRequestValidator struct {
-	Options           *config_options.IdentityServerOptions
+	Options           *config_options.WicketOptions
 	ResourceValidator validators.ResourceValidator
 	Logger            *slog.Logger
 }
 
 func NewDeviceAuthorizationRequestValidator(
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	resourceValidator validators.ResourceValidator,
 	logger *slog.Logger,
 ) *DeviceAuthorizationRequestValidator {

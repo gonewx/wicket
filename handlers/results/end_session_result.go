@@ -21,7 +21,7 @@ import (
 type EndSessionResult struct {
 	result *validators_models.EndSessionValidationResult
 
-	options            *config_options.IdentityServerOptions
+	options            *config_options.WicketOptions
 	clock              services.SystemClock
 	urls               services.ServerUrls
 	logoutMessageStore storage.MessageStore[messages.LogoutMessage]
@@ -37,7 +37,7 @@ func NewEndSessionResult(
 
 func newEndSessionResult(
 	result *validators_models.EndSessionValidationResult,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	clock services.SystemClock,
 	urls services.ServerUrls,
 	logoutMessageStore storage.MessageStore[messages.LogoutMessage],
@@ -54,7 +54,7 @@ func newEndSessionResult(
 func (esr *EndSessionResult) init(ctx context.Context) {
 	if esr.options == nil {
 		// AD-10: EndSessionResult resolves options from RequestServices.
-		esr.options = godi.GetRequired[*config_options.IdentityServerOptions](hosting.ScopeFrom(ctx))
+		esr.options = godi.GetRequired[*config_options.WicketOptions](hosting.ScopeFrom(ctx))
 	}
 
 	if esr.clock == nil {
@@ -96,7 +96,7 @@ func (esr *EndSessionResult) Execute(w http.ResponseWriter, r *http.Request) err
 	redirect := esr.options.UserInteraction.LogoutUrl
 
 	if utils.IsLocalUrl(redirect) {
-		redirect = esr.urls.GetIdentityServerRelativeUrl(redirect)
+		redirect = esr.urls.GetWicketRelativeUrl(redirect)
 	}
 
 	if id != "" && err == nil {

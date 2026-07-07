@@ -20,14 +20,14 @@ import (
 
 type endSessionCallbackResultTests struct {
 	validationResult *validators_models.EndSessionCallbackValidationResult
-	options          *config_options.IdentityServerOptions
+	options          *config_options.WicketOptions
 	subject          *EndSessionCallbackResult
 	mockWriter       *test_common.MockHttpWriter
 }
 
 func newEndSessionCallbackResultTests() *endSessionCallbackResultTests {
 	validationResult := validators_models.NewEndSessionCallbackValidationResult()
-	options := config_options.NewIdentityServerOptions()
+	options := config_options.NewWicketOptions()
 
 	subject := newEndSessionCallbackResult(
 		validationResult,
@@ -43,7 +43,7 @@ func newEndSessionCallbackResultTests() *endSessionCallbackResultTests {
 	}
 }
 
-// test/IdentityServer.UnitTests/Endpoints/EndSession/EndSessionCallbackResultTests.cs
+// From: IdentityServer4/src/IdentityServer/Endpoints/Results/EndSessionCallbackResult.cs
 func TestEndSessionCallbackResultDefaultOptionsShouldEmitFrameSrcCspHeaders(t *testing.T) {
 	a := require.New(t)
 
@@ -75,7 +75,7 @@ func TestEndSessionCallbackResultRelaxCspOptionsShouldPreventFrameSrcCspHeaders(
 	a.Nil(header)
 }
 
-// test/IdentityServer.UnitTests/Endpoints/Results/EndSessionCallbackResultTests.cs
+// From: IdentityServer4/src/IdentityServer/Endpoints/Results/EndSessionCallbackResult.cs
 func TestEndSessionCallbackResulterror_should_return_400(t *testing.T) {
 	a := require.New(t)
 

@@ -25,14 +25,14 @@ import (
 )
 
 type JwtRequestValidator struct {
-	options           *config_options.IdentityServerOptions
+	options           *config_options.WicketOptions
 	issuerNameService services.IssuerNameService
 	logger            *slog.Logger
 	audienceUri       string
 }
 
 func NewJwtRequestValidator(
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 	issuerNameService services.IssuerNameService,
 	logger *slog.Logger,
 ) *JwtRequestValidator {

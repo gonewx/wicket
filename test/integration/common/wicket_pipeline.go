@@ -63,8 +63,8 @@ var (
 	FederatedSignOutUrl  = FederatedSignOutPath
 )
 
-type IdentityServerPipeline struct {
-	Options           *config_options.IdentityServerOptions
+type WicketPipeline struct {
+	Options           *config_options.WicketOptions
 	TestServer        *httptest.Server
 	BrowserClient     *BrowserClient
 	BackChannelClient *http.Client
@@ -109,8 +109,8 @@ type IdentityServerPipeline struct {
 	AuthorizationParametersMessageStore storage.AuthorizationParametersMessageStore
 }
 
-func NewIdentityServerPipeline() *IdentityServerPipeline {
-	p := &IdentityServerPipeline{
+func NewWicketPipeline() *WicketPipeline {
+	p := &WicketPipeline{
 		BackChannelMessageHandler: newMockMessageHandler(),
 		JwtRequestMessageHandler:  newMockMessageHandler(),
 		IdentityScopes:            make([]*storage_models.IdentityResource, 0),
@@ -135,12 +135,12 @@ func NewIdentityServerPipeline() *IdentityServerPipeline {
 	return p
 }
 
-func (p *IdentityServerPipeline) createInteractionService(r *http.Request) services.IdentityServerInteractionService {
+func (p *WicketPipeline) createInteractionService(r *http.Request) services.InteractionService {
 	// AD-10: integration host resolves interaction service from the request scope.
-	return godi.GetRequired[services.IdentityServerInteractionService](hosting.ScopeFrom(r.Context()))
+	return godi.GetRequired[services.InteractionService](hosting.ScopeFrom(r.Context()))
 }
 
-func (p *IdentityServerPipeline) onLogin() http.HandlerFunc {
+func (p *WicketPipeline) onLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p.LoginWasCalled = true
 
@@ -149,7 +149,7 @@ func (p *IdentityServerPipeline) onLogin() http.HandlerFunc {
 	}
 }
 
-func (p *IdentityServerPipeline) readLoginRequest(r *http.Request, w http.ResponseWriter) {
+func (p *WicketPipeline) readLoginRequest(r *http.Request, w http.ResponseWriter) {
 	var err error
 
 	interaction := p.createInteractionService(r)
@@ -169,7 +169,7 @@ func service(ctx context.Context) (auth.Service, error) {
 	return godi.GetRequired[auth.Service](hosting.ScopeFrom(ctx)), nil
 }
 
-func (p *IdentityServerPipeline) issueLoginCookie(r *http.Request, w http.ResponseWriter) {
+func (p *WicketPipeline) issueLoginCookie(r *http.Request, w http.ResponseWriter) {
 	if p.Subject == nil {
 		return
 	}
@@ -198,7 +198,7 @@ func (p *IdentityServerPipeline) issueLoginCookie(r *http.Request, w http.Respon
 
 }
 
-func (p *IdentityServerPipeline) onLogout() http.HandlerFunc {
+func (p *WicketPipeline) onLogout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p.LogoutWasCalled = true
 
@@ -218,7 +218,7 @@ func (p *IdentityServerPipeline) onLogout() http.HandlerFunc {
 	}
 }
 
-func (p *IdentityServerPipeline) readLogoutRequest(r *http.Request, w http.ResponseWriter) {
+func (p *WicketPipeline) readLogoutRequest(r *http.Request, w http.ResponseWriter) {
 	var err error
 
 	interaction := p.createInteractionService(r)
@@ -228,7 +228,7 @@ func (p *IdentityServerPipeline) readLogoutRequest(r *http.Request, w http.Respo
 	}
 }
 
-func (p *IdentityServerPipeline) onConsent() http.HandlerFunc {
+func (p *WicketPipeline) onConsent() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p.ConsentWasCalled = true
 
@@ -237,7 +237,7 @@ func (p *IdentityServerPipeline) onConsent() http.HandlerFunc {
 	}
 }
 
-func (p *IdentityServerPipeline) readConsentRequest(r *http.Request, w http.ResponseWriter) {
+func (p *WicketPipeline) readConsentRequest(r *http.Request, w http.ResponseWriter) {
 	var err error
 
 	interaction := p.createInteractionService(r)
@@ -247,7 +247,7 @@ func (p *IdentityServerPipeline) readConsentRequest(r *http.Request, w http.Resp
 	}
 }
 
-func (p *IdentityServerPipeline) createConsentResponse(r *http.Request, w http.ResponseWriter) {
+func (p *WicketPipeline) createConsentResponse(r *http.Request, w http.ResponseWriter) {
 	if p.ConsentRequest == nil || p.ConsentResponse == nil {
 		return
 	}
@@ -268,7 +268,7 @@ func (p *IdentityServerPipeline) createConsentResponse(r *http.Request, w http.R
 	w.WriteHeader(http.StatusOK)
 }
 
-func (p *IdentityServerPipeline) onCustom() http.HandlerFunc {
+func (p *WicketPipeline) onCustom() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p.CustomWasCalled = true
 
@@ -281,7 +281,7 @@ func (p *IdentityServerPipeline) onCustom() http.HandlerFunc {
 	}
 }
 
-func (p *IdentityServerPipeline) onError() http.HandlerFunc {
+func (p *WicketPipeline) onError() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p.ErrorWasCalled = true
 
@@ -291,7 +291,7 @@ func (p *IdentityServerPipeline) onError() http.HandlerFunc {
 	}
 }
 
-func (p *IdentityServerPipeline) readErrorMessage(r *http.Request, w http.ResponseWriter) {
+func (p *WicketPipeline) readErrorMessage(r *http.Request, w http.ResponseWriter) {
 	var err error
 	interaction := p.createInteractionService(r)
 
@@ -301,7 +301,7 @@ func (p *IdentityServerPipeline) readErrorMessage(r *http.Request, w http.Respon
 	}
 }
 
-func (p *IdentityServerPipeline) LoginWithPrincipal(subject *claimspkg.ClaimsPrincipal) error {
+func (p *WicketPipeline) LoginWithPrincipal(subject *claimspkg.ClaimsPrincipal) error {
 	old := p.BrowserClient.AllowAutoRedirect
 	p.BrowserClient.AllowAutoRedirect = false
 
@@ -320,29 +320,29 @@ func (p *IdentityServerPipeline) LoginWithPrincipal(subject *claimspkg.ClaimsPri
 	return nil
 }
 
-func (p *IdentityServerPipeline) Login(subject string) error {
-	user, err := models.NewIdentityServerUser(models.WithIdentityServerUserSubjectId(subject)).CreatePrincipal()
+func (p *WicketPipeline) Login(subject string) error {
+	user, err := models.NewLocalUser(models.WithLocalUserSubjectId(subject)).CreatePrincipal()
 	if err != nil {
 		return err
 	}
 	return p.LoginWithPrincipal(user)
 }
 
-func (p *IdentityServerPipeline) RemoveLoginCookie() {
+func (p *WicketPipeline) RemoveLoginCookie() {
 	p.BrowserClient.RemoveCookie(p.TestServer.URL, gois.DefaultCookieAuthenticationScheme)
 }
 
-func (p *IdentityServerPipeline) RemoveSessionCookie() {
+func (p *WicketPipeline) RemoveSessionCookie() {
 	p.BrowserClient.RemoveCookie(p.TestServer.URL, gois.DefaultCheckSessionCookieName)
 }
 
-func (p *IdentityServerPipeline) GetSessionCookie() *http.Cookie {
+func (p *WicketPipeline) GetSessionCookie() *http.Cookie {
 	return p.BrowserClient.GetCookie(p.TestServer.URL, gois.DefaultCheckSessionCookieName)
 }
 
-func (p *IdentityServerPipeline) Initialize() {
+func (p *WicketPipeline) Initialize() {
 
-	p.Options = godi.GetRequired[*config_options.IdentityServerOptions](p.Root)
+	p.Options = godi.GetRequired[*config_options.WicketOptions](p.Root)
 	p.Options.CleanRoomKeyGap.Enabled = false
 
 	p.UserStore = test.NewTestUserStore(p.Users)
@@ -351,7 +351,7 @@ func (p *IdentityServerPipeline) Initialize() {
 
 	p.configureServices()
 
-	idsrvMiddleware := p.Server.UseIdentityServer()
+	wicketMiddleware := p.Server.UseWicket()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(utils.EnsureLeadingSlash(gois.UIConstantsDefaultRoutePathsLogin), p.onLogin())
@@ -360,7 +360,7 @@ func (p *IdentityServerPipeline) Initialize() {
 	mux.HandleFunc("/custom", p.onCustom())
 	mux.HandleFunc(utils.EnsureLeadingSlash(gois.UIConstantsDefaultRoutePathsError), p.onError())
 
-	p.TestServer = httptest.NewServer(hosting.ScopeMiddleware(p.Root)(idsrvMiddleware(mux)))
+	p.TestServer = httptest.NewServer(hosting.ScopeMiddleware(p.Root)(wicketMiddleware(mux)))
 	p.TestServer.Config.RegisterOnShutdown(func() {
 		_ = p.Root.Close()
 	})
@@ -371,7 +371,7 @@ func (p *IdentityServerPipeline) Initialize() {
 
 }
 
-func (p *IdentityServerPipeline) configureServices() {
+func (p *WicketPipeline) configureServices() {
 	p.ResourceOwnerValidator = test.NewTestUserResourceOwnerPasswordValidator(p.UserStore, godi.GetRequired[services.SystemClock](p.Root))
 	p.BackChannelClient = &http.Client{Transport: p.BackChannelMessageHandler}
 	p.AddDeveloperSigningCredential(jwa.RS256)
@@ -407,7 +407,7 @@ func (p *IdentityServerPipeline) configureServices() {
 
 }
 
-func (p *IdentityServerPipeline) AddDeveloperSigningCredential(signingAlgorithm jwa.SignatureAlgorithm) {
+func (p *WicketPipeline) AddDeveloperSigningCredential(signingAlgorithm jwa.SignatureAlgorithm) {
 	raw, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic(err)
@@ -419,7 +419,7 @@ func (p *IdentityServerPipeline) AddDeveloperSigningCredential(signingAlgorithm 
 	p.AddSigningCredential(credential)
 }
 
-func (p *IdentityServerPipeline) AddSigningCredential(credential *tokens.SigningCredentials) {
+func (p *WicketPipeline) AddSigningCredential(credential *tokens.SigningCredentials) {
 	if !utils.Contains(gois.SupportedSigningAlgorithms, credential.Algorithm) {
 		panic(fmt.Sprintf("credential.Algorithm is not supported %s", credential.Algorithm))
 	}
@@ -432,7 +432,7 @@ func (p *IdentityServerPipeline) AddSigningCredential(credential *tokens.Signing
 	})
 }
 
-func (p *IdentityServerPipeline) AddValidationKey(keys []*models.SecurityKeyInfo) {
+func (p *WicketPipeline) AddValidationKey(keys []*models.SecurityKeyInfo) {
 	p.ValidationKeysStores = append(p.ValidationKeysStores, storage_memory.NewMemoryValidationKeysStore(keys))
 }
 
@@ -451,7 +451,7 @@ type AuthorizeUrl struct {
 	Extra               url.Values
 }
 
-func (p *IdentityServerPipeline) CreateAuthorizeUrl(au *AuthorizeUrl) (*url.URL, error) {
+func (p *WicketPipeline) CreateAuthorizeUrl(au *AuthorizeUrl) (*url.URL, error) {
 
 	rawURL, err := url.JoinPath(p.TestServer.URL, gois.ProtocolRoutePathsAuthorize)
 	if err != nil {
@@ -485,11 +485,11 @@ func (p *IdentityServerPipeline) CreateAuthorizeUrl(au *AuthorizeUrl) (*url.URL,
 	), nil
 }
 
-func (p *IdentityServerPipeline) ParseAuthorizationResponseUrl(u string) *client_messages.AuthorizeResponse {
+func (p *WicketPipeline) ParseAuthorizationResponseUrl(u string) *client_messages.AuthorizeResponse {
 	return client_messages.NewAuthorizeResponse(u)
 }
 
-func (p *IdentityServerPipeline) RequestAuthorizationEndpoint(
+func (p *WicketPipeline) RequestAuthorizationEndpoint(
 	authorizeUrl *AuthorizeUrl,
 ) *client_messages.AuthorizeResponse {
 	old := p.BrowserClient.AllowAutoRedirect

@@ -26,11 +26,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// test/IdentityServer.UnitTests/Endpoints/Results/AuthorizeResultTests.cs
+// From: IdentityServer4/src/IdentityServer/Endpoints/Results/AuthorizeResult.cs
 type authorizeResultTests struct {
 	subject               *AuthorizeResult
 	response              *responses_models.AuthorizeResponse
-	options               *config_options.IdentityServerOptions
+	options               *config_options.WicketOptions
 	mockUserSession       *svcmock.MockUserSession
 	mockErrorMessageStore *storagemock.MockMessageStore[messages.ErrorMessage]
 	urls                  *services_impl.ServerUrls
@@ -43,7 +43,7 @@ func newAuthorizeResultTests() *authorizeResultTests {
 	// httpContextAccessor := accessor.NewHttpContextAccessor()
 	// httpContextAccessor.SetRequest(httpRequest)
 
-	options := optmock.NewTestIdentityServerOptions().Create()
+	options := optmock.NewTestWicketOptions().Create()
 	options.UserInteraction.ErrorUrl = "~/error"
 	options.UserInteraction.ErrorIdParameter = "errorId"
 

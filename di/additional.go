@@ -13,7 +13,7 @@ import (
 // Static marker only; Epic 3.5 fills this registration block.
 func registerAdditional() {
 	var r godi.Registry
-	// From: IdentityServer/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Additional.cs#L484-488
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Additional.cs
 	// Dotnet leaves IAuthorizationParametersMessageStore absent by default; AddAuthorizationParametersMessageStore<T> explicitly adds it.
 	godi.AddTransientFactory[storage.AuthorizationParametersMessageStore](&r, func(p godi.Provider) storage.AuthorizationParametersMessageStore {
 		return godi.GetRequired[*ServerConfig](p).AuthorizationParametersMessageStore()

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//From: test/IdentityServer.UnitTests/Validation/GrantTypesValidation.cs
+// From: IdentityServer4/src/Storage/Models/Client.cs
 
 func TestEmpty_should_be_allowed(t *testing.T) {
 	a := require.New(t)

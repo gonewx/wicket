@@ -10,11 +10,11 @@ import (
 )
 
 func SetSignOutCalled(user services.UserSession) {
-	user.SetItem(gois.EnvironmentKeysSignOutCalled, "true")
+	user.SetItem(gois.EnvironmentKeysWicketSignOutCalled, "true")
 }
 
 func GetSignOutCalled(user services.UserSession) bool {
-	item, ok := user.Item(gois.EnvironmentKeysSignOutCalled)
+	item, ok := user.Item(gois.EnvironmentKeysWicketSignOutCalled)
 	if !ok {
 		return false
 	}

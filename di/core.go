@@ -42,7 +42,7 @@ func registerCore() {
 	// (AD-5). It must be registered before AddOptions because the generated
 	// eager singleton graph constructs OptionsFactory during NewRoot().
 	godi.AddSingleton[*ServerConfig, ServerConfig](&r)
-	// From: BuilderExtensions/Core.cs AddRequiredPlatformServices platform logging.
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs
 	// Go has no ILogger<T> framework registration; expose the shared slog logger
 	// via ServerConfig with server.DefaultLogger() as the default. The returned
 	// logger defers seam reads until log time so NewRoot() does not freeze the
@@ -51,15 +51,15 @@ func registerCore() {
 		return newServerConfigLogger(godi.GetRequired[*ServerConfig](p), server.DefaultLogger())
 	})
 	// From: Microsoft.Extensions.DependencyInjection HttpServiceCollectionExtensions.AddHttpContextAccessor
-	// via IdentityServer AddRequiredPlatformServices (Core.cs). dotnet registers
+	// via platform service registration. dotnet registers
 	// a singleton accessor backed by AsyncLocal; Go has no AsyncLocal equivalent,
 	// so this migration intentionally uses scoped request storage.
 	godi.AddScoped[accessor.HttpContextAccessor, accessor.DefaultHttpContextAccessor](&r)
-	// From: BuilderExtensions/Core.cs#L107 (Add)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs
 	godi.AddTransientFactory[hosting.EndpointRouter](&r, func(p godi.Provider) hosting.EndpointRouter {
 		return hosting.NewEndpointRouter(
 			godi.GetServices[*hosting.Endpoint](p),
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[*slog.Logger](p),
 		)
 	})
@@ -130,7 +130,7 @@ func registerCore() {
 	// From: ASP.NET Core DataProtection AddDataProtection platform service used by Core.cs#L163.
 	godi.AddSingleton[dp.DataProtectionProvider, impl.DataProtectionProvider](&r)
 	// From: BuilderExtensions/Core.cs#L49 (AddRequiredPlatformServices -> services.AddOptions())
-	AddOptions[*config_options.IdentityServerOptions](&r)
+	AddOptions[*config_options.WicketOptions](&r)
 	// From: aspnetcore AuthenticationCoreServiceCollectionExtensions.cs AddAuthenticationCore (TryAdd)
 	// Container *auth.Options currently only closes
 	// PostConfigureInternalCookieOptions dependencies; SchemeProvider still
@@ -158,7 +158,7 @@ func registerCore() {
 		return impl.NewUserSession(
 			godi.GetRequired[accessor.HttpContextAccessor](p),
 			godi.GetRequired[auth.HandlerProvider](p),
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[services.SystemClock](p),
 			impl.NewServerUrlsFromAccessor(godi.GetRequired[accessor.HttpContextAccessor](p)),
 			godi.GetRequired[*slog.Logger](p),
@@ -181,13 +181,13 @@ func registerCore() {
 	// construct a transient with scoped dependencies.
 	godi.AddTransientFactory[auth.Service](&r, func(p godi.Provider) auth.Service {
 		requestFromProvider(p)
-		return server.NewIdentityServerAuthenticationService(
+		return server.NewWicketAuthenticationService(
 			godi.GetRequired[*gois.Decorator[auth.Service]](p),
 			godi.GetRequired[auth.SchemeProvider](p),
 			godi.GetRequired[services.SystemClock](p),
 			godi.GetRequired[services.UserSession](p),
 			godi.GetRequired[*slog.Logger](p),
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 		)
 	})
 	// From: Core.cs#L78 (Add) - AddAuthentication(DefaultCookieAuthenticationScheme)
@@ -201,7 +201,7 @@ func registerCore() {
 	AddOptions[*authcookies.AuthenticationOptions](&r)
 	// From: Core.cs#L81 (Add)
 	godi.AddSingletonFactory[optspkg.ConfigureOptions[*authcookies.AuthenticationOptions]](&r, func(p godi.Provider) optspkg.ConfigureOptions[*authcookies.AuthenticationOptions] {
-		return config.NewConfigureInternalCookieOptions(godi.GetRequired[*config_options.IdentityServerOptions](p))
+		return config.NewConfigureInternalCookieOptions(godi.GetRequired[*config_options.WicketOptions](p))
 	})
 	// From: aspnetcore CookieExtensions.cs AddCookie (TryAddEnumerable Singleton -> unique registration)
 	godi.AddSingletonFactory[optspkg.PostConfigureOptions[*authcookies.AuthenticationOptions]](&r, func(p godi.Provider) optspkg.PostConfigureOptions[*authcookies.AuthenticationOptions] {
@@ -210,7 +210,7 @@ func registerCore() {
 	// From: Core.cs#L93 (Add)
 	godi.AddSingletonFactory[optspkg.PostConfigureOptions[*authcookies.AuthenticationOptions]](&r, func(p godi.Provider) optspkg.PostConfigureOptions[*authcookies.AuthenticationOptions] {
 		return config.NewPostConfigureInternalCookieOptions(
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[optspkg.Options[*auth.Options]](p),
 			godi.GetRequired[*slog.Logger](p), // logger is currently unused inside PostConfigureInternalCookieOptions.
 		)
@@ -228,32 +228,32 @@ func registerCore() {
 			optspkg.DefaultValidationFailureMessage)
 	})
 	// From: BuilderExtensions/Core.cs#L50-51 (Add)
-	godi.AddSingletonFactory[*config_options.IdentityServerOptions](&r, func(p godi.Provider) *config_options.IdentityServerOptions {
-		v, err := godi.GetRequired[optspkg.Options[*config_options.IdentityServerOptions]](p).Value()
+	godi.AddSingletonFactory[*config_options.WicketOptions](&r, func(p godi.Provider) *config_options.WicketOptions {
+		v, err := godi.GetRequired[optspkg.Options[*config_options.WicketOptions]](p).Value()
 		if err != nil {
 			// Accepted design decision (code review of Story 2.3, 2026-07-03):
 			// dotnet resolver exceptions fail startup synchronously, so this
 			// factory panics at construction time instead of threading the
 			// error through NewRoot()'s error return, matching that fail-fast
 			// semantics. This path is unreachable today because no
-			// ValidateOptions is registered for IdentityServerOptions; if one
+			// ValidateOptions is registered for WicketOptions; if one
 			// is added later, a resolution failure will panic during NewRoot()
 			// rather than surface as a NewRoot() error.
-			panic(fmt.Errorf("resolve IdentityServerOptions: %w", err))
+			panic(fmt.Errorf("resolve WicketOptions: %w", err))
 		}
 		return v
 	})
 	// From: BuilderExtensions/Core.cs#L52-53 (Add)
 	godi.AddSingletonFactory[*config_options.PersistentGrantOptions](&r, func(p godi.Provider) *config_options.PersistentGrantOptions {
-		return godi.GetRequired[*config_options.IdentityServerOptions](p).PersistentGrants
+		return godi.GetRequired[*config_options.WicketOptions](p).PersistentGrants
 	})
-	// From: BuilderExtensions/Core.cs#L261 (AddTransient factory for IdentityServerOptions.CleanRoomProviderGap).
+	// From: BuilderExtensions/Core.cs#L261 (AddTransient factory for WicketOptions.CleanRoomProviderGap).
 	godi.AddTransientFactory[*config_options.CleanRoomProviderGapOptions](&r, func(p godi.Provider) *config_options.CleanRoomProviderGapOptions {
-		return godi.GetRequired[*config_options.IdentityServerOptions](p).CleanRoomProviderGap
+		return godi.GetRequired[*config_options.WicketOptions](p).CleanRoomProviderGap
 	})
 	// From: BuilderExtensions/Core.cs#L243 (TryAdd -> unique registration)
 	godi.AddTransientFactory[*config_options.CleanRoomKeyGapOptions](&r, func(p godi.Provider) *config_options.CleanRoomKeyGapOptions {
-		return godi.GetRequired[*config_options.IdentityServerOptions](p).CleanRoomKeyGap
+		return godi.GetRequired[*config_options.WicketOptions](p).CleanRoomKeyGap
 	})
 	// From: BuilderExtensions/Core.cs#L150 (Add)
 	godi.AddTransientFactory[services.ServerUrls](&r, func(p godi.Provider) services.ServerUrls {
@@ -262,7 +262,7 @@ func registerCore() {
 	// From: BuilderExtensions/Core.cs#L151 (Add)
 	godi.AddTransientFactory[services.IssuerNameService](&r, func(p godi.Provider) services.IssuerNameService {
 		req := requestFromProvider(p)
-		svc := impl.NewIssuerNameService(godi.GetRequired[*config_options.IdentityServerOptions](p))
+		svc := impl.NewIssuerNameService(godi.GetRequired[*config_options.WicketOptions](p))
 		svc.Init(req)
 		return svc
 	})
@@ -292,7 +292,7 @@ func registerCore() {
 		return responses_impl.NewAuthorizeInteractionResponseGenerator(
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[services.SystemClock](p),
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[services.ConsentService](p),
 			godi.GetRequired[services.ProfileService](p),
 			godi.GetRequired[services.ServerUrls](p),

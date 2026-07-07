@@ -20,12 +20,12 @@ import (
 // BasicAuthenticationSecretParser Parses a Basic Authentication header
 type BasicAuthenticationSecretParser struct {
 	logger  *slog.Logger
-	options *config_options.IdentityServerOptions
+	options *config_options.WicketOptions
 }
 
 func NewBasicAuthenticationSecretParser(
 	logger *slog.Logger,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 ) *BasicAuthenticationSecretParser {
 	return &BasicAuthenticationSecretParser{
 		logger:  logger,

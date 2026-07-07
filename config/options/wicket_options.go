@@ -6,9 +6,9 @@ package options
 
 import optspkg "github.com/gonewx/wicket/options"
 
-var _ optspkg.Entity[*IdentityServerOptions] = (*IdentityServerOptions)(nil)
+var _ optspkg.Entity[*WicketOptions] = (*WicketOptions)(nil)
 
-type IdentityServerOptions struct {
+type WicketOptions struct {
 	IssuerUri                                 string
 	LowerCaseIssuerUri                        bool
 	AccessTokenJwtType                        string
@@ -39,8 +39,8 @@ type IdentityServerOptions struct {
 	CleanRoomSessionGap  *CleanRoomSessionGapOptions
 }
 
-func NewIdentityServerOptions() *IdentityServerOptions {
-	return &IdentityServerOptions{
+func NewWicketOptions() *WicketOptions {
+	return &WicketOptions{
 		LowerCaseIssuerUri:                        true,
 		AccessTokenJwtType:                        "at+jwt",
 		EmitIssuerIdentificationResponseParameter: true,
@@ -67,6 +67,6 @@ func NewIdentityServerOptions() *IdentityServerOptions {
 
 // Entity[T] simulates dotnet's new() generic constraint on the Go side.
 // OptionsFactory.Create instantiates options through zero.New().
-func (o *IdentityServerOptions) New() *IdentityServerOptions {
-	return NewIdentityServerOptions()
+func (o *WicketOptions) New() *WicketOptions {
+	return NewWicketOptions()
 }

@@ -19,7 +19,7 @@ import (
 	"github.com/gonewx/wicket/utils"
 )
 
-func CreateJwtPayload(token *storage_models.Token, options *config_options.IdentityServerOptions, clock services.SystemClock, logger *slog.Logger) (jwt.Token, error) {
+func CreateJwtPayload(token *storage_models.Token, options *config_options.WicketOptions, clock services.SystemClock, logger *slog.Logger) (jwt.Token, error) {
 
 	payload := jwt.New()
 	if err := payload.Set(gois.JwtClaimTypesIssuer, token.Issuer); err != nil {

@@ -14,7 +14,7 @@ import (
 	"github.com/gonewx/wicket/utils"
 )
 
-// combine: test/IdentityServer.IntegrationTests/Common/BrowserHandler.cs test/IdentityServer.IntegrationTests/Common/BrowserClient.cs
+// From: IdentityServer4/test/IdentityServer.IntegrationTests/Common/BrowserClient.cs
 
 type BrowserClient struct {
 	*http.Client

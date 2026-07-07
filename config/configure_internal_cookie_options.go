@@ -17,11 +17,11 @@ import (
 )
 
 type ConfigureInternalCookieOptions struct {
-	idsrv *options.IdentityServerOptions
+	wicket *options.WicketOptions
 }
 
-func NewConfigureInternalCookieOptions(idsrv *options.IdentityServerOptions) *ConfigureInternalCookieOptions {
-	return &ConfigureInternalCookieOptions{idsrv: idsrv}
+func NewConfigureInternalCookieOptions(wicket *options.WicketOptions) *ConfigureInternalCookieOptions {
+	return &ConfigureInternalCookieOptions{wicket: wicket}
 }
 
 func (o *ConfigureInternalCookieOptions) Configure(options *authcookies.AuthenticationOptions) error {
@@ -30,29 +30,28 @@ func (o *ConfigureInternalCookieOptions) Configure(options *authcookies.Authenti
 
 func (o *ConfigureInternalCookieOptions) ConfigureWithName(name string, options *authcookies.AuthenticationOptions) error {
 	if name == gois.DefaultCookieAuthenticationScheme {
-		options.SlidingExpiration = o.idsrv.Authentication.CookieSlidingExpiration
-		options.ExpireTimeSpan = o.idsrv.Authentication.CookieLifetime
+		options.SlidingExpiration = o.wicket.Authentication.CookieSlidingExpiration
+		options.ExpireTimeSpan = o.wicket.Authentication.CookieLifetime
 		options.Cookie().SetName(gois.DefaultCookieAuthenticationScheme)
 		options.Cookie().SetIsEssential(true)
-		options.Cookie().SetSameSite(o.idsrv.Authentication.CookieSameSiteMode)
+		options.Cookie().SetSameSite(o.wicket.Authentication.CookieSameSiteMode)
 
-		options.LoginPath = extractLocalUrl(o.idsrv.UserInteraction.LoginUrl)
-		options.LogoutPath = extractLocalUrl(o.idsrv.UserInteraction.LogoutUrl)
-		if o.idsrv.UserInteraction.LoginReturnUrlParameter != "" {
-			options.ReturnUrlParameter = o.idsrv.UserInteraction.LoginReturnUrlParameter
+		options.LoginPath = extractLocalUrl(o.wicket.UserInteraction.LoginUrl)
+		options.LogoutPath = extractLocalUrl(o.wicket.UserInteraction.LogoutUrl)
+		if o.wicket.UserInteraction.LoginReturnUrlParameter != "" {
+			options.ReturnUrlParameter = o.wicket.UserInteraction.LoginReturnUrlParameter
 		}
 	}
 
 	if name == gois.ExternalCookieAuthenticationScheme {
 		options.Cookie().SetName(gois.ExternalCookieAuthenticationScheme)
 		options.Cookie().SetIsEssential(true)
-		// https://github.com/IdentityServer/IdentityServer4/issues/2595
 		// need to set None because iOS 12 safari considers the POST back to the client from the
 		// IdP as not safe, so cookies issued from response (with lax) then should not be honored.
 		// so we need to make those cookies issued without same-site, thus the browser will
 		// hold onto them and send on the next redirect to the callback page.
 		// see: https://brockallen.com/2019/01/11/same-site-cookies-asp-net-core-and-external-authentication-providers/
-		options.Cookie().SetSameSite(o.idsrv.Authentication.CookieSameSiteMode)
+		options.Cookie().SetSameSite(o.wicket.Authentication.CookieSameSiteMode)
 	}
 
 	return nil
@@ -71,24 +70,24 @@ func extractLocalUrl(url string) string {
 }
 
 type PostConfigureInternalCookieOptions struct {
-	idsrv       *options.IdentityServerOptions
+	wicket      *options.WicketOptions
 	authOptions optspkg.Options[*auth.Options]
 	logger      *slog.Logger
 }
 
 func NewPostConfigureInternalCookieOptions(
-	idsrv *options.IdentityServerOptions,
+	wicket *options.WicketOptions,
 	authOptions optspkg.Options[*auth.Options],
 	logger *slog.Logger) *PostConfigureInternalCookieOptions {
 	return &PostConfigureInternalCookieOptions{
-		idsrv:       idsrv,
+		wicket:      wicket,
 		authOptions: authOptions,
 		logger:      logger,
 	}
 }
 
 func (p *PostConfigureInternalCookieOptions) PostConfigure(name string, options *authcookies.AuthenticationOptions) error {
-	scheme := p.idsrv.Authentication.CookieAuthenticationScheme
+	scheme := p.wicket.Authentication.CookieAuthenticationScheme
 	if scheme == "" {
 		v, err := p.authOptions.Value()
 		if err != nil {
@@ -102,25 +101,25 @@ func (p *PostConfigureInternalCookieOptions) PostConfigure(name string, options 
 	}
 
 	if name == scheme {
-		if p.idsrv.UserInteraction.LoginUrl == "" {
-			p.idsrv.UserInteraction.LoginUrl = options.LoginPath
+		if p.wicket.UserInteraction.LoginUrl == "" {
+			p.wicket.UserInteraction.LoginUrl = options.LoginPath
 		}
-		if p.idsrv.UserInteraction.LoginReturnUrlParameter == "" {
-			p.idsrv.UserInteraction.LoginReturnUrlParameter = options.ReturnUrlParameter
+		if p.wicket.UserInteraction.LoginReturnUrlParameter == "" {
+			p.wicket.UserInteraction.LoginReturnUrlParameter = options.ReturnUrlParameter
 		}
-		if p.idsrv.UserInteraction.LogoutUrl == "" {
-			p.idsrv.UserInteraction.LogoutUrl = options.LogoutPath
+		if p.wicket.UserInteraction.LogoutUrl == "" {
+			p.wicket.UserInteraction.LogoutUrl = options.LogoutPath
 		}
 
-		// p.logger.Debug("Login Url: ", slog.String("url", p.idsrv.UserInteraction.LoginUrl))
-		// p.logger.Debug("Login Return Url Parameter: ", slog.String("param", p.idsrv.UserInteraction.LoginReturnUrlParameter))
-		// p.logger.Debug("Logout Url: ", slog.String("url", p.idsrv.UserInteraction.LogoutUrl))
+		// p.logger.Debug("Login Url: ", slog.String("url", p.wicket.UserInteraction.LoginUrl))
+		// p.logger.Debug("Login Return Url Parameter: ", slog.String("param", p.wicket.UserInteraction.LoginReturnUrlParameter))
+		// p.logger.Debug("Logout Url: ", slog.String("url", p.wicket.UserInteraction.LogoutUrl))
 
-		// p.logger.Debug("ConsentUrl Url: ", slog.String("url", p.idsrv.UserInteraction.ConsentUrl))
-		// p.logger.Debug("Consent Return Url Parameter: ", slog.String("param", p.idsrv.UserInteraction.ConsentReturnUrlParameter))
+		// p.logger.Debug("ConsentUrl Url: ", slog.String("url", p.wicket.UserInteraction.ConsentUrl))
+		// p.logger.Debug("Consent Return Url Parameter: ", slog.String("param", p.wicket.UserInteraction.ConsentReturnUrlParameter))
 
-		// p.logger.Debug("Error Url: ", slog.String("url", p.idsrv.UserInteraction.ErrorUrl))
-		// p.logger.Debug("Error Id Parameter: ", slog.String("param", p.idsrv.UserInteraction.ErrorIdParameter))
+		// p.logger.Debug("Error Url: ", slog.String("url", p.wicket.UserInteraction.ErrorUrl))
+		// p.logger.Debug("Error Id Parameter: ", slog.String("param", p.wicket.UserInteraction.ErrorIdParameter))
 	}
 
 	return nil

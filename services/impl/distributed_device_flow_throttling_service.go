@@ -22,14 +22,14 @@ type DistributedDeviceFlowThrottlingService struct {
 	cache       services.DistributedCache
 	clientStore storage.ClientStore
 	clock       services.SystemClock
-	options     *config_options.IdentityServerOptions
+	options     *config_options.WicketOptions
 }
 
 func NewDistributedDeviceFlowThrottlingService(
 	cache services.DistributedCache,
 	clientStore storage.ClientStore,
 	clock services.SystemClock,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 ) *DistributedDeviceFlowThrottlingService {
 	return &DistributedDeviceFlowThrottlingService{
 		cache:       cache,

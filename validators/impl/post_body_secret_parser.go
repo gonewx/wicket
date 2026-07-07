@@ -18,12 +18,12 @@ import (
 // PostBodySecretParser Parses a POST body for secrets
 type PostBodySecretParser struct {
 	logger  *slog.Logger
-	options *config_options.IdentityServerOptions
+	options *config_options.WicketOptions
 }
 
 func NewPostBodySecretParser(
 	logger *slog.Logger,
-	options *config_options.IdentityServerOptions,
+	options *config_options.WicketOptions,
 ) *PostBodySecretParser {
 	return &PostBodySecretParser{
 		logger:  logger,

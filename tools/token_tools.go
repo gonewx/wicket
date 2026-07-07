@@ -14,20 +14,20 @@ import (
 )
 
 // From: IdentityServer4/src/IdentityServer/IdentityServerTools.cs
-// IdentityServerTools helpers for interacting with IdentityServer
-type IdentityServerTools struct {
+// TokenTools helpers for issuing tokens.
+type TokenTools struct {
 	issuerNameService services.IssuerNameService
 	tokenCreation     services.TokenCreationService
 	clock             services.SystemClock
 }
 
-// NewIdentityServerTools Initializes a new instance of the IdentityServerTools.
-func NewIdentityServerTools(
+// NewTokenTools initializes a token helper.
+func NewTokenTools(
 	issuerNameService services.IssuerNameService,
 	tokenCreation services.TokenCreationService,
 	clock services.SystemClock,
-) *IdentityServerTools {
-	return &IdentityServerTools{
+) *TokenTools {
+	return &TokenTools{
 		issuerNameService: issuerNameService,
 		tokenCreation:     tokenCreation,
 		clock:             clock,
@@ -35,7 +35,7 @@ func NewIdentityServerTools(
 }
 
 // IssueJwt Issues a JWT.
-func (t *IdentityServerTools) IssueJwt(lifetime int, claims []*claimspkg.Claim) (string, error) {
+func (t *TokenTools) IssueJwt(lifetime int, claims []*claimspkg.Claim) (string, error) {
 	if claims == nil {
 		return "", gois.ArgumentNullException
 	}
@@ -52,7 +52,7 @@ func (t *IdentityServerTools) IssueJwt(lifetime int, claims []*claimspkg.Claim) 
 	return t.tokenCreation.CreateToken(token)
 }
 
-func (t *IdentityServerTools) IssueJwtWithIssuer(lifetime int, issuer string, claims []*claimspkg.Claim) (string, error) {
+func (t *TokenTools) IssueJwtWithIssuer(lifetime int, issuer string, claims []*claimspkg.Claim) (string, error) {
 	if claims == nil {
 		return "", gois.ArgumentNullException
 	}

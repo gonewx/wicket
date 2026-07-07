@@ -19,7 +19,7 @@ import (
 type CustomRedirectResult struct {
 	request *validators_models.ValidatedAuthorizeRequest
 
-	options                             *options.IdentityServerOptions
+	options                             *options.WicketOptions
 	urls                                services.ServerUrls
 	authorizationParametersMessageStore storage.AuthorizationParametersMessageStore
 }
@@ -35,7 +35,7 @@ func NewCustomRedirectResult(
 func (crr *CustomRedirectResult) init(ctx context.Context) {
 	if crr.options == nil {
 		// AD-10: CustomRedirectResult resolves options from RequestServices.
-		crr.options = godi.GetRequired[*options.IdentityServerOptions](hosting.ScopeFrom(ctx))
+		crr.options = godi.GetRequired[*options.WicketOptions](hosting.ScopeFrom(ctx))
 	}
 
 	if crr.urls == nil {

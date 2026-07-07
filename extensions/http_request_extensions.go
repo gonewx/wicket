@@ -21,8 +21,8 @@ func HasApplicationFormContentType(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded")
 }
 
-// From : src/IdentityServer/Extensions/HttpContextExtensions.cs GetIdentityServerSignoutFrameCallbackUrlAsync
-func GetIdentityServerSignoutFrameCallbackUrl(userSession services.UserSession, clock services.SystemClock, urls services.ServerUrls, endSessionMessageStore storage.MessageStore[models_contexts.LogoutNotificationContext], logoutMessage *messages.LogoutMessage) (string, error) {
+// From: IdentityServer4/src/IdentityServer/Extensions/HttpRequestExtensions.cs
+func GetWicketSignoutFrameCallbackUrl(userSession services.UserSession, clock services.SystemClock, urls services.ServerUrls, endSessionMessageStore storage.MessageStore[models_contexts.LogoutNotificationContext], logoutMessage *messages.LogoutMessage) (string, error) {
 	user := userSession.GetUser()
 	var currentSubId string
 	if user != nil {

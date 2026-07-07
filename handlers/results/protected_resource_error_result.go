@@ -44,10 +44,10 @@ func (prer *ProtectedResourceErrorResult) Execute(w http.ResponseWriter, r *http
 
 	errorString := fmt.Sprintf("error=\"%s\"", prer.Error.Error())
 	if prer.ErrorDescription == "" {
-		w.Header()["www-authenticate"] = []string{"Bearer realm=\"IdentityServer\"", errorString}
+		w.Header()["www-authenticate"] = []string{"Bearer realm=\"wicket\"", errorString}
 	} else {
 		errorDescriptionString := fmt.Sprintf("error_description=\"%s\"", prer.ErrorDescription)
-		w.Header()["www-authenticate"] = []string{"Bearer realm=\"IdentityServer\"", prer.ErrorDescription, errorDescriptionString}
+		w.Header()["www-authenticate"] = []string{"Bearer realm=\"wicket\"", prer.ErrorDescription, errorDescriptionString}
 	}
 
 	return nil

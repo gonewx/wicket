@@ -19,7 +19,7 @@ import (
 type LoginPageResult struct {
 	request *validators_models.ValidatedAuthorizeRequest
 
-	options                             *options.IdentityServerOptions
+	options                             *options.WicketOptions
 	urls                                services.ServerUrls
 	authorizationParametersMessageStore storage.AuthorizationParametersMessageStore
 }
@@ -35,7 +35,7 @@ func NewLoginPageResult(
 func (lpr *LoginPageResult) init(ctx context.Context) {
 	if lpr.options == nil {
 		// AD-10: LoginPageResult resolves options from RequestServices.
-		lpr.options = godi.GetRequired[*options.IdentityServerOptions](hosting.ScopeFrom(ctx))
+		lpr.options = godi.GetRequired[*options.WicketOptions](hosting.ScopeFrom(ctx))
 	}
 
 	if lpr.urls == nil {

@@ -36,8 +36,8 @@ func ConfigureServices(logger *slog.Logger) *httptest.Server {
 		panic(err)
 	}
 
-	options := godi.GetRequired[*config_options.IdentityServerOptions](root)
-	options.IssuerUri = "https://goisidsvr"
+	options := godi.GetRequired[*config_options.WicketOptions](root)
+	options.IssuerUri = "https://wicket-local"
 	options.CleanRoomKeyGap.Enabled = false
 
 	clients := GetClients()
@@ -63,11 +63,11 @@ func ConfigureServices(logger *slog.Logger) *httptest.Server {
 	cfg.SetProfileProvider(profileProvider)
 	cfg.Freeze()
 
-	idsrvMiddleware := srv.UseIdentityServer()
+	wicketMiddleware := srv.UseWicket()
 
 	mux := http.NewServeMux()
 
-	testServer := httptest.NewServer(hosting.ScopeMiddleware(root)(idsrvMiddleware(mux)))
+	testServer := httptest.NewServer(hosting.ScopeMiddleware(root)(wicketMiddleware(mux)))
 	testServer.Config.RegisterOnShutdown(func() {
 		_ = root.Close()
 	})
@@ -88,8 +88,8 @@ func developerSigningStores(signingAlgorithm jwa.SignatureAlgorithm) ([]storage.
 		SigningAlgorithm: credential.Algorithm,
 	}
 	return []storage.SigningCredentialStore{
-		storage_memory.NewMemorySigningCredentialStore(credential),
-	}, []storage.ValidationKeysStore{
-		storage_memory.NewMemoryValidationKeysStore([]*models.SecurityKeyInfo{keyInfo}),
-	}
+			storage_memory.NewMemorySigningCredentialStore(credential),
+		}, []storage.ValidationKeysStore{
+			storage_memory.NewMemoryValidationKeysStore([]*models.SecurityKeyInfo{keyInfo}),
+		}
 }

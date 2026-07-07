@@ -24,7 +24,7 @@ type ValidatedRequest struct {
 	AccessTokenType     gois.AccessTokenType
 	Subject             *claims.ClaimsPrincipal
 	SessionId           string // empty string for anonymous users
-	Options             *config_options.IdentityServerOptions
+	Options             *config_options.WicketOptions
 	ValidatedResources  *ResourceValidationResult
 	Confirmation        string
 	ClientId            string

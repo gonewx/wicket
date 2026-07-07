@@ -18,7 +18,7 @@ import (
 )
 
 type checkSessionResultTests struct {
-	options     *config_options.IdentityServerOptions
+	options     *config_options.WicketOptions
 	subject     *CheckSessionResult
 	httpRequest *http.Request
 	mockWriter  *test_common.MockHttpWriter
@@ -28,7 +28,7 @@ func newCheckSessionResultTests() *checkSessionResultTests {
 
 	httpRequest := httptest.NewRequest(http.MethodGet, "https://server", nil)
 
-	options := config_options.NewIdentityServerOptions()
+	options := config_options.NewWicketOptions()
 	options.Authentication.CheckSessionCookieName = "foobar"
 
 	subject := newCheckSessionResult(
@@ -44,7 +44,7 @@ func newCheckSessionResultTests() *checkSessionResultTests {
 	return instance
 }
 
-// test/IdentityServer.UnitTests/Endpoints/Results/CheckSessionResultTests.cs
+// From: IdentityServer4/src/IdentityServer/Endpoints/Results/CheckSessionResult.cs
 func TestCheckSessionResultshould_pass_results_in_body(t *testing.T) {
 	a := require.New(t)
 

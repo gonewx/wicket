@@ -43,7 +43,7 @@ func registerPluggableServicesAndValidators() {
 
 	// From: BuilderExtensions/Core.cs#L220 (TryAdd -> unique Go registration; no IHttpClientFactory equivalent)
 	godi.AddTransientFactory[services.JwtRequestUriHttpClient](&r, func(p godi.Provider) services.JwtRequestUriHttpClient {
-		return services_impl.NewJwtRequestUriHttpClient(http.DefaultClient, godi.GetRequired[*config_options.IdentityServerOptions](p))
+		return services_impl.NewJwtRequestUriHttpClient(http.DefaultClient, godi.GetRequired[*config_options.WicketOptions](p))
 	})
 	// From: BuilderExtensions/Core.cs#L221 (TryAdd -> ServerConfig client seam; no IHttpClientFactory equivalent)
 	godi.AddTransientFactory[services.BackChannelLogoutHttpClient](&r, func(p godi.Provider) services.BackChannelLogoutHttpClient {
@@ -121,14 +121,14 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[services.TokenCreationService](p),
 			godi.GetRequired[services.SystemClock](p),
 			godi.GetRequired[services.KeyMaterialService](p),
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[*slog.Logger](p),
 			requestFromProvider(p),
 		)
 	})
 	// From: BuilderExtensions/Core.cs#L197 (TryAddTransient)
-	godi.AddTransientFactory[services.IdentityServerInteractionService](&r, func(p godi.Provider) services.IdentityServerInteractionService {
-		return services_impl.NewIdentityServerInteractionService(
+	godi.AddTransientFactory[services.InteractionService](&r, func(p godi.Provider) services.InteractionService {
+		return services_impl.NewInteractionService(
 			godi.GetRequired[services.SystemClock](p),
 			godi.GetRequired[storage.MessageStore[messages.LogoutMessage]](p),
 			godi.GetRequired[storage.MessageStore[messages.ErrorMessage]](p),
@@ -143,7 +143,7 @@ func registerPluggableServicesAndValidators() {
 	})
 	// TODO: clean-room reimplementation for server-side session coordination.
 	// From: BuilderExtensions/Core.cs#L159 (AddTransient)
-	godi.AddTransient[*tools.IdentityServerTools, tools.IdentityServerTools](&r)
+	godi.AddTransient[*tools.TokenTools, tools.TokenTools](&r)
 
 	// From: BuilderExtensions/Core.cs#L281 (TryAddTransient)
 	godi.AddTransient[validators.TokenRevocationRequestValidator, validators_impl.TokenRevocationRequestValidator](&r)
@@ -151,7 +151,7 @@ func registerPluggableServicesAndValidators() {
 	godi.AddTransientFactory[validators.AuthorizeRequestValidator](&r, func(p godi.Provider) validators.AuthorizeRequestValidator {
 		return validators_impl.NewAuthorizeRequestValidator(
 			godi.GetRequired[*slog.Logger](p),
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[services.IssuerNameService](p),
 			godi.GetRequired[storage.ClientStore](p),
 			godi.GetRequired[services.JwtRequestUriHttpClient](p),
@@ -166,7 +166,7 @@ func registerPluggableServicesAndValidators() {
 	godi.AddTransientFactory[validators.EndSessionRequestValidator](&r, func(p godi.Provider) validators.EndSessionRequestValidator {
 		return validators_impl.NewEndSessionRequestValidator(
 			godi.GetRequired[*slog.Logger](p),
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[validators.TokenValidator](p),
 			godi.GetRequired[validators.RedirectUriValidator](p),
 			userSessionFromProvider(p),
@@ -211,7 +211,7 @@ func registerPluggableServicesAndValidators() {
 	// From: BuilderExtensions/Core.cs#L161 (AddTransient)
 	godi.AddTransientFactory[services.ReturnUrlParser](&r, func(p godi.Provider) services.ReturnUrlParser {
 		return services_impl.NewOidcReturnUrlParser(
-			godi.GetRequired[*config_options.IdentityServerOptions](p),
+			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[validators.AuthorizeRequestValidator](p),
 			userSessionFromProvider(p),
 			godi.GetRequired[services.ServerUrls](p),

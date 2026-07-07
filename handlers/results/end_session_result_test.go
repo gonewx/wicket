@@ -25,7 +25,7 @@ import (
 type endSessionResultTests struct {
 	subject                *EndSessionResult
 	result                 *validators_models.EndSessionValidationResult
-	options                *config_options.IdentityServerOptions
+	options                *config_options.WicketOptions
 	mockLogoutMessageStore *storagemock.MockMessageStore[messages.LogoutMessage]
 	urls                   *services_impl.ServerUrls
 	httpRequest            *http.Request
@@ -40,7 +40,7 @@ func newEndSessionResultTests() *endSessionResultTests {
 	urls := services_impl.NewServerUrls(httpRequest)
 	// urls.SetOrigin("https://server")
 
-	options := config_options.NewIdentityServerOptions()
+	options := config_options.NewWicketOptions()
 	options.UserInteraction.LogoutUrl = "~/logout"
 	options.UserInteraction.LogoutIdParameter = "logoutId"
 
