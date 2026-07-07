@@ -4,7 +4,7 @@
 
 package options
 
-import optspkg "github.com/gonewx/wicket/options"
+import optspkg "github.com/gonewx/wicket/di/options"
 
 var _ optspkg.Entity[*WicketOptions] = (*WicketOptions)(nil)
 

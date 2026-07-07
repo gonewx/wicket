@@ -36,6 +36,8 @@ type TokenValidationResult struct {
 	/// Gets or sets the client.
 	/// The client.
 	Client *storage_models.Client
+
+	Subject *claims.ClaimsPrincipal
 }
 
 func NewTokenValidationResult() *TokenValidationResult {

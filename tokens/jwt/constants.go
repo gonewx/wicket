@@ -20,6 +20,15 @@ var (
 	RegexJwe = regexp.MustCompile(JweCompactSerializationRegex)
 )
 
+func OutboundClaimTypeMap() map[string]string {
+	return map[string]string{}
+}
+
 const (
 	HeaderType = "JWT"
+)
+
+const (
+	JwtRegisteredClaimNamesJti = "jti"
+	JwtRegisteredClaimNamesSub = "sub"
 )

@@ -1,0 +1,210 @@
+// Copyright 2026 Decker.
+// Licensed under the Apache License, Version 2.0.
+
+package services
+
+import (
+	"time"
+
+	"github.com/gonewx/wicket/auth"
+	"github.com/gonewx/wicket/claims"
+	core_models "github.com/gonewx/wicket/models"
+	"github.com/gonewx/wicket/models/contexts"
+	"github.com/gonewx/wicket/models/messages"
+	responses_models "github.com/gonewx/wicket/responses/models"
+	"github.com/gonewx/wicket/storage/models"
+	"github.com/gonewx/wicket/tokens"
+	validators_models "github.com/gonewx/wicket/validators/models"
+)
+
+// SystemClock returns the current time.
+// input: none -> behavior: read clock -> output: current time.
+type SystemClock interface {
+	Now() time.Time
+}
+
+// DistributedCache stores small opaque byte values by key.
+// input: key/value/options -> behavior: set/get/remove cache item -> output: value or error.
+type DistributedCache interface {
+	Get(string) ([]byte, error)
+	Set(string, []byte, *DistributedCacheEntryOptions) error
+	Remove(string) error
+}
+
+type DistributedCacheEntryOptions struct {
+	AbsoluteExpiration time.Time
+}
+
+// ServerUrls derives request-relative server URLs.
+// input: current request -> behavior: derive origin/base/relative URL -> output: URL string.
+type ServerUrls interface {
+	Origin() string
+	BasePath() string
+	BaseUrl() string
+	GetWicketRelativeUrl(string) string
+}
+
+// IssuerNameService returns the current issuer name.
+// input: current request/options -> behavior: derive issuer -> output: issuer string.
+type IssuerNameService interface {
+	GetCurrent() string
+}
+
+// JwtRequestUriHttpClient retrieves JWT request objects.
+// input: URL -> behavior: fetch body -> output: body or error.
+type JwtRequestUriHttpClient interface {
+	Get(string) (string, error)
+	GetJwt(string, *models.Client) (string, error)
+}
+
+// CorsPolicyService decides whether an origin is allowed.
+// input: origin -> behavior: evaluate client origins -> output: allowed flag.
+type CorsPolicyService interface {
+	IsOriginAllowed(string) bool
+}
+
+// UserSession tracks the current user session.
+// input: principal/properties/client id -> behavior: create/read session state -> output: session data or error.
+type UserSession interface {
+	EnsureSessionIdCookie() error
+	RemoveSessionIdCookie() error
+	CreateSessionId(*claims.ClaimsPrincipal, *auth.Properties) (string, error)
+	GetSessionId() string
+	GetClientList() ([]string, error)
+	GetUser() *claims.ClaimsPrincipal
+	AddClientId(string) error
+	Item(string) (any, bool)
+	SetItem(string, any)
+}
+
+// ProfileService supplies profile claims and active-state checks.
+// input: profile/is-active context -> behavior: mutate context -> output: context fields or error.
+type ProfileService interface {
+	GetProfileData(*contexts.ProfileDataRequestContext)
+	IsActive(*contexts.IsActiveContext)
+}
+
+// ClaimsService creates token claims from current request context.
+// input: subject/resources/request -> behavior: select claims -> output: claims or error.
+type ClaimsService interface {
+	GetIdentityTokenClaims(*claims.ClaimsPrincipal, *validators_models.ResourceValidationResult, bool, *validators_models.ValidatedRequest) ([]*claims.Claim, error)
+	GetAccessTokenClaims(*claims.ClaimsPrincipal, *validators_models.ResourceValidationResult, *validators_models.ValidatedRequest) ([]*claims.Claim, error)
+}
+
+// KeyMaterialService exposes signing and validation key material.
+// input: allowed algorithms -> behavior: choose configured key material -> output: credentials/keys or error.
+type KeyMaterialService interface {
+	GetSigningCredentials([]string) (*tokens.SigningCredentials, error)
+	GetAllSigningCredentials() ([]*tokens.SigningCredentials, error)
+	GetValidationKeys() ([]*core_models.SecurityKeyInfo, error)
+}
+
+// TokenCreationService serializes a token.
+// input: token model -> behavior: create serialized security token -> output: token string or error.
+type TokenCreationService interface {
+	CreateToken(*models.Token) (string, error)
+}
+
+// TokenService creates protocol token models and serializes them.
+// input: token creation request/model -> behavior: create or serialize token -> output: token model/string or error.
+type TokenService interface {
+	CreateAccessToken(*responses_models.TokenCreationRequest) (*models.Token, error)
+	CreateIdentityToken(*responses_models.TokenCreationRequest) (*models.Token, error)
+	CreateSecurityToken(*models.Token) (string, error)
+}
+
+// RefreshTokenService manages refresh token handles.
+// input: refresh token request/handle -> behavior: create, validate, or update -> output: handle/result or error.
+type RefreshTokenService interface {
+	CreateRefreshToken(*responses_models.RefreshTokenCreationRequest) (string, error)
+	UpdateRefreshToken(*responses_models.RefreshTokenUpdateRequest) (string, error)
+	ValidateRefreshToken(string, *models.Client) *validators_models.TokenValidationResult
+}
+
+// PersistedGrantService removes persisted grants for subjects and clients.
+// input: subject/client/session -> behavior: remove grants -> output: error.
+type PersistedGrantService interface {
+	RemoveAllGrantsAsync(string, string, string) error
+}
+
+// HandleGenerationService creates opaque handles.
+// input: none -> behavior: generate random handle -> output: handle string.
+type HandleGenerationService interface {
+	Generate() string
+}
+
+// UserCodeGenerator creates device-flow user codes.
+// input: none -> behavior: generate code and expose policy -> output: code/type/retry limit.
+type UserCodeGenerator interface {
+	Generate() string
+	GetUserCodeType() string
+	GetRetryLimit() int
+}
+
+// UserCodeService chooses a user-code generator by type.
+// input: code type -> behavior: select generator -> output: generator.
+type UserCodeService interface {
+	GetGenerator(string) UserCodeGenerator
+}
+
+// DeviceFlowCodeService stores and retrieves device-flow codes.
+// input: user/device code -> behavior: store/find/update device authorization -> output: data or error.
+type DeviceFlowCodeService interface {
+	StoreDeviceAuthorization(string, *models.DeviceCode) (string, error)
+	FindByUserCode(string) (*models.DeviceCode, error)
+	FindByDeviceCode(string) (*models.DeviceCode, error)
+	UpdateByUserCode(string, *models.DeviceCode) error
+	RemoveByDeviceCode(string) error
+}
+
+// ConsentService stores user consent for an authorization request.
+// input: authorization request/consent -> behavior: grant or deny consent -> output: error.
+type ConsentService interface {
+	GrantConsent(*messages.AuthorizationRequest, *messages.ConsentResponse, string) error
+	DenyAuthorization(*messages.AuthorizationRequest, string) error
+}
+
+// InteractionService reads and updates user-interaction state.
+// input: return URL/request/consent -> behavior: retrieve context or persist decision -> output: context or error.
+type InteractionService interface {
+	GetAuthorizationContext(string) (*messages.AuthorizationRequest, error)
+	GetLogoutContext(string) (*messages.LogoutRequest, error)
+	GetErrorContext(string) (*messages.ErrorMessage, error)
+	GrantConsent(*messages.AuthorizationRequest, *messages.ConsentResponse, string) error
+	DenyAuthorization(*messages.AuthorizationRequest, string) error
+}
+
+// BackchannelLogoutService sends back-channel logout notifications.
+// input: logout context -> behavior: dispatch notifications -> output: error.
+type BackchannelLogoutService interface {
+	SendLogoutNotificationsAsync(*contexts.LogoutNotificationContext) error
+}
+
+// DeviceFlowThrottlingService enforces device-flow polling interval.
+// input: device code/details -> behavior: check throttling state -> output: slow-down flag or error.
+type DeviceFlowThrottlingService interface {
+	ShouldSlowDown(string, *models.DeviceCode) (bool, error)
+}
+
+// CleanRoomGapUserNotificationService is a placeholder for later clean-room notification behavior.
+// input: request context -> behavior: reject unsupported behavior -> output: error.
+type CleanRoomGapUserNotificationService interface{}
+
+type SessionValidationType string
+
+const SessionValidationTypeAccessToken SessionValidationType = "access_token"
+
+type SessionValidationRequest struct {
+	Type      SessionValidationType
+	Token     string
+	Client    *models.Client
+	ClientId  string
+	SubjectId string
+	SessionId string
+}
+
+// SessionCoordinationService is a placeholder for later server-side-session behavior.
+// input: session validation request -> behavior: reject unsupported behavior -> output: error.
+type SessionCoordinationService interface {
+	ValidateSession(*SessionValidationRequest) (bool, error)
+}

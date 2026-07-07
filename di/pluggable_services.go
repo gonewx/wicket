@@ -78,7 +78,7 @@ func registerPluggableServicesAndValidators() {
 	// TODO: clean-room reimplementation for clean-room gap request storage.
 	// From: BuilderExtensions/Core.cs#L183 (TryAddTransient)
 	godi.AddTransient[services.PersistedGrantService, services_impl.PersistedGrantService](&r)
-	// TODO: clean-room reimplementation for key-material service.
+	godi.AddTransient[services.KeyMaterialService, services_impl.KeyMaterialService](&r)
 	// From: BuilderExtensions/Core.cs#L186 (TryAddTransient)
 	godi.AddTransient[services.TokenCreationService, services_impl.TokenCreationService](&r)
 	// From: BuilderExtensions/Core.cs#L192 (TryAddTransient)
@@ -109,10 +109,10 @@ func registerPluggableServicesAndValidators() {
 	godi.AddTransient[services.LogoutNotificationService, services_impl.LogoutNotificationService](&r)
 	// From: BuilderExtensions/Core.cs#L212 (TryAddTransient)
 	godi.AddTransient[services.BackchannelLogoutService, services_impl.BackchannelLogoutService](&r)
-	// TODO: clean-room reimplementation for resource validation.
+	godi.AddTransient[validators.ResourceValidator, validators_impl.ResourceValidator](&r)
 	// From: BuilderExtensions/Core.cs#L226 (TryAddTransient)
 	godi.AddTransient[services.DeviceFlowThrottlingService, services_impl.DistributedDeviceFlowThrottlingService](&r)
-	// TODO: clean-room reimplementation for clean-room gap services.
+	godi.AddTransient[validators.CleanRoomGapRequestIdValidator, validators_impl.CleanRoomGapRequestIdValidator](&r)
 	// From: BuilderExtensions/Core.cs#L185 (TryAddTransient)
 	godi.AddTransientFactory[services.TokenService](&r, func(p godi.Provider) services.TokenService {
 		return services_impl.NewTokenService(
@@ -141,7 +141,7 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[storage.MessageStore[models_contexts.LogoutNotificationContext]](p),
 		)
 	})
-	// TODO: clean-room reimplementation for server-side session coordination.
+	godi.AddTransient[services.SessionCoordinationService, services_impl.SessionCoordinationService](&r)
 	// From: BuilderExtensions/Core.cs#L159 (AddTransient)
 	godi.AddTransient[*tools.TokenTools, tools.TokenTools](&r)
 

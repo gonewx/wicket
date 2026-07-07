@@ -12,7 +12,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	authcookies "github.com/gonewx/wicket/auth/cookies"
 	"github.com/gonewx/wicket/config/options"
-	optspkg "github.com/gonewx/wicket/options"
+	optspkg "github.com/gonewx/wicket/di/options"
 	"github.com/gonewx/wicket/utils"
 )
 
