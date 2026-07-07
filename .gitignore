@@ -3,3 +3,5 @@
 _bmad/
 _bmad-output/
 go.work
+.rnix/
+go.work.sum
