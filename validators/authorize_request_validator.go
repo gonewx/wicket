@@ -1,0 +1,16 @@
+// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+// Modifications Copyright 2026 Decker.
+
+package validators
+
+import (
+	"net/url"
+
+	"github.com/gonewx/wicket/claims"
+	validators_models "github.com/gonewx/wicket/validators/models"
+)
+
+type AuthorizeRequestValidator interface {
+	Validate(values url.Values, subject *claims.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult
+}

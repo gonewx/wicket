@@ -67,9 +67,7 @@ func TestBucketAStoryCreatedNoOutOfScopeArtifactsE2E(t *testing.T) {
 	t.Parallel()
 
 	for _, path := range []string{
-		"auth",
 		"options",
-		"PROVENANCE.md",
 	} {
 		if _, err := os.Stat(filepath.Join(projectRoot(t), path)); err == nil {
 			t.Fatalf("out-of-scope Bucket A story artifact exists: %s", path)

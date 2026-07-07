@@ -1,0 +1,120 @@
+// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+// Modifications Copyright 2026 Decker.
+
+package impl
+
+import (
+	"log/slog"
+
+	"github.com/gonewx/wicket"
+	responses_models "github.com/gonewx/wicket/responses/models"
+	"github.com/gonewx/wicket/storage"
+	validators_models "github.com/gonewx/wicket/validators/models"
+)
+
+// TokenRevocationResponseGenerator Default revocation response generator
+type TokenRevocationResponseGenerator struct {
+	referenceTokenStore storage.ReferenceTokenStore
+	refreshTokenStore   storage.RefreshTokenStore
+	logger              *slog.Logger
+}
+
+func NewTokenRevocationResponseGenerator(
+	referenceTokenStore storage.ReferenceTokenStore,
+	refreshTokenStore storage.RefreshTokenStore,
+	logger *slog.Logger,
+) *TokenRevocationResponseGenerator {
+	return &TokenRevocationResponseGenerator{
+		referenceTokenStore: referenceTokenStore,
+		refreshTokenStore:   refreshTokenStore,
+		logger:              logger,
+	}
+}
+
+// Handle Creates the revocation endpoint response and processes the revocation request.
+func (g *TokenRevocationResponseGenerator) Handle(validationResult *validators_models.TokenRevocationRequestValidationResult) (*responses_models.TokenRevocationResponse, error) {
+	response := &responses_models.TokenRevocationResponse{
+		Success:   true,
+		TokenType: validationResult.TokenTypeHint,
+	}
+
+	var err error
+	// revoke tokens
+	if validationResult.TokenTypeHint == gois.TokenTypeHintsAccessToken {
+		g.logger.Debug("Hint was for access token")
+		response.Success, err = g.revokeAccessToken(validationResult)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if validationResult.TokenTypeHint == gois.TokenTypeHintsRefreshToken {
+			g.logger.Debug("Hint was for refresh token")
+
+			response.Success, err = g.revokeRefreshToken(validationResult)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			g.logger.Debug("No hint for token type")
+			response.Success, err = g.revokeAccessToken(validationResult)
+			if err != nil {
+				return nil, err
+			}
+
+			if !response.Success {
+				response.Success, err = g.revokeRefreshToken(validationResult)
+				if err != nil {
+					return nil, err
+				}
+				response.TokenType = gois.TokenTypeHintsRefreshToken
+			} else {
+				response.TokenType = gois.TokenTypeHintsAccessToken
+			}
+		}
+	}
+
+	return response, nil
+}
+
+func (g *TokenRevocationResponseGenerator) revokeAccessToken(validationResult *validators_models.TokenRevocationRequestValidationResult) (bool, error) {
+	token, err := g.referenceTokenStore.GetReferenceToken(validationResult.Token)
+
+	if err != nil || token == nil {
+		return false, err
+	}
+
+	if token.ClientId == validationResult.Client.ClientId {
+		g.logger.Debug("Access token revoked")
+		if err := g.referenceTokenStore.RemoveReferenceToken(validationResult.Token); err != nil {
+			return false, err
+		}
+	} else {
+		g.logger.Debug("Client denied from revoking access token belonging to Client", slog.String("clientId", validationResult.Client.ClientId), slog.String("tokenClientId", token.ClientId))
+	}
+
+	return true, nil
+}
+
+// revokeRefreshToken Revoke refresh token only if it belongs to client doing the request
+func (g *TokenRevocationResponseGenerator) revokeRefreshToken(validationResult *validators_models.TokenRevocationRequestValidationResult) (bool, error) {
+	token, err := g.refreshTokenStore.GetRefreshToken(validationResult.Token)
+
+	if err != nil || token == nil {
+		return false, err
+	}
+
+	if token.ClientId == validationResult.Client.ClientId {
+		g.logger.Debug("Refresh token revoked")
+		if err := g.refreshTokenStore.RemoveRefreshToken(validationResult.Token); err != nil {
+			return false, err
+		}
+		if err := g.referenceTokenStore.RemoveReferenceTokens(token.SubjectId(), token.ClientId); err != nil {
+			return false, err
+		}
+	} else {
+		g.logger.Debug("Client denied from revoking a refresh token belonging to Client", slog.String("clientId", validationResult.Client.ClientId), slog.String("tokenClientId", token.ClientId))
+	}
+
+	return true, nil
+}
