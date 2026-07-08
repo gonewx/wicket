@@ -376,9 +376,9 @@ func (g *DiscoveryResponseGenerator) CreateJwkDocument() ([]*models.JsonWebKey, 
 		if err != nil {
 			return nil, err
 		}
-		if key.KeyId != "" {
-			_ = k.Set(jwk.KeyIDKey, key.KeyId)
-		} else {
+		if key.KeyId == "" || k.Set(jwk.KeyIDKey, key.KeyId) != nil {
+			// No stable kid, or it could not be applied: derive one so no key is
+			// ever published without a kid the token header can reference.
 			_ = jwk.AssignKeyID(k)
 		}
 		_ = k.Set(jwk.AlgorithmKey, key.SigningAlgorithm)
