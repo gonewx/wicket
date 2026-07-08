@@ -28,6 +28,7 @@ type TokenResponseGenerator struct {
 	scopeParser         validators.ScopeParser
 	resources           storage.ResourceStore
 	clients             storage.ClientStore
+	backchannelRequests storage.BackchannelAuthenticationRequestStore
 	clock               services.SystemClock
 }
 
@@ -51,6 +52,21 @@ func NewTokenResponseGenerator(
 	}
 }
 
+func NewTokenResponseGeneratorWithBackchannelRequests(
+	clock services.SystemClock,
+	tokenService services.TokenService,
+	refreshTokenService services.RefreshTokenService,
+	scopeParser validators.ScopeParser,
+	resources storage.ResourceStore,
+	clients storage.ClientStore,
+	backchannelRequests storage.BackchannelAuthenticationRequestStore,
+	logger *slog.Logger,
+) *TokenResponseGenerator {
+	g := NewTokenResponseGenerator(clock, tokenService, refreshTokenService, scopeParser, resources, clients, logger)
+	g.backchannelRequests = backchannelRequests
+	return g
+}
+
 // Processes the response.
 func (g *TokenResponseGenerator) Handle(request *validators_models.TokenRequestValidationResult) (*responses_models.TokenResponse, error) {
 	switch request.ValidatedRequest.GrantType {
@@ -64,8 +80,8 @@ func (g *TokenResponseGenerator) Handle(request *validators_models.TokenRequestV
 		return g.handleRefreshTokenRequest(request)
 	case gois.GrantTypeDeviceCode:
 		return g.handleDeviceCodeRequest(request)
-	case gois.GrantTypeCleanRoomGap:
-		return g.handleCleanRoomGapRequest(request)
+	case gois.GrantTypeBackchannelAuthentication:
+		return g.handleBackchannelAuthenticationRequest(request)
 	default:
 		return g.handleExtensionGrant(request)
 	}
@@ -261,8 +277,19 @@ func (g *TokenResponseGenerator) handleDeviceCodeRequest(request *validators_mod
 	return response, nil
 }
 
-func (g *TokenResponseGenerator) handleCleanRoomGapRequest(request *validators_models.TokenRequestValidationResult) (*responses_models.TokenResponse, error) {
-	return nil, errors.New("clean-room gap grant is not implemented")
+func (g *TokenResponseGenerator) handleBackchannelAuthenticationRequest(request *validators_models.TokenRequestValidationResult) (*responses_models.TokenResponse, error) {
+	response, err := g.handleTokenRequest(request)
+	if err != nil {
+		return nil, err
+	}
+	state := request.ValidatedRequest.BackchannelAuthenticationRequest
+	if state != nil && g.backchannelRequests != nil {
+		state.Status = storage_models.BackchannelAuthenticationRequestStatusConsumed
+		if err := g.backchannelRequests.UpdateBackchannelAuthenticationRequest(state.RequestId, state); err != nil {
+			return nil, err
+		}
+	}
+	return response, nil
 }
 
 // Creates the response for an extension grant request.
@@ -320,8 +347,18 @@ func (g *TokenResponseGenerator) createAccessToken(request *validators_models.Va
 		authorizedScopes = request.AuthorizationCode.RequestedScopes
 		authorizedResourceGaps = request.AuthorizationCode.RequestedResourceGaps
 	} else {
-		if request.CleanRoomGapRequest != nil {
-			return "", "", errors.New("clean-room gap grant is not implemented")
+		if request.BackchannelAuthenticationRequest != nil {
+			var client *storage_models.Client
+			var err error
+			if request.BackchannelAuthenticationRequest.ClientId != "" {
+				client, err = extensions.FindEnabledClientById(g.clients, request.BackchannelAuthenticationRequest.ClientId)
+			}
+			if err != nil || client == nil {
+				return "", "", errors.New("Client does not exist anymore.")
+			}
+			tokenRequest.Subject = request.BackchannelAuthenticationRequest.Subject
+			authorizedScopes = request.BackchannelAuthenticationRequest.RequestedScopes
+			authorizedResourceGaps = request.BackchannelAuthenticationRequest.RequestedResourceGaps
 		} else {
 			if request.DeviceCode != nil {
 				var client *storage_models.Client

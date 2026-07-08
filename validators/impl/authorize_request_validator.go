@@ -133,8 +133,6 @@ func (v *AuthorizeRequestValidator) Validate(values url.Values,
 		return invalid(request, err, err.Error())
 	}
 
-	// TODO: CleanRoomValidationGap
-
 	return valid(request)
 }
 
@@ -516,8 +514,6 @@ func (v *AuthorizeRequestValidator) validateScopeAndResource(request *validators
 			return invalid(request, gois.AuthorizeErrorsInvalidScope, "Invalid scope")
 		}
 	}
-
-	// TODO: CleanRoomValidationGap
 
 	if utils.Any(validatedResources.Resources.IdentityResources()) && !request.IsOpenIdRequest {
 		return invalid(request, gois.AuthorizeErrorsInvalidScope, "Identity scopes requested, but openid scope is missing")

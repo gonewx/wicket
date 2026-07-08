@@ -63,6 +63,15 @@ type DeviceFlowStore interface {
 	RemoveByDeviceCode(string) error
 }
 
+// BackchannelAuthenticationRequestStore stores CIBA request state by opaque auth_req_id.
+// input: request id/data -> behavior: store, find, update, consume -> output: data or error.
+type BackchannelAuthenticationRequestStore interface {
+	StoreBackchannelAuthenticationRequest(string, *models.BackchannelAuthenticationRequest) error
+	FindBackchannelAuthenticationRequest(string) (*models.BackchannelAuthenticationRequest, error)
+	UpdateBackchannelAuthenticationRequest(string, *models.BackchannelAuthenticationRequest) error
+	RemoveBackchannelAuthenticationRequest(string) error
+}
+
 // AuthorizationCodeStore stores authorization codes by generated handle.
 // input: code/handle -> behavior: store, find, or remove -> output: handle, code, or error.
 type AuthorizationCodeStore interface {

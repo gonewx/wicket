@@ -30,8 +30,8 @@ func TestBucketCDependencySeamsResolveFromContainerE2E(t *testing.T) {
 	if service := root.NewKeyMaterialService(); service == nil {
 		t.Fatal("KeyMaterialService seam did not resolve")
 	}
-	if validator := root.NewCleanRoomGapRequestIdValidator(); validator == nil {
-		t.Fatal("CleanRoomGapRequestIdValidator seam did not resolve")
+	if validator := root.NewBackchannelAuthenticationRequestIdValidator(); validator == nil {
+		t.Fatal("BackchannelAuthenticationRequestIdValidator seam did not resolve")
 	}
 	sessionService := root.NewSessionCoordinationService()
 	if sessionService == nil {
@@ -91,7 +91,7 @@ func TestBucketCNeutralSeamFilesAvoidSourceContactMarkersE2E(t *testing.T) {
 		"auth/cookies/options.go",
 		"auth/core/core.go",
 		"claims/claims.go",
-		"config/options/clean_room_gap_options.go",
+		"config/options/backchannel_authentication_options.go",
 		"di/options/options.go",
 		"dp/dp.go",
 		"handlers/handlers.go",
@@ -107,7 +107,7 @@ func TestBucketCNeutralSeamFilesAvoidSourceContactMarkersE2E(t *testing.T) {
 		"storage/memory/client_resource_store.go",
 		"storage/memory/grant_stores.go",
 		"storage/memory/keys.go",
-		"storage/models/clean_room_gap_request.go",
+		"storage/models/backchannel_authentication_request.go",
 		"validators/impl/default_seams.go",
 		"validators/seams.go",
 	} {
@@ -172,7 +172,7 @@ func TestBucketCGeneratedContainerIncludesNeutralSeamsE2E(t *testing.T) {
 	for _, want := range []string{
 		"func NewRoot() (*Root, error)",
 		"func (r *Root) NewKeyMaterialService()",
-		"func (r *Root) NewCleanRoomGapRequestIdValidator()",
+		"func (r *Root) NewBackchannelAuthenticationRequestIdValidator()",
 		"func (r *Root) NewSessionCoordinationService()",
 		"func (r *Root) NewPtr_TokenHandler()",
 		"func (s *scope) NewSessionCoordinationService()",

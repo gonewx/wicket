@@ -112,7 +112,18 @@ func registerPluggableServicesAndValidators() {
 	godi.AddTransient[validators.ResourceValidator, validators_impl.ResourceValidator](&r)
 	// From: BuilderExtensions/Core.cs#L226 (TryAddTransient)
 	godi.AddTransient[services.DeviceFlowThrottlingService, services_impl.DistributedDeviceFlowThrottlingService](&r)
-	godi.AddTransient[validators.CleanRoomGapRequestIdValidator, validators_impl.CleanRoomGapRequestIdValidator](&r)
+	godi.AddTransient[services.BackchannelAuthenticationThrottlingService, services_impl.BackchannelAuthenticationThrottlingService](&r)
+	godi.AddTransientFactory[services.BackchannelAuthenticationNotificationService](&r, func(p godi.Provider) services.BackchannelAuthenticationNotificationService {
+		return services_impl.NewBackchannelAuthenticationNotificationService(godi.GetRequired[*ServerConfig](p).BackchannelAuthenticationNotificationHttpClient())
+	})
+	godi.AddTransient[validators.BackchannelAuthenticationRequestIdValidator, validators_impl.BackchannelAuthenticationRequestIdValidator](&r)
+	godi.AddTransientFactory[validators.BackchannelAuthenticationUserValidator](&r, func(p godi.Provider) validators.BackchannelAuthenticationUserValidator {
+		if override := godi.GetRequired[*ServerConfig](p).BackchannelAuthenticationUserValidator(); override != nil {
+			return override
+		}
+		return validators_impl.NewBackchannelAuthenticationUserValidator()
+	})
+	godi.AddTransient[validators.BackchannelAuthenticationRequestValidator, validators_impl.BackchannelAuthenticationRequestValidator](&r)
 	// From: BuilderExtensions/Core.cs#L185 (TryAddTransient)
 	godi.AddTransientFactory[services.TokenService](&r, func(p godi.Provider) services.TokenService {
 		return services_impl.NewTokenService(
@@ -199,7 +210,6 @@ func registerPluggableServicesAndValidators() {
 	godi.AddTransient[validators.DeviceAuthorizationRequestValidator, validators_impl.DeviceAuthorizationRequestValidator](&r)
 	// From: BuilderExtensions/Core.cs#L293 (TryAddTransient)
 	godi.AddTransient[validators.DeviceCodeValidator, validators_impl.DeviceCodeValidator](&r)
-	// TODO: clean-room reimplementation for clean-room gap validators.
 	// From: BuilderExtensions/Core.cs#L299 (TryAddTransient)
 	godi.AddTransient[validators.CustomTokenValidator, validators_impl.CustomTokenValidator](&r)
 	// From: BuilderExtensions/Core.cs#L300 (TryAddTransient)

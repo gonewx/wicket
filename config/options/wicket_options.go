@@ -25,11 +25,11 @@ type WicketOptions struct {
 	InputLengthRestrictions *InputLengthRestrictions
 	UserInteraction         *UserInteractionOptions
 	// Caching            CachingOptions
-	Cors         *CorsOptions
-	Csp          *CspOptions
-	Validation   *ValidationOptions
-	DeviceFlow   DeviceFlowOptions
-	CleanRoomGap *CleanRoomGapOptions
+	Cors                      *CorsOptions
+	Csp                       *CspOptions
+	Validation                *ValidationOptions
+	DeviceFlow                DeviceFlowOptions
+	BackchannelAuthentication *BackchannelAuthenticationOptions
 	// Logging            LoggingOptions
 	MutualTls        *MutualTlsOptions
 	CleanRoomKeyGap  *CleanRoomKeyGapOptions
@@ -55,7 +55,7 @@ func NewWicketOptions() *WicketOptions {
 		Csp:        NewCspOptions(),
 		Validation: NewValidationOptions(),
 		// DeviceFlow: NewDeviceFlowOptions(),
-		CleanRoomGap: NewCleanRoomGapOptions(),
+		BackchannelAuthentication: NewBackchannelAuthenticationOptions(),
 		// Logging: NewLoggingOptions(),
 		MutualTls:            NewMutualTlsOptions(),
 		CleanRoomKeyGap:      NewCleanRoomKeyGapOptions(),

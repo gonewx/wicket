@@ -40,8 +40,8 @@ type ValidatedTokenRequest struct {
 	// Gets or sets the device code.
 	DeviceCode *storage_models.DeviceCode
 
-	// Gets or sets the clean-room gap request placeholder.
-	CleanRoomGapRequest *storage_models.CleanRoomGapRequest
+	// Gets or sets the CIBA request state.
+	BackchannelAuthenticationRequest *storage_models.BackchannelAuthenticationRequest
 }
 
 func NewValidatedTokenRequest() *ValidatedTokenRequest {

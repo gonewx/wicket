@@ -63,8 +63,12 @@ type Client struct {
 	UserSsoLifetime                       int
 	UserCodeType                          string
 	DeviceCodeLifetime                    int
-	CleanRoomGapLifetime                  *int
+	BackchannelAuthenticationLifetime     *int
 	PollingInterval                       *int
+	BackchannelTokenDeliveryMode          string
+	ClientNotificationEndpoint            string
+	ClientNotificationToken               string
+	BackchannelUserCodeParameter          bool
 	CoordinateLifetimeWithUserSession     *bool
 	AllowedCorsOrigins                    []string
 	Properties                            map[string]string

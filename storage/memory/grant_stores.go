@@ -140,3 +140,39 @@ func (s *MemoryDeviceFlowStore) RemoveByDeviceCode(deviceCode string) error {
 	delete(s.byUserCode, userCode)
 	return nil
 }
+
+type MemoryBackchannelAuthenticationRequestStore struct {
+	mu       sync.Mutex
+	requests map[string]*models.BackchannelAuthenticationRequest
+}
+
+func NewMemoryBackchannelAuthenticationRequestStore() *MemoryBackchannelAuthenticationRequestStore {
+	return &MemoryBackchannelAuthenticationRequestStore{requests: map[string]*models.BackchannelAuthenticationRequest{}}
+}
+
+func (s *MemoryBackchannelAuthenticationRequestStore) StoreBackchannelAuthenticationRequest(requestID string, data *models.BackchannelAuthenticationRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requests[requestID] = data
+	return nil
+}
+
+func (s *MemoryBackchannelAuthenticationRequestStore) FindBackchannelAuthenticationRequest(requestID string) (*models.BackchannelAuthenticationRequest, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.requests[requestID], nil
+}
+
+func (s *MemoryBackchannelAuthenticationRequestStore) UpdateBackchannelAuthenticationRequest(requestID string, data *models.BackchannelAuthenticationRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requests[requestID] = data
+	return nil
+}
+
+func (s *MemoryBackchannelAuthenticationRequestStore) RemoveBackchannelAuthenticationRequest(requestID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.requests, requestID)
+	return nil
+}

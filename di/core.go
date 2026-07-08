@@ -27,6 +27,7 @@ import (
 	"github.com/gonewx/wicket/server"
 	"github.com/gonewx/wicket/services"
 	impl "github.com/gonewx/wicket/services/impl"
+	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/validators"
 	validators_impl "github.com/gonewx/wicket/validators/impl"
 )
@@ -87,7 +88,9 @@ func registerCore() {
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
 		return newEndpoint(gois.EndpointNamesCheckSession, gois.ProtocolRoutePathsCheckSession, endpointHandler[*handlers.CheckSessionHandler])
 	})
-	// TODO: clean-room reimplementation for clean-room gap endpoint.
+	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(gois.EndpointNamesBackchannelAuthentication, gois.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
+	})
 	// From: BuilderExtensions/Core.cs#L116 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
 		return newEndpoint(gois.EndpointNamesIntrospection, gois.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
@@ -116,7 +119,7 @@ func registerCore() {
 	godi.AddTransientFactory[*handlers.DiscoveryKeyHandler](&r, newDiscoveryKeyHandlerFromProvider)
 	// From: BuilderExtensions/Core.cs#L137 (AddTransient<T>)
 	godi.AddTransientFactory[*handlers.CheckSessionHandler](&r, newCheckSessionHandlerFromProvider)
-	// TODO: clean-room reimplementation for clean-room gap handler.
+	godi.AddTransientFactory[*handlers.BackchannelAuthenticationHandler](&r, newBackchannelAuthenticationHandlerFromProvider)
 	// From: BuilderExtensions/Core.cs#L137 (AddTransient<T>)
 	godi.AddTransientFactory[*handlers.IntrospectionHandler](&r, newIntrospectionHandlerFromProvider)
 	// From: BuilderExtensions/Core.cs#L137 (AddTransient<T>)
@@ -282,7 +285,18 @@ func registerCore() {
 		)
 	})
 	// From: BuilderExtensions/Core.cs#L312 (TryAddTransient)
-	godi.AddTransient[responses.TokenResponseGenerator, responses_impl.TokenResponseGenerator](&r)
+	godi.AddTransientFactory[responses.TokenResponseGenerator](&r, func(p godi.Provider) responses.TokenResponseGenerator {
+		return responses_impl.NewTokenResponseGeneratorWithBackchannelRequests(
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[services.TokenService](p),
+			godi.GetRequired[services.RefreshTokenService](p),
+			godi.GetRequired[validators.ScopeParser](p),
+			godi.GetRequired[storage.ResourceStore](p),
+			godi.GetRequired[storage.ClientStore](p),
+			godi.GetRequired[storage.BackchannelAuthenticationRequestStore](p),
+			godi.GetRequired[*slog.Logger](p),
+		)
+	})
 	// From: BuilderExtensions/Core.cs#L313 (TryAddTransient)
 	godi.AddTransient[responses.UserInfoResponseGenerator, responses_impl.UserInfoResponseGenerator](&r)
 	// From: BuilderExtensions/Core.cs#L314 (TryAddTransient)

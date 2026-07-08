@@ -186,9 +186,17 @@ type DeviceFlowThrottlingService interface {
 	ShouldSlowDown(string, *models.DeviceCode) (bool, error)
 }
 
-// CleanRoomGapUserNotificationService is a placeholder for later clean-room notification behavior.
-// input: request context -> behavior: reject unsupported behavior -> output: error.
-type CleanRoomGapUserNotificationService interface{}
+// BackchannelAuthenticationNotificationService sends CIBA ping/push notifications.
+// input: request state -> behavior: notify client endpoint when configured -> output: error.
+type BackchannelAuthenticationNotificationService interface {
+	Notify(*models.BackchannelAuthenticationRequest) error
+}
+
+// BackchannelAuthenticationThrottlingService enforces per-request CIBA poll interval.
+// input: request id/details -> behavior: update poll timing when needed -> output: slow-down flag or error.
+type BackchannelAuthenticationThrottlingService interface {
+	ShouldSlowDown(string, *models.BackchannelAuthenticationRequest) (bool, error)
+}
 
 type SessionValidationType string
 

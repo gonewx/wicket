@@ -27,15 +27,16 @@ type ServerConfig struct {
 	apiResourcesProvider            func() []*storage_models.ApiResource
 	apiScopesProvider               func() []*storage_models.ApiScope
 
-	authorizationParametersMessageStoreProvider func() storage.AuthorizationParametersMessageStore
-	persistedGrantStoreProvider                 func() storage.PersistedGrantStore
-	deviceFlowStoreProvider                     func() storage.DeviceFlowStore
+	authorizationParametersMessageStoreProvider   func() storage.AuthorizationParametersMessageStore
+	persistedGrantStoreProvider                   func() storage.PersistedGrantStore
+	deviceFlowStoreProvider                       func() storage.DeviceFlowStore
+	backchannelAuthenticationRequestStoreProvider func() storage.BackchannelAuthenticationRequestStore
 
-	cleanRoomGapUserNotificationService services.CleanRoomGapUserNotificationService
-	cleanRoomGapUserValidator           validators.CleanRoomGapUserValidator
-	resourceOwnerValidator              validators.ResourceOwnerPasswordValidator
-	profileProvider                     func() services.ProfileService
-	backChannelLogoutHttpClient         *http.Client
+	backchannelAuthenticationUserValidator          validators.BackchannelAuthenticationUserValidator
+	resourceOwnerValidator                          validators.ResourceOwnerPasswordValidator
+	profileProvider                                 func() services.ProfileService
+	backChannelLogoutHttpClient                     *http.Client
+	backchannelAuthenticationNotificationHttpClient *http.Client
 }
 
 func NewServerConfig() *ServerConfig {
@@ -196,26 +197,30 @@ func (c *ServerConfig) DeviceFlowStore() storage.DeviceFlowStore {
 	return c.deviceFlowStoreProvider()
 }
 
-func (c *ServerConfig) SetCleanRoomGapUserNotificationService(service services.CleanRoomGapUserNotificationService) {
-	c.cleanRoomGapUserNotificationService = service
+func (c *ServerConfig) SetBackchannelAuthenticationRequestStoreProvider(provider func() storage.BackchannelAuthenticationRequestStore) {
+	c.backchannelAuthenticationRequestStoreProvider = provider
 }
 
-func (c *ServerConfig) CleanRoomGapUserNotificationService() services.CleanRoomGapUserNotificationService {
+func (c *ServerConfig) SetBackchannelAuthenticationRequestStore(store storage.BackchannelAuthenticationRequestStore) {
+	c.SetBackchannelAuthenticationRequestStoreProvider(func() storage.BackchannelAuthenticationRequestStore { return store })
+}
+
+func (c *ServerConfig) BackchannelAuthenticationRequestStore() storage.BackchannelAuthenticationRequestStore {
+	if c == nil || c.backchannelAuthenticationRequestStoreProvider == nil {
+		return nil
+	}
+	return c.backchannelAuthenticationRequestStoreProvider()
+}
+
+func (c *ServerConfig) SetBackchannelAuthenticationUserValidator(validator validators.BackchannelAuthenticationUserValidator) {
+	c.backchannelAuthenticationUserValidator = validator
+}
+
+func (c *ServerConfig) BackchannelAuthenticationUserValidator() validators.BackchannelAuthenticationUserValidator {
 	if c == nil {
 		return nil
 	}
-	return c.cleanRoomGapUserNotificationService
-}
-
-func (c *ServerConfig) SetCleanRoomGapUserValidator(validator validators.CleanRoomGapUserValidator) {
-	c.cleanRoomGapUserValidator = validator
-}
-
-func (c *ServerConfig) CleanRoomGapUserValidator() validators.CleanRoomGapUserValidator {
-	if c == nil {
-		return nil
-	}
-	return c.cleanRoomGapUserValidator
+	return c.backchannelAuthenticationUserValidator
 }
 
 func (c *ServerConfig) SetResourceOwnerValidator(validator validators.ResourceOwnerPasswordValidator) {
@@ -249,4 +254,15 @@ func (c *ServerConfig) BackChannelLogoutHttpClient() *http.Client {
 		return nil
 	}
 	return c.backChannelLogoutHttpClient
+}
+
+func (c *ServerConfig) SetBackchannelAuthenticationNotificationHttpClient(client *http.Client) {
+	c.backchannelAuthenticationNotificationHttpClient = client
+}
+
+func (c *ServerConfig) BackchannelAuthenticationNotificationHttpClient() *http.Client {
+	if c == nil {
+		return nil
+	}
+	return c.backchannelAuthenticationNotificationHttpClient
 }

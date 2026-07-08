@@ -92,6 +92,9 @@ func registerInMemory() {
 	godi.AddSingletonFactory[storage.DeviceFlowStore](&r, func(p godi.Provider) storage.DeviceFlowStore {
 		return &lazyDeviceFlowStore{cfg: godi.GetRequired[*ServerConfig](p)}
 	})
+	godi.AddSingletonFactory[storage.BackchannelAuthenticationRequestStore](&r, func(p godi.Provider) storage.BackchannelAuthenticationRequestStore {
+		return &lazyBackchannelAuthenticationRequestStore{cfg: godi.GetRequired[*ServerConfig](p)}
+	})
 }
 
 type lazyPersistedGrantStore struct {
@@ -164,4 +167,36 @@ func (s *lazyDeviceFlowStore) UpdateByUserCode(userCode string, data *storage_mo
 
 func (s *lazyDeviceFlowStore) RemoveByDeviceCode(deviceCode string) error {
 	return s.store().RemoveByDeviceCode(deviceCode)
+}
+
+type lazyBackchannelAuthenticationRequestStore struct {
+	cfg  *ServerConfig
+	once sync.Once
+	impl storage.BackchannelAuthenticationRequestStore
+}
+
+func (s *lazyBackchannelAuthenticationRequestStore) store() storage.BackchannelAuthenticationRequestStore {
+	s.once.Do(func() {
+		s.impl = s.cfg.BackchannelAuthenticationRequestStore()
+		if s.impl == nil {
+			s.impl = storage_memory.NewMemoryBackchannelAuthenticationRequestStore()
+		}
+	})
+	return s.impl
+}
+
+func (s *lazyBackchannelAuthenticationRequestStore) StoreBackchannelAuthenticationRequest(requestID string, data *storage_models.BackchannelAuthenticationRequest) error {
+	return s.store().StoreBackchannelAuthenticationRequest(requestID, data)
+}
+
+func (s *lazyBackchannelAuthenticationRequestStore) FindBackchannelAuthenticationRequest(requestID string) (*storage_models.BackchannelAuthenticationRequest, error) {
+	return s.store().FindBackchannelAuthenticationRequest(requestID)
+}
+
+func (s *lazyBackchannelAuthenticationRequestStore) UpdateBackchannelAuthenticationRequest(requestID string, data *storage_models.BackchannelAuthenticationRequest) error {
+	return s.store().UpdateBackchannelAuthenticationRequest(requestID, data)
+}
+
+func (s *lazyBackchannelAuthenticationRequestStore) RemoveBackchannelAuthenticationRequest(requestID string) error {
+	return s.store().RemoveBackchannelAuthenticationRequest(requestID)
 }

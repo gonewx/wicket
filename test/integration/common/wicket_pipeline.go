@@ -45,19 +45,19 @@ var (
 	ConsentPage = "/account/consent"
 	ErrorPage   = "/home/error"
 
-	DeviceAuthorization             = "/connect/deviceauthorization"
-	DiscoveryEndpoint               = "/.well-known/openid-configuration"
-	DiscoveryKeysEndpoint           = "/.well-known/openid-configuration/jwks"
-	AuthorizeEndpoint               = "/connect/authorize"
-	CleanRoomGapEndpoint            = "/connect/clean-room-gap"
-	TokenEndpoint                   = "/connect/token"
-	RevocationEndpoint              = "/connect/revocation"
-	UserInfoEndpoint                = "/connect/userinfo"
-	IntrospectionEndpoint           = "/connect/introspect"
-	IdentityTokenValidationEndpoint = "/connect/identityTokenValidation"
-	EndSessionEndpoint              = "/connect/endsession"
-	EndSessionCallbackEndpoint      = "/connect/endsession/callback"
-	CheckSessionEndpoint            = "/connect/checksession"
+	DeviceAuthorization               = "/connect/deviceauthorization"
+	DiscoveryEndpoint                 = "/.well-known/openid-configuration"
+	DiscoveryKeysEndpoint             = "/.well-known/openid-configuration/jwks"
+	AuthorizeEndpoint                 = "/connect/authorize"
+	BackchannelAuthenticationEndpoint = "/connect/ciba"
+	TokenEndpoint                     = "/connect/token"
+	RevocationEndpoint                = "/connect/revocation"
+	UserInfoEndpoint                  = "/connect/userinfo"
+	IntrospectionEndpoint             = "/connect/introspect"
+	IdentityTokenValidationEndpoint   = "/connect/identityTokenValidation"
+	EndSessionEndpoint                = "/connect/endsession"
+	EndSessionCallbackEndpoint        = "/connect/endsession/callback"
+	CheckSessionEndpoint              = "/connect/checksession"
 
 	FederatedSignOutPath = "/signout-oidc"
 	FederatedSignOutUrl  = FederatedSignOutPath
@@ -75,18 +75,17 @@ type WicketPipeline struct {
 	Server *server.Server
 	Root   *di.Root
 
-	Clients                             []*storage_models.Client
-	IdentityScopes                      []*storage_models.IdentityResource
-	ApiResources                        []*storage_models.ApiResource
-	ApiScopes                           []*storage_models.ApiScope
-	SigningCredentialStores             []storage.SigningCredentialStore
-	ValidationKeysStores                []storage.ValidationKeysStore
-	Users                               []*test.TestUser
-	UserStore                           *test.TestUserStore
-	Profile                             services.ProfileService
-	ResourceOwnerValidator              validators.ResourceOwnerPasswordValidator
-	CleanRoomGapUserValidator           validators.CleanRoomGapUserValidator
-	CleanRoomGapUserNotificationService services.CleanRoomGapUserNotificationService
+	Clients                                []*storage_models.Client
+	IdentityScopes                         []*storage_models.IdentityResource
+	ApiResources                           []*storage_models.ApiResource
+	ApiScopes                              []*storage_models.ApiScope
+	SigningCredentialStores                []storage.SigningCredentialStore
+	ValidationKeysStores                   []storage.ValidationKeysStore
+	Users                                  []*test.TestUser
+	UserStore                              *test.TestUserStore
+	Profile                                services.ProfileService
+	ResourceOwnerValidator                 validators.ResourceOwnerPasswordValidator
+	BackchannelAuthenticationUserValidator validators.BackchannelAuthenticationUserValidator
 
 	LoginWasCalled bool
 	LoginReturnUrl string
@@ -398,8 +397,7 @@ func (p *WicketPipeline) configureServices() {
 	cfg.SetAuthorizationParametersMessageStoreProvider(func() storage.AuthorizationParametersMessageStore {
 		return p.AuthorizationParametersMessageStore
 	})
-	cfg.SetCleanRoomGapUserNotificationService(p.CleanRoomGapUserNotificationService)
-	cfg.SetCleanRoomGapUserValidator(p.CleanRoomGapUserValidator)
+	cfg.SetBackchannelAuthenticationUserValidator(p.BackchannelAuthenticationUserValidator)
 	cfg.SetResourceOwnerValidator(p.ResourceOwnerValidator)
 	cfg.SetProfileProvider(func() services.ProfileService { return p.Profile })
 	cfg.SetBackChannelLogoutHttpClient(p.BackChannelClient)

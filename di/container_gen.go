@@ -52,6 +52,7 @@ type Root struct {
 	f_Ptr_Endpoint__8                                        *hosting.Endpoint
 	f_Ptr_Endpoint__9                                        *hosting.Endpoint
 	f_Ptr_Endpoint__10                                       *hosting.Endpoint
+	f_Ptr_Endpoint__11                                       *hosting.Endpoint
 	f_DataProtectionProvider                                 dp.DataProtectionProvider
 	f_UnnamedOptionsManager__options_WicketOptions           options2.Options[*options.WicketOptions]
 	f_UnnamedOptionsManager__auth_Options                    options2.Options[*auth.Options]
@@ -68,6 +69,7 @@ type Root struct {
 	f_Ptr_PersistentGrantOptions                             *options.PersistentGrantOptions
 	f_PersistedGrantStore                                    storage.PersistedGrantStore
 	f_DeviceFlowStore                                        storage.DeviceFlowStore
+	f_BackchannelAuthenticationRequestStore                  storage.BackchannelAuthenticationRequestStore
 	f_MemoryDistributedCache                                 services.DistributedCache
 	f_DefaultHttpContextAccessor                             accessor.HttpContextAccessor
 	f_HandlerProvider                                        auth.HandlerProvider
@@ -105,15 +107,18 @@ func NewRoot() (*Root, error) {
 		return newEndpoint(gois.EndpointNamesCheckSession, gois.ProtocolRoutePathsCheckSession, endpointHandler[*handlers.CheckSessionHandler])
 	})(r)
 	r.f_Ptr_Endpoint__7 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesIntrospection, gois.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
+		return newEndpoint(gois.EndpointNamesBackchannelAuthentication, gois.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
 	})(r)
 	r.f_Ptr_Endpoint__8 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesUserInfo, gois.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
+		return newEndpoint(gois.EndpointNamesIntrospection, gois.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
 	})(r)
 	r.f_Ptr_Endpoint__9 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesEndSession, gois.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
+		return newEndpoint(gois.EndpointNamesUserInfo, gois.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
 	})(r)
 	r.f_Ptr_Endpoint__10 = (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(gois.EndpointNamesEndSession, gois.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
+	})(r)
+	r.f_Ptr_Endpoint__11 = (func(p godi.Provider) *hosting.Endpoint {
 		return newEndpoint(gois.EndpointNamesEndSession, gois.ProtocolRoutePathsEndSessionCallback, endpointHandler[*handlers.EndSessionCallbackHandler])
 	})(r)
 	r.f_DataProtectionProvider = impl.NewDataProtectionProvider()
@@ -175,6 +180,9 @@ func NewRoot() (*Root, error) {
 	r.f_DeviceFlowStore = (func(p godi.Provider) storage.DeviceFlowStore {
 		return &lazyDeviceFlowStore{cfg: godi.GetRequired[*ServerConfig](p)}
 	})(r)
+	r.f_BackchannelAuthenticationRequestStore = (func(p godi.Provider) storage.BackchannelAuthenticationRequestStore {
+		return &lazyBackchannelAuthenticationRequestStore{cfg: godi.GetRequired[*ServerConfig](p)}
+	})(r)
 	r.f_MemoryDistributedCache = memory2.NewMemoryDistributedCache()
 	r.f_DefaultHttpContextAccessor = accessor.NewDefaultHttpContextAccessor()
 	r.f_HandlerProvider = (func(p godi.Provider) auth.HandlerProvider {
@@ -233,6 +241,10 @@ func (r *Root) NewPtr_DiscoveryKeyHandler() *handlers.DiscoveryKeyHandler {
 
 func (r *Root) NewPtr_CheckSessionHandler() *handlers.CheckSessionHandler {
 	return (newCheckSessionHandlerFromProvider)(r)
+}
+
+func (r *Root) NewPtr_BackchannelAuthenticationHandler() *handlers.BackchannelAuthenticationHandler {
+	return (newBackchannelAuthenticationHandlerFromProvider)(r)
 }
 
 func (r *Root) NewPtr_IntrospectionHandler() *handlers.IntrospectionHandler {
@@ -371,7 +383,18 @@ func (r *Root) NewSecretsListValidator() validators.SecretsListValidator {
 }
 
 func (r *Root) NewTokenResponseGenerator() responses.TokenResponseGenerator {
-	return impl3.NewTokenResponseGenerator(r.f_SystemClock, r.NewTokenService(), r.NewRefreshTokenService(), r.NewScopeParser(), r.NewResourceStore(), r.NewClientStore(), r.f_Ptr_Logger)
+	return (func(p godi.Provider) responses.TokenResponseGenerator {
+		return impl3.NewTokenResponseGeneratorWithBackchannelRequests(
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[services.TokenService](p),
+			godi.GetRequired[services.RefreshTokenService](p),
+			godi.GetRequired[validators.ScopeParser](p),
+			godi.GetRequired[storage.ResourceStore](p),
+			godi.GetRequired[storage.ClientStore](p),
+			godi.GetRequired[storage.BackchannelAuthenticationRequestStore](p),
+			godi.GetRequired[*slog.Logger](p),
+		)
+	})(r)
 }
 
 func (r *Root) NewUserInfoResponseGenerator() responses.UserInfoResponseGenerator {
@@ -641,8 +664,31 @@ func (r *Root) NewDistributedDeviceFlowThrottlingService() services.DeviceFlowTh
 	return impl.NewDistributedDeviceFlowThrottlingService(r.f_MemoryDistributedCache, r.NewClientStore(), r.f_SystemClock, r.f_Ptr_WicketOptions)
 }
 
-func (r *Root) NewCleanRoomGapRequestIdValidator() validators.CleanRoomGapRequestIdValidator {
-	return impl2.NewCleanRoomGapRequestIdValidator()
+func (r *Root) NewBackchannelAuthenticationThrottlingService() services.BackchannelAuthenticationThrottlingService {
+	return impl.NewBackchannelAuthenticationThrottlingService(r.f_Ptr_WicketOptions, r.f_SystemClock)
+}
+
+func (r *Root) NewBackchannelAuthenticationNotificationService() services.BackchannelAuthenticationNotificationService {
+	return (func(p godi.Provider) services.BackchannelAuthenticationNotificationService {
+		return impl.NewBackchannelAuthenticationNotificationService(godi.GetRequired[*ServerConfig](p).BackchannelAuthenticationNotificationHttpClient())
+	})(r)
+}
+
+func (r *Root) NewBackchannelAuthenticationRequestIdValidator() validators.BackchannelAuthenticationRequestIdValidator {
+	return impl2.NewBackchannelAuthenticationRequestIdValidator(r.f_BackchannelAuthenticationRequestStore, r.NewBackchannelAuthenticationThrottlingService(), r.f_SystemClock)
+}
+
+func (r *Root) NewBackchannelAuthenticationUserValidator() validators.BackchannelAuthenticationUserValidator {
+	return (func(p godi.Provider) validators.BackchannelAuthenticationUserValidator {
+		if override := godi.GetRequired[*ServerConfig](p).BackchannelAuthenticationUserValidator(); override != nil {
+			return override
+		}
+		return impl2.NewBackchannelAuthenticationUserValidator()
+	})(r)
+}
+
+func (r *Root) NewBackchannelAuthenticationRequestValidator() validators.BackchannelAuthenticationRequestValidator {
+	return impl2.NewBackchannelAuthenticationRequestValidator(r.f_Ptr_WicketOptions, r.f_BackchannelAuthenticationRequestStore, r.NewResourceValidator(), r.NewBackchannelAuthenticationUserValidator(), r.NewBackchannelAuthenticationNotificationService(), r.f_SystemClock, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewTokenService() services.TokenService {
@@ -721,7 +767,7 @@ func (r *Root) NewEndSessionRequestValidator() validators.EndSessionRequestValid
 }
 
 func (r *Root) NewTokenRequestValidator() validators.TokenRequestValidator {
-	return impl2.NewTokenRequestValidator(r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.NewAuthorizationCodeStore(), r.NewPtr_ExtensionGrantValidator(), r.NewCustomTokenRequestValidator(), r.NewResourceValidator(), r.NewResourceStore(), r.NewRefreshTokenService(), r.NewResourceOwnerPasswordValidator(), r.NewProfileService(), r.NewDeviceCodeValidator(), r.NewCleanRoomGapRequestIdValidator(), r.f_SystemClock, r.f_Ptr_Logger)
+	return impl2.NewTokenRequestValidator(r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.NewAuthorizationCodeStore(), r.NewPtr_ExtensionGrantValidator(), r.NewCustomTokenRequestValidator(), r.NewResourceValidator(), r.NewResourceStore(), r.NewRefreshTokenService(), r.NewResourceOwnerPasswordValidator(), r.NewProfileService(), r.NewDeviceCodeValidator(), r.NewBackchannelAuthenticationRequestIdValidator(), r.f_SystemClock, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
@@ -820,6 +866,8 @@ func (r *Root) Ptr_Endpoint__9() *hosting.Endpoint { return r.f_Ptr_Endpoint__9 
 
 func (r *Root) Ptr_Endpoint__10() *hosting.Endpoint { return r.f_Ptr_Endpoint__10 }
 
+func (r *Root) Ptr_Endpoint__11() *hosting.Endpoint { return r.f_Ptr_Endpoint__11 }
+
 func (r *Root) DataProtectionProvider() dp.DataProtectionProvider { return r.f_DataProtectionProvider }
 
 func (r *Root) UnnamedOptionsManager__options_WicketOptions() options2.Options[*options.WicketOptions] {
@@ -874,6 +922,10 @@ func (r *Root) PersistedGrantStore() storage.PersistedGrantStore { return r.f_Pe
 
 func (r *Root) DeviceFlowStore() storage.DeviceFlowStore { return r.f_DeviceFlowStore }
 
+func (r *Root) BackchannelAuthenticationRequestStore() storage.BackchannelAuthenticationRequestStore {
+	return r.f_BackchannelAuthenticationRequestStore
+}
+
 func (r *Root) MemoryDistributedCache() services.DistributedCache { return r.f_MemoryDistributedCache }
 
 func (r *Root) DefaultHttpContextAccessor() accessor.HttpContextAccessor {
@@ -899,7 +951,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*slog.Logger]():
 		return r.f_Ptr_Logger
 	case reflect.TypeFor[*hosting.Endpoint]():
-		return r.f_Ptr_Endpoint__10
+		return r.f_Ptr_Endpoint__11
 	case reflect.TypeFor[dp.DataProtectionProvider]():
 		return r.f_DataProtectionProvider
 	case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
@@ -928,6 +980,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_PersistedGrantStore
 	case reflect.TypeFor[storage.DeviceFlowStore]():
 		return r.f_DeviceFlowStore
+	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+		return r.f_BackchannelAuthenticationRequestStore
 	case reflect.TypeFor[services.DistributedCache]():
 		return r.f_MemoryDistributedCache
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -954,6 +1008,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewPtr_DiscoveryKeyHandler()
 	case reflect.TypeFor[*handlers.CheckSessionHandler]():
 		return r.NewPtr_CheckSessionHandler()
+	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
+		return r.NewPtr_BackchannelAuthenticationHandler()
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return r.NewPtr_IntrospectionHandler()
 	case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -1082,8 +1138,16 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewResourceValidator()
 	case reflect.TypeFor[services.DeviceFlowThrottlingService]():
 		return r.NewDistributedDeviceFlowThrottlingService()
-	case reflect.TypeFor[validators.CleanRoomGapRequestIdValidator]():
-		return r.NewCleanRoomGapRequestIdValidator()
+	case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
+		return r.NewBackchannelAuthenticationThrottlingService()
+	case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
+		return r.NewBackchannelAuthenticationNotificationService()
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
+		return r.NewBackchannelAuthenticationRequestIdValidator()
+	case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
+		return r.NewBackchannelAuthenticationUserValidator()
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
+		return r.NewBackchannelAuthenticationRequestValidator()
 	case reflect.TypeFor[services.TokenService]():
 		return r.NewTokenService()
 	case reflect.TypeFor[services.InteractionService]():
@@ -1159,6 +1223,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[*handlers.DiscoveryKeyHandler]():
 		return true
 	case reflect.TypeFor[*handlers.CheckSessionHandler]():
+		return true
+	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
 		return true
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return true
@@ -1268,6 +1334,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[storage.DeviceFlowStore]():
 		return true
+	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+		return true
 	case reflect.TypeFor[*impl4.PersistentGrantSerializer]():
 		return true
 	case reflect.TypeFor[storage.MessageStore[messages.LogoutMessage]]():
@@ -1324,7 +1392,15 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[services.DeviceFlowThrottlingService]():
 		return true
-	case reflect.TypeFor[validators.CleanRoomGapRequestIdValidator]():
+	case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
+		return true
+	case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
+		return true
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
+		return true
+	case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
+		return true
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
 		return true
 	case reflect.TypeFor[services.TokenService]():
 		return true
@@ -1412,7 +1488,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 	case reflect.TypeFor[*slog.Logger]():
 		return []any{r.f_Ptr_Logger}
 	case reflect.TypeFor[*hosting.Endpoint]():
-		return []any{r.f_Ptr_Endpoint, r.f_Ptr_Endpoint__2, r.f_Ptr_Endpoint__3, r.f_Ptr_Endpoint__4, r.f_Ptr_Endpoint__5, r.f_Ptr_Endpoint__6, r.f_Ptr_Endpoint__7, r.f_Ptr_Endpoint__8, r.f_Ptr_Endpoint__9, r.f_Ptr_Endpoint__10}
+		return []any{r.f_Ptr_Endpoint, r.f_Ptr_Endpoint__2, r.f_Ptr_Endpoint__3, r.f_Ptr_Endpoint__4, r.f_Ptr_Endpoint__5, r.f_Ptr_Endpoint__6, r.f_Ptr_Endpoint__7, r.f_Ptr_Endpoint__8, r.f_Ptr_Endpoint__9, r.f_Ptr_Endpoint__10, r.f_Ptr_Endpoint__11}
 	case reflect.TypeFor[dp.DataProtectionProvider]():
 		return []any{r.f_DataProtectionProvider}
 	case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
@@ -1441,6 +1517,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{r.f_PersistedGrantStore}
 	case reflect.TypeFor[storage.DeviceFlowStore]():
 		return []any{r.f_DeviceFlowStore}
+	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+		return []any{r.f_BackchannelAuthenticationRequestStore}
 	case reflect.TypeFor[services.DistributedCache]():
 		return []any{r.f_MemoryDistributedCache}
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -1467,6 +1545,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{r.NewPtr_DiscoveryKeyHandler()}
 	case reflect.TypeFor[*handlers.CheckSessionHandler]():
 		return []any{r.NewPtr_CheckSessionHandler()}
+	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
+		return []any{r.NewPtr_BackchannelAuthenticationHandler()}
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return []any{r.NewPtr_IntrospectionHandler()}
 	case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -1595,8 +1675,16 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{r.NewResourceValidator()}
 	case reflect.TypeFor[services.DeviceFlowThrottlingService]():
 		return []any{r.NewDistributedDeviceFlowThrottlingService()}
-	case reflect.TypeFor[validators.CleanRoomGapRequestIdValidator]():
-		return []any{r.NewCleanRoomGapRequestIdValidator()}
+	case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
+		return []any{r.NewBackchannelAuthenticationThrottlingService()}
+	case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
+		return []any{r.NewBackchannelAuthenticationNotificationService()}
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
+		return []any{r.NewBackchannelAuthenticationRequestIdValidator()}
+	case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
+		return []any{r.NewBackchannelAuthenticationUserValidator()}
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
+		return []any{r.NewBackchannelAuthenticationRequestValidator()}
 	case reflect.TypeFor[services.TokenService]():
 		return []any{r.NewTokenService()}
 	case reflect.TypeFor[services.InteractionService]():
@@ -1697,7 +1785,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*slog.Logger]():
 		return s.root.f_Ptr_Logger
 	case reflect.TypeFor[*hosting.Endpoint]():
-		return s.root.f_Ptr_Endpoint__10
+		return s.root.f_Ptr_Endpoint__11
 	case reflect.TypeFor[dp.DataProtectionProvider]():
 		return s.root.f_DataProtectionProvider
 	case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
@@ -1726,6 +1814,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_PersistedGrantStore
 	case reflect.TypeFor[storage.DeviceFlowStore]():
 		return s.root.f_DeviceFlowStore
+	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+		return s.root.f_BackchannelAuthenticationRequestStore
 	case reflect.TypeFor[services.DistributedCache]():
 		return s.root.f_MemoryDistributedCache
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -1752,6 +1842,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewPtr_DiscoveryKeyHandler()
 	case reflect.TypeFor[*handlers.CheckSessionHandler]():
 		return s.NewPtr_CheckSessionHandler()
+	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
+		return s.NewPtr_BackchannelAuthenticationHandler()
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return s.NewPtr_IntrospectionHandler()
 	case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -1880,8 +1972,16 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewResourceValidator()
 	case reflect.TypeFor[services.DeviceFlowThrottlingService]():
 		return s.NewDistributedDeviceFlowThrottlingService()
-	case reflect.TypeFor[validators.CleanRoomGapRequestIdValidator]():
-		return s.NewCleanRoomGapRequestIdValidator()
+	case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
+		return s.NewBackchannelAuthenticationThrottlingService()
+	case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
+		return s.NewBackchannelAuthenticationNotificationService()
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
+		return s.NewBackchannelAuthenticationRequestIdValidator()
+	case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
+		return s.NewBackchannelAuthenticationUserValidator()
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
+		return s.NewBackchannelAuthenticationRequestValidator()
 	case reflect.TypeFor[services.TokenService]():
 		return s.NewTokenService()
 	case reflect.TypeFor[services.InteractionService]():
@@ -1968,6 +2068,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[storage.DeviceFlowStore]():
 		return true
+	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+		return true
 	case reflect.TypeFor[services.DistributedCache]():
 		return true
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -1993,6 +2095,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[*handlers.DiscoveryKeyHandler]():
 		return true
 	case reflect.TypeFor[*handlers.CheckSessionHandler]():
+		return true
+	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
 		return true
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return true
@@ -2122,7 +2226,15 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[services.DeviceFlowThrottlingService]():
 		return true
-	case reflect.TypeFor[validators.CleanRoomGapRequestIdValidator]():
+	case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
+		return true
+	case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
+		return true
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
+		return true
+	case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
+		return true
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
 		return true
 	case reflect.TypeFor[services.TokenService]():
 		return true
@@ -2204,7 +2316,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 	case reflect.TypeFor[*slog.Logger]():
 		return []any{s.root.f_Ptr_Logger}
 	case reflect.TypeFor[*hosting.Endpoint]():
-		return []any{s.root.f_Ptr_Endpoint, s.root.f_Ptr_Endpoint__2, s.root.f_Ptr_Endpoint__3, s.root.f_Ptr_Endpoint__4, s.root.f_Ptr_Endpoint__5, s.root.f_Ptr_Endpoint__6, s.root.f_Ptr_Endpoint__7, s.root.f_Ptr_Endpoint__8, s.root.f_Ptr_Endpoint__9, s.root.f_Ptr_Endpoint__10}
+		return []any{s.root.f_Ptr_Endpoint, s.root.f_Ptr_Endpoint__2, s.root.f_Ptr_Endpoint__3, s.root.f_Ptr_Endpoint__4, s.root.f_Ptr_Endpoint__5, s.root.f_Ptr_Endpoint__6, s.root.f_Ptr_Endpoint__7, s.root.f_Ptr_Endpoint__8, s.root.f_Ptr_Endpoint__9, s.root.f_Ptr_Endpoint__10, s.root.f_Ptr_Endpoint__11}
 	case reflect.TypeFor[dp.DataProtectionProvider]():
 		return []any{s.root.f_DataProtectionProvider}
 	case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
@@ -2233,6 +2345,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{s.root.f_PersistedGrantStore}
 	case reflect.TypeFor[storage.DeviceFlowStore]():
 		return []any{s.root.f_DeviceFlowStore}
+	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+		return []any{s.root.f_BackchannelAuthenticationRequestStore}
 	case reflect.TypeFor[services.DistributedCache]():
 		return []any{s.root.f_MemoryDistributedCache}
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -2259,6 +2373,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{s.NewPtr_DiscoveryKeyHandler()}
 	case reflect.TypeFor[*handlers.CheckSessionHandler]():
 		return []any{s.NewPtr_CheckSessionHandler()}
+	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
+		return []any{s.NewPtr_BackchannelAuthenticationHandler()}
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return []any{s.NewPtr_IntrospectionHandler()}
 	case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -2387,8 +2503,16 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{s.NewResourceValidator()}
 	case reflect.TypeFor[services.DeviceFlowThrottlingService]():
 		return []any{s.NewDistributedDeviceFlowThrottlingService()}
-	case reflect.TypeFor[validators.CleanRoomGapRequestIdValidator]():
-		return []any{s.NewCleanRoomGapRequestIdValidator()}
+	case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
+		return []any{s.NewBackchannelAuthenticationThrottlingService()}
+	case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
+		return []any{s.NewBackchannelAuthenticationNotificationService()}
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
+		return []any{s.NewBackchannelAuthenticationRequestIdValidator()}
+	case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
+		return []any{s.NewBackchannelAuthenticationUserValidator()}
+	case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
+		return []any{s.NewBackchannelAuthenticationRequestValidator()}
 	case reflect.TypeFor[services.TokenService]():
 		return []any{s.NewTokenService()}
 	case reflect.TypeFor[services.InteractionService]():
@@ -2504,6 +2628,10 @@ func (s *scope) NewPtr_DiscoveryKeyHandler() *handlers.DiscoveryKeyHandler {
 
 func (s *scope) NewPtr_CheckSessionHandler() *handlers.CheckSessionHandler {
 	return (newCheckSessionHandlerFromProvider)(s)
+}
+
+func (s *scope) NewPtr_BackchannelAuthenticationHandler() *handlers.BackchannelAuthenticationHandler {
+	return (newBackchannelAuthenticationHandlerFromProvider)(s)
 }
 
 func (s *scope) NewPtr_IntrospectionHandler() *handlers.IntrospectionHandler {
@@ -2642,7 +2770,18 @@ func (s *scope) NewSecretsListValidator() validators.SecretsListValidator {
 }
 
 func (s *scope) NewTokenResponseGenerator() responses.TokenResponseGenerator {
-	return impl3.NewTokenResponseGenerator(s.root.f_SystemClock, s.NewTokenService(), s.NewRefreshTokenService(), s.NewScopeParser(), s.NewResourceStore(), s.NewClientStore(), s.root.f_Ptr_Logger)
+	return (func(p godi.Provider) responses.TokenResponseGenerator {
+		return impl3.NewTokenResponseGeneratorWithBackchannelRequests(
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[services.TokenService](p),
+			godi.GetRequired[services.RefreshTokenService](p),
+			godi.GetRequired[validators.ScopeParser](p),
+			godi.GetRequired[storage.ResourceStore](p),
+			godi.GetRequired[storage.ClientStore](p),
+			godi.GetRequired[storage.BackchannelAuthenticationRequestStore](p),
+			godi.GetRequired[*slog.Logger](p),
+		)
+	})(s)
 }
 
 func (s *scope) NewUserInfoResponseGenerator() responses.UserInfoResponseGenerator {
@@ -2912,8 +3051,31 @@ func (s *scope) NewDistributedDeviceFlowThrottlingService() services.DeviceFlowT
 	return impl.NewDistributedDeviceFlowThrottlingService(s.root.f_MemoryDistributedCache, s.NewClientStore(), s.root.f_SystemClock, s.root.f_Ptr_WicketOptions)
 }
 
-func (s *scope) NewCleanRoomGapRequestIdValidator() validators.CleanRoomGapRequestIdValidator {
-	return impl2.NewCleanRoomGapRequestIdValidator()
+func (s *scope) NewBackchannelAuthenticationThrottlingService() services.BackchannelAuthenticationThrottlingService {
+	return impl.NewBackchannelAuthenticationThrottlingService(s.root.f_Ptr_WicketOptions, s.root.f_SystemClock)
+}
+
+func (s *scope) NewBackchannelAuthenticationNotificationService() services.BackchannelAuthenticationNotificationService {
+	return (func(p godi.Provider) services.BackchannelAuthenticationNotificationService {
+		return impl.NewBackchannelAuthenticationNotificationService(godi.GetRequired[*ServerConfig](p).BackchannelAuthenticationNotificationHttpClient())
+	})(s)
+}
+
+func (s *scope) NewBackchannelAuthenticationRequestIdValidator() validators.BackchannelAuthenticationRequestIdValidator {
+	return impl2.NewBackchannelAuthenticationRequestIdValidator(s.root.f_BackchannelAuthenticationRequestStore, s.NewBackchannelAuthenticationThrottlingService(), s.root.f_SystemClock)
+}
+
+func (s *scope) NewBackchannelAuthenticationUserValidator() validators.BackchannelAuthenticationUserValidator {
+	return (func(p godi.Provider) validators.BackchannelAuthenticationUserValidator {
+		if override := godi.GetRequired[*ServerConfig](p).BackchannelAuthenticationUserValidator(); override != nil {
+			return override
+		}
+		return impl2.NewBackchannelAuthenticationUserValidator()
+	})(s)
+}
+
+func (s *scope) NewBackchannelAuthenticationRequestValidator() validators.BackchannelAuthenticationRequestValidator {
+	return impl2.NewBackchannelAuthenticationRequestValidator(s.root.f_Ptr_WicketOptions, s.root.f_BackchannelAuthenticationRequestStore, s.NewResourceValidator(), s.NewBackchannelAuthenticationUserValidator(), s.NewBackchannelAuthenticationNotificationService(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewTokenService() services.TokenService {
@@ -2992,7 +3154,7 @@ func (s *scope) NewEndSessionRequestValidator() validators.EndSessionRequestVali
 }
 
 func (s *scope) NewTokenRequestValidator() validators.TokenRequestValidator {
-	return impl2.NewTokenRequestValidator(s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.NewAuthorizationCodeStore(), s.NewPtr_ExtensionGrantValidator(), s.NewCustomTokenRequestValidator(), s.NewResourceValidator(), s.NewResourceStore(), s.NewRefreshTokenService(), s.NewResourceOwnerPasswordValidator(), s.NewProfileService(), s.NewDeviceCodeValidator(), s.NewCleanRoomGapRequestIdValidator(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
+	return impl2.NewTokenRequestValidator(s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.NewAuthorizationCodeStore(), s.NewPtr_ExtensionGrantValidator(), s.NewCustomTokenRequestValidator(), s.NewResourceValidator(), s.NewResourceStore(), s.NewRefreshTokenService(), s.NewResourceOwnerPasswordValidator(), s.NewProfileService(), s.NewDeviceCodeValidator(), s.NewBackchannelAuthenticationRequestIdValidator(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
@@ -3091,6 +3253,8 @@ func (s *scope) Ptr_Endpoint__9() *hosting.Endpoint { return s.root.f_Ptr_Endpoi
 
 func (s *scope) Ptr_Endpoint__10() *hosting.Endpoint { return s.root.f_Ptr_Endpoint__10 }
 
+func (s *scope) Ptr_Endpoint__11() *hosting.Endpoint { return s.root.f_Ptr_Endpoint__11 }
+
 func (s *scope) DataProtectionProvider() dp.DataProtectionProvider {
 	return s.root.f_DataProtectionProvider
 }
@@ -3148,6 +3312,10 @@ func (s *scope) PersistedGrantStore() storage.PersistedGrantStore {
 }
 
 func (s *scope) DeviceFlowStore() storage.DeviceFlowStore { return s.root.f_DeviceFlowStore }
+
+func (s *scope) BackchannelAuthenticationRequestStore() storage.BackchannelAuthenticationRequestStore {
+	return s.root.f_BackchannelAuthenticationRequestStore
+}
 
 func (s *scope) MemoryDistributedCache() services.DistributedCache {
 	return s.root.f_MemoryDistributedCache

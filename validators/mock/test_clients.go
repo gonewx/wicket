@@ -396,19 +396,19 @@ func (c TestClients) Get() []*storage_models.Client {
 	clientWSFed := storage_models.NewClient()
 	clientWSFed.ClientName = "WS-Fed Client"
 	clientWSFed.Enabled = true
-	clientWSFed.ClientId = "clean-room-gap"
-	clientWSFed.ProtocolType = gois.ProtocolTypesCleanRoomProtocolGap
+	clientWSFed.ClientId = "saml2p-gap"
+	clientWSFed.ProtocolType = gois.ProtocolTypesSaml2p
 	if err := clientWSFed.SetAllowedGrantTypes(gois.GrantTypesImplicit); err != nil {
 		panic(err)
 	}
 	clientWSFed.AllowedScopes = []string{"openid", "profile", "resource", "resource2"}
-	clientWSFed.RedirectUris = []string{"http://clean-room-gap/callback"}
+	clientWSFed.RedirectUris = []string{"http://saml2p-gap/callback"}
 
 	clientCredWSFed := storage_models.NewClient()
 	clientCredWSFed.ClientName = "WS-Fed Client"
 	clientCredWSFed.Enabled = true
-	clientCredWSFed.ClientId = "client.cred.clean-room-gap"
-	clientCredWSFed.ProtocolType = gois.ProtocolTypesCleanRoomProtocolGap
+	clientCredWSFed.ClientId = "client.cred.saml2p-gap"
+	clientCredWSFed.ProtocolType = gois.ProtocolTypesSaml2p
 	if err := clientCredWSFed.SetAllowedGrantTypes(gois.GrantTypesClientCredentials); err != nil {
 		panic(err)
 	}

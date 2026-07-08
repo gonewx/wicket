@@ -11,6 +11,7 @@ import (
 	"github.com/gonewx/wicket/accessor"
 	"github.com/gonewx/wicket/handlers"
 	"github.com/gonewx/wicket/hosting"
+	"github.com/gonewx/wicket/validators"
 )
 
 func newServerConfigLogger(config *ServerConfig, fallback *slog.Logger) *slog.Logger {
@@ -66,6 +67,13 @@ func newDiscoveryKeyHandlerFromProvider(godi.Provider) *handlers.DiscoveryKeyHan
 
 func newCheckSessionHandlerFromProvider(godi.Provider) *handlers.CheckSessionHandler {
 	return handlers.NewCheckSessionHandler()
+}
+
+func newBackchannelAuthenticationHandlerFromProvider(p godi.Provider) *handlers.BackchannelAuthenticationHandler {
+	return handlers.NewBackchannelAuthenticationHandler(
+		godi.GetRequired[validators.ClientSecretValidator](p),
+		godi.GetRequired[validators.BackchannelAuthenticationRequestValidator](p),
+	)
 }
 
 func newIntrospectionHandlerFromProvider(godi.Provider) *handlers.IntrospectionHandler {

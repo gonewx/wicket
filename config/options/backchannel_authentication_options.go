@@ -3,12 +3,24 @@
 
 package options
 
-type CleanRoomGapOptions struct {
-	Enabled bool
+type BackchannelAuthenticationOptions struct {
+	Enabled                    bool
+	AllowedDeliveryModes       []string
+	DefaultRequestLifetime     int
+	DefaultPollingInterval     int
+	SlowDownIntervalIncrement  int
+	UserCodeParameterSupported bool
 }
 
-func NewCleanRoomGapOptions() *CleanRoomGapOptions {
-	return &CleanRoomGapOptions{Enabled: false}
+func NewBackchannelAuthenticationOptions() *BackchannelAuthenticationOptions {
+	return &BackchannelAuthenticationOptions{
+		Enabled:                    true,
+		AllowedDeliveryModes:       []string{"poll"},
+		DefaultRequestLifetime:     300,
+		DefaultPollingInterval:     5,
+		SlowDownIntervalIncrement:  5,
+		UserCodeParameterSupported: true,
+	}
 }
 
 type MutualTlsOptions struct {

@@ -4,9 +4,14 @@
 package impl
 
 import (
+	"errors"
 	"log/slog"
 
+	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/claims"
+	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/storage"
+	storage_models "github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/validators"
 	validators_contexts "github.com/gonewx/wicket/validators/contexts"
 	validators_models "github.com/gonewx/wicket/validators/models"
@@ -131,10 +136,90 @@ func (v *ResourceValidator) ValidateRequestedResources(request *validators_model
 	return result, nil
 }
 
-// CleanRoomGapRequestIdValidator is a neutral placeholder for unsupported request-id validation.
-// input: none -> behavior: carry no validation state -> output: constructible service.
-type CleanRoomGapRequestIdValidator struct{}
+// BackchannelAuthenticationRequestIdValidator validates CIBA auth_req_id state.
+// input: context/store -> behavior: enforce client binding, expiry, status, and poll interval -> output: token validation result.
+type BackchannelAuthenticationRequestIdValidator struct {
+	store     storage.BackchannelAuthenticationRequestStore
+	throttler services.BackchannelAuthenticationThrottlingService
+	clock     services.SystemClock
+}
 
-func NewCleanRoomGapRequestIdValidator() CleanRoomGapRequestIdValidator {
-	return CleanRoomGapRequestIdValidator{}
+func NewBackchannelAuthenticationRequestIdValidator(store storage.BackchannelAuthenticationRequestStore, throttler services.BackchannelAuthenticationThrottlingService, clock services.SystemClock) *BackchannelAuthenticationRequestIdValidator {
+	return &BackchannelAuthenticationRequestIdValidator{store: store, throttler: throttler, clock: clock}
+}
+
+func (v *BackchannelAuthenticationRequestIdValidator) Validate(ctx *validators_models.BackchannelAuthenticationRequestIdValidationContext) error {
+	if ctx == nil || ctx.Request == nil {
+		return errors.New("validation context is required")
+	}
+	if ctx.RequestId == "" {
+		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsInvalidRequest, "")
+		return nil
+	}
+	request, err := v.store.FindBackchannelAuthenticationRequest(ctx.RequestId)
+	if err != nil {
+		return err
+	}
+	if request == nil || request.ClientId != ctx.Request.Client.ClientId {
+		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsInvalidGrant, "")
+		return nil
+	}
+	if !request.ExpirationTime.IsZero() && request.ExpirationTime.Before(v.clock.Now()) {
+		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsExpiredToken, "")
+		return nil
+	}
+	switch request.Status {
+	case storage_models.BackchannelAuthenticationRequestStatusApproved:
+		ctx.Request.BackchannelAuthenticationRequest = request
+		ctx.Request.Subject = request.Subject
+		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationSuccess(ctx.Request)
+	case storage_models.BackchannelAuthenticationRequestStatusDenied:
+		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsAccessDenied, "")
+	case storage_models.BackchannelAuthenticationRequestStatusConsumed:
+		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsInvalidGrant, "")
+	default:
+		slowDown, err := v.throttler.ShouldSlowDown(ctx.RequestId, request)
+		if err != nil {
+			return err
+		}
+		if err := v.store.UpdateBackchannelAuthenticationRequest(ctx.RequestId, request); err != nil {
+			return err
+		}
+		if slowDown {
+			ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsSlowDown, "")
+		} else {
+			ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsAuthorizationPending, "")
+		}
+	}
+	return nil
+}
+
+type BackchannelAuthenticationUserValidator struct{}
+
+func NewBackchannelAuthenticationUserValidator() BackchannelAuthenticationUserValidator {
+	return BackchannelAuthenticationUserValidator{}
+}
+
+func (BackchannelAuthenticationUserValidator) Validate(ctx *validators_models.BackchannelAuthenticationUserValidationContext) error {
+	if ctx == nil || (ctx.LoginHint == "" && ctx.IdTokenHint == "" && ctx.LoginHintToken == "") {
+		return gois.TokenErrorsInvalidRequest
+	}
+	subjectID := ctx.LoginHint
+	if subjectID == "" {
+		subjectID = ctx.LoginHintToken
+	}
+	if subjectID == "" {
+		subjectID = ctx.IdTokenHint
+	}
+	ctx.Subject = claims.NewClaimsPrincipal(
+		claims.WithClaimsPrincipalIdentity(
+			claims.NewClaimsIdentity(
+				claims.WithAuthenticationType(gois.WicketAuthenticationType),
+				claims.WithClaims([]*claims.Claim{
+					claims.NewClaim(claims.WithClaimType(gois.JwtClaimTypesSubject), claims.WithClaimValue(subjectID)),
+				}),
+			),
+		),
+	)
+	return nil
 }

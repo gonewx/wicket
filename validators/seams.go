@@ -5,6 +5,7 @@ package validators
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/gonewx/wicket/models"
 	storage_models "github.com/gonewx/wicket/storage/models"
@@ -49,13 +50,23 @@ type CustomTokenValidator interface {
 	ValidateIdentityToken(*validators_models.TokenValidationResult) *validators_models.TokenValidationResult
 }
 
-// CleanRoomGapRequestIdValidator is a placeholder for the clean-room gap grant.
-// input: request id -> behavior: reject unsupported validation -> output: validation result or error.
-type CleanRoomGapRequestIdValidator interface{}
+// BackchannelAuthenticationRequestIdValidator validates CIBA auth_req_id state for token polling.
+// input: validation context -> behavior: mutate result/store state -> output: error.
+type BackchannelAuthenticationRequestIdValidator interface {
+	Validate(*validators_models.BackchannelAuthenticationRequestIdValidationContext) error
+}
 
-// CleanRoomGapUserValidator is a placeholder for the clean-room gap user validator.
-// input: validation context -> behavior: reject unsupported validation -> output: error.
-type CleanRoomGapUserValidator interface{}
+// BackchannelAuthenticationUserValidator resolves a CIBA user hint into a subject.
+// input: validation context -> behavior: set subject or error -> output: error.
+type BackchannelAuthenticationUserValidator interface {
+	Validate(*validators_models.BackchannelAuthenticationUserValidationContext) error
+}
+
+// BackchannelAuthenticationRequestValidator validates a CIBA backchannel authentication request.
+// input: raw form values/client -> behavior: save request state -> output: validation result.
+type BackchannelAuthenticationRequestValidator interface {
+	Validate(url.Values, *storage_models.Client) *validators_models.BackchannelAuthenticationRequestValidationResult
+}
 
 // SecretsListParser selects a parsed secret from an HTTP request.
 // input: HTTP request -> behavior: parse supported secret forms -> output: parsed secret or error.

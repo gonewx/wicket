@@ -29,21 +29,21 @@ import (
 )
 
 type TokenRequestValidator struct {
-	Options                        *config_options.WicketOptions
-	IssuerNameService              services.IssuerNameService
-	ResourceStore                  storage.ResourceStore
-	AuthorizationCodeStore         storage.AuthorizationCodeStore
-	RefreshTokenStore              storage.RefreshTokenStore
-	ExtensionGrantValidator        *ExtensionGrantValidator
-	CustomRequestValidator         validators.CustomTokenRequestValidator
-	ResourceValidator              validators.ResourceValidator
-	RefreshTokenService            services.RefreshTokenService
-	ResourceOwnerValidator         validators.ResourceOwnerPasswordValidator
-	Profile                        services.ProfileService
-	DeviceCodeValidator            validators.DeviceCodeValidator
-	CleanRoomGapRequestIdValidator validators.CleanRoomGapRequestIdValidator
-	Clock                          services.SystemClock
-	Logger                         *slog.Logger
+	Options                                     *config_options.WicketOptions
+	IssuerNameService                           services.IssuerNameService
+	ResourceStore                               storage.ResourceStore
+	AuthorizationCodeStore                      storage.AuthorizationCodeStore
+	RefreshTokenStore                           storage.RefreshTokenStore
+	ExtensionGrantValidator                     *ExtensionGrantValidator
+	CustomRequestValidator                      validators.CustomTokenRequestValidator
+	ResourceValidator                           validators.ResourceValidator
+	RefreshTokenService                         services.RefreshTokenService
+	ResourceOwnerValidator                      validators.ResourceOwnerPasswordValidator
+	Profile                                     services.ProfileService
+	DeviceCodeValidator                         validators.DeviceCodeValidator
+	BackchannelAuthenticationRequestIdValidator validators.BackchannelAuthenticationRequestIdValidator
+	Clock                                       services.SystemClock
+	Logger                                      *slog.Logger
 
 	validatedRequest *models.ValidatedTokenRequest
 }
@@ -60,25 +60,25 @@ func NewTokenRequestValidator(
 	resourceOwnerValidator validators.ResourceOwnerPasswordValidator,
 	profile services.ProfileService,
 	deviceCodeValidator validators.DeviceCodeValidator,
-	backChannelAuthenticationRequestIdValidator validators.CleanRoomGapRequestIdValidator,
+	backChannelAuthenticationRequestIdValidator validators.BackchannelAuthenticationRequestIdValidator,
 	clock services.SystemClock,
 	logger *slog.Logger,
 ) *TokenRequestValidator {
 	return &TokenRequestValidator{
-		Options:                        options,
-		IssuerNameService:              issuerNameService,
-		AuthorizationCodeStore:         authorizationCodeStore,
-		ExtensionGrantValidator:        extensionGrantValidator,
-		CustomRequestValidator:         customRequestValidator,
-		ResourceValidator:              resourceValidator,
-		ResourceStore:                  resourceStore,
-		RefreshTokenService:            refreshTokenService,
-		ResourceOwnerValidator:         resourceOwnerValidator,
-		Profile:                        profile,
-		DeviceCodeValidator:            deviceCodeValidator,
-		CleanRoomGapRequestIdValidator: backChannelAuthenticationRequestIdValidator,
-		Clock:                          clock,
-		Logger:                         logger,
+		Options:                 options,
+		IssuerNameService:       issuerNameService,
+		AuthorizationCodeStore:  authorizationCodeStore,
+		ExtensionGrantValidator: extensionGrantValidator,
+		CustomRequestValidator:  customRequestValidator,
+		ResourceValidator:       resourceValidator,
+		ResourceStore:           resourceStore,
+		RefreshTokenService:     refreshTokenService,
+		ResourceOwnerValidator:  resourceOwnerValidator,
+		Profile:                 profile,
+		DeviceCodeValidator:     deviceCodeValidator,
+		BackchannelAuthenticationRequestIdValidator: backChannelAuthenticationRequestIdValidator,
+		Clock:  clock,
+		Logger: logger,
 	}
 }
 
@@ -149,8 +149,8 @@ func (s *TokenRequestValidator) ValidateRequest(parameters url.Values, clientVal
 		return s.runValidation(s.validateRefreshTokenRequest, parameters)
 	case gois.GrantTypeDeviceCode:
 		return s.runValidation(s.validateDeviceCodeRequest, parameters)
-	case gois.GrantTypeCleanRoomGap:
-		return s.runValidation(s.validateCleanRoomGapRequestRequest, parameters)
+	case gois.GrantTypeBackchannelAuthentication:
+		return s.runValidation(s.validateBackchannelAuthenticationRequest, parameters)
 	default:
 		return s.runValidation(s.validateExtensionGrantRequest, parameters)
 	}
@@ -178,8 +178,6 @@ func (s *TokenRequestValidator) runValidation(validationFunc func(url.Values) *m
 
 		return customValidationContext.Result
 	}
-
-	//TODO: CleanRoomValidationGap
 
 	return customValidationContext.Result
 }
@@ -294,8 +292,6 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(parameters url.
 			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope.")
 		}
 	}
-
-	//TODO: CleanRoomValidationGap
 
 	s.validatedRequest.ValidatedResources = validatedResources.FilterByResourceGap(s.validatedRequest.RequestedResourceGap)
 
@@ -595,9 +591,49 @@ func (s *TokenRequestValidator) validateDeviceCodeRequest(parameters url.Values)
 	return s.valid()
 }
 
-func (s *TokenRequestValidator) validateCleanRoomGapRequestRequest(parameters url.Values) *models.TokenRequestValidationResult {
-	s.Logger.Debug("Clean-room gap grant is not implemented")
-	return s.invalid(gois.TokenErrorsUnsupportedGrantType, "")
+func (s *TokenRequestValidator) validateBackchannelAuthenticationRequest(parameters url.Values) *models.TokenRequestValidationResult {
+	s.Logger.Debug("Start validation of CIBA token request")
+	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeBackchannelAuthentication) {
+		return s.invalid(gois.TokenErrorsUnauthorizedClient, "")
+	}
+	requestID := parameters.Get(gois.TokenRequestAuthenticationRequestId)
+	if requestID == "" {
+		return s.invalid(gois.TokenErrorsInvalidRequest, "")
+	}
+	if len(requestID) > s.Options.InputLengthRestrictions.AuthenticationRequestId {
+		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+	}
+	ctx := &validators_models.BackchannelAuthenticationRequestIdValidationContext{
+		RequestId: requestID,
+		Request:   s.validatedRequest,
+	}
+	if err := s.BackchannelAuthenticationRequestIdValidator.Validate(ctx); err != nil {
+		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+	}
+	if ctx.Result == nil {
+		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+	}
+	if ctx.Result.Error != nil {
+		return ctx.Result
+	}
+	validatedResources, err := s.ResourceValidator.ValidateRequestedResources(
+		&validators_models.ResourceValidationRequest{
+			Client:       s.validatedRequest.Client,
+			Scopes:       s.validatedRequest.BackchannelAuthenticationRequest.RequestedScopes,
+			ResourceGaps: s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps,
+		},
+	)
+	if err != nil {
+		return s.invalid(err, "")
+	}
+	if !validatedResources.Succeeded() {
+		if len(validatedResources.InvalidResourceGaps) > 0 {
+			return s.invalid(gois.TokenErrorsInvalidTarget, "")
+		}
+		return s.invalid(gois.TokenErrorsInvalidScope, "")
+	}
+	s.validatedRequest.ValidatedResources = validatedResources.FilterByResourceGap(s.validatedRequest.RequestedResourceGap)
+	return s.valid()
 }
 
 func (s *TokenRequestValidator) validateExtensionGrantRequest(parameters url.Values) *models.TokenRequestValidationResult {
@@ -740,8 +776,6 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(parameters u
 	}
 
 	s.validatedRequest.RequestedScopes = requestedScopes
-
-	//TODO: CleanRoomValidationGap
 
 	s.validatedRequest.ValidatedResources = resourceValidationResult.FilterByResourceGap(s.validatedRequest.RequestedResourceGap)
 

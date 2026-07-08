@@ -134,8 +134,8 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 			entries[gois.DiscoveryDeviceAuthorizationEndpoint] = baseUrl + gois.ProtocolRoutePathsDeviceAuthorization
 		}
 
-		if g.options.Endpoints.EnableCleanRoomGapEndpoint {
-			entries[gois.DiscoveryCleanRoomGapEndpoint] = baseUrl + gois.ProtocolRoutePathsCleanRoomGap
+		if g.options.Endpoints.EnableBackchannelAuthenticationEndpoint {
+			entries[gois.DiscoveryBackchannelAuthenticationEndpoint] = baseUrl + gois.ProtocolRoutePathsBackchannelAuthentication
 		}
 
 		if g.options.MutualTls.Enabled {
@@ -256,8 +256,8 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 			standardGrantTypes = append(standardGrantTypes, gois.GrantTypeDeviceCode)
 		}
 
-		if g.options.Endpoints.EnableCleanRoomGapEndpoint {
-			standardGrantTypes = append(standardGrantTypes, gois.GrantTypeCleanRoomGap)
+		if g.options.Endpoints.EnableBackchannelAuthenticationEndpoint {
+			standardGrantTypes = append(standardGrantTypes, gois.GrantTypeBackchannelAuthentication)
 		}
 
 		if g.options.Discovery.ShowExtensionGrantTypes {
@@ -334,10 +334,10 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 		entries[gois.DiscoveryTlsClientCertificateBoundAccessTokens] = true
 	}
 
-	if g.options.Endpoints.EnableCleanRoomGapEndpoint {
+	if g.options.Endpoints.EnableBackchannelAuthenticationEndpoint {
 		entries[gois.DiscoveryBackchannelTokenDeliveryModesSupported] =
-			[]string{gois.BackchannelTokenDeliveryModesPoll}
-		entries[gois.DiscoveryBackchannelUserCodeParameterSupported] = true
+			g.options.BackchannelAuthentication.AllowedDeliveryModes
+		entries[gois.DiscoveryBackchannelUserCodeParameterSupported] = g.options.BackchannelAuthentication.UserCodeParameterSupported
 	}
 
 	// custom entries
