@@ -4,6 +4,7 @@ package di
 import (
 	"reflect"
 
+	"crypto/rand"
 	"fmt"
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket"
@@ -19,6 +20,7 @@ import (
 	"github.com/gonewx/wicket/hosting"
 	"github.com/gonewx/wicket/hosting/dynamic/schemes"
 	"github.com/gonewx/wicket/infrastructure"
+	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/models/messages"
 	"github.com/gonewx/wicket/responses"
@@ -70,6 +72,7 @@ type Root struct {
 	f_PersistedGrantStore                                    storage.PersistedGrantStore
 	f_DeviceFlowStore                                        storage.DeviceFlowStore
 	f_BackchannelAuthenticationRequestStore                  storage.BackchannelAuthenticationRequestStore
+	f_Ptr_Manager                                            *keymgmt.Manager
 	f_MemoryDistributedCache                                 services.DistributedCache
 	f_DefaultHttpContextAccessor                             accessor.HttpContextAccessor
 	f_HandlerProvider                                        auth.HandlerProvider
@@ -182,6 +185,48 @@ func NewRoot() (*Root, error) {
 	})(r)
 	r.f_BackchannelAuthenticationRequestStore = (func(p godi.Provider) storage.BackchannelAuthenticationRequestStore {
 		return &lazyBackchannelAuthenticationRequestStore{cfg: godi.GetRequired[*ServerConfig](p)}
+	})(r)
+	r.f_Ptr_Manager = (func(p godi.Provider) *keymgmt.Manager {
+		opts := godi.GetRequired[*options.KeyManagementOptions](p)
+
+		// TokenLifetimeCeiling stays unset here: token lifetimes are per-client
+		// runtime data, so no ceiling is visible at composition time. A host
+		// constructing the manager directly may supply one to arm the retention
+		// adequacy warning.
+		cfg := keymgmt.Config{
+			Enabled:             opts.Enabled,
+			AutoCreate:          resolveAutoCreate(opts),
+			RotationInterval:    opts.RotationInterval,
+			ActivationLeadTime:  opts.ActivationLeadTime,
+			RetentionDuration:   opts.RetentionDuration,
+			AllowedAlgorithms:   opts.AllowedAlgorithms,
+			DefaultAlgorithm:    opts.DefaultAlgorithm,
+			CacheTTL:            opts.CacheTTL,
+			ClockSkew:           opts.ClockSkew,
+			AllowMultipleActive: opts.AllowMultipleActive,
+		}
+
+		store := opts.StorageProvider
+		if store == nil {
+			store = keymgmt.NewMemoryRecordStore()
+		}
+
+		var provider dp.DataProtectionProvider = opts.Protector
+		if provider == nil {
+			provider = godi.GetRequired[dp.DataProtectionProvider](p)
+		}
+
+		var clock keymgmt.Clock = opts.Clock
+		if clock == nil {
+			clock = godi.GetRequired[services.SystemClock](p)
+		}
+
+		var entropy keymgmt.Entropy = opts.Entropy
+		if entropy == nil {
+			entropy = rand.Reader
+		}
+
+		return keymgmt.NewManager(cfg, store, provider, clock, entropy, godi.GetRequired[*slog.Logger](p))
 	})(r)
 	r.f_MemoryDistributedCache = memory2.NewMemoryDistributedCache()
 	r.f_DefaultHttpContextAccessor = accessor.NewDefaultHttpContextAccessor()
@@ -609,7 +654,7 @@ func (r *Root) NewPersistedGrantService() services.PersistedGrantService {
 }
 
 func (r *Root) NewKeyMaterialService() services.KeyMaterialService {
-	return impl.NewKeyMaterialService(r.NewSlice_SigningCredentialStore(), r.NewSlice_ValidationKeysStore())
+	return impl.NewKeyMaterialService(r.NewSlice_SigningCredentialStore(), r.NewSlice_ValidationKeysStore(), r.f_Ptr_Manager, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewTokenCreationService() services.TokenCreationService {
@@ -926,6 +971,8 @@ func (r *Root) BackchannelAuthenticationRequestStore() storage.BackchannelAuthen
 	return r.f_BackchannelAuthenticationRequestStore
 }
 
+func (r *Root) Ptr_Manager() *keymgmt.Manager { return r.f_Ptr_Manager }
+
 func (r *Root) MemoryDistributedCache() services.DistributedCache { return r.f_MemoryDistributedCache }
 
 func (r *Root) DefaultHttpContextAccessor() accessor.HttpContextAccessor {
@@ -982,6 +1029,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_DeviceFlowStore
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return r.f_BackchannelAuthenticationRequestStore
+	case reflect.TypeFor[*keymgmt.Manager]():
+		return r.f_Ptr_Manager
 	case reflect.TypeFor[services.DistributedCache]():
 		return r.f_MemoryDistributedCache
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -1336,6 +1385,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return true
+	case reflect.TypeFor[*keymgmt.Manager]():
+		return true
 	case reflect.TypeFor[*impl4.PersistentGrantSerializer]():
 		return true
 	case reflect.TypeFor[storage.MessageStore[messages.LogoutMessage]]():
@@ -1519,6 +1570,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{r.f_DeviceFlowStore}
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return []any{r.f_BackchannelAuthenticationRequestStore}
+	case reflect.TypeFor[*keymgmt.Manager]():
+		return []any{r.f_Ptr_Manager}
 	case reflect.TypeFor[services.DistributedCache]():
 		return []any{r.f_MemoryDistributedCache}
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -1816,6 +1869,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_DeviceFlowStore
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return s.root.f_BackchannelAuthenticationRequestStore
+	case reflect.TypeFor[*keymgmt.Manager]():
+		return s.root.f_Ptr_Manager
 	case reflect.TypeFor[services.DistributedCache]():
 		return s.root.f_MemoryDistributedCache
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -2069,6 +2124,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[storage.DeviceFlowStore]():
 		return true
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+		return true
+	case reflect.TypeFor[*keymgmt.Manager]():
 		return true
 	case reflect.TypeFor[services.DistributedCache]():
 		return true
@@ -2347,6 +2404,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{s.root.f_DeviceFlowStore}
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return []any{s.root.f_BackchannelAuthenticationRequestStore}
+	case reflect.TypeFor[*keymgmt.Manager]():
+		return []any{s.root.f_Ptr_Manager}
 	case reflect.TypeFor[services.DistributedCache]():
 		return []any{s.root.f_MemoryDistributedCache}
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -2996,7 +3055,7 @@ func (s *scope) NewPersistedGrantService() services.PersistedGrantService {
 }
 
 func (s *scope) NewKeyMaterialService() services.KeyMaterialService {
-	return impl.NewKeyMaterialService(s.NewSlice_SigningCredentialStore(), s.NewSlice_ValidationKeysStore())
+	return impl.NewKeyMaterialService(s.NewSlice_SigningCredentialStore(), s.NewSlice_ValidationKeysStore(), s.root.f_Ptr_Manager, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewTokenCreationService() services.TokenCreationService {
@@ -3316,6 +3375,8 @@ func (s *scope) DeviceFlowStore() storage.DeviceFlowStore { return s.root.f_Devi
 func (s *scope) BackchannelAuthenticationRequestStore() storage.BackchannelAuthenticationRequestStore {
 	return s.root.f_BackchannelAuthenticationRequestStore
 }
+
+func (s *scope) Ptr_Manager() *keymgmt.Manager { return s.root.f_Ptr_Manager }
 
 func (s *scope) MemoryDistributedCache() services.DistributedCache {
 	return s.root.f_MemoryDistributedCache

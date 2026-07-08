@@ -12,4 +12,8 @@ type SecurityKeyInfo struct {
 	// The key
 	Key              tokens.SecurityKey
 	SigningAlgorithm string
+	// KeyId is the stable public JWKS key id. When set it is published verbatim
+	// so a token header kid resolves through JWKS; when empty the JWK serializer
+	// derives one from the key material.
+	KeyId string
 }
