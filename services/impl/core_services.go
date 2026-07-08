@@ -16,14 +16,12 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
 	config_options "github.com/gonewx/wicket/config/options"
-	core_models "github.com/gonewx/wicket/models"
 	"github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/models/messages"
 	responses_models "github.com/gonewx/wicket/responses/models"
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/storage"
 	storage_models "github.com/gonewx/wicket/storage/models"
-	"github.com/gonewx/wicket/tokens"
 	"github.com/gonewx/wicket/utils"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -200,49 +198,6 @@ func (ClaimsService) GetAccessTokenClaims(subject *claims.ClaimsPrincipal, resou
 		return nil, nil
 	}
 	return subject.Claims(), nil
-}
-
-type KeyMaterialService struct {
-	signingStores    []storage.SigningCredentialStore
-	validationStores []storage.ValidationKeysStore
-}
-
-func NewKeyMaterialService(signingStores []storage.SigningCredentialStore, validationStores []storage.ValidationKeysStore) *KeyMaterialService {
-	return &KeyMaterialService{signingStores: signingStores, validationStores: validationStores}
-}
-
-func (s *KeyMaterialService) GetSigningCredentials(allowed []string) (*tokens.SigningCredentials, error) {
-	all, err := s.GetAllSigningCredentials()
-	if err != nil || len(all) == 0 {
-		return nil, err
-	}
-	return all[0], nil
-}
-
-func (s *KeyMaterialService) GetAllSigningCredentials() ([]*tokens.SigningCredentials, error) {
-	out := make([]*tokens.SigningCredentials, 0)
-	for _, store := range s.signingStores {
-		credential, err := store.GetSigningCredentials()
-		if err != nil {
-			return nil, err
-		}
-		if credential != nil {
-			out = append(out, credential)
-		}
-	}
-	return out, nil
-}
-
-func (s *KeyMaterialService) GetValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
-	out := make([]*core_models.SecurityKeyInfo, 0)
-	for _, store := range s.validationStores {
-		keys, err := store.GetValidationKeys()
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, keys...)
-	}
-	return out, nil
 }
 
 type TokenCreationService struct{}
