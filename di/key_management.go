@@ -26,6 +26,10 @@ func registerKeyManagement() {
 	godi.AddSingletonFactory[*keymgmt.Manager](&r, func(p godi.Provider) *keymgmt.Manager {
 		opts := godi.GetRequired[*config_options.KeyManagementOptions](p)
 
+		// TokenLifetimeCeiling stays unset here: token lifetimes are per-client
+		// runtime data, so no ceiling is visible at composition time. A host
+		// constructing the manager directly may supply one to arm the retention
+		// adequacy warning.
 		cfg := keymgmt.Config{
 			Enabled:             opts.Enabled,
 			AutoCreate:          resolveAutoCreate(opts),
