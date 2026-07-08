@@ -16,7 +16,7 @@ type AuthSchemeProvider struct {
 	inner auth.SchemeProvider
 }
 
-func NewAuthSchemeProvider(inner *gois.Decorator[auth.SchemeProvider], gap *config_options.DynamicProviderOptions) AuthSchemeProvider {
+func NewAuthSchemeProvider(inner *gois.Decorator[auth.SchemeProvider], dynamicProviders *config_options.DynamicProviderOptions) AuthSchemeProvider {
 	if inner == nil {
 		return AuthSchemeProvider{}
 	}
@@ -90,7 +90,7 @@ func (p AuthSchemeProvider) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {
 	return p.inner.GetRequestHandlerSchemes()
 }
 
-func UseSchemeAuthMiddleware(logger *slog.Logger, gap *config_options.DynamicProviderOptions) func(http.Handler) http.Handler {
+func UseSchemeAuthMiddleware(logger *slog.Logger, dynamicProviders *config_options.DynamicProviderOptions) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return next
 	}
