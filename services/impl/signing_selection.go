@@ -143,10 +143,12 @@ func (s *KeyMaterialService) GetAllSigningCredentials() ([]*tokens.SigningCreden
 }
 
 // GetValidationKeys aggregates auto-managed validation keys and host validation
-// stores. Per-store read errors are isolated so one failing store does not hide
-// the surviving keys; a duplicate public id keeps the auto-managed key and omits
-// the later duplicate. It fails closed only when every source errored and no key
-// survived.
+// stores. Per-host-store read errors are isolated so one failing store does not
+// hide the surviving keys; a duplicate public id keeps the auto-managed key and
+// omits the later duplicate. A failure of the enabled automatic key set is not
+// isolated: the kids currently signing could be missing from the output, and a
+// JWKS without them breaks verification, so the error propagates. Host-store
+// aggregation fails closed only when every source errored and no key survived.
 func (s *KeyMaterialService) GetValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
 	out := make([]*core_models.SecurityKeyInfo, 0)
 	seen := map[string]bool{}
@@ -170,13 +172,10 @@ func (s *KeyMaterialService) GetValidationKeys() ([]*core_models.SecurityKeyInfo
 	if s.autoEnabled() {
 		keys, err := s.manager.ValidationKeys()
 		if err != nil {
-			failed = true
-			firstErr = err
-			s.warn("automatic validation keys unavailable", "err", err)
-		} else {
-			for _, key := range keys {
-				appendKey(key)
-			}
+			return nil, err
+		}
+		for _, key := range keys {
+			appendKey(key)
 		}
 	}
 
