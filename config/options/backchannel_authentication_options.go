@@ -32,14 +32,6 @@ func NewMutualTlsOptions() *MutualTlsOptions {
 	return &MutualTlsOptions{Enabled: false}
 }
 
-type KeyManagementOptions struct {
-	Enabled bool
-}
-
-func NewKeyManagementOptions() *KeyManagementOptions {
-	return &KeyManagementOptions{Enabled: false}
-}
-
 type DynamicProviderOptions struct {
 	Enabled bool
 }
