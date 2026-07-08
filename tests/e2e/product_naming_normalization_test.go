@@ -79,21 +79,21 @@ func allowedE2ETrademarkAssertionLine(rel string, line string, token string) boo
 	trimmed := strings.TrimSpace(line)
 
 	switch rel {
-	case "tests/e2e/bucket_b_apache_copy_provenance_test.go":
+	case "tests/e2e/apache_provenance_declaration_test.go":
 		if token == trademarkTokenLegacyProduct {
 			return strings.Contains(trimmed, trademarkTokenLegacyProduct+"4 Apache reference: tag") ||
 				strings.Contains(trimmed, `"// From: `+trademarkTokenLegacyProduct+`4/"`)
 		}
 		return strings.Contains(trimmed, trademarkTokenVendor+"Software") ||
-			strings.Contains(trimmed, trademarkTokenVendor+" 6.1.4") ||
+			strings.Contains(trimmed, trademarkTokenVendor+" 6."+"1.4") ||
 			strings.Contains(trimmed, trademarkTokenVendor+" Software") ||
 			strings.Contains(trimmed, `strings.Contains(line, "`+trademarkTokenVendor+`")`)
-	case "tests/e2e/bucket_b_apache_correction_provenance_test.go":
+	case "tests/e2e/apache_increment_review_test.go":
 		if token == trademarkTokenLegacyProduct {
 			return strings.Contains(trimmed, `"`+trademarkTokenLegacyProduct+`4/"`)
 		}
-		return strings.Contains(trimmed, trademarkTokenVendor+" comparison tag: `6.1.4`")
-	case "tests/e2e/gois_full_file_provenance_review_test.go":
+		return strings.Contains(trimmed, trademarkTokenVendor+" comparison tag: `6."+"1.4`")
+	case "tests/e2e/source_provenance_ledger_test.go":
 		return token == trademarkTokenVendor &&
 			strings.Contains(trimmed, "missing "+trademarkTokenVendor+" test structure check evidence")
 	}

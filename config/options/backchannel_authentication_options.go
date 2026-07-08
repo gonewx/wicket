@@ -32,26 +32,26 @@ func NewMutualTlsOptions() *MutualTlsOptions {
 	return &MutualTlsOptions{Enabled: false}
 }
 
-type CleanRoomKeyGapOptions struct {
+type KeyManagementOptions struct {
 	Enabled bool
 }
 
-func NewCleanRoomKeyGapOptions() *CleanRoomKeyGapOptions {
-	return &CleanRoomKeyGapOptions{Enabled: false}
+func NewKeyManagementOptions() *KeyManagementOptions {
+	return &KeyManagementOptions{Enabled: false}
 }
 
-type CleanRoomProviderGapOptions struct {
+type DynamicProviderOptions struct {
 	Enabled bool
 }
 
-func NewCleanRoomProviderGapOptions() *CleanRoomProviderGapOptions {
-	return &CleanRoomProviderGapOptions{Enabled: false}
+func NewDynamicProviderOptions() *DynamicProviderOptions {
+	return &DynamicProviderOptions{Enabled: false}
 }
 
-type CleanRoomSessionGapOptions struct {
+type ServerSideSessionOptions struct {
 	Enabled bool
 }
 
-func NewCleanRoomSessionGapOptions() *CleanRoomSessionGapOptions {
-	return &CleanRoomSessionGapOptions{Enabled: false}
+func NewServerSideSessionOptions() *ServerSideSessionOptions {
+	return &ServerSideSessionOptions{Enabled: false}
 }

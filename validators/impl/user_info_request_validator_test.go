@@ -7,13 +7,13 @@ package impl
 import "testing"
 
 func TestToken_without_sub_should_fail(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestActive_user_should_succeed(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestUserInfoRequestValidatorInactive_user_should_fail(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }

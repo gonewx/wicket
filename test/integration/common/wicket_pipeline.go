@@ -342,7 +342,7 @@ func (p *WicketPipeline) GetSessionCookie() *http.Cookie {
 func (p *WicketPipeline) Initialize() {
 
 	p.Options = godi.GetRequired[*config_options.WicketOptions](p.Root)
-	p.Options.CleanRoomKeyGap.Enabled = false
+	p.Options.KeyManagement.Enabled = false
 
 	p.UserStore = test.NewTestUserStore(p.Users)
 

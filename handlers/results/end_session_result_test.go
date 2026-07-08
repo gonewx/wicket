@@ -7,13 +7,13 @@ package results
 import "testing"
 
 func TestEndSessionResultValidatedSignoutShouldPassLogoutMessage(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestEndSessionResultUnvalidatedSignoutShouldNotPassLogoutMessage(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestEndSessionResultErrorResultShouldNotPassLogoutMessage(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }

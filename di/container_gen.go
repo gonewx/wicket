@@ -135,7 +135,7 @@ func NewRoot() (*Root, error) {
 	r.f_Ptr_WicketOptions = (func(p godi.Provider) *options.WicketOptions {
 		v, err := godi.GetRequired[options2.Options[*options.WicketOptions]](p).Value()
 		if err != nil {
-			// Accepted design decision (code review of Story 2.3, 2026-07-03):
+			// Accepted design decision from code review dated 2026-07-03:
 			// dotnet resolver exceptions fail startup synchronously, so this
 			// factory panics at construction time instead of threading the
 			// error through NewRoot()'s error return, matching that fail-fast
@@ -303,7 +303,7 @@ func (r *Root) NewPtr_Decorator_auth_SchemeProvider() *gois.Decorator[auth.Schem
 }
 
 func (r *Root) NewAuthSchemeProvider() auth.SchemeProvider {
-	return schemes.NewAuthSchemeProvider(r.NewPtr_Decorator_auth_SchemeProvider(), r.NewPtr_CleanRoomProviderGapOptions())
+	return schemes.NewAuthSchemeProvider(r.NewPtr_Decorator_auth_SchemeProvider(), r.NewPtr_DynamicProviderOptions())
 }
 
 func (r *Root) NewPtr_Decorator_auth_Service() *gois.Decorator[auth.Service] {
@@ -336,15 +336,15 @@ func (r *Root) NewOptionsFactory__cookies_AuthenticationOptions() options2.Optio
 	})(r)
 }
 
-func (r *Root) NewPtr_CleanRoomProviderGapOptions() *options.CleanRoomProviderGapOptions {
-	return (func(p godi.Provider) *options.CleanRoomProviderGapOptions {
-		return godi.GetRequired[*options.WicketOptions](p).CleanRoomProviderGap
+func (r *Root) NewPtr_DynamicProviderOptions() *options.DynamicProviderOptions {
+	return (func(p godi.Provider) *options.DynamicProviderOptions {
+		return godi.GetRequired[*options.WicketOptions](p).DynamicProviders
 	})(r)
 }
 
-func (r *Root) NewPtr_CleanRoomKeyGapOptions() *options.CleanRoomKeyGapOptions {
-	return (func(p godi.Provider) *options.CleanRoomKeyGapOptions {
-		return godi.GetRequired[*options.WicketOptions](p).CleanRoomKeyGap
+func (r *Root) NewPtr_KeyManagementOptions() *options.KeyManagementOptions {
+	return (func(p godi.Provider) *options.KeyManagementOptions {
+		return godi.GetRequired[*options.WicketOptions](p).KeyManagement
 	})(r)
 }
 
@@ -1034,10 +1034,10 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewService__2()
 	case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
 		return r.NewOptionsFactory__cookies_AuthenticationOptions()
-	case reflect.TypeFor[*options.CleanRoomProviderGapOptions]():
-		return r.NewPtr_CleanRoomProviderGapOptions()
-	case reflect.TypeFor[*options.CleanRoomKeyGapOptions]():
-		return r.NewPtr_CleanRoomKeyGapOptions()
+	case reflect.TypeFor[*options.DynamicProviderOptions]():
+		return r.NewPtr_DynamicProviderOptions()
+	case reflect.TypeFor[*options.KeyManagementOptions]():
+		return r.NewPtr_KeyManagementOptions()
 	case reflect.TypeFor[services.ServerUrls]():
 		return r.NewServerUrls()
 	case reflect.TypeFor[services.IssuerNameService]():
@@ -1280,9 +1280,9 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[*options.PersistentGrantOptions]():
 		return true
-	case reflect.TypeFor[*options.CleanRoomProviderGapOptions]():
+	case reflect.TypeFor[*options.DynamicProviderOptions]():
 		return true
-	case reflect.TypeFor[*options.CleanRoomKeyGapOptions]():
+	case reflect.TypeFor[*options.KeyManagementOptions]():
 		return true
 	case reflect.TypeFor[services.ServerUrls]():
 		return true
@@ -1571,10 +1571,10 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{r.NewService__2()}
 	case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
 		return []any{r.NewOptionsFactory__cookies_AuthenticationOptions()}
-	case reflect.TypeFor[*options.CleanRoomProviderGapOptions]():
-		return []any{r.NewPtr_CleanRoomProviderGapOptions()}
-	case reflect.TypeFor[*options.CleanRoomKeyGapOptions]():
-		return []any{r.NewPtr_CleanRoomKeyGapOptions()}
+	case reflect.TypeFor[*options.DynamicProviderOptions]():
+		return []any{r.NewPtr_DynamicProviderOptions()}
+	case reflect.TypeFor[*options.KeyManagementOptions]():
+		return []any{r.NewPtr_KeyManagementOptions()}
 	case reflect.TypeFor[services.ServerUrls]():
 		return []any{r.NewServerUrls()}
 	case reflect.TypeFor[services.IssuerNameService]():
@@ -1868,10 +1868,10 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewService__2()
 	case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
 		return s.NewOptionsFactory__cookies_AuthenticationOptions()
-	case reflect.TypeFor[*options.CleanRoomProviderGapOptions]():
-		return s.NewPtr_CleanRoomProviderGapOptions()
-	case reflect.TypeFor[*options.CleanRoomKeyGapOptions]():
-		return s.NewPtr_CleanRoomKeyGapOptions()
+	case reflect.TypeFor[*options.DynamicProviderOptions]():
+		return s.NewPtr_DynamicProviderOptions()
+	case reflect.TypeFor[*options.KeyManagementOptions]():
+		return s.NewPtr_KeyManagementOptions()
 	case reflect.TypeFor[services.ServerUrls]():
 		return s.NewServerUrls()
 	case reflect.TypeFor[services.IssuerNameService]():
@@ -2122,9 +2122,9 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
 		return true
-	case reflect.TypeFor[*options.CleanRoomProviderGapOptions]():
+	case reflect.TypeFor[*options.DynamicProviderOptions]():
 		return true
-	case reflect.TypeFor[*options.CleanRoomKeyGapOptions]():
+	case reflect.TypeFor[*options.KeyManagementOptions]():
 		return true
 	case reflect.TypeFor[services.ServerUrls]():
 		return true
@@ -2399,10 +2399,10 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{s.NewService__2()}
 	case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
 		return []any{s.NewOptionsFactory__cookies_AuthenticationOptions()}
-	case reflect.TypeFor[*options.CleanRoomProviderGapOptions]():
-		return []any{s.NewPtr_CleanRoomProviderGapOptions()}
-	case reflect.TypeFor[*options.CleanRoomKeyGapOptions]():
-		return []any{s.NewPtr_CleanRoomKeyGapOptions()}
+	case reflect.TypeFor[*options.DynamicProviderOptions]():
+		return []any{s.NewPtr_DynamicProviderOptions()}
+	case reflect.TypeFor[*options.KeyManagementOptions]():
+		return []any{s.NewPtr_KeyManagementOptions()}
 	case reflect.TypeFor[services.ServerUrls]():
 		return []any{s.NewServerUrls()}
 	case reflect.TypeFor[services.IssuerNameService]():
@@ -2690,7 +2690,7 @@ func (s *scope) NewPtr_Decorator_auth_SchemeProvider() *gois.Decorator[auth.Sche
 }
 
 func (s *scope) NewAuthSchemeProvider() auth.SchemeProvider {
-	return schemes.NewAuthSchemeProvider(s.NewPtr_Decorator_auth_SchemeProvider(), s.NewPtr_CleanRoomProviderGapOptions())
+	return schemes.NewAuthSchemeProvider(s.NewPtr_Decorator_auth_SchemeProvider(), s.NewPtr_DynamicProviderOptions())
 }
 
 func (s *scope) NewPtr_Decorator_auth_Service() *gois.Decorator[auth.Service] {
@@ -2723,15 +2723,15 @@ func (s *scope) NewOptionsFactory__cookies_AuthenticationOptions() options2.Opti
 	})(s)
 }
 
-func (s *scope) NewPtr_CleanRoomProviderGapOptions() *options.CleanRoomProviderGapOptions {
-	return (func(p godi.Provider) *options.CleanRoomProviderGapOptions {
-		return godi.GetRequired[*options.WicketOptions](p).CleanRoomProviderGap
+func (s *scope) NewPtr_DynamicProviderOptions() *options.DynamicProviderOptions {
+	return (func(p godi.Provider) *options.DynamicProviderOptions {
+		return godi.GetRequired[*options.WicketOptions](p).DynamicProviders
 	})(s)
 }
 
-func (s *scope) NewPtr_CleanRoomKeyGapOptions() *options.CleanRoomKeyGapOptions {
-	return (func(p godi.Provider) *options.CleanRoomKeyGapOptions {
-		return godi.GetRequired[*options.WicketOptions](p).CleanRoomKeyGap
+func (s *scope) NewPtr_KeyManagementOptions() *options.KeyManagementOptions {
+	return (func(p godi.Provider) *options.KeyManagementOptions {
+		return godi.GetRequired[*options.WicketOptions](p).KeyManagement
 	})(s)
 }
 

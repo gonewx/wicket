@@ -15,4 +15,3 @@ type DataProtector interface {
 	Protect([]byte) []byte
 	Unprotect([]byte) ([]byte, error)
 }
-

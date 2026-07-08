@@ -32,11 +32,11 @@ type WicketOptions struct {
 	BackchannelAuthentication *BackchannelAuthenticationOptions
 	// Logging            LoggingOptions
 	MutualTls        *MutualTlsOptions
-	CleanRoomKeyGap  *CleanRoomKeyGapOptions
+	KeyManagement    *KeyManagementOptions
 	PersistentGrants *PersistentGrantOptions
 	// LicenseKey         string
-	CleanRoomProviderGap *CleanRoomProviderGapOptions
-	CleanRoomSessionGap  *CleanRoomSessionGapOptions
+	DynamicProviders   *DynamicProviderOptions
+	ServerSideSessions *ServerSideSessionOptions
 }
 
 func NewWicketOptions() *WicketOptions {
@@ -57,11 +57,11 @@ func NewWicketOptions() *WicketOptions {
 		// DeviceFlow: NewDeviceFlowOptions(),
 		BackchannelAuthentication: NewBackchannelAuthenticationOptions(),
 		// Logging: NewLoggingOptions(),
-		MutualTls:            NewMutualTlsOptions(),
-		CleanRoomKeyGap:      NewCleanRoomKeyGapOptions(),
-		PersistentGrants:     NewPersistentGrantOptions(),
-		CleanRoomProviderGap: NewCleanRoomProviderGapOptions(),
-		CleanRoomSessionGap:  NewCleanRoomSessionGapOptions(),
+		MutualTls:          NewMutualTlsOptions(),
+		KeyManagement:      NewKeyManagementOptions(),
+		PersistentGrants:   NewPersistentGrantOptions(),
+		DynamicProviders:   NewDynamicProviderOptions(),
+		ServerSideSessions: NewServerSideSessionOptions(),
 	}
 }
 

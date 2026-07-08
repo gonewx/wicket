@@ -10,7 +10,7 @@ import (
 
 const testSplitLedgerFileName = "gois-full-file-provenance-ledger-2026-07-07.csv"
 
-func TestBucketABPostMigrationTestScopeE2E(t *testing.T) {
+func TestRegressionTestScopeE2E(t *testing.T) {
 	t.Parallel()
 
 	evidenceRoot := evidenceRepositoryRoot(t)
@@ -27,7 +27,7 @@ func TestBucketABPostMigrationTestScopeE2E(t *testing.T) {
 		testRows++
 		dispositionCounts[row.Disposition]++
 
-		currentPath := currentBucketBPath(row.Path)
+		currentPath := currentApachePath(row.Path)
 		switch row.Disposition {
 		case "Epic 1 迁入":
 			migratedTests[currentPath] = struct{}{}
@@ -65,7 +65,7 @@ func TestBucketABPostMigrationTestScopeE2E(t *testing.T) {
 		if !strings.HasSuffix(rel, "_test.go") || strings.HasPrefix(rel, "tests/e2e/") {
 			continue
 		}
-		if _, ok := story25RestoredTests[rel]; ok {
+		if _, ok := restoredBehaviorTests[rel]; ok {
 			continue
 		}
 		if disposition, ok := excludedLedgerTests[rel]; ok {
@@ -74,7 +74,7 @@ func TestBucketABPostMigrationTestScopeE2E(t *testing.T) {
 	}
 }
 
-var story25RestoredTests = map[string]struct{}{
+var restoredBehaviorTests = map[string]struct{}{
 	"test/integration/handlers/authorize/resource_test.go": {},
 	"validators/impl/resource_validator_test.go":           {},
 }
@@ -127,10 +127,10 @@ func readTestSplitLedgerRows(t *testing.T, path string) []ledgerRow {
 	return rows
 }
 
-func TestBucketABPostMigrationSkipDisciplineE2E(t *testing.T) {
+func TestPendingImplementationSkipDisciplineE2E(t *testing.T) {
 	t.Parallel()
 
-	skipReason := "pending Epic " + "2/3 clean-room rewrite"
+	skipReason := "pending Epic " + "2/3 implementation"
 	skipCall := `t.Skip("` + skipReason + `")`
 
 	for _, rel := range goFiles(t) {
@@ -140,11 +140,11 @@ func TestBucketABPostMigrationSkipDisciplineE2E(t *testing.T) {
 
 		content := readProjectFile(t, rel)
 		for lineNo, line := range strings.Split(content, "\n") {
-			if !strings.Contains(line, "pending Epic") && !strings.Contains(line, "clean-room rewrite") {
+			if !strings.Contains(line, "pending Epic") && !strings.Contains(line, "implementation") {
 				continue
 			}
 			if !strings.Contains(line, skipCall) {
-				t.Fatalf("%s:%d has non-standard clean-room skip line: %s", rel, lineNo+1, line)
+				t.Fatalf("%s:%d has non-standard pending implementation skip line: %s", rel, lineNo+1, line)
 			}
 		}
 	}

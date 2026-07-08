@@ -39,7 +39,7 @@ func AddProtectedMessageStore[T any](r *godi.Registry) *godi.Registry {
 }
 
 func AddPersistentGrantSerializer(r *godi.Registry) *godi.Registry {
-	// From: BuilderExtensions/Core.cs#L206 TryAddTransient<IPersistentGrantSerializer, PersistentGrantSerializer>.
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L206 TryAddTransient<IPersistentGrantSerializer, PersistentGrantSerializer>.
 	// Keep the current Go wire format by using the existing bare constructor;
 	// injecting PersistentGrantOptions/DataProtectionProvider would enable
 	// data protection and change persisted grant payloads.

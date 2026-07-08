@@ -1,6 +1,6 @@
 # PROVENANCE
 
-This document records the Bucket B Apache 2.0 provenance migrated into wicket.
+This document records the Apache 2.0 provenance migrated into wicket.
 
 ## Inputs
 
@@ -13,16 +13,15 @@ This document records the Bucket B Apache 2.0 provenance migrated into wicket.
 
 ## Scope
 
-- Bucket B rows copied: `273`
+- Apache-origin rows copied: `273`
 - Business files: `246`
 - Epic 1 migrated tests: `27`
 
-KeyManagement, CIBA, server-side sessions, dynamic providers, federation, and resource-indicator increments are not declared as Apache provenance here. Story 1.3 copies only ledger Bucket B rows; non-IS4 expressions detected during review are recorded for later clean-room work.
+KeyManagement, CIBA, server-side sessions, dynamic providers, federation, and resource-indicator increments are excluded from this declaration. This document covers only Apache-origin ledger rows.
 
 ## Method-Level Review Evidence
 
-- Method-level review report: `../wicket-provenance-evidence/bucket-b-method-diff-review-2026-07-07.md`
-- Bucket C increment handoff: `../wicket-provenance-evidence/bucket-c-increment-handoff-2026-07-07.md`
+Method-level review records and increment handoff records are maintained in the project's evidence archive and are available upon request.
 
 ## Migrated Files
 

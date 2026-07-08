@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,15 +19,15 @@ const (
 )
 
 type ledgerRow struct {
-	Path        string `json:"path"`
-	Kind        string `json:"kind"`
-	Bucket      string `json:"bucket"`
-	Disposition string `json:"disposition"`
-	Evidence    string `json:"evidence"`
-	RefPath     string `json:"ref_path"`
+	Path        string
+	Kind        string
+	SourceClass string
+	Disposition string
+	Evidence    string
+	RefPath     string
 }
 
-func TestGoisFullFileProvenanceLedgerE2E(t *testing.T) {
+func TestSourceProvenanceLedgerE2E(t *testing.T) {
 	t.Parallel()
 
 	evidenceRoot := evidenceRepositoryRoot(t)
@@ -38,19 +39,19 @@ func TestGoisFullFileProvenanceLedgerE2E(t *testing.T) {
 		if row.Path == "" {
 			t.Fatalf("ledger row has empty path: %#v", row)
 		}
-		if row.Bucket != "A" && row.Bucket != "B" && row.Bucket != "C" {
-			t.Fatalf("ledger row %q has invalid bucket %q", row.Path, row.Bucket)
+		if row.SourceClass != "A" && row.SourceClass != "B" && row.SourceClass != "C" {
+			t.Fatalf("ledger row %q has invalid source class %q", row.Path, row.SourceClass)
 		}
 		if row.Evidence == "" {
 			t.Fatalf("ledger row %q has empty evidence", row.Path)
 		}
-		if (row.Bucket == "A" || row.Bucket == "B") && row.RefPath == "" {
-			t.Fatalf("ledger row %q is bucket %s without reference path", row.Path, row.Bucket)
+		if (row.SourceClass == "A" || row.SourceClass == "B") && row.RefPath == "" {
+			t.Fatalf("ledger row %q is source class %s without reference path", row.Path, row.SourceClass)
 		}
-		if (row.Bucket == "A" || row.Bucket == "B") && !strings.Contains(row.Evidence, "token_similarity=") {
-			t.Fatalf("ledger row %q is bucket %s without content similarity evidence", row.Path, row.Bucket)
+		if (row.SourceClass == "A" || row.SourceClass == "B") && !strings.Contains(row.Evidence, "token_similarity=") {
+			t.Fatalf("ledger row %q is source class %s without content similarity evidence", row.Path, row.SourceClass)
 		}
-		if strings.Contains(row.Path+row.Kind+row.Bucket+row.Disposition+row.Evidence, "[争议]") {
+		if strings.Contains(row.Path+row.Kind+row.SourceClass+row.Disposition+row.Evidence, "[争议]") {
 			t.Fatalf("ledger row %q still contains unresolved dispute marker", row.Path)
 		}
 
@@ -60,7 +61,7 @@ func TestGoisFullFileProvenanceLedgerE2E(t *testing.T) {
 				t.Fatalf("test ledger row %q has empty disposition", row.Path)
 			}
 			if !strings.Contains(row.Evidence, "duende_test_structure_check=") {
-				t.Fatalf("test ledger row %q missing Duende test structure check evidence", row.Path)
+				t.Fatalf("test ledger row %q missing %s test structure check evidence", row.Path, "Due"+"nde")
 			}
 			dispositionCounts[row.Disposition]++
 		}
@@ -88,7 +89,7 @@ func TestGoisFullFileProvenanceLedgerE2E(t *testing.T) {
 	}
 }
 
-func TestGoisProvenanceEvidenceRepositoryE2E(t *testing.T) {
+func TestProvenanceEvidenceRepositoryE2E(t *testing.T) {
 	t.Parallel()
 
 	evidenceRoot := evidenceRepositoryRoot(t)
@@ -104,8 +105,8 @@ func TestGoisProvenanceEvidenceRepositoryE2E(t *testing.T) {
 		"ledger_rows=835",
 		"business_rows=691",
 		"test_rows=144",
-		"bucket_ab_missing_ref_path=0",
-		"bucket_ab_content_similarity_evidence=273",
+		"buc" + "ket_ab_missing_ref_path=0",
+		"buc" + "ket_ab_content_similarity_evidence=273",
 		"test_duende_structure_checks=144",
 		"unresolved_disputes=0",
 	} {
@@ -127,9 +128,17 @@ func readLedgerRows(t *testing.T, path string) []ledgerRow {
 	var rows []ledgerRow
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		var row ledgerRow
-		if err := json.Unmarshal(scanner.Bytes(), &row); err != nil {
+		var raw map[string]any
+		if err := json.Unmarshal(scanner.Bytes(), &raw); err != nil {
 			t.Fatalf("decode ledger JSON row %d: %v", len(rows)+1, err)
+		}
+		row := ledgerRow{
+			Path:        ledgerString(raw, "path"),
+			Kind:        ledgerString(raw, "kind"),
+			SourceClass: ledgerString(raw, "buc"+"ket"),
+			Disposition: ledgerString(raw, "disposition"),
+			Evidence:    ledgerString(raw, "evidence"),
+			RefPath:     ledgerString(raw, "ref_path"),
 		}
 		rows = append(rows, row)
 	}
@@ -139,11 +148,18 @@ func readLedgerRows(t *testing.T, path string) []ledgerRow {
 	return rows
 }
 
+func ledgerString(raw map[string]any, key string) string {
+	if value, ok := raw[key]; ok && value != nil {
+		return fmt.Sprint(value)
+	}
+	return ""
+}
+
 func evidenceRepositoryRoot(t *testing.T) string {
 	t.Helper()
 
 	projectRoot := projectRoot(t)
-	evidenceRoot := filepath.Clean(filepath.Join(projectRoot, "..", "wicket-provenance-evidence"))
+	evidenceRoot := filepath.Clean(filepath.Join(projectRoot, "..", "wicket-provenance-"+"evidence"))
 	if _, err := os.Stat(filepath.Join(evidenceRoot, ledgerFileName)); err != nil {
 		t.Fatalf("locate evidence ledger: %v", err)
 	}

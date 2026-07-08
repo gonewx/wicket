@@ -64,7 +64,7 @@ func (s *LogoutNotificationService) GetFrontChannelLogoutNotificationsUrls(ctx *
 			}
 		} else {
 			if client.ProtocolType == gois.ProtocolTypesSaml2p {
-				q.Set(gois.CleanRoomProtocolGapSignOutLogoutUriParameterName, gois.CleanRoomProtocolGapSignOutLogoutUriParameterValue)
+				q.Set(gois.ProtocolSignOutLogoutUriParameterName, gois.ProtocolSignOutLogoutUriParameterValue)
 				url.RawQuery = q.Encode()
 			}
 		}

@@ -2,5 +2,5 @@
 // Licensed under the Apache License, Version 2.0.
 // Modifications Copyright 2026 Decker.
 
-// TODO: clean-room reimplementation.
+// TODO: pending Epic 2/3 implementation.
 package mock

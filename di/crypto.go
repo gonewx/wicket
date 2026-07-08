@@ -30,17 +30,17 @@ import (
 // 返回同一缝切片，内容语义等价。
 //
 // AddDeveloperSigningCredential（Crypto.cs#L161）exception：gois 无开发者临时
-// 密钥对应物，CleanRoomKeyGap 自动密钥（3.3 已注册）是现行默认。见 REGISTRATION_MAP。
+// 密钥对应物，KeyManagement 自动密钥（3.3 已注册）是现行默认。见 REGISTRATION_MAP。
 func registerCrypto() {
 	var r godi.Registry
 
-	// From: BuilderExtensions/Crypto.cs#L29-L157 AddSigningCredential 重载归并
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Crypto.cs#L29-L157 AddSigningCredential 重载归并
 	// -> AddSingleton<ISigningCredentialStore>(实例) 累积 (Add)
 	godi.AddTransientFactory[[]storage.SigningCredentialStore](&r, func(p godi.Provider) []storage.SigningCredentialStore {
 		return godi.GetRequired[*ServerConfig](p).SigningCredentialStores()
 	})
 
-	// From: BuilderExtensions/Crypto.cs#L200-L285 AddValidationKey 重载归并
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Crypto.cs#L200-L285 AddValidationKey 重载归并
 	// -> AddSingleton<IValidationKeysStore>(实例) 累积 (Add)
 	godi.AddTransientFactory[[]storage.ValidationKeysStore](&r, func(p godi.Provider) []storage.ValidationKeysStore {
 		return godi.GetRequired[*ServerConfig](p).ValidationKeysStores()

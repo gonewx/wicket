@@ -7,9 +7,9 @@ package impl
 import "testing"
 
 func TestAuthorizeProtocolValidationValid(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestAuthorizeProtocolValidationValidSuppressedPromt(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }

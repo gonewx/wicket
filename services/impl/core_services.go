@@ -118,7 +118,7 @@ func NewJwtRequestUriHttpClient(client *http.Client, options *config_options.Wic
 }
 
 func (c *JwtRequestUriHttpClient) Get(uri string) (string, error) {
-	return "", fmt.Errorf("JWT request URI retrieval pending Epic 2/3 clean-room rewrite")
+	return "", fmt.Errorf("JWT request URI retrieval pending Epic 2/3 implementation")
 }
 
 func (c *JwtRequestUriHttpClient) GetJwt(uri string, client *storage_models.Client) (string, error) {
@@ -467,7 +467,7 @@ type SessionCoordinationService struct{}
 
 func NewSessionCoordinationService() SessionCoordinationService { return SessionCoordinationService{} }
 func (SessionCoordinationService) ValidateSession(*services.SessionValidationRequest) (bool, error) {
-	return false, fmt.Errorf("server-side session validation pending Epic 2/3 clean-room rewrite")
+	return false, fmt.Errorf("server-side session validation pending Epic 2/3 implementation")
 }
 
 func newHandle() string {

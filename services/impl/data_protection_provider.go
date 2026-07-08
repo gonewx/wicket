@@ -30,4 +30,3 @@ func (p dataProtector) Unprotect(data []byte) ([]byte, error) {
 	copy(out, data)
 	return out, nil
 }
-

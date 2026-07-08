@@ -38,7 +38,7 @@ func ConfigureServices(logger *slog.Logger) *httptest.Server {
 
 	options := godi.GetRequired[*config_options.WicketOptions](root)
 	options.IssuerUri = "https://wicket-local"
-	options.CleanRoomKeyGap.Enabled = false
+	options.KeyManagement.Enabled = false
 
 	clients := GetClients()
 	identityScopes := GetIdentityScopes()
@@ -88,8 +88,8 @@ func developerSigningStores(signingAlgorithm jwa.SignatureAlgorithm) ([]storage.
 		SigningAlgorithm: credential.Algorithm,
 	}
 	return []storage.SigningCredentialStore{
-			storage_memory.NewMemorySigningCredentialStore(credential),
-		}, []storage.ValidationKeysStore{
-			storage_memory.NewMemoryValidationKeysStore([]*models.SecurityKeyInfo{keyInfo}),
-		}
+		storage_memory.NewMemorySigningCredentialStore(credential),
+	}, []storage.ValidationKeysStore{
+		storage_memory.NewMemoryValidationKeysStore([]*models.SecurityKeyInfo{keyInfo}),
+	}
 }

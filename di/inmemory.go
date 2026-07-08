@@ -31,7 +31,7 @@ import (
 func registerInMemory() {
 	var r godi.Registry
 
-	// From: BuilderExtensions/InMemory.cs#L128 AddInMemoryClients ->
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/InMemory.cs#L128 AddInMemoryClients ->
 	// Additional.cs#L124-L131 AddClientStore<InMemoryClientStore>() (Add):
 	// TryAddTransient<InMemoryClientStore>（inner）并入工厂体内联构造；
 	// AddTransient<IClientStore, ValidatingClientStore<InMemoryClientStore>> 为
@@ -49,7 +49,7 @@ func registerInMemory() {
 		)
 	})
 
-	// From: BuilderExtensions/InMemory.cs#L130-L138 AddInMemoryClients 条件替换
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/InMemory.cs#L130-L138 AddInMemoryClients 条件替换
 	// ICorsPolicyService -> InMemoryCorsPolicyService (Add，条件覆盖定案)：
 	// dotnet 语义 = 当前注册为 DefaultCorsPolicyService(Transient) 则覆盖；gois
 	// 产品组合恒用 in-memory clients，最终注册即 InMemory 版。godi 无覆盖语义，
@@ -61,7 +61,7 @@ func registerInMemory() {
 		)
 	})
 
-	// From: BuilderExtensions/InMemory.cs#L43/L71/L99 AddInMemoryIdentityResources/
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/InMemory.cs#L43/L71/L99 AddInMemoryIdentityResources/
 	// ApiResources/ApiScopes -> Additional.cs#L139-L145 AddResourceStore (Add)：
 	// 朴素 Transient 链（无 Validating 包装 = dotnet 原文）。
 	godi.AddTransientFactory[storage.ResourceStore](&r, func(p godi.Provider) storage.ResourceStore {
@@ -77,7 +77,7 @@ func registerInMemory() {
 		return store
 	})
 
-	// From: BuilderExtensions/InMemory.cs#L166 AddInMemoryPersistedGrants
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/InMemory.cs#L166 AddInMemoryPersistedGrants
 	// (TryAddSingleton -> ServerConfig 覆盖钩子)：lazy seam 包装避免 NewRoot
 	// eager 装配提前冻结 ServerConfig；缝覆盖优先，默认 NewMemoryPersistedGrantStore()
 	// = NewServer 现硬编码等价。注册行自 3.3 done-early（di/pluggable_services.go）
@@ -86,7 +86,7 @@ func registerInMemory() {
 		return &lazyPersistedGrantStore{cfg: godi.GetRequired[*ServerConfig](p)}
 	})
 
-	// From: BuilderExtensions/InMemory.cs#L167 AddInMemoryPersistedGrants
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/InMemory.cs#L167 AddInMemoryPersistedGrants
 	// (TryAddSingleton -> ServerConfig 覆盖钩子)：同上 lazy seam；默认
 	// NewMemoryDeviceFlowStore()。DeviceFlowCodeService 消费同步切换为容器解析。
 	godi.AddSingletonFactory[storage.DeviceFlowStore](&r, func(p godi.Provider) storage.DeviceFlowStore {

@@ -758,8 +758,8 @@ const (
 )
 
 const (
-	CleanRoomProtocolGapSignOutLogoutUriParameterName  = "wa"
-	CleanRoomProtocolGapSignOutLogoutUriParameterValue = "wsignoutcleanup1.0"
+	ProtocolSignOutLogoutUriParameterName  = "wa"
+	ProtocolSignOutLogoutUriParameterValue = "wsignoutcleanup1.0"
 )
 
 var (

@@ -5,3 +5,5 @@ _bmad-output/
 go.work
 .rnix/
 go.work.sum
+.cursor/
+.codegraph/

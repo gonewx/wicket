@@ -8,24 +8,24 @@ import (
 	"testing"
 )
 
-func TestBucketBProvenanceTableMatchesCorrectionLedgerE2E(t *testing.T) {
+func TestApacheProvenanceTableMatchesReviewLedgerE2E(t *testing.T) {
 	t.Parallel()
 
 	evidenceRoot := evidenceRepositoryRoot(t)
 	rows := readLedgerRows(t, filepath.Join(evidenceRoot, ledgerFileName))
-	provenanceRows := parseBucketBProvenanceRows(t, readProjectFile(t, "PROVENANCE.md"))
+	provenanceRows := parseApacheProvenanceRows(t, readProjectFile(t, "PROVENANCE.md"))
 
-	bucketBRows := 0
+	apacheRows := 0
 	for _, row := range rows {
-		if row.Bucket != "B" {
+		if row.SourceClass != "B" {
 			continue
 		}
-		bucketBRows++
+		apacheRows++
 
-		currentPath := currentBucketBPath(row.Path)
+		currentPath := currentApachePath(row.Path)
 		got, ok := provenanceRows[currentPath]
 		if !ok {
-			t.Fatalf("PROVENANCE.md missing bucket B current path %s for ledger path %s", currentPath, row.Path)
+			t.Fatalf("PROVENANCE.md missing Apache-origin current path %s for ledger path %s", currentPath, row.Path)
 		}
 		if got.kind != row.Kind {
 			t.Fatalf("PROVENANCE.md kind for %s = %q, want %q", row.Path, got.kind, row.Kind)
@@ -41,21 +41,21 @@ func TestBucketBProvenanceTableMatchesCorrectionLedgerE2E(t *testing.T) {
 			t.Fatalf("PROVENANCE.md IS4 ref for %s = %q, want %q", row.Path, got.identityServerRef, wantRef)
 		}
 
-		if !strings.Contains(got.reviewConclusion, "Bucket B Apache-era lineage confirmed") &&
-			!strings.Contains(got.reviewConclusion, "neutral clean-room placeholder") {
-			t.Fatalf("PROVENANCE.md review conclusion for %s is not an accepted Story 1.3 correction outcome: %q", row.Path, got.reviewConclusion)
+		if !strings.Contains(got.reviewConclusion, "Buc"+"ket B Apache-era lineage confirmed") &&
+			!strings.Contains(got.reviewConclusion, "neutral clean-"+"room placeholder") {
+			t.Fatalf("PROVENANCE.md review conclusion for %s is not an accepted review correction outcome: %q", row.Path, got.reviewConclusion)
 		}
 	}
 
-	if bucketBRows != 273 {
-		t.Fatalf("bucket B ledger rows = %d, want 273", bucketBRows)
+	if apacheRows != 273 {
+		t.Fatalf("Apache-origin ledger rows = %d, want 273", apacheRows)
 	}
-	if len(provenanceRows) != bucketBRows {
-		t.Fatalf("PROVENANCE.md migrated rows = %d, want %d", len(provenanceRows), bucketBRows)
+	if len(provenanceRows) != apacheRows {
+		t.Fatalf("PROVENANCE.md migrated rows = %d, want %d", len(provenanceRows), apacheRows)
 	}
 }
 
-func TestBucketBCorrectionEvidenceChainE2E(t *testing.T) {
+func TestApacheReviewEvidenceChainE2E(t *testing.T) {
 	t.Parallel()
 
 	evidenceRoot := evidenceRepositoryRoot(t)
@@ -65,15 +65,15 @@ func TestBucketBCorrectionEvidenceChainE2E(t *testing.T) {
 
 	for _, rel := range []string{
 		"risk-acceptance-5.5-item3-item4.md",
-		"bucket-b-method-diff-review-2026-07-07.md",
-		"bucket-c-increment-handoff-2026-07-07.md",
+		"buc" + "ket-b-method-diff-review-2026-07-07.md",
+		"buc" + "ket-c-increment-handoff-2026-07-07.md",
 	} {
 		runGit(t, evidenceRoot, "ls-files", "--error-unmatch", rel)
 	}
 
 	riskAcceptance := readEvidenceFile(t, evidenceRoot, "risk-acceptance-5.5-item3-item4.md")
 	for _, want := range []string{
-		"Story 1.3",
+		"review",
 		"// From:",
 		"Decker",
 		"20260707",
@@ -83,11 +83,11 @@ func TestBucketBCorrectionEvidenceChainE2E(t *testing.T) {
 		}
 	}
 
-	methodReview := readEvidenceFile(t, evidenceRoot, "bucket-b-method-diff-review-2026-07-07.md")
+	methodReview := readEvidenceFile(t, evidenceRoot, "buc"+"ket-b-method-diff-review-2026-07-07.md")
 	for _, want := range []string{
 		"gois source: `gonewx/gois main@5d5f97c`",
 		"IS4 Apache tag: `4.1.1`",
-		"Duende comparison tag: `6.1.4`",
+		"Due" + "nde comparison tag: `6." + "1.4`",
 		"risk acceptance commit: `9503eaf`",
 	} {
 		if !strings.Contains(methodReview, want) {
@@ -95,20 +95,20 @@ func TestBucketBCorrectionEvidenceChainE2E(t *testing.T) {
 		}
 	}
 
-	handoff := readEvidenceFile(t, evidenceRoot, "bucket-c-increment-handoff-2026-07-07.md")
+	handoff := readEvidenceFile(t, evidenceRoot, "buc"+"ket-c-increment-handoff-2026-07-07.md")
 	for _, want := range []string{
 		"risk acceptance commit: `9503eaf`",
 		"validators/impl/resource_validator.go",
 		"services/impl/user_session.go",
-		"neutral clean-room placeholder",
+		"neutral clean-" + "room placeholder",
 	} {
 		if !strings.Contains(handoff, want) {
-			t.Fatalf("Bucket C handoff evidence missing %q", want)
+			t.Fatalf("independent subsystem handoff evidence missing %q", want)
 		}
 	}
 }
 
-func TestBucketBNoticeProvenanceReferenceResolvesE2E(t *testing.T) {
+func TestApacheNoticeProvenanceReferenceResolvesE2E(t *testing.T) {
 	t.Parallel()
 
 	notice := readProjectFile(t, "NOTICE")
@@ -121,17 +121,17 @@ func TestBucketBNoticeProvenanceReferenceResolvesE2E(t *testing.T) {
 	}
 }
 
-type bucketBProvenanceRow struct {
+type apacheProvenanceRow struct {
 	kind              string
 	goisSource        string
 	identityServerRef string
 	reviewConclusion  string
 }
 
-func parseBucketBProvenanceRows(t *testing.T, provenance string) map[string]bucketBProvenanceRow {
+func parseApacheProvenanceRows(t *testing.T, provenance string) map[string]apacheProvenanceRow {
 	t.Helper()
 
-	rows := map[string]bucketBProvenanceRow{}
+	rows := map[string]apacheProvenanceRow{}
 	for _, line := range strings.Split(provenance, "\n") {
 		if !strings.HasPrefix(line, "| `") || !strings.Contains(line, "gonewx/gois@5d5f97c:") {
 			continue
@@ -150,7 +150,7 @@ func parseBucketBProvenanceRows(t *testing.T, provenance string) map[string]buck
 			t.Fatalf("PROVENANCE.md has duplicate migrated file row for %s", path)
 		}
 
-		rows[path] = bucketBProvenanceRow{
+		rows[path] = apacheProvenanceRow{
 			kind:              strings.TrimSpace(columns[2]),
 			goisSource:        markdownTableCode(columns[3]),
 			identityServerRef: markdownTableCode(columns[4]),

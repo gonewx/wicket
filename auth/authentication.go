@@ -109,4 +109,3 @@ type SchemeProvider interface {
 type ClaimsTransformation interface {
 	Transform(*claims.ClaimsPrincipal) (*claims.ClaimsPrincipal, error)
 }
-

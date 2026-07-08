@@ -13,7 +13,7 @@ type unsupportedEndpointHandler struct {
 }
 
 func (h *unsupportedEndpointHandler) Process(http.ResponseWriter, *http.Request) error {
-	return fmt.Errorf("%s endpoint pending Epic 2/3 clean-room rewrite", h.name)
+	return fmt.Errorf("%s endpoint pending Epic 2/3 implementation", h.name)
 }
 
 type AuthorizeHandler struct{ unsupportedEndpointHandler }

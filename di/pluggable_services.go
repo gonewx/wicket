@@ -27,61 +27,61 @@ import (
 func registerPluggableServicesAndValidators() {
 	var r godi.Registry
 
-	// From: BuilderExtensions/Core.cs#L194 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L194 (TryAddTransient)
 	AddProtectedMessageStore[messages.LogoutMessage](&r)
-	// From: BuilderExtensions/Core.cs#L196 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L196 (TryAddTransient)
 	AddProtectedMessageStore[messages.ErrorMessage](&r)
-	// From: BuilderExtensions/Core.cs#L195 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L195 (TryAddTransient)
 	AddProtectedMessageStore[models_contexts.LogoutNotificationContext](&r)
 	AddPersistentGrantSerializer(&r)
 
 	// ClientStore / ResourceStore / PersistedGrantStore 注册已随 3.5 移至
 	// di/inmemory.go（InMemory.cs 归属文件）：ClientStore/ResourceStore 修正为
 	// Transient（含 ValidatingClientStore 链），PersistedGrantStore lazy Singleton 归位。
-	// From: BuilderExtensions/Core.cs#L227 (AddDistributedMemoryCache)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L227 (AddDistributedMemoryCache)
 	godi.AddSingleton[services.DistributedCache, services_memory.MemoryDistributedCache](&r)
 
-	// From: BuilderExtensions/Core.cs#L220 (TryAdd -> unique Go registration; no IHttpClientFactory equivalent)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L220 (TryAdd -> unique Go registration; no IHttpClientFactory equivalent)
 	godi.AddTransientFactory[services.JwtRequestUriHttpClient](&r, func(p godi.Provider) services.JwtRequestUriHttpClient {
 		return services_impl.NewJwtRequestUriHttpClient(http.DefaultClient, godi.GetRequired[*config_options.WicketOptions](p))
 	})
-	// From: BuilderExtensions/Core.cs#L221 (TryAdd -> ServerConfig client seam; no IHttpClientFactory equivalent)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L221 (TryAdd -> ServerConfig client seam; no IHttpClientFactory equivalent)
 	godi.AddTransientFactory[services.BackChannelLogoutHttpClient](&r, func(p godi.Provider) services.BackChannelLogoutHttpClient {
 		return services_impl.NewBackChannelLogoutHttpClient(
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[*ServerConfig](p).BackChannelLogoutHttpClient(),
 		)
 	})
-	// From: BuilderExtensions/Core.cs#L193 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L193 (TryAddTransient)
 	godi.AddTransient[storage.ConsentMessageStore, storage_impl.ConsentMessageStore](&r)
 
-	// TODO: clean-room reimplementation for key-management registrations.
+	// TODO: pending Epic 2/3 implementation.
 
-	// From: BuilderExtensions/Core.cs#L205 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L205 (TryAddTransient)
 	godi.AddTransient[services.HandleGenerationService, services_impl.HandleGenerationService](&r)
 	// Core.cs#L191 DefaultCorsPolicyService 注册已随 3.5 删除：InMemory.cs#L130-L138
 	// 条件替换定案为 InMemoryCorsPolicyService，见 di/inmemory.go 与 REGISTRATION_MAP。
-	// From: BuilderExtensions/Core.cs#L210 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L210 (TryAddTransient)
 	godi.AddTransient[services.UserCodeGenerator, services_impl.NumericUserCodeGenerator](&r)
-	// From: BuilderExtensions/Core.cs#L209 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L209 (TryAddTransient)
 	godi.AddTransient[services.UserCodeService, services_impl.UserCodeService](&r)
-	// From: BuilderExtensions/Core.cs#L214 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L214 (TryAddTransient)
 	godi.AddTransient[validators.ScopeParser, validators_impl.ScopeParser](&r)
-	// From: BuilderExtensions/Core.cs#L200 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L200 (TryAddTransient)
 	godi.AddTransient[storage.AuthorizationCodeStore, storage_impl.AuthorizationCodeStore](&r)
-	// From: BuilderExtensions/Core.cs#L201 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L201 (TryAddTransient)
 	godi.AddTransient[storage.RefreshTokenStore, storage_impl.RefreshTokenStore](&r)
-	// From: BuilderExtensions/Core.cs#L202 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L202 (TryAddTransient)
 	godi.AddTransient[storage.ReferenceTokenStore, storage_impl.ReferenceTokenStore](&r)
-	// From: BuilderExtensions/Core.cs#L203 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L203 (TryAddTransient)
 	godi.AddTransient[storage.UserConsentStore, storage_impl.UserConsentStore](&r)
-	// TODO: clean-room reimplementation for clean-room gap request storage.
-	// From: BuilderExtensions/Core.cs#L183 (TryAddTransient)
+	// TODO: pending Epic 2/3 implementation.
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L183 (TryAddTransient)
 	godi.AddTransient[services.PersistedGrantService, services_impl.PersistedGrantService](&r)
 	godi.AddTransient[services.KeyMaterialService, services_impl.KeyMaterialService](&r)
-	// From: BuilderExtensions/Core.cs#L186 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L186 (TryAddTransient)
 	godi.AddTransient[services.TokenCreationService, services_impl.TokenCreationService](&r)
-	// From: BuilderExtensions/Core.cs#L192 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L192 (TryAddTransient)
 	godi.AddTransientFactory[services.ProfileService](&r, func(p godi.Provider) services.ProfileService {
 		if provider := godi.GetRequired[*ServerConfig](p).ProfileProvider(); provider != nil {
 			if svc := provider(); svc != nil {
@@ -90,11 +90,11 @@ func registerPluggableServicesAndValidators() {
 		}
 		return services_impl.NewProfileService(godi.GetRequired[*slog.Logger](p))
 	})
-	// From: BuilderExtensions/Core.cs#L187 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L187 (TryAddTransient)
 	godi.AddTransient[services.ClaimsService, services_impl.ClaimsService](&r)
-	// From: BuilderExtensions/Core.cs#L188 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L188 (TryAddTransient)
 	godi.AddTransient[services.RefreshTokenService, services_impl.RefreshTokenService](&r)
-	// From: BuilderExtensions/Core.cs#L189 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L189 (TryAddTransient)
 	// DeviceFlowStore 经容器解析（3.5：storage.DeviceFlowStore Singleton lazy seam，
 	// di/inmemory.go）——消除原工厂内联读缝每次新建默认实例与容器单例的双通道。
 	godi.AddTransientFactory[services.DeviceFlowCodeService](&r, func(p godi.Provider) services.DeviceFlowCodeService {
@@ -103,14 +103,14 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[services.HandleGenerationService](p),
 		)
 	})
-	// From: BuilderExtensions/Core.cs#L190 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L190 (TryAddTransient)
 	godi.AddTransient[services.ConsentService, services_impl.ConsentService](&r)
-	// From: BuilderExtensions/Core.cs#L211 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L211 (TryAddTransient)
 	godi.AddTransient[services.LogoutNotificationService, services_impl.LogoutNotificationService](&r)
-	// From: BuilderExtensions/Core.cs#L212 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L212 (TryAddTransient)
 	godi.AddTransient[services.BackchannelLogoutService, services_impl.BackchannelLogoutService](&r)
 	godi.AddTransient[validators.ResourceValidator, validators_impl.ResourceValidator](&r)
-	// From: BuilderExtensions/Core.cs#L226 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L226 (TryAddTransient)
 	godi.AddTransient[services.DeviceFlowThrottlingService, services_impl.DistributedDeviceFlowThrottlingService](&r)
 	godi.AddTransient[services.BackchannelAuthenticationThrottlingService, services_impl.BackchannelAuthenticationThrottlingService](&r)
 	godi.AddTransientFactory[services.BackchannelAuthenticationNotificationService](&r, func(p godi.Provider) services.BackchannelAuthenticationNotificationService {
@@ -124,7 +124,7 @@ func registerPluggableServicesAndValidators() {
 		return validators_impl.NewBackchannelAuthenticationUserValidator()
 	})
 	godi.AddTransient[validators.BackchannelAuthenticationRequestValidator, validators_impl.BackchannelAuthenticationRequestValidator](&r)
-	// From: BuilderExtensions/Core.cs#L185 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L185 (TryAddTransient)
 	godi.AddTransientFactory[services.TokenService](&r, func(p godi.Provider) services.TokenService {
 		return services_impl.NewTokenService(
 			godi.GetRequired[services.ClaimsService](p),
@@ -137,7 +137,7 @@ func registerPluggableServicesAndValidators() {
 			requestFromProvider(p),
 		)
 	})
-	// From: BuilderExtensions/Core.cs#L197 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L197 (TryAddTransient)
 	godi.AddTransientFactory[services.InteractionService](&r, func(p godi.Provider) services.InteractionService {
 		return services_impl.NewInteractionService(
 			godi.GetRequired[services.SystemClock](p),
@@ -153,12 +153,12 @@ func registerPluggableServicesAndValidators() {
 		)
 	})
 	godi.AddTransient[services.SessionCoordinationService, services_impl.SessionCoordinationService](&r)
-	// From: BuilderExtensions/Core.cs#L159 (AddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L159 (AddTransient)
 	godi.AddTransient[*tools.TokenTools, tools.TokenTools](&r)
 
-	// From: BuilderExtensions/Core.cs#L281 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L281 (TryAddTransient)
 	godi.AddTransient[validators.TokenRevocationRequestValidator, validators_impl.TokenRevocationRequestValidator](&r)
-	// From: BuilderExtensions/Core.cs#L282 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L282 (TryAddTransient)
 	godi.AddTransientFactory[validators.AuthorizeRequestValidator](&r, func(p godi.Provider) validators.AuthorizeRequestValidator {
 		return validators_impl.NewAuthorizeRequestValidator(
 			godi.GetRequired[*slog.Logger](p),
@@ -173,7 +173,7 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[validators.CustomAuthorizeRequestValidator](p),
 		)
 	})
-	// From: BuilderExtensions/Core.cs#L280 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L280 (TryAddTransient)
 	godi.AddTransientFactory[validators.EndSessionRequestValidator](&r, func(p godi.Provider) validators.EndSessionRequestValidator {
 		return validators_impl.NewEndSessionRequestValidator(
 			godi.GetRequired[*slog.Logger](p),
@@ -185,40 +185,40 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[storage.MessageStore[models_contexts.LogoutNotificationContext]](p),
 		)
 	})
-	// From: BuilderExtensions/Core.cs#L283 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L283 (TryAddTransient)
 	godi.AddTransient[validators.TokenRequestValidator, validators_impl.TokenRequestValidator](&r)
-	// From: BuilderExtensions/Core.cs#L284 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L284 (TryAddTransient)
 	godi.AddTransient[validators.RedirectUriValidator, validators_impl.StrictRedirectUriValidator](&r)
-	// From: BuilderExtensions/Core.cs#L285 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L285 (TryAddTransient)
 	godi.AddTransient[validators.TokenValidator, validators_impl.TokenValidator](&r)
-	// From: BuilderExtensions/Core.cs#L286 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L286 (TryAddTransient)
 	godi.AddTransient[validators.IntrospectionRequestValidator, validators_impl.IntrospectionRequestValidator](&r)
-	// From: BuilderExtensions/Core.cs#L287 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L287 (TryAddTransient)
 	godi.AddTransientFactory[validators.ResourceOwnerPasswordValidator](&r, func(p godi.Provider) validators.ResourceOwnerPasswordValidator {
 		if override := godi.GetRequired[*ServerConfig](p).ResourceOwnerValidator(); override != nil {
 			return override
 		}
 		return validators_impl.NewNotSupportedResourceOwnerPasswordValidator(godi.GetRequired[*slog.Logger](p))
 	})
-	// From: BuilderExtensions/Core.cs#L288 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L288 (TryAddTransient)
 	godi.AddTransient[validators.CustomTokenRequestValidator, validators_impl.CustomTokenRequestValidator](&r)
-	// From: BuilderExtensions/Core.cs#L289 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L289 (TryAddTransient)
 	godi.AddTransient[validators.UserInfoRequestValidator, validators_impl.UserInfoRequestValidator](&r)
-	// From: BuilderExtensions/Core.cs#L290 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L290 (TryAddTransient)
 	godi.AddTransient[validators.ClientConfigurationValidator, validators_impl.ClientConfigurationValidator](&r)
-	// From: BuilderExtensions/Core.cs#L292 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L292 (TryAddTransient)
 	godi.AddTransient[validators.DeviceAuthorizationRequestValidator, validators_impl.DeviceAuthorizationRequestValidator](&r)
-	// From: BuilderExtensions/Core.cs#L293 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L293 (TryAddTransient)
 	godi.AddTransient[validators.DeviceCodeValidator, validators_impl.DeviceCodeValidator](&r)
-	// From: BuilderExtensions/Core.cs#L299 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L299 (TryAddTransient)
 	godi.AddTransient[validators.CustomTokenValidator, validators_impl.CustomTokenValidator](&r)
-	// From: BuilderExtensions/Core.cs#L300 (TryAddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L300 (TryAddTransient)
 	godi.AddTransient[validators.CustomAuthorizeRequestValidator, validators_impl.CustomAuthorizeRequestValidator](&r)
-	// From: BuilderExtensions/Core.cs#L223 (AddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L223 (AddTransient)
 	godi.AddTransient[validators.ClientSecretValidator, validators_impl.ClientSecretValidator](&r)
-	// From: BuilderExtensions/Core.cs#L224 (AddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L224 (AddTransient)
 	godi.AddTransient[validators.ApiSecretValidator, validators_impl.ApiSecretValidator](&r)
-	// From: BuilderExtensions/Core.cs#L161 (AddTransient)
+	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L161 (AddTransient)
 	godi.AddTransientFactory[services.ReturnUrlParser](&r, func(p godi.Provider) services.ReturnUrlParser {
 		return services_impl.NewOidcReturnUrlParser(
 			godi.GetRequired[*config_options.WicketOptions](p),

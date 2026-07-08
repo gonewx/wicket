@@ -66,7 +66,7 @@ func (s *Server) UseWicket() func(http.Handler) http.Handler {
 	s.Validate()
 
 	opts := godi.GetRequired[*config_options.WicketOptions](s.provider)
-	dynamicProviders := opts.CleanRoomProviderGap
+	dynamicProviders := opts.DynamicProviders
 
 	schemeAuthMiddleware := dynamicschemes.UseSchemeAuthMiddleware(s.Logger, dynamicProviders)
 

@@ -7,29 +7,29 @@ package impl
 import "testing"
 
 func TestValid_Single_Secret(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestInvalid_Credential_Type(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestValid_Multiple_Secrets(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestInvalid_Single_Secret(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestInvalid_Multiple_Secrets(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestClient_with_no_Secret_Should_Fail(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
 
 func TestClient_with_null_Secret_Should_Fail(t *testing.T) {
-	t.Skip("pending Epic 2/3 clean-room rewrite")
+	t.Skip("pending Epic 2/3 implementation")
 }
