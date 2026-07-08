@@ -376,7 +376,11 @@ func (g *DiscoveryResponseGenerator) CreateJwkDocument() ([]*models.JsonWebKey, 
 		if err != nil {
 			return nil, err
 		}
-		_ = jwk.AssignKeyID(k)
+		if key.KeyId != "" {
+			_ = k.Set(jwk.KeyIDKey, key.KeyId)
+		} else {
+			_ = jwk.AssignKeyID(k)
+		}
 		_ = k.Set(jwk.AlgorithmKey, key.SigningAlgorithm)
 		webKeys = append(webKeys, &models.JsonWebKey{Key: k})
 	}
