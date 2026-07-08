@@ -4,6 +4,7 @@
 package keymgmt
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -73,15 +74,32 @@ type Manager struct {
 }
 
 type snapshot struct {
-	signing    []SigningCandidate
-	validation []*core_models.SecurityKeyInfo
+	signing []SigningCandidate
+	// validation and validationErr capture the JWKS-facing build outcome.
+	// A snapshot with a validation error still serves signing: an active key
+	// with recoverable private material may sign even while its public
+	// serialization fails JWKS generation.
+	validation    []*core_models.SecurityKeyInfo
+	validationErr error
 }
 
 // NewManager builds a manager from resolved configuration and injected seams.
 // It resolves zero-value defaults but defers validation and the first key
 // bootstrap until the first signing or validation access, so an assembled but
-// unused manager never performs cryptographic work.
+// unused manager never performs cryptographic work. Nil seams fall back to the
+// same defaults the composition root applies, so a directly constructed manager
+// degrades safely instead of panicking; a nil protection provider stays nil and
+// fails closed through the protector-unavailable startup check.
 func NewManager(cfg Config, store RecordStore, provider dp.DataProtectionProvider, clock Clock, entropy Entropy, logger *slog.Logger) *Manager {
+	if store == nil {
+		store = NewMemoryRecordStore()
+	}
+	if clock == nil {
+		clock = systemClock{}
+	}
+	if entropy == nil {
+		entropy = rand.Reader
+	}
 	return &Manager{
 		cfg:       resolveDefaults(cfg),
 		store:     store,
@@ -91,6 +109,12 @@ func NewManager(cfg Config, store RecordStore, provider dp.DataProtectionProvide
 		logger:    logger,
 	}
 }
+
+// systemClock is the wall-clock fallback for a nil injected clock. Tests always
+// inject a deterministic clock instead.
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now() }
 
 // resolveDefaults fills conservative defaults for zero-valued fields.
 func resolveDefaults(cfg Config) Config {
@@ -177,7 +201,24 @@ func (m *Manager) checkConfig() error {
 		m.warn("RetentionDuration may be shorter than token lifetime plus clock skew",
 			"retention", m.cfg.RetentionDuration, "ceiling", m.cfg.TokenLifetimeCeiling)
 	}
+	// The effective warm-up lead is max(ActivationLeadTime, CacheTTL); when it
+	// swallows the whole rotation interval, candidates keep expiring before they
+	// may activate and rotation degrades into bootstrap churn.
+	if lead := m.effectiveLead(); lead >= m.cfg.RotationInterval {
+		m.warn("effective warm-up lead (max of ActivationLeadTime and CacheTTL) is not shorter than RotationInterval",
+			"lead", lead, "rotation", m.cfg.RotationInterval)
+	}
 	return nil
+}
+
+// effectiveLead is the warm-up duration a candidate must be published before it
+// may activate: the configured lead widened to at least the cache TTL so every
+// verifier cache can observe the kid first.
+func (m *Manager) effectiveLead() time.Duration {
+	if m.cfg.CacheTTL > m.cfg.ActivationLeadTime {
+		return m.cfg.CacheTTL
+	}
+	return m.cfg.ActivationLeadTime
 }
 
 // SigningCandidates returns the active, in-window signing candidates. Storage
@@ -205,26 +246,31 @@ func (m *Manager) SigningCandidates() ([]SigningCandidate, error) {
 	return cloneCandidates(snap.signing), nil
 }
 
-// ValidationKeys returns the public key material for active and retained keys.
-// Within the cache TTL a storage read failure returns the last good snapshot;
-// after the TTL it fails closed.
+// ValidationKeys returns the public key material for candidate, active and
+// retained keys. Within the cache TTL a storage read failure returns the last
+// good snapshot; after the TTL it fails closed. An active key whose public
+// material cannot be serialized fails the whole set rather than silently
+// dropping the kid that is currently signing.
 func (m *Manager) ValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	snap, err := m.currentSnapshot()
 	if err != nil {
-		if m.snapshot != nil && m.clock.Now().Before(m.cacheExpiry) {
+		if m.snapshot != nil && m.snapshot.validationErr == nil && m.clock.Now().Before(m.cacheExpiry) {
 			return cloneKeyInfos(m.snapshot.validation), nil
 		}
 		return nil, err
 	}
+	if snap.validationErr != nil {
+		return nil, snap.validationErr
+	}
 	return cloneKeyInfos(snap.validation), nil
 }
 
-// ExportValidationMaterial lists the public material of currently active and
-// retained keys without gating on Enabled or running rotation. It supports a
-// host draining auto-managed keys into its own validation stores when disabling
-// the manager, so already-issued tokens keep resolving through JWKS.
+// ExportValidationMaterial lists the public material of currently publishable
+// keys without gating on Enabled or running rotation. It supports a host
+// draining auto-managed keys into its own validation stores when disabling the
+// manager, so already-issued tokens keep resolving through JWKS.
 func (m *Manager) ExportValidationMaterial() ([]*core_models.SecurityKeyInfo, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -232,7 +278,7 @@ func (m *Manager) ExportValidationMaterial() ([]*core_models.SecurityKeyInfo, er
 	if err != nil {
 		return nil, err
 	}
-	return m.buildValidation(records, m.clock.Now()), nil
+	return m.buildValidation(records, m.clock.Now())
 }
 
 // currentSnapshot returns a fresh snapshot, reconciling the lifecycle when the
@@ -255,9 +301,11 @@ func (m *Manager) currentSnapshot() (*snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
+	validation, validationErr := m.buildValidation(records, now)
 	snap := &snapshot{
-		signing:    m.buildSigning(records, now),
-		validation: m.buildValidation(records, now),
+		signing:       m.buildSigning(records, now),
+		validation:    validation,
+		validationErr: validationErr,
 	}
 	m.snapshot = snap
 	m.cacheExpiry = now.Add(m.cfg.CacheTTL)
@@ -278,8 +326,9 @@ func (m *Manager) reconcile(now time.Time) error {
 		}
 		mutated, err := m.reconcileStep(now, records)
 		if err != nil {
-			if errors.Is(err, ErrVersionConflict) || errors.Is(err, ErrDuplicateKey) {
-				// Another instance advanced the state; re-read and continue.
+			if errors.Is(err, ErrVersionConflict) || errors.Is(err, ErrDuplicateKey) || errors.Is(err, ErrRecordNotFound) {
+				// Another instance advanced or removed the record; re-read and
+				// continue from the fresh state.
 				continue
 			}
 			return err
@@ -288,6 +337,10 @@ func (m *Manager) reconcile(now time.Time) error {
 			return nil
 		}
 	}
+	// The step budget is a liveness backstop, not a correctness boundary: the
+	// snapshot below is built from whatever state was reached, so surface the
+	// non-convergence instead of implying success silently.
+	m.warn("key lifecycle reconciliation stopped before convergence", "steps", maxReconcileSteps)
 	return nil
 }
 
@@ -329,10 +382,15 @@ func (m *Manager) reconcileStep(now time.Time, records []*Record) (bool, error) 
 		}
 		return false, nil
 	}
-	// 6. Isolate a stale orphan candidate that can no longer become active.
+	// 6. Isolate a stale orphan candidate that can no longer become active. It
+	// never signed, so no issued token depends on its kid: it retires directly
+	// instead of passing through retention, keeping its audit metadata.
 	for _, r := range records {
 		if r.Phase == PhaseCandidate && m.orphanCandidate(r, now) {
-			return true, m.retain(r, now)
+			m.warn("isolating stale candidate superseded by a fresher active key", "kid", r.PublicID)
+			next := copyRecord(r)
+			next.Phase = PhaseRetired
+			return true, m.store.Update(next, r.Version)
 		}
 	}
 	// 7. Warm up the next rotation candidate ahead of active expiry.
@@ -348,21 +406,13 @@ func (m *Manager) candidateReady(r *Record, now time.Time) bool {
 	if !r.NotBefore.IsZero() && now.Before(r.NotBefore) {
 		return false
 	}
-	lead := m.cfg.ActivationLeadTime
-	if m.cfg.CacheTTL > lead {
-		lead = m.cfg.CacheTTL
-	}
-	return !now.Before(r.CreatedAt.Add(lead))
+	return !now.Before(r.CreatedAt.Add(m.effectiveLead()))
 }
 
 // orphanCandidate reports whether a candidate is stale and can no longer be
 // activated because a fresh active key already exists.
 func (m *Manager) orphanCandidate(r *Record, now time.Time) bool {
-	grace := m.cfg.ActivationLeadTime
-	if m.cfg.CacheTTL > grace {
-		grace = m.cfg.CacheTTL
-	}
-	if now.Before(r.CreatedAt.Add(2 * grace)) {
+	if now.Before(r.CreatedAt.Add(2 * m.effectiveLead())) {
 		return false
 	}
 	// Only isolate a stale candidate once a fresher active key already covers
@@ -549,14 +599,18 @@ func (m *Manager) buildSigning(records []*Record, now time.Time) []SigningCandid
 	return out
 }
 
-// buildValidation produces JWKS-facing public key material for active and
-// retained keys within the publish window. An active key whose public material
-// cannot be recovered fails the whole set; a retained key is omitted with a
-// recorded warning.
-func (m *Manager) buildValidation(records []*Record, now time.Time) []*core_models.SecurityKeyInfo {
+// buildValidation produces JWKS-facing public key material for candidate,
+// active and retained keys within the publish window. A candidate publishes
+// from creation so its kid is resolvable before it may sign. An active key
+// whose public material cannot be recovered fails the whole set, because its
+// kid would otherwise silently vanish from JWKS while it keeps signing; a
+// candidate or retained key is omitted with a recorded warning, unless the
+// omissions leave no key at all.
+func (m *Manager) buildValidation(records []*Record, now time.Time) ([]*core_models.SecurityKeyInfo, error) {
 	var out []*core_models.SecurityKeyInfo
+	omitted := 0
 	for _, r := range records {
-		if r.Phase != PhaseActive && r.Phase != PhaseRetained {
+		if r.Phase != PhaseCandidate && r.Phase != PhaseActive && r.Phase != PhaseRetained {
 			continue
 		}
 		if !r.withinPublishWindow(now, m.cfg.ClockSkew) {
@@ -565,12 +619,10 @@ func (m *Manager) buildValidation(records []*Record, now time.Time) []*core_mode
 		pub, err := recoverPublicKey(r.PublicMaterial)
 		if err != nil {
 			if r.Phase == PhaseActive {
-				m.warn("active key public material not serializable", "kid", r.PublicID, "err", err)
-				// Active key must remain visible; surface as empty so the caller
-				// treats the set as unavailable rather than silently dropping it.
-				return nil
+				return nil, fmt.Errorf("active key %s public material not serializable: %w", r.PublicID, err)
 			}
-			m.warn("omitting retained key with unusable public material", "kid", r.PublicID, "err", err)
+			m.warn("omitting key with unusable public material", "kid", r.PublicID, "phase", r.Phase, "err", err)
+			omitted++
 			continue
 		}
 		out = append(out, &core_models.SecurityKeyInfo{
@@ -579,8 +631,11 @@ func (m *Manager) buildValidation(records []*Record, now time.Time) []*core_mode
 			KeyId:            r.PublicID,
 		})
 	}
+	if len(out) == 0 && omitted > 0 {
+		return nil, fmt.Errorf("no validation key survived: %d key(s) had unusable public material", omitted)
+	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].KeyId < out[j].KeyId })
-	return out
+	return out, nil
 }
 
 func (m *Manager) newHandle() (string, error) {

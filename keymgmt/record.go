@@ -67,8 +67,6 @@ type Record struct {
 	PublicMaterial []byte
 	// ProtectedPrivateMaterial is the protected PKCS#8-encoded private key.
 	ProtectedPrivateMaterial []byte
-	// CertificateChain is an optional DER certificate chain carrier.
-	CertificateChain [][]byte
 	// Format tags the protection scheme of ProtectedPrivateMaterial. It is
 	// independent of Version and lets a later protection scheme coexist with
 	// records written under an earlier one.
@@ -157,9 +155,11 @@ func (r *Record) withinSigningWindow(now time.Time) bool {
 
 // withinPublishWindow reports whether the key should appear in JWKS at now,
 // widening both bounds by skew so verifiers with skewed clocks can still resolve
-// the kid.
+// the kid. A candidate publishes from creation, before its NotBefore, so verifier
+// caches can resolve its kid for the required pre-publish duration before it may
+// sign.
 func (r *Record) withinPublishWindow(now time.Time, skew time.Duration) bool {
-	if !r.NotBefore.IsZero() && now.Before(r.NotBefore.Add(-skew)) {
+	if r.Phase != PhaseCandidate && !r.NotBefore.IsZero() && now.Before(r.NotBefore.Add(-skew)) {
 		return false
 	}
 	if r.Phase == PhaseRetained && !r.RetainUntil.IsZero() && !now.Before(r.RetainUntil.Add(skew)) {
@@ -175,11 +175,5 @@ func copyRecord(r *Record) *Record {
 	clone := *r
 	clone.PublicMaterial = append([]byte(nil), r.PublicMaterial...)
 	clone.ProtectedPrivateMaterial = append([]byte(nil), r.ProtectedPrivateMaterial...)
-	if r.CertificateChain != nil {
-		clone.CertificateChain = make([][]byte, len(r.CertificateChain))
-		for i, c := range r.CertificateChain {
-			clone.CertificateChain[i] = append([]byte(nil), c...)
-		}
-	}
 	return &clone
 }

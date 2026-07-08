@@ -4,6 +4,7 @@
 package keymgmt
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 
@@ -19,8 +20,9 @@ const protectionFormatV1 = "keymgmt.protected.v1"
 const protectionPurpose = "keymgmt.key-material"
 
 // keyProtector protects and recovers private key material through the host data
-// protection seam. A nil provider means protection is unavailable, so no key may
-// be created or signed with.
+// protection seam. A nil provider, or a protector that fails the construction
+// probe, means protection is unavailable, so no key may be created or signed
+// with.
 type keyProtector struct {
 	protector dp.DataProtector
 }
@@ -29,7 +31,26 @@ func newKeyProtector(provider dp.DataProtectionProvider) *keyProtector {
 	if provider == nil {
 		return &keyProtector{}
 	}
-	return &keyProtector{protector: provider.Create(protectionPurpose)}
+	protector := provider.Create(protectionPurpose)
+	if protector == nil || !probeProtector(protector) {
+		return &keyProtector{}
+	}
+	return &keyProtector{protector: protector}
+}
+
+// probeProtector proves the protector actually transforms its input and can
+// recover it. An identity transform would persist private material effectively
+// in the clear while the record claims it is protected, and a protector that
+// cannot round-trip would strand every key it wrote — both are treated as
+// unavailable so key creation fails closed instead.
+func probeProtector(p dp.DataProtector) bool {
+	probe := []byte("keymgmt.protection.probe")
+	sealed := p.Protect(probe)
+	if bytes.Equal(sealed, probe) {
+		return false
+	}
+	recovered, err := p.Unprotect(sealed)
+	return err == nil && bytes.Equal(recovered, probe)
 }
 
 func (p *keyProtector) available() bool {

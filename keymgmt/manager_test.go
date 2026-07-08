@@ -487,6 +487,165 @@ func TestManagerConcurrentInstancesConverge(t *testing.T) {
 	}
 }
 
+// identityProvider returns bytes unchanged, standing in for a protector that
+// applies no real protection.
+type identityProvider struct{}
+
+func (identityProvider) Create(string) dp.DataProtector { return identityProtector{} }
+
+type identityProtector struct{}
+
+func (identityProtector) Protect(data []byte) []byte { return append([]byte(nil), data...) }
+
+func (identityProtector) Unprotect(data []byte) ([]byte, error) {
+	return append([]byte(nil), data...), nil
+}
+
+func TestManagerCandidatePublishedBeforeActivation(t *testing.T) {
+	t.Parallel()
+
+	clock := newFakeClock()
+	store := NewMemoryRecordStore()
+	cfg := enabledConfig()
+	m := newTestManager(t, cfg, store, clock)
+
+	if _, err := m.SigningCandidates(); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	// Reach the rotation warm-up point so a candidate is created.
+	clock.advance(cfg.RotationInterval - cfg.ActivationLeadTime + time.Second)
+	m.invalidateCache()
+	signing, err := m.SigningCandidates()
+	if err != nil {
+		t.Fatalf("warm-up: %v", err)
+	}
+	if len(signing) != 1 {
+		t.Fatalf("signing candidates = %d, want 1 (candidate must not sign yet)", len(signing))
+	}
+
+	// The warming candidate must already be resolvable through JWKS so verifier
+	// caches observe its kid before it ever signs.
+	keys, err := m.ValidationKeys()
+	if err != nil {
+		t.Fatalf("validation keys: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Fatalf("validation keys = %d, want 2 (active + warming candidate)", len(keys))
+	}
+	kids := map[string]bool{}
+	for _, k := range keys {
+		kids[k.KeyId] = true
+	}
+	if !kids[signing[0].Credential.Kid] {
+		t.Fatal("active kid missing from JWKS output")
+	}
+	if got := countPhase(t, store, PhaseCandidate); got != 1 {
+		t.Fatalf("candidate count = %d, want 1", got)
+	}
+}
+
+func TestManagerActivePublicMaterialFailureFailsValidationClosed(t *testing.T) {
+	t.Parallel()
+
+	clock := newFakeClock()
+	store := NewMemoryRecordStore()
+	if err := store.Create(&Record{
+		Handle:                   "seed",
+		PublicID:                 "seed-kid",
+		Purpose:                  PurposeTokenSigning,
+		Algorithm:                AlgES256,
+		Phase:                    PhaseActive,
+		CreatedAt:                clock.Now(),
+		NotAfter:                 clock.Now().Add(time.Hour),
+		PublicMaterial:           []byte("garbage"),
+		ProtectedPrivateMaterial: []byte("corrupt"),
+		Format:                   protectionFormatV1,
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	cfg := enabledConfig()
+	cfg.AutoCreate = false
+	m := newTestManager(t, cfg, store, clock)
+
+	// An active key whose public material cannot be serialized must fail the
+	// whole validation set: its kid vanishing silently from JWKS would break
+	// verification of everything it signs.
+	if _, err := m.ValidationKeys(); err == nil {
+		t.Fatal("expected validation error when an active key's public material is unusable")
+	}
+	if _, err := m.ExportValidationMaterial(); err == nil {
+		t.Fatal("expected export error when an active key's public material is unusable")
+	}
+}
+
+func TestManagerIdentityProtectorFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	m := NewManager(enabledConfig(), NewMemoryRecordStore(), identityProvider{}, newFakeClock(), rand.Reader, nil)
+	if _, err := m.SigningCandidates(); err == nil {
+		t.Fatal("expected protector-unavailable error for an identity protector")
+	}
+}
+
+func TestManagerOrphanCandidateRetiresDirectly(t *testing.T) {
+	t.Parallel()
+
+	clock := newFakeClock()
+	store := NewMemoryRecordStore()
+	cfg := enabledConfig()
+	m := newTestManager(t, cfg, store, clock)
+
+	if _, err := m.SigningCandidates(); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	// Seed a stale candidate that can never activate: created long before the
+	// current active key, with a NotBefore still in the future.
+	if err := store.Create(&Record{
+		Handle:                   "stale",
+		PublicID:                 "stale-kid",
+		Purpose:                  PurposeTokenSigning,
+		Algorithm:                AlgES256,
+		Phase:                    PhaseCandidate,
+		CreatedAt:                clock.Now().Add(-3 * time.Hour),
+		NotBefore:                clock.Now().Add(time.Hour),
+		NotAfter:                 clock.Now().Add(2 * time.Hour),
+		PublicMaterial:           validPublicMaterial(t),
+		ProtectedPrivateMaterial: []byte("protected:x"),
+		Format:                   protectionFormatV1,
+	}); err != nil {
+		t.Fatalf("seed candidate: %v", err)
+	}
+
+	m.invalidateCache()
+	if _, err := m.SigningCandidates(); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	// The orphan never signed, so it retires directly instead of spending a
+	// retention window in JWKS.
+	if got := countPhase(t, store, PhaseRetired); got != 1 {
+		t.Fatalf("retired count = %d, want 1", got)
+	}
+	if got := countPhase(t, store, PhaseCandidate); got != 0 {
+		t.Fatalf("candidate count = %d, want 0", got)
+	}
+}
+
+func TestManagerNilSeamsDoNotPanic(t *testing.T) {
+	t.Parallel()
+
+	m := NewManager(Config{}, nil, nil, nil, nil, nil)
+	signing, err := m.SigningCandidates()
+	if err != nil {
+		t.Fatalf("disabled manager with nil seams: %v", err)
+	}
+	if len(signing) != 0 {
+		t.Fatalf("disabled manager returned %d candidates, want 0", len(signing))
+	}
+}
+
 func validPublicMaterial(t *testing.T) []byte {
 	t.Helper()
 	gen, err := generateKey(AlgES256, rand.Reader)
