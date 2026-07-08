@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"sort"
 	"sync"
@@ -247,18 +248,15 @@ func (m *Manager) SigningCandidates() ([]SigningCandidate, error) {
 }
 
 // ValidationKeys returns the public key material for candidate, active and
-// retained keys. Within the cache TTL a storage read failure returns the last
-// good snapshot; after the TTL it fails closed. An active key whose public
-// material cannot be serialized fails the whole set rather than silently
-// dropping the kid that is currently signing.
+// retained keys. The cache-hit path in currentSnapshot serves the last good
+// snapshot within the TTL; after the TTL a storage read failure fails closed.
+// An active key whose public material cannot be serialized fails the whole set
+// rather than silently dropping the kid that is currently signing.
 func (m *Manager) ValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	snap, err := m.currentSnapshot()
 	if err != nil {
-		if m.snapshot != nil && m.snapshot.validationErr == nil && m.clock.Now().Before(m.cacheExpiry) {
-			return cloneKeyInfos(m.snapshot.validation), nil
-		}
 		return nil, err
 	}
 	if snap.validationErr != nil {
@@ -347,9 +345,10 @@ func (m *Manager) reconcile(now time.Time) error {
 // reconcileStep finds the single highest-priority actionable transition, commits
 // it, and reports whether it mutated state.
 func (m *Manager) reconcileStep(now time.Time, records []*Record) (bool, error) {
-	// 1. Retire retained keys past their retention window.
+	// 1. Retire retained keys past their retention window plus clock skew, so
+	// the publish window (+skew in withinPublishWindow) is fully honoured.
 	for _, r := range records {
-		if r.Phase == PhaseRetained && !r.RetainUntil.IsZero() && !now.Before(r.RetainUntil) {
+		if r.Phase == PhaseRetained && !r.RetainUntil.IsZero() && !now.Before(r.RetainUntil.Add(m.cfg.ClockSkew)) {
 			next := copyRecord(r)
 			next.Phase = PhaseRetired
 			return true, m.store.Update(next, r.Version)
@@ -486,13 +485,16 @@ func (m *Manager) hasActiveSignable(records []*Record, now time.Time) bool {
 	return false
 }
 
-// shouldRotate reports whether an active key is aging and no candidate is warming
-// up yet, so a replacement should be created. An acceptable existing candidate
-// suppresses creating another.
+// shouldRotate reports whether an active key is aging and no acceptable
+// candidate is warming up yet, so a replacement should be created.
 func (m *Manager) shouldRotate(records []*Record, now time.Time) bool {
+	allowedSet := map[string]bool{}
+	for _, alg := range m.cfg.AllowedAlgorithms {
+		allowedSet[alg] = true
+	}
 	var newestActive *Record
 	for _, r := range records {
-		if r.Phase == PhaseCandidate {
+		if r.Phase == PhaseCandidate && m.acceptableCandidate(r, now, allowedSet) {
 			return false
 		}
 		if r.Phase == PhaseActive && r.withinSigningWindow(now) {
@@ -505,6 +507,17 @@ func (m *Manager) shouldRotate(records []*Record, now time.Time) bool {
 		return false
 	}
 	return !now.Before(newestActive.NotAfter.Add(-m.cfg.ActivationLeadTime))
+}
+
+// acceptableCandidate implements the four-condition test from spec supplement 9.
+func (m *Manager) acceptableCandidate(r *Record, now time.Time, allowedSet map[string]bool) bool {
+	if r.Purpose != PurposeTokenSigning {
+		return false
+	}
+	if !allowedSet[r.Algorithm] {
+		return false
+	}
+	return !r.CreatedAt.Before(now.Add(-m.cfg.RotationInterval))
 }
 
 // createKey generates, protects and persists a new key in the given phase.
@@ -576,6 +589,13 @@ func (m *Manager) buildSigning(records []*Record, now time.Time) []SigningCandid
 		if r.Phase != PhaseActive || !r.withinSigningWindow(now) {
 			continue
 		}
+		if r.Purpose != PurposeTokenSigning {
+			continue
+		}
+		if err := validateWindow(r); err != nil {
+			m.warn("skipping record with invalid field order", "kid", r.PublicID, "err", err)
+			continue
+		}
 		signer, err := m.signerFor(r)
 		if err != nil {
 			m.warn("active key private material not recoverable", "kid", r.PublicID, "err", err)
@@ -616,6 +636,14 @@ func (m *Manager) buildValidation(records []*Record, now time.Time) ([]*core_mod
 		if !r.withinPublishWindow(now, m.cfg.ClockSkew) {
 			continue
 		}
+		if err := validateWindow(r); err != nil {
+			if r.Phase == PhaseActive {
+				return nil, fmt.Errorf("active key %s has invalid field order: %w", r.PublicID, err)
+			}
+			m.warn("omitting key with invalid field order", "kid", r.PublicID, "phase", r.Phase, "err", err)
+			omitted++
+			continue
+		}
 		pub, err := recoverPublicKey(r.PublicMaterial)
 		if err != nil {
 			if r.Phase == PhaseActive {
@@ -640,7 +668,7 @@ func (m *Manager) buildValidation(records []*Record, now time.Time) ([]*core_mod
 
 func (m *Manager) newHandle() (string, error) {
 	buf := make([]byte, 16)
-	if _, err := m.entropy.Read(buf); err != nil {
+	if _, err := io.ReadFull(m.entropy, buf); err != nil {
 		return "", fmt.Errorf("generate key handle: %w", err)
 	}
 	return hex.EncodeToString(buf), nil
