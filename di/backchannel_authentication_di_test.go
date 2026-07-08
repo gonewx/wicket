@@ -31,6 +31,9 @@ func TestBackchannelAuthenticationServicesResolveFromContainer(t *testing.T) {
 	if root.NewBackchannelAuthenticationRequestIdValidator() == nil {
 		t.Fatal("BackchannelAuthenticationRequestIdValidator did not resolve")
 	}
+	if root.NewResourceValidator() == nil {
+		t.Fatal("ResourceValidator did not resolve")
+	}
 	if root.BackchannelAuthenticationRequestStore() == nil {
 		t.Fatal("BackchannelAuthenticationRequestStore did not resolve")
 	}

@@ -111,11 +111,22 @@ func ParseScopesString(value string) []string {
 
 func AreValidResourceGapFormat(values []string) bool {
 	for _, value := range values {
-		if strings.TrimSpace(value) == "" {
+		if !IsValidResourceGapFormat(value) {
 			return false
 		}
 	}
 	return true
+}
+
+func IsValidResourceGapFormat(value string) bool {
+	if strings.TrimSpace(value) == "" || strings.TrimSpace(value) != value {
+		return false
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || !parsed.IsAbs() {
+		return false
+	}
+	return parsed.Fragment == ""
 }
 
 func ToClaimsMap(items []*claims.Claim) map[string]any {

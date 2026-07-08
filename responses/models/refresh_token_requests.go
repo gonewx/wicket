@@ -19,9 +19,10 @@ type RefreshTokenCreationRequest struct {
 }
 
 type RefreshTokenUpdateRequest struct {
-	Handle       string
-	Client       *storage_models.Client
-	RefreshToken *storage_models.RefreshToken
-	AccessToken  *storage_models.Token
-	MustUpdate   bool
+	Handle               string
+	Client               *storage_models.Client
+	RefreshToken         *storage_models.RefreshToken
+	AccessToken          *storage_models.Token
+	RequestedResourceGap string
+	MustUpdate           bool
 }

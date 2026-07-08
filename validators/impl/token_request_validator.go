@@ -264,7 +264,6 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(parameters url.
 
 	// resource gap
 	if s.validatedRequest.RequestedResourceGap != "" &&
-		len(s.validatedRequest.AuthorizationCode.RequestedResourceGaps) > 0 &&
 		!utils.Contains(s.validatedRequest.AuthorizationCode.RequestedResourceGaps, s.validatedRequest.RequestedResourceGap) {
 		return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request.")
 	}
@@ -470,8 +469,8 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(parameters url.Value
 
 	// resource gap
 	resourceIndicators := s.validatedRequest.RefreshToken.AuthorizedResourceGaps
-	if len(s.validatedRequest.RefreshToken.AuthorizedResourceGaps) > 0 {
-		// we had an authorization request so check current requested resource against original list
+	if s.validatedRequest.RefreshToken.AuthorizedResourceGaps != nil {
+		// we had an original resource collection, so check current requested resource against it
 		if s.validatedRequest.RequestedResourceGap != "" &&
 			!utils.Contains(s.validatedRequest.RefreshToken.AuthorizedResourceGaps, s.validatedRequest.RequestedResourceGap) {
 			s.Logger.Error("Refresh token validation failed. requested resource gap not authorized")
@@ -507,8 +506,6 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(parameters url.Value
 			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope.")
 		}
 	}
-
-	//TODO License validation
 
 	s.validatedRequest.ValidatedResources = validatedResources.FilterByResourceGap(s.validatedRequest.RequestedResourceGap)
 
@@ -584,8 +581,6 @@ func (s *TokenRequestValidator) validateDeviceCodeRequest(parameters url.Values)
 		}
 	}
 
-	//TODO License validation
-
 	s.Logger.Debug("Validation of device code token request success")
 
 	return s.valid()
@@ -615,6 +610,13 @@ func (s *TokenRequestValidator) validateBackchannelAuthenticationRequest(paramet
 	}
 	if ctx.Result.Error != nil {
 		return ctx.Result
+	}
+	if s.validatedRequest.RequestedResourceGap != "" &&
+		!utils.Contains(s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps, s.validatedRequest.RequestedResourceGap) {
+		return s.invalid(gois.TokenErrorsInvalidTarget, "")
+	}
+	if s.validatedRequest.RequestedResourceGap == "" && len(s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps) == 1 {
+		s.validatedRequest.RequestedResourceGap = s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps[0]
 	}
 	validatedResources, err := s.ResourceValidator.ValidateRequestedResources(
 		&validators_models.ResourceValidationRequest{

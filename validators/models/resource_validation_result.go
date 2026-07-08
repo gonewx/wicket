@@ -104,16 +104,19 @@ func (r *ResourceValidationResult) FilterByResourceGap(resourceIndicator string)
 	apiScopesToKeep := r.Resources.ApiScopes()
 	parsedScopesToKeep := r.ParsedScopes
 
-	if strings.TrimSpace(resourceIndicator) != "" {
-		// filter ApiScopes to only the ones allowed by the ApiResource requested
+	if strings.TrimSpace(resourceIndicator) != "" || len(apiResourcesToKeep) != len(r.Resources.ApiResources()) {
 		scopeNamesToKeep := utils.SelectMany(apiResourcesToKeep, func(x *storage_models.ApiResource) []string {
 			return x.Scopes
 		})
+		if strings.TrimSpace(resourceIndicator) == "" {
+			scopeNamesToKeep = append(scopeNamesToKeep, utils.Select(r.Resources.IdentityResources(), func(x *storage_models.IdentityResource) string {
+				return x.Name
+			})...)
+		}
 		apiScopesToKeep = utils.Where(apiScopesToKeep, func(x *storage_models.ApiScope) bool {
 			return utils.Contains(scopeNamesToKeep, x.Name)
 		})
 
-		// filter ParsedScopes to those matching the apiScopesToKeep
 		parsedScopesToKeepList := utils.Where(parsedScopesToKeep, func(x *ParsedScopeValue) bool {
 			return utils.Contains(scopeNamesToKeep, x.ParsedName)
 		})

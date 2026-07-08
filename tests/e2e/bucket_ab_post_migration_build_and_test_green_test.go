@@ -65,10 +65,18 @@ func TestBucketABPostMigrationTestScopeE2E(t *testing.T) {
 		if !strings.HasSuffix(rel, "_test.go") || strings.HasPrefix(rel, "tests/e2e/") {
 			continue
 		}
+		if _, ok := story25RestoredTests[rel]; ok {
+			continue
+		}
 		if disposition, ok := excludedLedgerTests[rel]; ok {
 			t.Fatalf("non-Epic 1 ledger test %s is present with disposition %q", rel, disposition)
 		}
 	}
+}
+
+var story25RestoredTests = map[string]struct{}{
+	"test/integration/handlers/authorize/resource_test.go": {},
+	"validators/impl/resource_validator_test.go":           {},
 }
 
 func readTestSplitLedgerRows(t *testing.T, path string) []ledgerRow {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -280,7 +281,16 @@ func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreation
 	if request.Subject != nil {
 		claims = request.Subject.Claims()
 	}
-	return &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: claims}, nil
+	audiences := []string(nil)
+	if request.ValidatedResources != nil && request.ValidatedResources.Resources != nil {
+		for _, resource := range request.ValidatedResources.Resources.ApiResources() {
+			if resource != nil && resource.Name != "" && !utils.Contains(audiences, resource.Name) {
+				audiences = append(audiences, resource.Name)
+			}
+		}
+		sort.Strings(audiences)
+	}
+	return &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: claims, Audiences: audiences}, nil
 }
 
 func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
@@ -316,7 +326,7 @@ func (s *RefreshTokenService) CreateRefreshToken(request *responses_models.Refre
 
 func (s *RefreshTokenService) UpdateRefreshToken(request *responses_models.RefreshTokenUpdateRequest) (string, error) {
 	if request.RefreshToken != nil && request.AccessToken != nil {
-		request.RefreshToken.SetAccessToken(request.AccessToken, "")
+		request.RefreshToken.SetAccessToken(request.AccessToken, request.RequestedResourceGap)
 	}
 	return request.Handle, s.store.UpdateRefreshToken(request.Handle, request.RefreshToken)
 }

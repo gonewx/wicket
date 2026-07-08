@@ -140,7 +140,6 @@ func TestBucketBDoesNotCopyBucketCSubsystemsE2E(t *testing.T) {
 		"services/impl/memory_key_storage_cache.go",
 		"services/impl/user_session.go",
 		"services/impl/server_urls.go",
-		"validators/impl/resource_validator.go",
 		"validators/resource_validator.go",
 	} {
 		if _, err := os.Stat(filepath.Join(projectRoot(t), rel)); err == nil {

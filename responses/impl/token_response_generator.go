@@ -195,10 +195,12 @@ func (g *TokenResponseGenerator) handleRefreshTokenRequest(request *validators_m
 
 	handle, err := g.refreshTokenService.UpdateRefreshToken(
 		&responses_models.RefreshTokenUpdateRequest{
-			Handle:       request.ValidatedRequest.RefreshTokenHandle,
-			RefreshToken: request.ValidatedRequest.RefreshToken,
-			Client:       request.ValidatedRequest.Client,
-			MustUpdate:   mustUpdate,
+			Handle:               request.ValidatedRequest.RefreshTokenHandle,
+			RefreshToken:         request.ValidatedRequest.RefreshToken,
+			Client:               request.ValidatedRequest.Client,
+			AccessToken:          accessToken,
+			RequestedResourceGap: request.ValidatedRequest.RequestedResourceGap,
+			MustUpdate:           mustUpdate,
 		},
 	)
 	if err != nil {
@@ -345,7 +347,7 @@ func (g *TokenResponseGenerator) createAccessToken(request *validators_models.Va
 		tokenRequest.Description = request.AuthorizationCode.Description
 
 		authorizedScopes = request.AuthorizationCode.RequestedScopes
-		authorizedResourceGaps = request.AuthorizationCode.RequestedResourceGaps
+		authorizedResourceGaps = cloneResourceGaps(request.AuthorizationCode.RequestedResourceGaps)
 	} else {
 		if request.BackchannelAuthenticationRequest != nil {
 			var client *storage_models.Client
@@ -358,7 +360,7 @@ func (g *TokenResponseGenerator) createAccessToken(request *validators_models.Va
 			}
 			tokenRequest.Subject = request.BackchannelAuthenticationRequest.Subject
 			authorizedScopes = request.BackchannelAuthenticationRequest.RequestedScopes
-			authorizedResourceGaps = request.BackchannelAuthenticationRequest.RequestedResourceGaps
+			authorizedResourceGaps = cloneResourceGaps(request.BackchannelAuthenticationRequest.RequestedResourceGaps)
 		} else {
 			if request.DeviceCode != nil {
 				var client *storage_models.Client
@@ -376,8 +378,10 @@ func (g *TokenResponseGenerator) createAccessToken(request *validators_models.Va
 				tokenRequest.Description = request.DeviceCode.Description
 
 				authorizedScopes = request.DeviceCode.RequestedScopes
+				authorizedResourceGaps = []string{}
 			} else {
 				authorizedScopes = request.ValidatedResources.RawScopeValues()
+				authorizedResourceGaps = selectedResourceGaps(request.RequestedResourceGap)
 			}
 		}
 	}
@@ -411,6 +415,20 @@ func (g *TokenResponseGenerator) createAccessToken(request *validators_models.Va
 	}
 
 	return accessToken, "", nil
+}
+
+func cloneResourceGaps(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return append([]string(nil), values...)
+}
+
+func selectedResourceGaps(value string) []string {
+	if value == "" {
+		return []string{}
+	}
+	return []string{value}
 }
 
 func (g *TokenResponseGenerator) CreateIdTokenFromRefreshTokenRequest(request *validators_models.ValidatedTokenRequest, newAccessToken string) (string, error) {

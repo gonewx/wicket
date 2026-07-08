@@ -47,7 +47,7 @@ func TestCIBABackchannelAuthenticationPollRequestE2E(t *testing.T) {
 	form := url.Values{
 		gois.AuthorizeRequestClientId:                        {fixture.client.ClientId},
 		gois.BackchannelAuthenticationRequestScope:           {gois.StandardScopesOpenId + " api"},
-		gois.BackchannelAuthenticationRequestResource:        {"api-resource"},
+		gois.BackchannelAuthenticationRequestResource:        {"https://resources.example.com/api"},
 		gois.BackchannelAuthenticationRequestLoginHint:       {"alice"},
 		gois.BackchannelAuthenticationRequestBindingMessage:  {"Transfer 100 USD"},
 		gois.BackchannelAuthenticationRequestUserCode:        {"123456"},
@@ -89,7 +89,7 @@ func TestCIBABackchannelAuthenticationPollRequestE2E(t *testing.T) {
 	if !reflect.DeepEqual(stored.RequestedScopes, []string{gois.StandardScopesOpenId, "api"}) {
 		t.Fatalf("stored scopes = %#v", stored.RequestedScopes)
 	}
-	if !reflect.DeepEqual(stored.RequestedResourceGaps, []string{"api-resource"}) {
+	if !reflect.DeepEqual(stored.RequestedResourceGaps, []string{"https://resources.example.com/api"}) {
 		t.Fatalf("stored resource gaps = %#v", stored.RequestedResourceGaps)
 	}
 	if stored.BindingMessage != "Transfer 100 USD" || stored.UserCode != "123456" {
@@ -225,7 +225,7 @@ func newCIBAE2EIdentityResource() *storage_models.IdentityResource {
 
 func newCIBAE2EAPIResource() *storage_models.ApiResource {
 	resource := storage_models.NewApiResource()
-	resource.Name = "api-resource"
+	resource.Name = "https://resources.example.com/api"
 	resource.Scopes = []string{"api"}
 	return resource
 }

@@ -5,14 +5,12 @@ package impl
 
 import (
 	"errors"
-	"log/slog"
 
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/storage"
 	storage_models "github.com/gonewx/wicket/storage/models"
-	"github.com/gonewx/wicket/validators"
 	validators_contexts "github.com/gonewx/wicket/validators/contexts"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -87,53 +85,6 @@ func (CustomTokenValidator) ValidateAccessToken(result *validators_models.TokenV
 
 func (CustomTokenValidator) ValidateIdentityToken(result *validators_models.TokenValidationResult) *validators_models.TokenValidationResult {
 	return result
-}
-
-// ResourceValidator resolves requested resources for already parsed scopes.
-// input: resource validation request -> behavior: parse scopes and query resource store -> output: resource validation result.
-type ResourceValidator struct {
-	store  storage.ResourceStore
-	parser validators.ScopeParser
-}
-
-func NewResourceValidator(store storage.ResourceStore, parser validators.ScopeParser, logger *slog.Logger) *ResourceValidator {
-	return &ResourceValidator{store: store, parser: parser}
-}
-
-func (v *ResourceValidator) ValidateRequestedResources(request *validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error) {
-	result := validators_models.NewResourceValidationResult()
-	if request == nil {
-		return result, nil
-	}
-
-	if v.parser != nil {
-		parsed := v.parser.ParseScopeValues(request.Scopes)
-		if parsed != nil {
-			result.ParsedScopes = parsed.ParsedScopes
-			for _, err := range parsed.Errors {
-				result.InvalidScopes = append(result.InvalidScopes, err.RawValue)
-			}
-		}
-	} else {
-		for _, scope := range request.Scopes {
-			result.ParsedScopes = append(result.ParsedScopes, &validators_models.ParsedScopeValue{
-				RawValue:   scope,
-				ParsedName: scope,
-			})
-		}
-	}
-
-	if v.store != nil {
-		resources, err := v.store.FindResourcesByScope(result.RawScopeValues())
-		if err != nil {
-			return nil, err
-		}
-		if resources != nil {
-			result.Resources = resources
-		}
-	}
-
-	return result, nil
 }
 
 // BackchannelAuthenticationRequestIdValidator validates CIBA auth_req_id state.
