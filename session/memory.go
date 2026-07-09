@@ -55,7 +55,7 @@ func (s *MemoryStore) GetSession(sessionID string) (*Record, error) {
 	s.mu.RUnlock()
 
 	if expired {
-		_ = s.DeleteSession(sessionID)
+		s.deleteIfExpired(sessionID)
 		return nil, nil
 	}
 	return cp, nil
@@ -166,10 +166,30 @@ func (s *MemoryStore) GetSessionsBySubjectID(subjectID string) ([]*Record, error
 	s.mu.RUnlock()
 
 	for _, id := range expired {
-		_ = s.DeleteSession(id)
+		s.deleteIfExpired(id)
 	}
 
 	return result, nil
+}
+
+// deleteIfExpired removes a session only if it is still expired under the write
+// lock. This closes the TOCTOU window between an unlocked expiry observation and
+// the delete: a concurrent ValidateSession may have renewed the record after it
+// was flagged expired, and that renewed session must survive.
+func (s *MemoryStore) deleteIfExpired(sessionID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rec, ok := s.sessions[sessionID]
+	if !ok {
+		return
+	}
+	now := s.now()
+	if !now.set || !rec.IsExpired(now.at) {
+		return
+	}
+	s.unindexSubject(rec.SubjectID, sessionID)
+	delete(s.sessions, sessionID)
 }
 
 func (s *MemoryStore) DeleteSessionsBySubjectID(subjectID string) (int, error) {

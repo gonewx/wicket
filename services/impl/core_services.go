@@ -126,17 +126,19 @@ func (c *JwtRequestUriHttpClient) GetJwt(uri string, client *storage_models.Clie
 }
 
 type UserSession struct {
-	accessor   accessor.HttpContextAccessor
-	items      map[string]any
-	user       *claims.ClaimsPrincipal
-	session    string
-	clients    []string
-	store      sessionpkg.Store
-	clock      services.SystemClock
-	logger     *slog.Logger
-	enabled    bool
-	lifetime   time.Duration
-	cookieName string
+	accessor       accessor.HttpContextAccessor
+	items          map[string]any
+	user           *claims.ClaimsPrincipal
+	session        string
+	clients        []string
+	store          sessionpkg.Store
+	clock          services.SystemClock
+	logger         *slog.Logger
+	enabled        bool
+	lifetime       time.Duration
+	cookieName     string
+	cookieSecure   bool
+	cookieSameSite http.SameSite
 }
 
 func NewUserSession(
@@ -152,6 +154,8 @@ func NewUserSession(
 	enabled := false
 	lifetime := 14 * 24 * time.Hour
 	cookieName := "wicket.session"
+	cookieSecure := true
+	cookieSameSite := http.SameSiteNoneMode
 	if options != nil && options.ServerSideSessions != nil {
 		enabled = options.ServerSideSessions.Enabled
 		if options.ServerSideSessions.SessionLifetime > 0 {
@@ -160,16 +164,22 @@ func NewUserSession(
 		if options.ServerSideSessions.CookieName != "" {
 			cookieName = options.ServerSideSessions.CookieName
 		}
+		cookieSecure = options.ServerSideSessions.CookieSecure
+		if options.ServerSideSessions.CookieSameSite != 0 {
+			cookieSameSite = options.ServerSideSessions.CookieSameSite
+		}
 	}
 	return &UserSession{
-		accessor:   accessor,
-		items:      map[string]any{},
-		store:      store,
-		clock:      clock,
-		logger:     logger,
-		enabled:    enabled,
-		lifetime:   lifetime,
-		cookieName: cookieName,
+		accessor:       accessor,
+		items:          map[string]any{},
+		store:          store,
+		clock:          clock,
+		logger:         logger,
+		enabled:        enabled,
+		lifetime:       lifetime,
+		cookieName:     cookieName,
+		cookieSecure:   cookieSecure,
+		cookieSameSite: cookieSameSite,
 	}
 }
 
@@ -190,17 +200,13 @@ func (s *UserSession) writeSessionCookie(sessionID string) {
 	if w == nil {
 		return
 	}
-	secure := false
-	if s.accessor != nil {
-		if req := s.accessor.Request(); req != nil {
-			secure = req.TLS != nil
-		}
-	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.cookieName,
 		Value:    sessionID,
+		MaxAge:   int(s.lifetime.Seconds()),
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   s.cookieSecure,
+		SameSite: s.cookieSameSite,
 		Path:     "/",
 	})
 }
@@ -210,18 +216,14 @@ func (s *UserSession) clearSessionCookie() {
 	if w == nil {
 		return
 	}
-	secure := false
-	if s.accessor != nil {
-		if req := s.accessor.Request(); req != nil {
-			secure = req.TLS != nil
-		}
-	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.cookieName,
 		Value:    "",
+		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   s.cookieSecure,
+		SameSite: s.cookieSameSite,
 		Path:     "/",
 	})
 }
@@ -286,6 +288,11 @@ func (s *UserSession) CreateSessionId(principal *claims.ClaimsPrincipal, propert
 	s.session = newHandle()
 
 	if s.enabled && s.store != nil {
+		if s.clock == nil {
+			s.session = ""
+			s.user = nil
+			return "", fmt.Errorf("create session: clock not configured")
+		}
 		now := s.clock.Now()
 		rec := &sessionpkg.Record{
 			SessionID: s.session,

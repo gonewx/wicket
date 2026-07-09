@@ -3,7 +3,10 @@
 
 package options
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
 
 type BackchannelAuthenticationOptions struct {
 	Enabled                    bool
@@ -46,6 +49,17 @@ type ServerSideSessionOptions struct {
 	Enabled         bool
 	SessionLifetime time.Duration
 	CookieName      string
+	// CookieSecure marks the session cookie Secure so browsers only send it
+	// over TLS. Defaults to true: all user-facing OIDC endpoints require TLS
+	// (OIDC Core 1.0 §16.17). Override to false only for plain-HTTP local
+	// development.
+	CookieSecure bool
+	// CookieSameSite controls the session cookie SameSite attribute. Defaults
+	// to None so the cookie is sent when the OP authorize endpoint is loaded
+	// in a cross-site hidden iframe during silent renew (OIDC Session
+	// Management 1.0). None requires Secure to be set. Deployments without
+	// iframe-based renew may tighten this to Lax.
+	CookieSameSite http.SameSite
 }
 
 func NewServerSideSessionOptions() *ServerSideSessionOptions {
@@ -53,5 +67,7 @@ func NewServerSideSessionOptions() *ServerSideSessionOptions {
 		Enabled:         false,
 		SessionLifetime: 14 * 24 * time.Hour,
 		CookieName:      "wicket.session",
+		CookieSecure:    true,
+		CookieSameSite:  http.SameSiteNoneMode,
 	}
 }

@@ -244,6 +244,48 @@ func TestMemoryStoreSubjectQueries(t *testing.T) {
 	}
 }
 
+// TestMemoryStoreDeleteIfExpiredSkipsRenewed guards the TOCTOU fix: a session
+// flagged expired during an unlocked subject scan must survive if it is renewed
+// (its Expires pushed into the future) before the deferred cleanup runs. The
+// re-check under the write lock is what prevents deleting a just-renewed session.
+func TestMemoryStoreDeleteIfExpiredSkipsRenewed(t *testing.T) {
+	t.Parallel()
+
+	clock := newTestClock()
+	store := NewMemoryStore(clock)
+
+	rec := &Record{
+		SessionID: "s1",
+		SubjectID: "u1",
+		Expires:   clock.Now().Add(time.Hour),
+	}
+	if err := store.CreateSession(rec); err != nil {
+		t.Fatal(err)
+	}
+
+	// Move past expiry so the record is currently expired.
+	clock.Advance(2 * time.Hour)
+
+	// Simulate a concurrent renewal landing before the deferred cleanup:
+	// the stored record's Expires is pushed back into the future.
+	renewed := *rec
+	renewed.Expires = clock.Now().Add(time.Hour)
+	if err := store.UpdateSession(&renewed); err != nil {
+		t.Fatal(err)
+	}
+
+	// deleteIfExpired must observe the renewed (non-expired) record and leave it.
+	store.deleteIfExpired("s1")
+
+	got, err := store.GetSession("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil {
+		t.Fatal("renewed session was deleted; deleteIfExpired must re-check expiry under the lock")
+	}
+}
+
 func TestMemoryStoreConcurrentAccess(t *testing.T) {
 	t.Parallel()
 

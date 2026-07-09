@@ -59,6 +59,8 @@ func newSessionUserSession(t *testing.T, enabled bool, store sessionpkg.Store, a
 			Enabled:         enabled,
 			SessionLifetime: 24 * time.Hour,
 			CookieName:      "wicket.session",
+			CookieSecure:    true,
+			CookieSameSite:  http.SameSiteNoneMode,
 		},
 	}
 	return NewUserSession(acc, nil, opts, clock, nil, nil, nil, store)
@@ -93,6 +95,36 @@ func TestUserSessionDisabledTwoState(t *testing.T) {
 
 	if err := us.EnsureSessionIdCookie(); err != nil {
 		t.Fatalf("EnsureSessionIdCookie: %v", err)
+	}
+}
+
+// TestUserSessionEnabledNilClockFailsClosed verifies the enabled-state
+// CreateSessionId path returns an error instead of panicking when constructed
+// without a clock (mirrors the Coordinator's nil-clock guard). Standard DI
+// always injects a real clock, so this guards direct construction in tests and
+// non-standard wiring.
+func TestUserSessionEnabledNilClockFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	store := sessionpkg.NewMemoryStore(newSessionStateClock())
+	rec := httptest.NewRecorder()
+	acc := &recordingAccessor{req: httptest.NewRequest(http.MethodGet, "/", nil), rw: rec}
+
+	opts := &config_options.WicketOptions{
+		ServerSideSessions: &config_options.ServerSideSessionOptions{
+			Enabled:        true,
+			CookieSecure:   true,
+			CookieSameSite: http.SameSiteNoneMode,
+		},
+	}
+	us := NewUserSession(acc, nil, opts, nil, nil, nil, nil, store)
+
+	_, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{})
+	if err == nil {
+		t.Fatal("expected CreateSessionId to fail closed with a nil clock, got nil error")
+	}
+	if len(rec.Result().Cookies()) != 0 {
+		t.Fatal("no session cookie should be written when creation fails")
 	}
 }
 
@@ -139,6 +171,15 @@ func TestUserSessionEnabledCreatePersistsAndSetsCookie(t *testing.T) {
 	}
 	if !sessionCookie.HttpOnly {
 		t.Fatal("session cookie should be HttpOnly")
+	}
+	if sessionCookie.MaxAge != int((24 * time.Hour).Seconds()) {
+		t.Fatalf("cookie MaxAge = %d, want lifetime in seconds so it survives browser restart", sessionCookie.MaxAge)
+	}
+	if !sessionCookie.Secure {
+		t.Fatal("session cookie should be Secure (OIDC endpoints require TLS)")
+	}
+	if sessionCookie.SameSite != http.SameSiteNoneMode {
+		t.Fatalf("cookie SameSite = %v, want None for cross-site silent renew", sessionCookie.SameSite)
 	}
 }
 
