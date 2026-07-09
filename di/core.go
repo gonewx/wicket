@@ -7,6 +7,7 @@ package di
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket"
@@ -18,6 +19,7 @@ import (
 	config_options "github.com/gonewx/wicket/config/options"
 	optspkg "github.com/gonewx/wicket/di/options"
 	"github.com/gonewx/wicket/dp"
+	"github.com/gonewx/wicket/dynamicscheme"
 	"github.com/gonewx/wicket/handlers"
 	"github.com/gonewx/wicket/hosting"
 	dynamicschemes "github.com/gonewx/wicket/hosting/dynamic/schemes"
@@ -145,8 +147,38 @@ func registerCore() {
 	godi.AddTransientFactory[*gois.Decorator[auth.SchemeProvider]](&r, func(p godi.Provider) *gois.Decorator[auth.SchemeProvider] {
 		return gois.NewDecorator[auth.SchemeProvider](godi.GetRequired[*authcore.SchemeProvider](p))
 	})
-	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L262 (AddTransientDecorator outer Add).
+	// The outer scheme provider merges the static registry with runtime dynamic
+	// providers. Its constructor params (decorator, options, resolver, logger)
+	// are auto-wired from their registrations below.
 	godi.AddTransient[auth.SchemeProvider, dynamicschemes.AuthSchemeProvider](&r)
+	// The dynamic provider store persists runtime scheme provider records. It is
+	// a singleton so its state persists across the transient scheme provider
+	// instances; the factory reads only singleton options, not the ServerConfig
+	// store seam, so eager singleton assembly does not freeze that seam.
+	godi.AddSingletonFactory[dynamicscheme.ProviderStore](&r, func(p godi.Provider) dynamicscheme.ProviderStore {
+		opts := godi.GetRequired[*config_options.DynamicProviderOptions](p)
+		if opts != nil && opts.StorageProvider != nil {
+			return opts.StorageProvider
+		}
+		return dynamicscheme.NewMemoryStore()
+	})
+	// The resolver merges the dynamic store view behind a TTL cache. Singleton so
+	// its cache persists; reads only singleton options, the store, and a clock.
+	godi.AddSingletonFactory[*dynamicscheme.Resolver](&r, func(p godi.Provider) *dynamicscheme.Resolver {
+		opts := godi.GetRequired[*config_options.DynamicProviderOptions](p)
+		enabled := false
+		var cacheTTL time.Duration
+		var clock dynamicscheme.Clock
+		if opts != nil {
+			enabled = opts.Enabled
+			cacheTTL = opts.CacheTTL
+			clock = opts.Clock
+		}
+		if clock == nil {
+			clock = godi.GetRequired[services.SystemClock](p)
+		}
+		return dynamicscheme.NewResolver(godi.GetRequired[dynamicscheme.ProviderStore](p), clock, enabled, cacheTTL)
+	})
 	// (TryAddScoped<IAuthenticationHandlerProvider, AuthenticationHandlerProvider>).
 	godi.AddScopedFactory[auth.HandlerProvider](&r, func(p godi.Provider) auth.HandlerProvider {
 		return authcore.NewHandlerProvider(godi.GetRequired[auth.SchemeProvider](p), p)
