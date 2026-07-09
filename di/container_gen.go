@@ -29,6 +29,7 @@ import (
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/services/impl"
 	memory2 "github.com/gonewx/wicket/services/memory"
+	"github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
 	impl4 "github.com/gonewx/wicket/storage/impl"
 	"github.com/gonewx/wicket/storage/memory"
@@ -74,6 +75,7 @@ type Root struct {
 	f_BackchannelAuthenticationRequestStore                  storage.BackchannelAuthenticationRequestStore
 	f_Ptr_Manager                                            *keymgmt.Manager
 	f_MemoryDistributedCache                                 services.DistributedCache
+	f_Store                                                  session.Store
 	f_DefaultHttpContextAccessor                             accessor.HttpContextAccessor
 	f_HandlerProvider                                        auth.HandlerProvider
 	f_UserSession                                            services.UserSession
@@ -229,6 +231,9 @@ func NewRoot() (*Root, error) {
 		return keymgmt.NewManager(cfg, store, provider, clock, entropy, godi.GetRequired[*slog.Logger](p))
 	})(r)
 	r.f_MemoryDistributedCache = memory2.NewMemoryDistributedCache()
+	r.f_Store = (func(p godi.Provider) session.Store {
+		return session.NewMemoryStore(godi.GetRequired[services.SystemClock](p))
+	})(r)
 	r.f_DefaultHttpContextAccessor = accessor.NewDefaultHttpContextAccessor()
 	r.f_HandlerProvider = (func(p godi.Provider) auth.HandlerProvider {
 		return core.NewHandlerProvider(godi.GetRequired[auth.SchemeProvider](p), p)
@@ -242,6 +247,7 @@ func NewRoot() (*Root, error) {
 			impl.NewServerUrlsFromAccessor(godi.GetRequired[accessor.HttpContextAccessor](p)),
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[auth.SchemeProvider](p),
+			godi.GetRequired[session.Store](p),
 		)
 	})(r)
 	r.f_Service = core.NewService(r.NewAuthSchemeProvider(), r.f_HandlerProvider)
@@ -769,7 +775,19 @@ func (r *Root) NewInteractionService() services.InteractionService {
 }
 
 func (r *Root) NewSessionCoordinationService() services.SessionCoordinationService {
-	return impl.NewSessionCoordinationService()
+	return (func(p godi.Provider) services.SessionCoordinationService {
+		opts := godi.GetRequired[*options.WicketOptions](p)
+		enabled := false
+		if opts != nil && opts.ServerSideSessions != nil {
+			enabled = opts.ServerSideSessions.Enabled
+		}
+		coordinator := session.NewCoordinator(
+			godi.GetRequired[session.Store](p),
+			godi.GetRequired[services.SystemClock](p),
+			enabled,
+		)
+		return impl.NewSessionCoordinationAdapter(coordinator)
+	})(r)
 }
 
 func (r *Root) NewTokenTools() *tools.TokenTools {
@@ -975,6 +993,8 @@ func (r *Root) Ptr_Manager() *keymgmt.Manager { return r.f_Ptr_Manager }
 
 func (r *Root) MemoryDistributedCache() services.DistributedCache { return r.f_MemoryDistributedCache }
 
+func (r *Root) Store() session.Store { return r.f_Store }
+
 func (r *Root) DefaultHttpContextAccessor() accessor.HttpContextAccessor {
 	return r.f_DefaultHttpContextAccessor
 }
@@ -1033,6 +1053,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_Ptr_Manager
 	case reflect.TypeFor[services.DistributedCache]():
 		return r.f_MemoryDistributedCache
+	case reflect.TypeFor[session.Store]():
+		return r.f_Store
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return r.f_DefaultHttpContextAccessor
 	case reflect.TypeFor[auth.HandlerProvider]():
@@ -1457,6 +1479,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[services.InteractionService]():
 		return true
+	case reflect.TypeFor[session.Store]():
+		return true
 	case reflect.TypeFor[services.SessionCoordinationService]():
 		return true
 	case reflect.TypeFor[*tools.TokenTools]():
@@ -1574,6 +1598,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{r.f_Ptr_Manager}
 	case reflect.TypeFor[services.DistributedCache]():
 		return []any{r.f_MemoryDistributedCache}
+	case reflect.TypeFor[session.Store]():
+		return []any{r.f_Store}
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return []any{r.f_DefaultHttpContextAccessor}
 	case reflect.TypeFor[auth.HandlerProvider]():
@@ -1804,6 +1830,7 @@ func (r *Root) CreateScope() godi.Scope {
 			impl.NewServerUrlsFromAccessor(godi.GetRequired[accessor.HttpContextAccessor](p)),
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[auth.SchemeProvider](p),
+			godi.GetRequired[session.Store](p),
 		)
 	})(s)
 	s.f_Service = core.NewService(s.NewAuthSchemeProvider(), s.f_HandlerProvider)
@@ -1873,6 +1900,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_Ptr_Manager
 	case reflect.TypeFor[services.DistributedCache]():
 		return s.root.f_MemoryDistributedCache
+	case reflect.TypeFor[session.Store]():
+		return s.root.f_Store
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return s.f_DefaultHttpContextAccessor
 	case reflect.TypeFor[auth.HandlerProvider]():
@@ -2128,6 +2157,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return true
 	case reflect.TypeFor[services.DistributedCache]():
+		return true
+	case reflect.TypeFor[session.Store]():
 		return true
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return true
@@ -2408,6 +2439,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		return []any{s.root.f_Ptr_Manager}
 	case reflect.TypeFor[services.DistributedCache]():
 		return []any{s.root.f_MemoryDistributedCache}
+	case reflect.TypeFor[session.Store]():
+		return []any{s.root.f_Store}
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return []any{s.f_DefaultHttpContextAccessor}
 	case reflect.TypeFor[auth.HandlerProvider]():
@@ -2638,6 +2671,7 @@ func (s *scope) CreateScope() godi.Scope {
 			impl.NewServerUrlsFromAccessor(godi.GetRequired[accessor.HttpContextAccessor](p)),
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[auth.SchemeProvider](p),
+			godi.GetRequired[session.Store](p),
 		)
 	})(ns)
 	ns.f_Service = core.NewService(ns.NewAuthSchemeProvider(), ns.f_HandlerProvider)
@@ -3170,7 +3204,19 @@ func (s *scope) NewInteractionService() services.InteractionService {
 }
 
 func (s *scope) NewSessionCoordinationService() services.SessionCoordinationService {
-	return impl.NewSessionCoordinationService()
+	return (func(p godi.Provider) services.SessionCoordinationService {
+		opts := godi.GetRequired[*options.WicketOptions](p)
+		enabled := false
+		if opts != nil && opts.ServerSideSessions != nil {
+			enabled = opts.ServerSideSessions.Enabled
+		}
+		coordinator := session.NewCoordinator(
+			godi.GetRequired[session.Store](p),
+			godi.GetRequired[services.SystemClock](p),
+			enabled,
+		)
+		return impl.NewSessionCoordinationAdapter(coordinator)
+	})(s)
 }
 
 func (s *scope) NewTokenTools() *tools.TokenTools {
@@ -3381,6 +3427,8 @@ func (s *scope) Ptr_Manager() *keymgmt.Manager { return s.root.f_Ptr_Manager }
 func (s *scope) MemoryDistributedCache() services.DistributedCache {
 	return s.root.f_MemoryDistributedCache
 }
+
+func (s *scope) Store() session.Store { return s.root.f_Store }
 
 func (s *scope) DefaultHttpContextAccessor() accessor.HttpContextAccessor {
 	return s.f_DefaultHttpContextAccessor

@@ -15,6 +15,7 @@ import (
 	"github.com/gonewx/wicket/services"
 	services_impl "github.com/gonewx/wicket/services/impl"
 	services_memory "github.com/gonewx/wicket/services/memory"
+	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
 	storage_impl "github.com/gonewx/wicket/storage/impl"
 	"github.com/gonewx/wicket/tools"
@@ -152,7 +153,22 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[storage.MessageStore[models_contexts.LogoutNotificationContext]](p),
 		)
 	})
-	godi.AddTransient[services.SessionCoordinationService, services_impl.SessionCoordinationService](&r)
+	godi.AddSingletonFactory[sessionpkg.Store](&r, func(p godi.Provider) sessionpkg.Store {
+		return sessionpkg.NewMemoryStore(godi.GetRequired[services.SystemClock](p))
+	})
+	godi.AddTransientFactory[services.SessionCoordinationService](&r, func(p godi.Provider) services.SessionCoordinationService {
+		opts := godi.GetRequired[*config_options.WicketOptions](p)
+		enabled := false
+		if opts != nil && opts.ServerSideSessions != nil {
+			enabled = opts.ServerSideSessions.Enabled
+		}
+		coordinator := sessionpkg.NewCoordinator(
+			godi.GetRequired[sessionpkg.Store](p),
+			godi.GetRequired[services.SystemClock](p),
+			enabled,
+		)
+		return services_impl.NewSessionCoordinationAdapter(coordinator)
+	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L159 (AddTransient)
 	godi.AddTransient[*tools.TokenTools, tools.TokenTools](&r)
 

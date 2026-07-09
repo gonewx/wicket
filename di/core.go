@@ -27,6 +27,7 @@ import (
 	"github.com/gonewx/wicket/server"
 	"github.com/gonewx/wicket/services"
 	impl "github.com/gonewx/wicket/services/impl"
+	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/validators"
 	validators_impl "github.com/gonewx/wicket/validators/impl"
@@ -161,6 +162,7 @@ func registerCore() {
 			impl.NewServerUrlsFromAccessor(godi.GetRequired[accessor.HttpContextAccessor](p)),
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[auth.SchemeProvider](p),
+			godi.GetRequired[sessionpkg.Store](p),
 		)
 	})
 	// (TryAddSingleton<IClaimsTransformation, NoopClaimsTransformation>).
