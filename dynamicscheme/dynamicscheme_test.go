@@ -309,3 +309,73 @@ func schemes(providers []*Provider) []string {
 	}
 	return out
 }
+
+// scriptedStore is a ProviderStore whose AllProviders output is fully
+// controlled, used to exercise resolver robustness against store types that
+// violate the store contract (duplicate keys, unsorted, empty scheme).
+type scriptedStore struct{ all []*Provider }
+
+func (s scriptedStore) GetProvider(string) (*Provider, error) { return nil, nil }
+func (s scriptedStore) AllProviders() ([]*Provider, error)    { return s.all, nil }
+func (s scriptedStore) PutProvider(*Provider) error           { return nil }
+func (s scriptedStore) DeleteProvider(string) error           { return nil }
+
+func TestNewResolverNilSeamGuards(t *testing.T) {
+	t.Parallel()
+
+	// A nil store must not panic on the enabled path; it falls back to an empty
+	// in-memory store.
+	rStore := NewResolver(nil, newFakeClock(), true, time.Minute)
+	if _, ok, err := rStore.Get("a"); ok || err != nil {
+		t.Fatalf("nil-store Get = ok:%v err:%v, want false,nil", ok, err)
+	}
+	if all, err := rStore.All(); len(all) != 0 || err != nil {
+		t.Fatalf("nil-store All = %v,%v, want empty,nil", all, err)
+	}
+	if err := rStore.Register(provider("a", true)); err != nil {
+		t.Fatalf("nil-store Register into fallback store: %v", err)
+	}
+
+	// A nil clock with a positive TTL must not panic: caching is disabled so the
+	// clock is never read.
+	rClock := NewResolver(NewMemoryStore(), nil, true, time.Minute)
+	_ = rClock.Register(provider("a", true))
+	if _, ok, err := rClock.Get("a"); !ok || err != nil {
+		t.Fatalf("nil-clock Get = ok:%v err:%v, want true,nil", ok, err)
+	}
+}
+
+func TestResolverSnapshotRobustAgainstMisbehavingStore(t *testing.T) {
+	t.Parallel()
+
+	// Store returns duplicate schemes, unsorted order, an empty-scheme row, a nil
+	// entry, and a disabled row — all of which the resolver must normalize.
+	store := scriptedStore{all: []*Provider{
+		provider("c", true),
+		provider("a", true),
+		provider("a", true), // duplicate key
+		provider("", true),  // empty scheme
+		nil,                  // nil entry
+		provider("b", false), // individually disabled
+	}}
+	r := NewResolver(store, newFakeClock(), true, 0) // caching off: reload every read
+
+	all, err := r.All()
+	if err != nil {
+		t.Fatalf("All: %v", err)
+	}
+	// Deduplicated (a once), empty scheme filtered, disabled filtered, sorted.
+	if got := schemes(all); len(got) != 2 || got[0] != "a" || got[1] != "c" {
+		t.Fatalf("All = %v, want [a c] (deduped, empty-filtered, sorted)", got)
+	}
+	// Get must be self-consistent with All: empty scheme absent, present ones hit.
+	if _, ok, _ := r.Get(""); ok {
+		t.Fatal("empty-scheme record must not resolve")
+	}
+	if _, ok, _ := r.Get("a"); !ok {
+		t.Fatal("scheme a should resolve")
+	}
+	if _, ok, _ := r.Get("b"); ok {
+		t.Fatal("disabled scheme b must not resolve")
+	}
+}

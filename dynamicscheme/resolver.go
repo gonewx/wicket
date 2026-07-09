@@ -5,6 +5,7 @@ package dynamicscheme
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
@@ -36,8 +37,17 @@ type Resolver struct {
 }
 
 // NewResolver builds a resolver over store and clock. When enabled is false the
-// resolver behaves as an empty dynamic source.
+// resolver behaves as an empty dynamic source. A nil store falls back to an
+// in-memory store; a nil clock disables caching (caching needs a time source),
+// so the enabled path never dereferences a nil seam. The DI path always injects
+// both, so these guards only matter for direct construction.
 func NewResolver(store ProviderStore, clock Clock, enabled bool, cacheTTL time.Duration) *Resolver {
+	if store == nil {
+		store = NewMemoryStore()
+	}
+	if clock == nil {
+		cacheTTL = 0
+	}
 	return &Resolver{store: store, clock: clock, enabled: enabled, cacheTTL: cacheTTL}
 }
 
@@ -119,13 +129,24 @@ func (r *Resolver) snapshot() (*snapshot, error) {
 		return nil, err
 	}
 
+	// Build byScheme first, then derive ordered from it so the two views stay
+	// consistent (deduplicated, empty-scheme-filtered, scheme-ordered) even when
+	// a store implementation returns duplicate or unsorted records.
 	snap := &snapshot{byScheme: make(map[string]*Provider, len(providers))}
 	for _, provider := range providers {
-		if provider == nil || !provider.Enabled {
+		if provider == nil || !provider.Enabled || provider.Scheme == "" {
 			continue
 		}
 		snap.byScheme[provider.Scheme] = provider
-		snap.ordered = append(snap.ordered, provider)
+	}
+	ordered := make([]string, 0, len(snap.byScheme))
+	for scheme := range snap.byScheme {
+		ordered = append(ordered, scheme)
+	}
+	sort.Strings(ordered)
+	snap.ordered = make([]*Provider, 0, len(ordered))
+	for _, scheme := range ordered {
+		snap.ordered = append(snap.ordered, snap.byScheme[scheme])
 	}
 
 	if r.cacheTTL > 0 {
