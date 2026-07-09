@@ -6,6 +6,8 @@ package options
 import (
 	"net/http"
 	"time"
+
+	"github.com/gonewx/wicket/dynamicscheme"
 )
 
 type BackchannelAuthenticationOptions struct {
@@ -37,8 +39,23 @@ func NewMutualTlsOptions() *MutualTlsOptions {
 	return &MutualTlsOptions{Enabled: false}
 }
 
+// DynamicProviderOptions configures runtime authentication scheme providers. It
+// is off by default; when enabled the scheme provider merges runtime providers
+// resolved from the store with the static registry. The injected seams
+// (StorageProvider, Clock) fall back to safe defaults when left nil. Business
+// packages do not read the environment; a host loads configuration and injects
+// it here.
 type DynamicProviderOptions struct {
+	// Enabled turns on runtime dynamic provider resolution.
 	Enabled bool
+	// StorageProvider persists provider records; nil uses an in-memory store.
+	StorageProvider dynamicscheme.ProviderStore
+	// Clock is the injected time source for cache expiry; nil uses the default
+	// clock.
+	Clock dynamicscheme.Clock
+	// CacheTTL bounds how long a resolved provider snapshot is reused. A
+	// non-positive value disables caching.
+	CacheTTL time.Duration
 }
 
 func NewDynamicProviderOptions() *DynamicProviderOptions {
