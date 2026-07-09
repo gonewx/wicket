@@ -19,9 +19,9 @@ import (
 // tests so lifetime arithmetic never depends on the real wall clock.
 var deviceCodeTestNow = time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 
-type deviceCodeTestClock struct{ now time.Time }
+type fixedTestClock struct{ now time.Time }
 
-func (c deviceCodeTestClock) Now() time.Time { return c.now }
+func (c fixedTestClock) Now() time.Time { return c.now }
 
 // createClientStore builds an in-memory client store over the shared client
 // fixtures.
@@ -50,7 +50,7 @@ func createDeviceCodeValidator(
 		throttlingService = validators_mock.NewTestDeviceFlowThrottlingService(false)
 	}
 	if systemClock == nil {
-		systemClock = deviceCodeTestClock{now: deviceCodeTestNow}
+		systemClock = fixedTestClock{now: deviceCodeTestNow}
 	}
 	return NewDeviceCodeValidator(devices, profile, throttlingService, systemClock, slog.Default())
 }
