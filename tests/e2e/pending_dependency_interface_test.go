@@ -38,15 +38,11 @@ func TestPendingDependencyInterfacesResolveFromContainerE2E(t *testing.T) {
 		t.Fatal("SessionCoordinationService seam did not resolve")
 	}
 	valid, err := sessionService.ValidateSession(nil)
-	if err == nil {
-		t.Fatal("SessionCoordinationService returned nil error, want neutral pending error")
+	if err != nil {
+		t.Fatalf("SessionCoordinationService returned error %v, want nil (pass-through when disabled)", err)
 	}
-	if valid {
-		t.Fatal("SessionCoordinationService returned valid session, want false")
-	}
-	want := "pending Epic " + "2/3 implementation"
-	if !strings.Contains(err.Error(), want) {
-		t.Fatalf("SessionCoordinationService error = %q, want substring %q", err.Error(), want)
+	if !valid {
+		t.Fatal("SessionCoordinationService returned invalid, want true (pass-through when disabled)")
 	}
 	body, err := root.NewJwtRequestUriHttpClient().GetJwt("http://127.0.0.1:1/request.jwt", nil)
 	if err == nil {
@@ -55,6 +51,7 @@ func TestPendingDependencyInterfacesResolveFromContainerE2E(t *testing.T) {
 	if body != "" {
 		t.Fatalf("JwtRequestUriHttpClient body = %q, want empty string", body)
 	}
+	want := "pending Epic " + "2/3 implementation"
 	if !strings.Contains(err.Error(), want) {
 		t.Fatalf("JwtRequestUriHttpClient error = %q, want substring %q", err.Error(), want)
 	}
