@@ -3,6 +3,8 @@
 
 package options
 
+import "time"
+
 type BackchannelAuthenticationOptions struct {
 	Enabled                    bool
 	AllowedDeliveryModes       []string
@@ -41,9 +43,13 @@ func NewDynamicProviderOptions() *DynamicProviderOptions {
 }
 
 type ServerSideSessionOptions struct {
-	Enabled bool
+	Enabled         bool
+	SessionLifetime time.Duration
 }
 
 func NewServerSideSessionOptions() *ServerSideSessionOptions {
-	return &ServerSideSessionOptions{Enabled: false}
+	return &ServerSideSessionOptions{
+		Enabled:         false,
+		SessionLifetime: 14 * 24 * time.Hour,
+	}
 }
