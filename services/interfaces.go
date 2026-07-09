@@ -211,8 +211,10 @@ type SessionValidationRequest struct {
 	SessionId string
 }
 
-// SessionCoordinationService is a placeholder for later server-side-session behavior.
-// input: session validation request -> behavior: reject unsupported behavior -> output: error.
+// SessionCoordinationService validates whether a referenced session is still
+// valid during token use. input: session validation request -> behavior:
+// pass-through when server-side sessions are disabled, real store-backed
+// validation when enabled -> output: validity flag or error.
 type SessionCoordinationService interface {
 	ValidateSession(*SessionValidationRequest) (bool, error)
 }

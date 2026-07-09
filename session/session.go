@@ -37,6 +37,9 @@ type Store interface {
 	DeleteSession(sessionID string) error
 	GetSessionsBySubjectID(subjectID string) ([]*Record, error)
 	DeleteSessionsBySubjectID(subjectID string) (int, error)
+	// AddClientID atomically appends a client id to the session record,
+	// deduplicating within the store lock. A missing session is a no-op.
+	AddClientID(sessionID, clientID string) error
 }
 
 type Clock interface {
@@ -58,7 +61,7 @@ func (c *Coordinator) ValidateSession(sessionID string) (bool, error) {
 		return true, nil
 	}
 
-	if c.store == nil {
+	if c.store == nil || c.clock == nil {
 		return false, nil
 	}
 

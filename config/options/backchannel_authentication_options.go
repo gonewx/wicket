@@ -45,11 +45,13 @@ func NewDynamicProviderOptions() *DynamicProviderOptions {
 type ServerSideSessionOptions struct {
 	Enabled         bool
 	SessionLifetime time.Duration
+	CookieName      string
 }
 
 func NewServerSideSessionOptions() *ServerSideSessionOptions {
 	return &ServerSideSessionOptions{
 		Enabled:         false,
 		SessionLifetime: 14 * 24 * time.Hour,
+		CookieName:      "wicket.session",
 	}
 }

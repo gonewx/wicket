@@ -126,15 +126,17 @@ func (c *JwtRequestUriHttpClient) GetJwt(uri string, client *storage_models.Clie
 }
 
 type UserSession struct {
-	accessor accessor.HttpContextAccessor
-	items    map[string]any
-	user     *claims.ClaimsPrincipal
-	session  string
-	clients  []string
-	store    sessionpkg.Store
-	clock    services.SystemClock
-	enabled  bool
-	lifetime time.Duration
+	accessor   accessor.HttpContextAccessor
+	items      map[string]any
+	user       *claims.ClaimsPrincipal
+	session    string
+	clients    []string
+	store      sessionpkg.Store
+	clock      services.SystemClock
+	logger     *slog.Logger
+	enabled    bool
+	lifetime   time.Duration
+	cookieName string
 }
 
 func NewUserSession(
@@ -149,22 +151,100 @@ func NewUserSession(
 ) *UserSession {
 	enabled := false
 	lifetime := 14 * 24 * time.Hour
+	cookieName := "wicket.session"
 	if options != nil && options.ServerSideSessions != nil {
 		enabled = options.ServerSideSessions.Enabled
 		if options.ServerSideSessions.SessionLifetime > 0 {
 			lifetime = options.ServerSideSessions.SessionLifetime
 		}
+		if options.ServerSideSessions.CookieName != "" {
+			cookieName = options.ServerSideSessions.CookieName
+		}
 	}
 	return &UserSession{
-		accessor: accessor,
-		items:    map[string]any{},
-		store:    store,
-		clock:    clock,
-		enabled:  enabled,
-		lifetime: lifetime,
+		accessor:   accessor,
+		items:      map[string]any{},
+		store:      store,
+		clock:      clock,
+		logger:     logger,
+		enabled:    enabled,
+		lifetime:   lifetime,
+		cookieName: cookieName,
 	}
 }
 
+// responseWriter returns the current response writer when the accessor also
+// exposes one; nil otherwise (e.g. outside a request scope).
+func (s *UserSession) responseWriter() http.ResponseWriter {
+	if s.accessor == nil {
+		return nil
+	}
+	if rw, ok := s.accessor.(accessor.HttpResponseWriterAccessor); ok {
+		return rw.ResponseWriter()
+	}
+	return nil
+}
+
+func (s *UserSession) writeSessionCookie(sessionID string) {
+	w := s.responseWriter()
+	if w == nil {
+		return
+	}
+	secure := false
+	if s.accessor != nil {
+		if req := s.accessor.Request(); req != nil {
+			secure = req.TLS != nil
+		}
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     s.cookieName,
+		Value:    sessionID,
+		HttpOnly: true,
+		Secure:   secure,
+		Path:     "/",
+	})
+}
+
+func (s *UserSession) clearSessionCookie() {
+	w := s.responseWriter()
+	if w == nil {
+		return
+	}
+	secure := false
+	if s.accessor != nil {
+		if req := s.accessor.Request(); req != nil {
+			secure = req.TLS != nil
+		}
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     s.cookieName,
+		Value:    "",
+		Expires:  time.Unix(0, 0),
+		HttpOnly: true,
+		Secure:   secure,
+		Path:     "/",
+	})
+}
+
+func (s *UserSession) readSessionCookie() string {
+	if s.accessor == nil {
+		return ""
+	}
+	req := s.accessor.Request()
+	if req == nil {
+		return ""
+	}
+	cookie, err := req.Cookie(s.cookieName)
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
+}
+
+// EnsureSessionIdCookie loads the session from the request cookie into internal
+// state when server-side sessions are enabled. If the cookie references a
+// session that is missing or expired, the cookie is cleared and internal state
+// stays empty (graceful degradation, not an error).
 func (s *UserSession) EnsureSessionIdCookie() error {
 	if !s.enabled || s.store == nil {
 		return nil
@@ -172,10 +252,30 @@ func (s *UserSession) EnsureSessionIdCookie() error {
 	if s.session != "" {
 		return nil
 	}
+
+	sessionID := s.readSessionCookie()
+	if sessionID == "" {
+		return nil
+	}
+
+	rec, err := s.store.GetSession(sessionID)
+	if err != nil {
+		return fmt.Errorf("load session: %w", err)
+	}
+	if rec == nil {
+		s.clearSessionCookie()
+		return nil
+	}
+
+	s.session = rec.SessionID
+	s.clients = append([]string(nil), rec.ClientIDs...)
 	return nil
 }
 
 func (s *UserSession) RemoveSessionIdCookie() error {
+	if s.enabled {
+		s.clearSessionCookie()
+	}
 	s.session = ""
 	s.clients = nil
 	return nil
@@ -199,6 +299,7 @@ func (s *UserSession) CreateSessionId(principal *claims.ClaimsPrincipal, propert
 			s.user = nil
 			return "", fmt.Errorf("create session: %w", err)
 		}
+		s.writeSessionCookie(s.session)
 	}
 
 	return s.session, nil
@@ -218,10 +319,12 @@ func (s *UserSession) AddClientId(clientId string) error {
 	}
 
 	if s.enabled && s.store != nil && s.session != "" {
-		rec, err := s.store.GetSession(s.session)
-		if err == nil && rec != nil {
-			rec.AddClientID(clientId)
-			_ = s.store.UpdateSession(rec)
+		if err := s.store.AddClientID(s.session, clientId); err != nil && s.logger != nil {
+			s.logger.Warn("failed to persist client id to session store",
+				slog.String("sessionId", s.session),
+				slog.String("clientId", clientId),
+				slog.Any("err", err),
+			)
 		}
 	}
 

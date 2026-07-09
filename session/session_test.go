@@ -391,6 +391,7 @@ func (failingStore) UpdateSession(*Record) error                        { return
 func (failingStore) DeleteSession(string) error                         { return fmt.Errorf("store unavailable") }
 func (failingStore) GetSessionsBySubjectID(string) ([]*Record, error)   { return nil, fmt.Errorf("store unavailable") }
 func (failingStore) DeleteSessionsBySubjectID(string) (int, error)      { return 0, fmt.Errorf("store unavailable") }
+func (failingStore) AddClientID(string, string) error                   { return fmt.Errorf("store unavailable") }
 
 func TestCoordinatorRenewedUpdate(t *testing.T) {
 	t.Parallel()
@@ -436,5 +437,131 @@ func TestMemoryStoreNilAndEmptyInput(t *testing.T) {
 	}
 	if err := store.CreateSession(&Record{}); err == nil {
 		t.Fatal("empty session id should error")
+	}
+}
+
+func TestMemoryStoreAddClientID(t *testing.T) {
+	t.Parallel()
+
+	clock := newTestClock()
+	for name, tt := range map[string]struct {
+		setup     func(*MemoryStore)
+		sessionID string
+		clientID  string
+		wantList  []string
+	}{
+		"append to existing": {
+			setup: func(s *MemoryStore) {
+				_ = s.CreateSession(&Record{SessionID: "s1", SubjectID: "u1", Expires: clock.Now().Add(time.Hour)})
+			},
+			sessionID: "s1", clientID: "c1", wantList: []string{"c1"},
+		},
+		"dedup existing client": {
+			setup: func(s *MemoryStore) {
+				_ = s.CreateSession(&Record{SessionID: "s1", SubjectID: "u1", Expires: clock.Now().Add(time.Hour), ClientIDs: []string{"c1"}})
+			},
+			sessionID: "s1", clientID: "c1", wantList: []string{"c1"},
+		},
+		"missing session is no-op": {
+			setup:     func(s *MemoryStore) {},
+			sessionID: "ghost", clientID: "c1", wantList: nil,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			store := NewMemoryStore(clock)
+			tt.setup(store)
+			if err := store.AddClientID(tt.sessionID, tt.clientID); err != nil {
+				t.Fatalf("AddClientID: %v", err)
+			}
+			got, _ := store.GetSession(tt.sessionID)
+			if tt.wantList == nil {
+				if got != nil {
+					t.Fatalf("expected no session, got %+v", got)
+				}
+				return
+			}
+			if got == nil || len(got.ClientIDs) != len(tt.wantList) {
+				t.Fatalf("ClientIDs = %v, want %v", got, tt.wantList)
+			}
+		})
+	}
+}
+
+func TestMemoryStoreAddClientIDExpiredIsNoOp(t *testing.T) {
+	t.Parallel()
+
+	clock := newTestClock()
+	store := NewMemoryStore(clock)
+	_ = store.CreateSession(&Record{SessionID: "s1", SubjectID: "u1", Expires: clock.Now().Add(time.Hour)})
+	clock.Advance(2 * time.Hour)
+
+	if err := store.AddClientID("s1", "c1"); err != nil {
+		t.Fatalf("AddClientID on expired: %v", err)
+	}
+	// Session is lazily reaped on next read; the client add must not have resurrected it.
+	if got, _ := store.GetSession("s1"); got != nil {
+		t.Fatal("expired session should not be revived by AddClientID")
+	}
+}
+
+func TestMemoryStoreNilClockNeverExpires(t *testing.T) {
+	t.Parallel()
+
+	store := NewMemoryStore(nil)
+	rec := &Record{SessionID: "s1", SubjectID: "u1", Expires: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)}
+	if err := store.CreateSession(rec); err != nil {
+		t.Fatal(err)
+	}
+
+	// With no clock, expiry cannot be evaluated: GetSession and the subject
+	// query must not panic and must return the record.
+	got, err := store.GetSession("s1")
+	if err != nil || got == nil {
+		t.Fatalf("GetSession with nil clock: got=%v err=%v", got, err)
+	}
+	list, err := store.GetSessionsBySubjectID("u1")
+	if err != nil || len(list) != 1 {
+		t.Fatalf("GetSessionsBySubjectID with nil clock: len=%d err=%v", len(list), err)
+	}
+}
+
+func TestCoordinatorNilClockDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	store := NewMemoryStore(nil)
+	_ = store.CreateSession(&Record{SessionID: "s1", SubjectID: "u1", Expires: time.Time{}})
+	coord := NewCoordinator(store, nil, true)
+
+	// A nil clock cannot decide expiry, so an enabled coordinator fails closed
+	// (returns false, nil) rather than panicking — same direction as store==nil.
+	valid, err := coord.ValidateSession("s1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if valid {
+		t.Fatal("enabled coordinator with nil clock should fail closed (false)")
+	}
+}
+
+func TestMemoryStoreUpdateClearingSubjectReindexes(t *testing.T) {
+	t.Parallel()
+
+	clock := newTestClock()
+	store := NewMemoryStore(clock)
+	_ = store.CreateSession(&Record{SessionID: "s1", SubjectID: "u1", Expires: clock.Now().Add(time.Hour)})
+
+	// Re-home the session under a new subject; the old subject must no longer
+	// resolve it and the new subject must.
+	updated := &Record{SessionID: "s1", SubjectID: "u2", Expires: clock.Now().Add(time.Hour)}
+	if err := store.UpdateSession(updated); err != nil {
+		t.Fatal(err)
+	}
+
+	if list, _ := store.GetSessionsBySubjectID("u1"); len(list) != 0 {
+		t.Fatalf("old subject should have 0 sessions, got %d", len(list))
+	}
+	if list, _ := store.GetSessionsBySubjectID("u2"); len(list) != 1 {
+		t.Fatalf("new subject should have 1 session, got %d", len(list))
 	}
 }

@@ -6,6 +6,7 @@ package session
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 type MemoryStore struct {
@@ -23,22 +24,41 @@ func NewMemoryStore(clock Clock) *MemoryStore {
 	}
 }
 
+// now returns the current time from the injected clock, or the zero time when
+// no clock is configured. A zero time never triggers expiry (Record.IsExpired
+// treats a zero Expires and a zero comparison time as non-expired), so a nil
+// clock degrades to "never expire" instead of panicking.
+func (s *MemoryStore) now() (t timeValue) {
+	if s.clock != nil {
+		t.set = true
+		t.at = s.clock.Now()
+	}
+	return t
+}
+
 func (s *MemoryStore) GetSession(sessionID string) (*Record, error) {
 	s.mu.RLock()
 	rec, ok := s.sessions[sessionID]
-	s.mu.RUnlock()
 	if !ok {
+		s.mu.RUnlock()
 		return nil, nil
 	}
 
-	if s.clock != nil && rec.IsExpired(s.clock.Now()) {
+	now := s.now()
+	expired := now.set && rec.IsExpired(now.at)
+	var cp *Record
+	if !expired {
+		c := *rec
+		c.ClientIDs = append([]string(nil), rec.ClientIDs...)
+		cp = &c
+	}
+	s.mu.RUnlock()
+
+	if expired {
 		_ = s.DeleteSession(sessionID)
 		return nil, nil
 	}
-
-	cp := *rec
-	cp.ClientIDs = append([]string(nil), rec.ClientIDs...)
-	return &cp, nil
+	return cp, nil
 }
 
 func (s *MemoryStore) CreateSession(session *Record) error {
@@ -56,13 +76,7 @@ func (s *MemoryStore) CreateSession(session *Record) error {
 	cp := *session
 	cp.ClientIDs = append([]string(nil), session.ClientIDs...)
 	s.sessions[session.SessionID] = &cp
-
-	if session.SubjectID != "" {
-		if s.subjects[session.SubjectID] == nil {
-			s.subjects[session.SubjectID] = make(map[string]struct{})
-		}
-		s.subjects[session.SubjectID][session.SessionID] = struct{}{}
-	}
+	s.indexSubject(session.SubjectID, session.SessionID)
 
 	return nil
 }
@@ -80,26 +94,34 @@ func (s *MemoryStore) UpdateSession(session *Record) error {
 		return nil
 	}
 
-	if existing.SubjectID != session.SubjectID && existing.SubjectID != "" {
-		if set := s.subjects[existing.SubjectID]; set != nil {
-			delete(set, session.SessionID)
-			if len(set) == 0 {
-				delete(s.subjects, existing.SubjectID)
-			}
-		}
+	if existing.SubjectID != session.SubjectID {
+		s.unindexSubject(existing.SubjectID, session.SessionID)
 	}
 
 	cp := *session
 	cp.ClientIDs = append([]string(nil), session.ClientIDs...)
 	s.sessions[session.SessionID] = &cp
+	s.indexSubject(session.SubjectID, session.SessionID)
 
-	if session.SubjectID != "" {
-		if s.subjects[session.SubjectID] == nil {
-			s.subjects[session.SubjectID] = make(map[string]struct{})
-		}
-		s.subjects[session.SubjectID][session.SessionID] = struct{}{}
+	return nil
+}
+
+// AddClientID atomically appends a client id to the stored session's client
+// list, deduplicating. It is a no-op (nil error) when the session is absent or
+// expired, so a caller racing with logout/expiry does not resurrect the record.
+func (s *MemoryStore) AddClientID(sessionID, clientID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rec, ok := s.sessions[sessionID]
+	if !ok {
+		return nil
 	}
-
+	now := s.now()
+	if now.set && rec.IsExpired(now.at) {
+		return nil
+	}
+	rec.AddClientID(clientID)
 	return nil
 }
 
@@ -112,15 +134,7 @@ func (s *MemoryStore) DeleteSession(sessionID string) error {
 		return nil
 	}
 
-	if rec.SubjectID != "" {
-		if set := s.subjects[rec.SubjectID]; set != nil {
-			delete(set, sessionID)
-			if len(set) == 0 {
-				delete(s.subjects, rec.SubjectID)
-			}
-		}
-	}
-
+	s.unindexSubject(rec.SubjectID, sessionID)
 	delete(s.sessions, sessionID)
 	return nil
 }
@@ -133,15 +147,15 @@ func (s *MemoryStore) GetSessionsBySubjectID(subjectID string) ([]*Record, error
 		return nil, nil
 	}
 
+	now := s.now()
 	result := make([]*Record, 0, len(ids))
-	now := s.clock.Now()
 	var expired []string
 	for id := range ids {
 		rec := s.sessions[id]
 		if rec == nil {
 			continue
 		}
-		if rec.IsExpired(now) {
+		if now.set && rec.IsExpired(now.at) {
 			expired = append(expired, id)
 			continue
 		}
@@ -167,11 +181,53 @@ func (s *MemoryStore) DeleteSessionsBySubjectID(subjectID string) (int, error) {
 		return 0, nil
 	}
 
-	count := len(ids)
+	count := 0
 	for id := range ids {
-		delete(s.sessions, id)
+		if _, exists := s.sessions[id]; exists {
+			delete(s.sessions, id)
+			count++
+		}
 	}
 	delete(s.subjects, subjectID)
 
 	return count, nil
+}
+
+// indexSubject records the session under its subject's reverse index. A session
+// with an empty subject id is intentionally not indexed: it cannot be enumerated
+// or invalidated by subject (there is no subject to key on). Callers that need
+// subject-based management must supply a non-empty subject id.
+//
+// Caller must hold the write lock.
+func (s *MemoryStore) indexSubject(subjectID, sessionID string) {
+	if subjectID == "" {
+		return
+	}
+	if s.subjects[subjectID] == nil {
+		s.subjects[subjectID] = make(map[string]struct{})
+	}
+	s.subjects[subjectID][sessionID] = struct{}{}
+}
+
+// unindexSubject removes the session from its subject's reverse index, pruning
+// the subject entry once its last session is gone. Caller must hold the write lock.
+func (s *MemoryStore) unindexSubject(subjectID, sessionID string) {
+	if subjectID == "" {
+		return
+	}
+	set := s.subjects[subjectID]
+	if set == nil {
+		return
+	}
+	delete(set, sessionID)
+	if len(set) == 0 {
+		delete(s.subjects, subjectID)
+	}
+}
+
+// timeValue carries a clock reading plus whether a clock was present, so expiry
+// logic can distinguish "clock says now" from "no clock configured".
+type timeValue struct {
+	at  time.Time
+	set bool
 }
