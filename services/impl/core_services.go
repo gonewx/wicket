@@ -16,10 +16,12 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/models/messages"
 	responses_models "github.com/gonewx/wicket/responses/models"
 	"github.com/gonewx/wicket/services"
+	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
 	storage_models "github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/utils"
@@ -129,6 +131,10 @@ type UserSession struct {
 	user     *claims.ClaimsPrincipal
 	session  string
 	clients  []string
+	store    sessionpkg.Store
+	clock    services.SystemClock
+	enabled  bool
+	lifetime time.Duration
 }
 
 func NewUserSession(
@@ -139,32 +145,94 @@ func NewUserSession(
 	urls services.ServerUrls,
 	logger *slog.Logger,
 	schemes auth.SchemeProvider,
+	store sessionpkg.Store,
 ) *UserSession {
-	return &UserSession{accessor: accessor, items: map[string]any{}}
+	enabled := false
+	lifetime := 14 * 24 * time.Hour
+	if options != nil && options.ServerSideSessions != nil {
+		enabled = options.ServerSideSessions.Enabled
+		if options.ServerSideSessions.SessionLifetime > 0 {
+			lifetime = options.ServerSideSessions.SessionLifetime
+		}
+	}
+	return &UserSession{
+		accessor: accessor,
+		items:    map[string]any{},
+		store:    store,
+		clock:    clock,
+		enabled:  enabled,
+		lifetime: lifetime,
+	}
 }
 
-func (s *UserSession) EnsureSessionIdCookie() error { return nil }
-func (s *UserSession) RemoveSessionIdCookie() error { s.session = ""; return nil }
+func (s *UserSession) EnsureSessionIdCookie() error {
+	if !s.enabled || s.store == nil {
+		return nil
+	}
+	if s.session != "" {
+		return nil
+	}
+	return nil
+}
+
+func (s *UserSession) RemoveSessionIdCookie() error {
+	s.session = ""
+	s.clients = nil
+	return nil
+}
+
 func (s *UserSession) CreateSessionId(principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	s.user = principal
 	s.session = newHandle()
+
+	if s.enabled && s.store != nil {
+		now := s.clock.Now()
+		rec := &sessionpkg.Record{
+			SessionID: s.session,
+			SubjectID: extensions.GetSubjectIdFromPrincipal(principal),
+			Created:   now,
+			Renewed:   now,
+			Expires:   now.Add(s.lifetime),
+		}
+		if err := s.store.CreateSession(rec); err != nil {
+			s.session = ""
+			s.user = nil
+			return "", fmt.Errorf("create session: %w", err)
+		}
+	}
+
 	return s.session, nil
 }
+
 func (s *UserSession) GetSessionId() string { return s.session }
+
 func (s *UserSession) GetClientList() ([]string, error) {
 	return append([]string(nil), s.clients...), nil
 }
+
 func (s *UserSession) GetUser() *claims.ClaimsPrincipal { return s.user }
+
 func (s *UserSession) AddClientId(clientId string) error {
 	if !utils.Contains(s.clients, clientId) {
 		s.clients = append(s.clients, clientId)
 	}
+
+	if s.enabled && s.store != nil && s.session != "" {
+		rec, err := s.store.GetSession(s.session)
+		if err == nil && rec != nil {
+			rec.AddClientID(clientId)
+			_ = s.store.UpdateSession(rec)
+		}
+	}
+
 	return nil
 }
+
 func (s *UserSession) Item(key string) (any, bool) {
 	v, ok := s.items[key]
 	return v, ok
 }
+
 func (s *UserSession) SetItem(key string, item any) { s.items[key] = item }
 
 type ProfileService struct {
@@ -416,13 +484,6 @@ func NewBackchannelLogoutService(notifications services.LogoutNotificationServic
 
 func (s *BackchannelLogoutService) SendLogoutNotificationsAsync(ctx *contexts.LogoutNotificationContext) error {
 	return nil
-}
-
-type SessionCoordinationService struct{}
-
-func NewSessionCoordinationService() SessionCoordinationService { return SessionCoordinationService{} }
-func (SessionCoordinationService) ValidateSession(*services.SessionValidationRequest) (bool, error) {
-	return false, fmt.Errorf("server-side session validation pending Epic 2/3 implementation")
 }
 
 func newHandle() string {
