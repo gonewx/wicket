@@ -181,7 +181,8 @@ func (ar *AuthorizeResult) renderAuthorizeResponse(w http.ResponseWriter, r *htt
 	} else {
 		if req.ResponseMode == gois.ResponseModesFormPost {
 			HttpRespSetNoCache(w)
-			AddSecurityHeaders(w, ar.options.Csp)
+			// the hash matches the inline submit script embedded in formPostHtml below
+			AddScriptCspHeaders(w, ar.options.Csp, "sha256-orD0/VhH8hLqrLxKHD/HUEMdwqX6/0ve7c5hspX5VJ8=")
 
 			if err := HttpRespWriteHtml(w, []byte(ar.GetFormPostHtml()), ""); err != nil {
 				return err
@@ -215,6 +216,10 @@ func (ar *AuthorizeResult) RedirectToErrorPage(w http.ResponseWriter, r *http.Re
 	}
 
 	errorUrl := ar.options.UserInteraction.ErrorUrl
+
+	if utils.IsLocalUrl(errorUrl) {
+		errorUrl = ar.urls.GetWicketRelativeUrl(errorUrl)
+	}
 
 	message := messages.NewMessageWithCreated(errorModel, time.Now().Unix())
 	id, err := ar.errorMessageStore.Write(message)
