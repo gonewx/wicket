@@ -77,7 +77,7 @@ func (u *ServerUrls) BaseUrl() string {
 
 func (u *ServerUrls) GetWicketRelativeUrl(value string) string {
 	if strings.HasPrefix(value, "~/") {
-		return utils.EnsureLeadingSlash(strings.TrimPrefix(value, "~/"))
+		return u.BaseUrl() + strings.TrimPrefix(value, "~/")
 	}
 	if utils.IsUri(value) {
 		return value
