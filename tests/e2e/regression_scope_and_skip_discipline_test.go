@@ -13,6 +13,10 @@ const (
 	testRoutingMatrixName   = "test-baseline-routing-matrix-2026-07-09.csv"
 )
 
+// pendingImplementationSkipReason is assembled rather than written whole so
+// this guard does not match itself while scanning the tree.
+var pendingImplementationSkipReason = "pending Epic " + "2/3 implementation"
+
 func TestRegressionTestScopeE2E(t *testing.T) {
 	t.Parallel()
 
@@ -65,6 +69,17 @@ func TestRegressionTestScopeE2E(t *testing.T) {
 		}
 	}
 
+	// A landing path earns its exemption by carrying assertions, not by being
+	// named: a file that still defers its behavior cannot stand for it.
+	for rel := range handledTests {
+		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
+			t.Fatalf("routing matrix landing path %s not present: %v", rel, err)
+		}
+		if strings.Contains(readProjectFile(t, rel), pendingImplementationSkipReason) {
+			t.Fatalf("routing matrix landing path %s still defers its behavior", rel)
+		}
+	}
+
 	for _, rel := range goFiles(t) {
 		if !strings.HasSuffix(rel, "_test.go") || strings.HasPrefix(rel, "tests/e2e/") {
 			continue
@@ -78,23 +93,46 @@ func TestRegressionTestScopeE2E(t *testing.T) {
 	}
 }
 
+// disposedFinalStatuses are the routing-matrix outcomes under which a landing
+// path may exempt a file from the presence guard. Blocked and archived rows
+// carry no landing path, so naming one is itself a matrix defect.
+var disposedFinalStatuses = map[string]struct{}{
+	"migrated":          {},
+	"already-restored":  {},
+	"restored":          {},
+	"rewritten":         {},
+	"rewritten-partial": {},
+	"covered-partial":   {},
+}
+
 // readRoutingMatrixLandingPaths collects the project-relative test paths the
 // routing matrix records as carrying a disposed behavior set. A path is only
-// admitted when the matrix names it as a landing site, so a ledger test that
-// has not been disposed still trips the presence guard above.
+// admitted when its row reports a disposed outcome, so neither an undisposed
+// ledger test nor a landing claimed by a blocked row escapes the guard above.
 func readRoutingMatrixLandingPaths(t *testing.T, path string) map[string]struct{} {
 	t.Helper()
 
 	records := readCsvRecords(t, path)
 	header := csvHeader(t, path, records)
 	landingIndex := header("wicket_landing_path")
+	statusIndex := header("final_status")
 
 	landings := map[string]struct{}{}
 	for rowNo, record := range records[1:] {
-		if len(record) <= landingIndex {
+		if len(record) <= landingIndex || len(record) <= statusIndex {
 			t.Fatalf("routing matrix row %d has too few columns", rowNo+2)
 		}
-		for _, landing := range strings.Split(record[landingIndex], ";") {
+		status := strings.TrimSpace(record[statusIndex])
+		named := strings.Split(record[landingIndex], ";")
+		if _, disposed := disposedFinalStatuses[status]; !disposed {
+			for _, landing := range named {
+				if strings.TrimSpace(landing) != "" {
+					t.Fatalf("routing matrix row %d names a landing path under undisposed status %q", rowNo+2, status)
+				}
+			}
+			continue
+		}
+		for _, landing := range named {
 			if landing = strings.TrimSpace(landing); landing != "" {
 				landings[landing] = struct{}{}
 			}
@@ -169,8 +207,7 @@ func readTestSplitLedgerRows(t *testing.T, path string) []ledgerRow {
 func TestPendingImplementationSkipDisciplineE2E(t *testing.T) {
 	t.Parallel()
 
-	skipReason := "pending Epic " + "2/3 implementation"
-	skipCall := `t.Skip("` + skipReason + `")`
+	skipCall := `t.Skip("` + pendingImplementationSkipReason + `")`
 
 	for _, rel := range goFiles(t) {
 		if !strings.HasSuffix(rel, "_test.go") || strings.HasPrefix(rel, "tests/e2e/") {
