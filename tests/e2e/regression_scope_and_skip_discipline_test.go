@@ -8,13 +8,17 @@ import (
 	"testing"
 )
 
-const testSplitLedgerFileName = "gois-full-file-provenance-ledger-2026-07-07.csv"
+const (
+	testSplitLedgerFileName = "gois-full-file-provenance-ledger-2026-07-07.csv"
+	testRoutingMatrixName   = "test-baseline-routing-matrix-2026-07-09.csv"
+)
 
 func TestRegressionTestScopeE2E(t *testing.T) {
 	t.Parallel()
 
 	evidenceRoot := evidenceRepositoryRoot(t)
 	rows := readTestSplitLedgerRows(t, filepath.Join(evidenceRoot, testSplitLedgerFileName))
+	handledTests := readRoutingMatrixLandingPaths(t, filepath.Join(evidenceRoot, testRoutingMatrixName))
 
 	testRows := 0
 	dispositionCounts := map[string]int{}
@@ -65,7 +69,7 @@ func TestRegressionTestScopeE2E(t *testing.T) {
 		if !strings.HasSuffix(rel, "_test.go") || strings.HasPrefix(rel, "tests/e2e/") {
 			continue
 		}
-		if _, ok := restoredBehaviorTests[rel]; ok {
+		if _, ok := handledTests[rel]; ok {
 			continue
 		}
 		if disposition, ok := excludedLedgerTests[rel]; ok {
@@ -74,40 +78,75 @@ func TestRegressionTestScopeE2E(t *testing.T) {
 	}
 }
 
-var restoredBehaviorTests = map[string]struct{}{
-	"test/integration/handlers/authorize/resource_test.go": {},
-	"validators/impl/resource_validator_test.go":           {},
+// readRoutingMatrixLandingPaths collects the project-relative test paths the
+// routing matrix records as carrying a disposed behavior set. A path is only
+// admitted when the matrix names it as a landing site, so a ledger test that
+// has not been disposed still trips the presence guard above.
+func readRoutingMatrixLandingPaths(t *testing.T, path string) map[string]struct{} {
+	t.Helper()
+
+	records := readCsvRecords(t, path)
+	header := csvHeader(t, path, records)
+	landingIndex := header("wicket_landing_path")
+
+	landings := map[string]struct{}{}
+	for rowNo, record := range records[1:] {
+		if len(record) <= landingIndex {
+			t.Fatalf("routing matrix row %d has too few columns", rowNo+2)
+		}
+		for _, landing := range strings.Split(record[landingIndex], ";") {
+			if landing = strings.TrimSpace(landing); landing != "" {
+				landings[landing] = struct{}{}
+			}
+		}
+	}
+	if len(landings) == 0 {
+		t.Fatal("routing matrix names no landing paths")
+	}
+	return landings
 }
 
-func readTestSplitLedgerRows(t *testing.T, path string) []ledgerRow {
+func readCsvRecords(t *testing.T, path string) [][]string {
 	t.Helper()
 
 	file, err := os.Open(path)
 	if err != nil {
-		t.Fatalf("open test split ledger: %v", err)
+		t.Fatalf("open %s: %v", filepath.Base(path), err)
 	}
 	defer file.Close()
 
 	records, err := csv.NewReader(file).ReadAll()
 	if err != nil {
-		t.Fatalf("read test split ledger: %v", err)
+		t.Fatalf("read %s: %v", filepath.Base(path), err)
 	}
 	if len(records) == 0 {
-		t.Fatal("test split ledger is empty")
+		t.Fatalf("%s is empty", filepath.Base(path))
 	}
+	return records
+}
+
+func csvHeader(t *testing.T, path string, records [][]string) func(string) int {
+	t.Helper()
 
 	header := map[string]int{}
 	for i, name := range records[0] {
 		header[name] = i
 	}
-	column := func(name string) int {
+	return func(name string) int {
 		t.Helper()
 		index, ok := header[name]
 		if !ok {
-			t.Fatalf("test split ledger missing %q column", name)
+			t.Fatalf("%s missing %q column", filepath.Base(path), name)
 		}
 		return index
 	}
+}
+
+func readTestSplitLedgerRows(t *testing.T, path string) []ledgerRow {
+	t.Helper()
+
+	records := readCsvRecords(t, path)
+	column := csvHeader(t, path, records)
 
 	pathIndex := column("path")
 	kindIndex := column("kind")
