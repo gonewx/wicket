@@ -7,28 +7,23 @@ package common
 import (
 	"crypto"
 	"crypto/x509"
+	_ "embed"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/gonewx/wicket/tokens"
-	"github.com/gonewx/wicket/utils"
 )
 
-func loadCertFile() ([]byte, error) {
-	certFile := path.Join(utils.AppBasePath(), "gois.example.com-key.pem")
-	src, err := os.ReadFile(certFile)
-	if err != nil {
-		return nil, err
-	}
+//go:embed test_signing_key.pem
+var signingKeyPEM []byte
 
-	return src, nil
+func loadCertFile() ([]byte, error) {
+	return signingKeyPEM, nil
 }
 
 func Load() ([]byte, error) {
