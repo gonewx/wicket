@@ -8,15 +8,15 @@ import (
 )
 
 // routingMatrixSupplementGlob matches the append-only supplement files that
-// dispose blocked base-matrix rows one story at a time. The 2026-07-09 base
-// matrix is never rewritten; each story records its transitions in a
-// supplement instead, and the disposition guards read the base and every
+// dispose blocked base-matrix rows one at a time. The 2026-07-09 base
+// matrix is never rewritten; each supplement records its transitions
+// separately, and the disposition guards read the base and every
 // supplement folded together.
 const routingMatrixSupplementGlob = "test-baseline-routing-matrix-supplement-*.csv"
 
 // blockedFinalStatuses are the base-matrix outcomes a supplement row may
 // transition away from. A supplement may only act on a row still awaiting a
-// later story; it can never re-open a row that is already disposed, archived,
+// later change; it can never re-open a row that is already disposed, archived,
 // or without extractable behavior.
 var blockedFinalStatuses = map[string]struct{}{
 	"blocked-rewrite":     {},

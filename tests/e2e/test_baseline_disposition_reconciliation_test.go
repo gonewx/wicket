@@ -24,14 +24,14 @@ var knownFinalStatuses = map[string]struct{}{
 }
 
 // blockedStubStatuses are the outcomes whose wicket file must remain a skip
-// stub until a later story resolves its missing dependency.
+// stub until a later change resolves its missing dependency.
 var blockedStubStatuses = map[string]struct{}{
 	"blocked-backfill":    {},
 	"rolled-back-blocked": {},
 }
 
 // TestBaselineDispositionReconciliationE2E holds the routing matrix and the
-// working tree to the same story: every matrix row carries a known outcome,
+// working tree in lockstep: every matrix row carries a known outcome,
 // every stub-blocked row (blocked-backfill, rolled-back-blocked) still has its
 // skip stub in place, and every skip stub in the tree is claimed by exactly
 // one such row. blocked-rewrite rows never had a stub to reconcile; their
@@ -40,8 +40,8 @@ var blockedStubStatuses = map[string]struct{}{
 // stays blocked, breaks the reconciliation either way.
 //
 // The matrix is read as the synthesized final view — base matrix plus every
-// append-only supplement — so a story that disposes a blocked row records its
-// transition in a supplement rather than rewriting the 2026-07-09 base. A row
+// append-only supplement — so a supplement that disposes a blocked row records its
+// transition separately rather than rewriting the 2026-07-09 base. A row
 // a supplement moves out of a blocked status is no longer expected to keep a
 // stub, exactly as an in-place edit would have required.
 func TestBaselineDispositionReconciliationE2E(t *testing.T) {
