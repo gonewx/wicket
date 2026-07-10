@@ -250,6 +250,31 @@ func TestManagerConfigValidation(t *testing.T) {
 			provider:  reversibleProvider{},
 			wantError: true,
 		},
+		"negative rotation interval": {
+			mutate:    func(c *Config) { c.RotationInterval = -time.Hour },
+			provider:  reversibleProvider{},
+			wantError: true,
+		},
+		"negative activation lead time": {
+			mutate:    func(c *Config) { c.ActivationLeadTime = -time.Minute },
+			provider:  reversibleProvider{},
+			wantError: true,
+		},
+		"negative retention duration": {
+			mutate:    func(c *Config) { c.RetentionDuration = -time.Minute },
+			provider:  reversibleProvider{},
+			wantError: true,
+		},
+		"negative cache ttl": {
+			mutate:    func(c *Config) { c.CacheTTL = -time.Second },
+			provider:  reversibleProvider{},
+			wantError: true,
+		},
+		"negative clock skew": {
+			mutate:    func(c *Config) { c.ClockSkew = -time.Second },
+			provider:  reversibleProvider{},
+			wantError: true,
+		},
 		"protector unavailable": {
 			mutate:    func(c *Config) {},
 			provider:  nil,
@@ -265,13 +290,23 @@ func TestManagerConfigValidation(t *testing.T) {
 			t.Parallel()
 			cfg := enabledConfig()
 			tc.mutate(&cfg)
-			m := NewManager(cfg, NewMemoryRecordStore(), tc.provider, newFakeClock(), rand.Reader, nil)
+			store := NewMemoryRecordStore()
+			m := NewManager(cfg, store, tc.provider, newFakeClock(), rand.Reader, nil)
 			_, err := m.SigningCandidates()
 			if tc.wantError && err == nil {
 				t.Fatal("expected error, got nil")
 			}
 			if !tc.wantError && err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+			if err != nil {
+				records, listErr := store.List()
+				if listErr != nil {
+					t.Fatalf("list records: %v", listErr)
+				}
+				if len(records) != 0 {
+					t.Fatalf("rejected configuration produced %d key record(s), want 0", len(records))
+				}
 			}
 		})
 	}
@@ -643,6 +678,128 @@ func TestManagerNilSeamsDoNotPanic(t *testing.T) {
 	}
 	if len(signing) != 0 {
 		t.Fatalf("disabled manager returned %d candidates, want 0", len(signing))
+	}
+}
+
+func TestManagerExpiredActiveAutoCreatesReplacement(t *testing.T) {
+	t.Parallel()
+
+	clock := newFakeClock()
+	store := NewMemoryRecordStore()
+	cfg := enabledConfig()
+
+	// Seed the store with a single signing key whose signing window has already
+	// closed, and no warming candidate behind it.
+	const staleKid = "expired-active-kid"
+	if err := store.Create(&Record{
+		Handle:                   "expired",
+		PublicID:                 staleKid,
+		Purpose:                  PurposeTokenSigning,
+		Algorithm:                AlgES256,
+		Phase:                    PhaseActive,
+		CreatedAt:                clock.Now().Add(-2 * time.Hour),
+		NotAfter:                 clock.Now().Add(-time.Hour),
+		PublicMaterial:           validPublicMaterial(t),
+		ProtectedPrivateMaterial: []byte("protected:x"),
+		Format:                   protectionFormatV1,
+	}); err != nil {
+		t.Fatalf("seed expired active: %v", err)
+	}
+
+	m := newTestManager(t, cfg, store, clock)
+
+	signing, err := m.SigningCandidates()
+	if err != nil {
+		t.Fatalf("signing candidates: %v", err)
+	}
+	// Signing does not break: a fresh active key is available to sign.
+	if len(signing) != 1 {
+		t.Fatalf("signing candidate count = %d, want 1", len(signing))
+	}
+	if signing[0].Credential.Kid == staleKid {
+		t.Fatal("replacement signing key must not reuse the expired key id")
+	}
+	// The expired key moves into retention; exactly one fresh active key exists.
+	if got := countPhase(t, store, PhaseActive); got != 1 {
+		t.Fatalf("active key count = %d, want 1", got)
+	}
+	if got := countPhase(t, store, PhaseRetained); got != 1 {
+		t.Fatalf("retained key count = %d, want 1", got)
+	}
+	// The retained key is the original expired one, preserving verifiability of
+	// tokens it already signed.
+	records, err := store.List()
+	if err != nil {
+		t.Fatalf("list records: %v", err)
+	}
+	for _, r := range records {
+		if r.Phase == PhaseRetained && r.PublicID != staleKid {
+			t.Fatalf("retained key id = %q, want the expired key %q", r.PublicID, staleKid)
+		}
+		if r.Phase == PhaseActive && r.PublicID == staleKid {
+			t.Fatal("expired key must not remain active")
+		}
+	}
+}
+
+func TestManagerSnapshotExpiresAfterCacheTTL(t *testing.T) {
+	t.Parallel()
+
+	clock := newFakeClock()
+	store := NewMemoryRecordStore()
+	cfg := enabledConfig() // CacheTTL = 1m, ClockSkew = 1m.
+	m := newTestManager(t, cfg, store, clock)
+
+	// Build the initial snapshot; its validation set carries the one active key.
+	if _, err := m.SigningCandidates(); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+	initial, err := m.ValidationKeys()
+	if err != nil {
+		t.Fatalf("initial validation keys: %v", err)
+	}
+	if len(initial) != 1 {
+		t.Fatalf("initial validation key count = %d, want 1", len(initial))
+	}
+
+	// A second publishable key appears in the store after the snapshot was built.
+	if err := store.Create(&Record{
+		Handle:                   "arrived",
+		PublicID:                 "arrived-kid",
+		Purpose:                  PurposeTokenSigning,
+		Algorithm:                AlgES256,
+		Phase:                    PhaseRetained,
+		CreatedAt:                clock.Now().Add(-time.Hour),
+		NotBefore:                clock.Now().Add(-time.Hour),
+		NotAfter:                 clock.Now().Add(-30 * time.Minute),
+		RetainUntil:              clock.Now().Add(time.Hour),
+		PublicMaterial:           validPublicMaterial(t),
+		ProtectedPrivateMaterial: []byte("protected:x"),
+		Format:                   protectionFormatV1,
+	}); err != nil {
+		t.Fatalf("inject record: %v", err)
+	}
+
+	// Advancing less than the cache TTL keeps serving the cached snapshot, so the
+	// injected record is not yet reflected.
+	clock.advance(cfg.CacheTTL - 30*time.Second)
+	within, err := m.ValidationKeys()
+	if err != nil {
+		t.Fatalf("within-ttl validation keys: %v", err)
+	}
+	if len(within) != 1 {
+		t.Fatalf("within-ttl validation key count = %d, want 1 (snapshot reused)", len(within))
+	}
+
+	// Advancing past the cache TTL retires the snapshot: the next access
+	// reconciles and re-reads the store, so the injected record now shows up.
+	clock.advance(cfg.CacheTTL)
+	after, err := m.ValidationKeys()
+	if err != nil {
+		t.Fatalf("post-ttl validation keys: %v", err)
+	}
+	if len(after) != 2 {
+		t.Fatalf("post-ttl validation key count = %d, want 2 (snapshot expired and store re-read)", len(after))
 	}
 }
 
