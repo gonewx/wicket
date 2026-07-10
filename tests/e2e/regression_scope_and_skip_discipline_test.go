@@ -132,10 +132,17 @@ func readRoutingMatrixLandingPaths(t *testing.T, path string) map[string]struct{
 			}
 			continue
 		}
+		rowLandings := 0
 		for _, landing := range named {
 			if landing = strings.TrimSpace(landing); landing != "" {
 				landings[landing] = struct{}{}
+				rowLandings++
 			}
+		}
+		// A disposed row must point at the file carrying its behavior;
+		// otherwise the disposition is an unbacked claim.
+		if rowLandings == 0 {
+			t.Fatalf("routing matrix row %d is disposed as %q but names no landing path", rowNo+2, status)
 		}
 	}
 	if len(landings) == 0 {
