@@ -151,7 +151,11 @@ func TestUserSessionEnabledEnsureWithoutCookieIsNoOp(t *testing.T) {
 	if us.GetSessionId() != "" {
 		t.Fatalf("GetSessionId = %q, want empty", us.GetSessionId())
 	}
-	if list, _ := us.GetClientList(); len(list) != 0 {
+	list, err := us.GetClientList()
+	if err != nil {
+		t.Fatalf("GetClientList: %v", err)
+	}
+	if len(list) != 0 {
 		t.Fatalf("GetClientList = %v, want empty", list)
 	}
 }
@@ -285,7 +289,10 @@ func TestUserSessionEnabledEnsureLoadsFromCookie(t *testing.T) {
 	if us.GetSessionId() != "seed-session" {
 		t.Fatalf("GetSessionId = %q, want seed-session", us.GetSessionId())
 	}
-	list, _ := us.GetClientList()
+	list, err := us.GetClientList()
+	if err != nil {
+		t.Fatalf("GetClientList: %v", err)
+	}
 	if len(list) != 1 || list[0] != "client-a" {
 		t.Fatalf("GetClientList = %v, want [client-a] loaded from store", list)
 	}
