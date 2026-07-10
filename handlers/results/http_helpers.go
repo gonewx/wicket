@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gonewx/wicket"
 	config_options "github.com/gonewx/wicket/config/options"
 )
 
@@ -43,14 +44,17 @@ func HttpRespWriteHtml(w http.ResponseWriter, value []byte, contentType string) 
 	return err
 }
 
-func AddSecurityHeaders(w http.ResponseWriter, options *config_options.CspOptions) {
-	AddScriptCspHeaders(w, options, "")
-}
-
 func AddScriptCspHeaders(w http.ResponseWriter, options *config_options.CspOptions, hashes ...string) {
 	directives := []string{"default-src 'none'"}
 	if len(hashes) > 0 && hashes[0] != "" {
-		directives = append(directives, "script-src '"+strings.Join(hashes, "' '")+"'")
+		sources := hashes
+		if options != nil && options.Level == gois.CspLevelOne {
+			// CSP Level 1 browsers do not recognise hash-sources and would block the
+			// inline script; 'unsafe-inline' is the backward-compatible fallback. CSP2+
+			// browsers ignore 'unsafe-inline' when a hash is present (W3C CSP).
+			sources = append([]string{"unsafe-inline"}, hashes...)
+		}
+		directives = append(directives, "script-src '"+strings.Join(sources, "' '")+"'")
 	}
 	addCsp(w, options, directives)
 }
@@ -58,7 +62,11 @@ func AddScriptCspHeaders(w http.ResponseWriter, options *config_options.CspOptio
 func AddStyleCspHeaders(w http.ResponseWriter, options *config_options.CspOptions, hash string, frameSrc string) {
 	directives := []string{"default-src 'none'"}
 	if hash != "" {
-		directives = append(directives, "style-src '"+hash+"'")
+		styleSrc := "'" + hash + "'"
+		if options != nil && options.Level == gois.CspLevelOne {
+			styleSrc = "'unsafe-inline' " + styleSrc
+		}
+		directives = append(directives, "style-src "+styleSrc)
 	}
 	if frameSrc != "" {
 		directives = append(directives, "frame-src "+frameSrc)
