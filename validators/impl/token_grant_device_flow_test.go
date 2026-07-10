@@ -72,7 +72,7 @@ func TestTokenRequestValidationDeviceFlowInvalid(t *testing.T) {
 			if tt.deviceCode != "" {
 				deviceCode := tt.deviceCode
 				if deviceCode == "over-limit" {
-					deviceCode = strings.Repeat("x", f.options.InputLengthRestrictions.AuthorizationCode+1)
+					deviceCode = strings.Repeat("x", f.options.InputLengthRestrictions.DeviceCode+1)
 				}
 				parameters.Set(gois.TokenRequestDeviceCode, deviceCode)
 			}
