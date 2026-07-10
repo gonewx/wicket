@@ -13,6 +13,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/services"
 	sessionpkg "github.com/gonewx/wicket/session"
 	gois "github.com/gonewx/wicket"
@@ -125,6 +126,73 @@ func TestUserSessionEnabledNilClockFailsClosed(t *testing.T) {
 	}
 	if len(rec.Result().Cookies()) != 0 {
 		t.Fatal("no session cookie should be written when creation fails")
+	}
+}
+
+// TestUserSessionEnabledEnsureWithoutCookieIsNoOp verifies that with server-side
+// sessions enabled but no session cookie on the request, EnsureSessionIdCookie
+// returns no error, emits no Set-Cookie, and leaves internal state empty.
+func TestUserSessionEnabledEnsureWithoutCookieIsNoOp(t *testing.T) {
+	t.Parallel()
+
+	clock := newSessionStateClock()
+	store := sessionpkg.NewMemoryStore(clock)
+	rec := httptest.NewRecorder()
+	acc := &recordingAccessor{req: httptest.NewRequest(http.MethodGet, "/", nil), rw: rec}
+
+	us := newSessionUserSession(t, true, store, acc, clock)
+
+	if err := us.EnsureSessionIdCookie(); err != nil {
+		t.Fatalf("EnsureSessionIdCookie: %v", err)
+	}
+	if len(rec.Result().Cookies()) != 0 {
+		t.Fatal("no cookie should be written when the request carries no session cookie")
+	}
+	if us.GetSessionId() != "" {
+		t.Fatalf("GetSessionId = %q, want empty", us.GetSessionId())
+	}
+	if list, _ := us.GetClientList(); len(list) != 0 {
+		t.Fatalf("GetClientList = %v, want empty", list)
+	}
+}
+
+// TestUserSessionGetUserReflectsCreation verifies GetUser returns nil before a
+// session is created and returns the created principal afterwards, with the
+// subject preserved. The behavior is identical in the disabled and enabled
+// states.
+func TestUserSessionGetUserReflectsCreation(t *testing.T) {
+	t.Parallel()
+
+	for name, enabled := range map[string]bool{
+		"disabled": false,
+		"enabled":  true,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			clock := newSessionStateClock()
+			store := sessionpkg.NewMemoryStore(clock)
+			rec := httptest.NewRecorder()
+			acc := &recordingAccessor{req: httptest.NewRequest(http.MethodGet, "/", nil), rw: rec}
+
+			us := newSessionUserSession(t, enabled, store, acc, clock)
+
+			if us.GetUser() != nil {
+				t.Fatal("GetUser must be nil before a session is created")
+			}
+
+			if _, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{}); err != nil {
+				t.Fatalf("CreateSessionId: %v", err)
+			}
+
+			user := us.GetUser()
+			if user == nil {
+				t.Fatal("GetUser must return the created principal")
+			}
+			if sub := extensions.GetSubjectIdFromPrincipal(user); sub != "alice" {
+				t.Fatalf("GetUser subject = %q, want alice", sub)
+			}
+		})
 	}
 }
 
