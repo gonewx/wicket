@@ -22,7 +22,7 @@ func TestRegressionTestScopeE2E(t *testing.T) {
 
 	evidenceRoot := evidenceRepositoryRoot(t)
 	rows := readTestSplitLedgerRows(t, filepath.Join(evidenceRoot, testSplitLedgerFileName))
-	handledTests := readRoutingMatrixLandingPaths(t, filepath.Join(evidenceRoot, testRoutingMatrixName))
+	handledTests := readRoutingMatrixLandingPaths(t)
 
 	testRows := 0
 	dispositionCounts := map[string]int{}
@@ -106,28 +106,22 @@ var disposedFinalStatuses = map[string]struct{}{
 }
 
 // readRoutingMatrixLandingPaths collects the project-relative test paths the
-// routing matrix records as carrying a disposed behavior set. A path is only
-// admitted when its row reports a disposed outcome, so neither an undisposed
-// ledger test nor a landing claimed by a blocked row escapes the guard above.
-func readRoutingMatrixLandingPaths(t *testing.T, path string) map[string]struct{} {
+// routing matrix records as carrying a disposed behavior set. It reads the
+// synthesized final view (base matrix plus every append-only supplement), so a
+// row a supplement disposes contributes its landing here just as an in-place
+// edit would have. A path is only admitted when its row reports a disposed
+// outcome, so neither an undisposed ledger test nor a landing claimed by a
+// still-blocked row escapes the guard above.
+func readRoutingMatrixLandingPaths(t *testing.T) map[string]struct{} {
 	t.Helper()
 
-	records := readCsvRecords(t, path)
-	header := csvHeader(t, path, records)
-	landingIndex := header("wicket_landing_path")
-	statusIndex := header("final_status")
-
 	landings := map[string]struct{}{}
-	for rowNo, record := range records[1:] {
-		if len(record) <= landingIndex || len(record) <= statusIndex {
-			t.Fatalf("routing matrix row %d has too few columns", rowNo+2)
-		}
-		status := strings.TrimSpace(record[statusIndex])
-		named := strings.Split(record[landingIndex], ";")
-		if _, disposed := disposedFinalStatuses[status]; !disposed {
+	for _, row := range synthesizedRoutingMatrix(t) {
+		named := strings.Split(row.LandingPath, ";")
+		if _, disposed := disposedFinalStatuses[row.FinalStatus]; !disposed {
 			for _, landing := range named {
 				if strings.TrimSpace(landing) != "" {
-					t.Fatalf("routing matrix row %d names a landing path under undisposed status %q", rowNo+2, status)
+					t.Fatalf("routing matrix row %s names a landing path under undisposed status %q", row.GoisPath, row.FinalStatus)
 				}
 			}
 			continue
@@ -142,7 +136,7 @@ func readRoutingMatrixLandingPaths(t *testing.T, path string) map[string]struct{
 		// A disposed row must point at the file carrying its behavior;
 		// otherwise the disposition is an unbacked claim.
 		if rowLandings == 0 {
-			t.Fatalf("routing matrix row %d is disposed as %q but names no landing path", rowNo+2, status)
+			t.Fatalf("routing matrix row %s is disposed as %q but names no landing path", row.GoisPath, row.FinalStatus)
 		}
 	}
 	if len(landings) == 0 {

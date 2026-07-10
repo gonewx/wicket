@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -39,6 +38,12 @@ var blockedStubStatuses = map[string]struct{}{
 // premature landing is caught by the ledger presence guard instead. A stub
 // deleted without a matrix correction, or a stub half-restored while its row
 // stays blocked, breaks the reconciliation either way.
+//
+// The matrix is read as the synthesized final view — base matrix plus every
+// append-only supplement — so a story that disposes a blocked row records its
+// transition in a supplement rather than rewriting the 2026-07-09 base. A row
+// a supplement moves out of a blocked status is no longer expected to keep a
+// stub, exactly as an in-place edit would have required.
 func TestBaselineDispositionReconciliationE2E(t *testing.T) {
 	t.Parallel()
 
@@ -53,27 +58,19 @@ func TestBaselineDispositionReconciliationE2E(t *testing.T) {
 		}
 	}
 
-	matrixPath := filepath.Join(evidenceRepositoryRoot(t), testRoutingMatrixName)
-	records := readCsvRecords(t, matrixPath)
-	header := csvHeader(t, matrixPath, records)
-	pathIndex := header("wicket_path")
-	statusIndex := header("final_status")
+	rows := synthesizedRoutingMatrix(t)
 
 	blockedStubs := map[string]struct{}{}
-	for rowNo, record := range records[1:] {
-		if len(record) <= pathIndex || len(record) <= statusIndex {
-			t.Fatalf("routing matrix row %d has too few columns", rowNo+2)
+	for _, row := range rows {
+		if _, ok := knownFinalStatuses[row.FinalStatus]; !ok {
+			t.Fatalf("routing matrix row %s has unknown final_status %q", row.GoisPath, row.FinalStatus)
 		}
-		status := strings.TrimSpace(record[statusIndex])
-		if _, ok := knownFinalStatuses[status]; !ok {
-			t.Fatalf("routing matrix row %d has unknown final_status %q", rowNo+2, status)
-		}
-		if _, blocked := blockedStubStatuses[status]; !blocked {
+		if _, blocked := blockedStubStatuses[row.FinalStatus]; !blocked {
 			continue
 		}
-		rel := strings.TrimSpace(record[pathIndex])
+		rel := row.WicketPath
 		if rel == "" || rel == "-" {
-			t.Fatalf("routing matrix row %d is blocked but names no wicket path", rowNo+2)
+			t.Fatalf("routing matrix row %s is blocked but names no wicket path", row.GoisPath)
 		}
 		if _, dup := blockedStubs[rel]; dup {
 			t.Fatalf("wicket path %s is claimed by more than one blocked matrix row", rel)
@@ -81,7 +78,7 @@ func TestBaselineDispositionReconciliationE2E(t *testing.T) {
 		blockedStubs[rel] = struct{}{}
 	}
 
-	if rowCount := len(records) - 1; rowCount != 144 {
+	if rowCount := len(rows); rowCount != 144 {
 		t.Fatalf("routing matrix row count = %d, want 144", rowCount)
 	}
 
