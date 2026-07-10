@@ -12,12 +12,12 @@ import (
 
 func Sha256(value string) string {
 	sum := sha256.Sum256([]byte(value))
-	return base64.RawURLEncoding.EncodeToString(sum[:])
+	return base64.StdEncoding.EncodeToString(sum[:])
 }
 
 func Sha512(value string) string {
 	sum := sha512.Sum512([]byte(value))
-	return base64.RawURLEncoding.EncodeToString(sum[:])
+	return base64.StdEncoding.EncodeToString(sum[:])
 }
 
 func TimeConstantCompare(left, right string) bool {
