@@ -58,9 +58,6 @@ func TestPendingDependencyInterfacesResolveFromContainerE2E(t *testing.T) {
 
 	request := httptest.NewRequest(http.MethodGet, "http://wicket.test/connect/token", nil)
 	for name, handler := range map[string]endpointProcessor{
-		"authorize":            root.NewPtr_AuthorizeHandler(),
-		"authorize_callback":   root.NewPtr_AuthorizeCallbackHandler(),
-		"token":                root.NewPtr_TokenHandler(),
 		"discovery":            root.NewPtr_DiscoveryHandler(),
 		"discovery_keys":       root.NewPtr_DiscoveryKeyHandler(),
 		"check_session":        root.NewPtr_CheckSessionHandler(),

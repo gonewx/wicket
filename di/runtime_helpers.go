@@ -11,6 +11,10 @@ import (
 	"github.com/gonewx/wicket/accessor"
 	"github.com/gonewx/wicket/handlers"
 	"github.com/gonewx/wicket/hosting"
+	"github.com/gonewx/wicket/responses"
+	"github.com/gonewx/wicket/services"
+	"github.com/gonewx/wicket/storage"
+	"github.com/gonewx/wicket/utils"
 	"github.com/gonewx/wicket/validators"
 )
 
@@ -22,7 +26,10 @@ func newServerConfigLogger(config *ServerConfig, fallback *slog.Logger) *slog.Lo
 }
 
 func newEndpoint(name string, path string, handler func(godi.Provider) (hosting.EndpointHandler, error)) *hosting.Endpoint {
-	return &hosting.Endpoint{Name: name, Path: path, Handler: handler}
+	// Route paths are declared without a leading slash, while incoming request
+	// paths always carry one; normalize here so the endpoint router can match the
+	// registered path against the request path.
+	return &hosting.Endpoint{Name: name, Path: utils.EnsureLeadingSlash(path), Handler: handler}
 }
 
 func endpointHandler[T hosting.EndpointHandler](p godi.Provider) (hosting.EndpointHandler, error) {
@@ -45,16 +52,36 @@ func responseFromProvider(p godi.Provider) http.ResponseWriter {
 	return nil
 }
 
-func newAuthorizeHandlerFromProvider(godi.Provider) *handlers.AuthorizeHandler {
-	return handlers.NewAuthorizeHandler()
+func newAuthorizeHandlerFromProvider(p godi.Provider) *handlers.AuthorizeHandler {
+	return handlers.NewAuthorizeHandler(
+		godi.GetRequired[validators.AuthorizeRequestValidator](p),
+		godi.GetRequired[responses.AuthorizeInteractionResponseGenerator](p),
+		godi.GetRequired[responses.AuthorizeResponseGenerator](p),
+		godi.GetRequired[services.UserSession](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
-func newAuthorizeCallbackHandlerFromProvider(godi.Provider) *handlers.AuthorizeCallbackHandler {
-	return handlers.NewAuthorizeCallbackHandler()
+func newAuthorizeCallbackHandlerFromProvider(p godi.Provider) *handlers.AuthorizeCallbackHandler {
+	parameters, _ := godi.Get[storage.AuthorizationParametersMessageStore](p)
+	return handlers.NewAuthorizeCallbackHandler(
+		godi.GetRequired[validators.AuthorizeRequestValidator](p),
+		godi.GetRequired[responses.AuthorizeInteractionResponseGenerator](p),
+		godi.GetRequired[responses.AuthorizeResponseGenerator](p),
+		godi.GetRequired[services.UserSession](p),
+		godi.GetRequired[storage.ConsentMessageStore](p),
+		parameters,
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
-func newTokenHandlerFromProvider(godi.Provider) *handlers.TokenHandler {
-	return handlers.NewTokenHandler()
+func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
+	return handlers.NewTokenHandler(
+		godi.GetRequired[validators.ClientSecretValidator](p),
+		godi.GetRequired[validators.TokenRequestValidator](p),
+		godi.GetRequired[responses.TokenResponseGenerator](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
 func newDiscoveryHandlerFromProvider(godi.Provider) *handlers.DiscoveryHandler {
