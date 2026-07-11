@@ -110,6 +110,34 @@ func TestHandleConsentShowsPageWhenUnanswered(t *testing.T) {
 	}
 }
 
+// TestHandleConsentAllowsWhenNotRequired covers the pass-through path: when neither
+// a consent-class prompt nor the consent service demands a decision, the handler
+// returns a plain non-consent, non-error result without showing a page or
+// persisting anything. This is the common no-interaction case.
+func TestHandleConsentAllowsWhenNotRequired(t *testing.T) {
+	t.Parallel()
+
+	consent := common.NewMockConsentService()
+	consent.RequiresConsentResult = false
+	req := consentRequest(t)
+	g := consentGenerator(consent)
+
+	resp := g.HandleConsent(req, nil)
+
+	if resp.IsError() {
+		t.Fatalf("did not expect an error, got %v", resp.Error)
+	}
+	if resp.IsConsent {
+		t.Fatalf("IsConsent = true, want false when consent is not required")
+	}
+	if req.WasConsentShown {
+		t.Fatalf("WasConsentShown = true, want false when no page was shown")
+	}
+	if consent.ConsentSubject != nil {
+		t.Fatalf("consent was persisted although none was required")
+	}
+}
+
 // TestHandleConsentRequiredUnderPromptNone covers the prompt=none case: a required
 // consent decision cannot be collected without an interaction, so it ends in a
 // consent_required error with nothing shown and nothing persisted.

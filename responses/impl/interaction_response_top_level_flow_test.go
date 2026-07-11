@@ -39,7 +39,19 @@ func TestHandlePromptNoneTurnsLoginIntoError(t *testing.T) {
 				authTime := time.Date(2020, 2, 1, 9, 0, 0, 0, time.UTC)
 				r.Subject = localSubject(t, &authTime)
 				r.Client = storage_models.NewClient()
-				r.MaxAge = 3600
+				maxAge := 3600
+				r.MaxAge = &maxAge
+			},
+		},
+		"max_age zero forces a fresh authentication": {
+			setup: func(r *validators_models.ValidatedAuthorizeRequest) {
+				// the subject authenticated an hour before now, yet max_age=0 rejects
+				// any non-zero session age. the old int guard silently skipped this.
+				authTime := now.Add(-1 * time.Hour)
+				r.Subject = localSubject(t, &authTime)
+				r.Client = storage_models.NewClient()
+				maxAge := 0
+				r.MaxAge = &maxAge
 			},
 		},
 		"acr requests a different idp": {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/claims"
+	"github.com/gonewx/wicket/models/contexts"
 	storage_models "github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/test/common"
 	validators_models "github.com/gonewx/wicket/validators/models"
@@ -141,6 +142,33 @@ func TestHandleLoginDecision(t *testing.T) {
 				t.Fatalf("IsLogin = %v, want %v", resp.IsLogin, tc.wantLogin)
 			}
 		})
+	}
+}
+
+// inactiveProfile is a profile service that reports every subject as inactive, so
+// the login decision must fall through to a forced re-authentication.
+type inactiveProfile struct{}
+
+func (inactiveProfile) GetProfileData(*contexts.ProfileDataRequestContext) {}
+func (inactiveProfile) IsActive(ctx *contexts.IsActiveContext)             { ctx.IsActive = false }
+
+// TestHandleLoginForcesLoginForInactiveSubject covers the profile-active branch:
+// an authenticated local session that the profile service reports as inactive must
+// still be forced to re-authenticate. The default mock reports subjects active, so
+// this branch needs a profile that answers inactive.
+func TestHandleLoginForcesLoginForInactiveSubject(t *testing.T) {
+	t.Parallel()
+
+	req := validators_models.NewValidatedAuthorizeRequest()
+	req.Subject = localSubject(t, nil)
+	req.Client = storage_models.NewClient()
+
+	g := buildGenerator(fixedClock(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)), common.NewMockConsentService(), inactiveProfile{})
+
+	resp := g.HandleLogin(req)
+
+	if !resp.IsLogin {
+		t.Fatalf("IsLogin = false, want true for an inactive subject")
 	}
 }
 
