@@ -114,8 +114,9 @@ func (g *AuthorizeInteractionResponseGenerator) HandleLogin(req *validators_mode
 		return &responses_models.InteractionResponse{IsLogin: true}
 	}
 
-	// the session is older than the request's maximum authentication age.
-	if req.MaxAge > 0 && g.sessionAge(req) > time.Duration(req.MaxAge)*time.Second {
+	// the session is older than the request's maximum authentication age. a
+	// max_age of zero demands a fresh authentication, so any elapsed session fails.
+	if req.MaxAge != nil && g.sessionAge(req) > time.Duration(*req.MaxAge)*time.Second {
 		return &responses_models.InteractionResponse{IsLogin: true}
 	}
 
@@ -191,10 +192,15 @@ func (g *AuthorizeInteractionResponseGenerator) HandleConsent(req *validators_mo
 	granted := req.ValidatedResources.Filter(consent.ScopesValuesConsented)
 
 	if req.Client != nil && req.Client.AllowRememberConsent {
+		var remembered []*validators_models.ParsedScopeValue
 		if consent.RememberConsent {
-			g.consent.UpdateConsent(req.Subject, req.Client, granted.ParsedScopes)
-		} else {
-			g.consent.UpdateConsent(req.Subject, req.Client, nil)
+			remembered = granted.ParsedScopes
+		}
+		// a failure to persist the remembered decision does not invalidate this
+		// grant; the user is simply asked to consent again next time, so we log
+		// and continue rather than failing the authorization.
+		if err := g.consent.UpdateConsent(req.Subject, req.Client, remembered); err != nil {
+			g.logger.Warn("persisting remembered consent failed", "err", err)
 		}
 	}
 

@@ -541,8 +541,8 @@ func NewConsentService() ConsentService { return ConsentService{} }
 
 // RequiresConsent reports whether an explicit consent decision is required for the
 // requested scopes. It currently honors only the client's RequireConsent flag;
-// remembered-grant lookup against the consent store is deferred (see
-// deferred-work.md) and lands with the endpoint pipeline.
+// remembered-grant lookup against the consent store is not yet wired and lands with
+// the authorize endpoint pipeline.
 func (ConsentService) RequiresConsent(subject *claims.ClaimsPrincipal, client *storage_models.Client, parsedScopes []*validators_models.ParsedScopeValue) (bool, error) {
 	if client == nil {
 		return false, nil
@@ -551,7 +551,7 @@ func (ConsentService) RequiresConsent(subject *claims.ClaimsPrincipal, client *s
 }
 
 // UpdateConsent persists a remembered consent decision. Store-backed persistence is
-// deferred (see deferred-work.md) and lands with the endpoint pipeline.
+// not yet wired and lands with the authorize endpoint pipeline.
 func (ConsentService) UpdateConsent(subject *claims.ClaimsPrincipal, client *storage_models.Client, parsedScopes []*validators_models.ParsedScopeValue) error {
 	return nil
 }

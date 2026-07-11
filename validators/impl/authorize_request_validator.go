@@ -621,7 +621,8 @@ func (v *AuthorizeRequestValidator) validateOptionalParameters(request *validato
 	maxAge := request.Raw.Get(gois.AuthorizeRequestMaxAge)
 	if strings.TrimSpace(maxAge) != "" {
 		if seconds, err := strconv.ParseInt(maxAge, 10, 64); err == nil && seconds >= 0 {
-			request.MaxAge = int(seconds)
+			age := int(seconds)
+			request.MaxAge = &age
 		} else {
 			return invalid(request, gois.AuthorizeErrorsInvalidRequest, "Invalid max_age")
 		}

@@ -37,7 +37,7 @@ type ValidatedAuthorizeRequest struct {
 	PromptModes                           []string
 	OriginalPromptModes                   []string
 	SuppressedPromptModes                 []string
-	MaxAge                                int
+	MaxAge                                *int
 	LoginHint                             string
 	CodeChallenge                         string
 	CodeChallengeMethod                   string
