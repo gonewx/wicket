@@ -17,7 +17,8 @@ import (
 )
 
 type CustomRedirectResult struct {
-	request *validators_models.ValidatedAuthorizeRequest
+	request        *validators_models.ValidatedAuthorizeRequest
+	redirectTarget string
 
 	options                             *options.WicketOptions
 	urls                                services.ServerUrls
@@ -26,9 +27,11 @@ type CustomRedirectResult struct {
 
 func NewCustomRedirectResult(
 	request *validators_models.ValidatedAuthorizeRequest,
+	redirectURL string,
 ) *CustomRedirectResult {
 	return &CustomRedirectResult{
-		request: request,
+		request:        request,
+		redirectTarget: redirectURL,
 	}
 }
 
@@ -54,19 +57,17 @@ func (crr *CustomRedirectResult) init(ctx context.Context) {
 func (crr *CustomRedirectResult) Execute(w http.ResponseWriter, r *http.Request) error {
 	crr.init(r.Context())
 
-	// redirectUri, err := redirectUrl(
-	// 	crr.request,
-	// 	crr.options,
-	// 	crr.urls,
-	// 	crr.authorizationParametersMessageStore,
-	// 	crr.options.UserInteraction.LoginUrl,
-	// 	crr.options.UserInteraction.LoginReturnUrlParameter,
-	// )
+	target, err := redirectUrl(
+		crr.request,
+		crr.urls,
+		crr.authorizationParametersMessageStore,
+		crr.redirectTarget,
+		crr.options.UserInteraction.CustomRedirectReturnUrlParameter,
+	)
+	if err != nil {
+		return err
+	}
 
-	// if err != nil {
-	// 	return err
-	// }
-
-	http.Redirect(w, r, crr.request.RedirectUri, http.StatusFound)
+	http.Redirect(w, r, target, http.StatusFound)
 	return nil
 }

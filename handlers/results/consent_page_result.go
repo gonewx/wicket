@@ -54,19 +54,17 @@ func (cpr *ConsentPageResult) init(ctx context.Context) {
 func (cpr *ConsentPageResult) Execute(w http.ResponseWriter, r *http.Request) error {
 	cpr.init(r.Context())
 
-	// redirectUri, err := redirectUrl(
-	// 	cpr.request,
-	// 	cpr.options,
-	// 	cpr.urls,
-	// 	cpr.authorizationParametersMessageStore,
-	// 	cpr.options.UserInteraction.ConsentUrl,
-	// 	cpr.options.UserInteraction.ConsentReturnUrlParameter,
-	// )
+	target, err := redirectUrl(
+		cpr.request,
+		cpr.urls,
+		cpr.authorizationParametersMessageStore,
+		cpr.options.UserInteraction.ConsentUrl,
+		cpr.options.UserInteraction.ConsentReturnUrlParameter,
+	)
+	if err != nil {
+		return err
+	}
 
-	// if err != nil {
-	// 	return err
-	// }
-
-	http.Redirect(w, r, cpr.request.RedirectUri, http.StatusFound)
+	http.Redirect(w, r, target, http.StatusFound)
 	return nil
 }

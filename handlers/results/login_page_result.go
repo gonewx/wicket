@@ -54,6 +54,17 @@ func (lpr *LoginPageResult) init(ctx context.Context) {
 func (lpr *LoginPageResult) Execute(w http.ResponseWriter, r *http.Request) error {
 	lpr.init(r.Context())
 
-	http.Redirect(w, r, lpr.request.RedirectUri, http.StatusFound)
+	target, err := redirectUrl(
+		lpr.request,
+		lpr.urls,
+		lpr.authorizationParametersMessageStore,
+		lpr.options.UserInteraction.LoginUrl,
+		lpr.options.UserInteraction.LoginReturnUrlParameter,
+	)
+	if err != nil {
+		return err
+	}
+
+	http.Redirect(w, r, target, http.StatusFound)
 	return nil
 }

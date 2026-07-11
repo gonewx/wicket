@@ -62,7 +62,7 @@ func (h *authorizeBaseHandler) dispatch(validation *validators_models.AuthorizeR
 	case interaction.IsConsent:
 		return results.NewConsentPageResult(request), nil
 	case interaction.IsRedirect():
-		return results.NewCustomRedirectResult(request), nil
+		return results.NewCustomRedirectResult(request, interaction.RedirectUrl), nil
 	}
 
 	response, err := h.generator.Create(request)
