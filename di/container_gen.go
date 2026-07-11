@@ -690,7 +690,7 @@ func (r *Root) NewKeyMaterialService() services.KeyMaterialService {
 }
 
 func (r *Root) NewTokenCreationService() services.TokenCreationService {
-	return impl.NewTokenCreationService()
+	return impl.NewTokenCreationService(r.NewKeyMaterialService(), r.f_SystemClock, r.f_Ptr_WicketOptions, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewProfileService() services.ProfileService {
@@ -3147,7 +3147,7 @@ func (s *scope) NewKeyMaterialService() services.KeyMaterialService {
 }
 
 func (s *scope) NewTokenCreationService() services.TokenCreationService {
-	return impl.NewTokenCreationService()
+	return impl.NewTokenCreationService(s.NewKeyMaterialService(), s.root.f_SystemClock, s.root.f_Ptr_WicketOptions, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewProfileService() services.ProfileService {

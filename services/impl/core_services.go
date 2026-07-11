@@ -378,13 +378,6 @@ func (ClaimsService) GetAccessTokenClaims(subject *claims.ClaimsPrincipal, resou
 	return subject.Claims(), nil
 }
 
-type TokenCreationService struct{}
-
-func NewTokenCreationService() TokenCreationService { return TokenCreationService{} }
-func (TokenCreationService) CreateToken(token *storage_models.Token) (string, error) {
-	return newHandle(), nil
-}
-
 type TokenService struct {
 	claims        services.ClaimsService
 	reference     storage.ReferenceTokenStore
@@ -410,9 +403,9 @@ func NewTokenService(
 }
 
 func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
-	claims := []*claims.Claim(nil)
+	tokenClaims := []*claims.Claim(nil)
 	if request.Subject != nil {
-		claims = request.Subject.Claims()
+		tokenClaims = request.Subject.Claims()
 	}
 	audiences := []string(nil)
 	if request.ValidatedResources != nil && request.ValidatedResources.Resources != nil {
@@ -423,7 +416,15 @@ func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreation
 		}
 		sort.Strings(audiences)
 	}
-	return &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: claims, Audiences: audiences}, nil
+	// A session-bound access token carries the session id so downstream
+	// validation can coordinate server-side session lifetime.
+	if request.ValidatedRequest != nil && request.ValidatedRequest.SessionId != "" {
+		tokenClaims = append(tokenClaims, claims.NewClaim(
+			claims.WithClaimType(gois.JwtClaimTypesSessionId),
+			claims.WithClaimValue(request.ValidatedRequest.SessionId),
+		))
+	}
+	return &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: tokenClaims, Audiences: audiences}, nil
 }
 
 func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
@@ -435,6 +436,22 @@ func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreati
 }
 
 func (s *TokenService) CreateSecurityToken(token *storage_models.Token) (string, error) {
+	// Only access tokens carry a jwt id, and only when the client opted in. Any
+	// value carried in from an earlier assembly is dropped and replaced with a
+	// freshly generated one so the id is never reused.
+	if token.Type == gois.TokenTypesAccessToken && token.IncludeJwtId {
+		jwtId, err := utils.CreateUniqueId(16, utils.Base64Url)
+		if err != nil {
+			return "", fmt.Errorf("create security token: generate jwt id: %w", err)
+		}
+		token.Claims = append(
+			utils.Where(token.Claims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesJwtId }),
+			claims.NewClaim(
+				claims.WithClaimType(gois.JwtClaimTypesJwtId),
+				claims.WithClaimValue(jwtId),
+			),
+		)
+	}
 	return s.tokenCreation.CreateToken(token)
 }
 
