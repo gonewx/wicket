@@ -157,9 +157,13 @@ type DeviceFlowCodeService interface {
 	RemoveByDeviceCode(string) error
 }
 
-// ConsentService stores user consent for an authorization request.
-// input: authorization request/consent -> behavior: grant or deny consent -> output: error.
+// ConsentService evaluates and stores user consent for an authorization request.
+// input: subject/client/scopes or authorization request/consent -> behavior: decide
+// whether consent is required, persist a remembered decision, or grant/deny consent
+// -> output: decision flag or error.
 type ConsentService interface {
+	RequiresConsent(*claims.ClaimsPrincipal, *models.Client, []*validators_models.ParsedScopeValue) (bool, error)
+	UpdateConsent(*claims.ClaimsPrincipal, *models.Client, []*validators_models.ParsedScopeValue) error
 	GrantConsent(*messages.AuthorizationRequest, *messages.ConsentResponse, string) error
 	DenyAuthorization(*messages.AuthorizationRequest, string) error
 }

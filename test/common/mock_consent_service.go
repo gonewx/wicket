@@ -6,6 +6,7 @@ package common
 
 import (
 	"github.com/gonewx/wicket/claims"
+	"github.com/gonewx/wicket/models/messages"
 	storage_models "github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/utils"
 	validators_models "github.com/gonewx/wicket/validators/models"
@@ -35,5 +36,13 @@ func (s *MockConsentService) UpdateConsent(subject *claims.ClaimsPrincipal, clie
 			return x.RawValue
 		})
 
+	return nil
+}
+
+func (s *MockConsentService) GrantConsent(*messages.AuthorizationRequest, *messages.ConsentResponse, string) error {
+	return nil
+}
+
+func (s *MockConsentService) DenyAuthorization(*messages.AuthorizationRequest, string) error {
 	return nil
 }

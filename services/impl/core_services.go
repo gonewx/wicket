@@ -538,6 +538,24 @@ func (s *DeviceFlowCodeService) RemoveByDeviceCode(deviceCode string) error {
 type ConsentService struct{}
 
 func NewConsentService() ConsentService { return ConsentService{} }
+
+// RequiresConsent reports whether an explicit consent decision is required for the
+// requested scopes. It currently honors only the client's RequireConsent flag;
+// remembered-grant lookup against the consent store is deferred (see
+// deferred-work.md) and lands with the endpoint pipeline.
+func (ConsentService) RequiresConsent(subject *claims.ClaimsPrincipal, client *storage_models.Client, parsedScopes []*validators_models.ParsedScopeValue) (bool, error) {
+	if client == nil {
+		return false, nil
+	}
+	return client.RequireConsent, nil
+}
+
+// UpdateConsent persists a remembered consent decision. Store-backed persistence is
+// deferred (see deferred-work.md) and lands with the endpoint pipeline.
+func (ConsentService) UpdateConsent(subject *claims.ClaimsPrincipal, client *storage_models.Client, parsedScopes []*validators_models.ParsedScopeValue) error {
+	return nil
+}
+
 func (ConsentService) GrantConsent(*messages.AuthorizationRequest, *messages.ConsentResponse, string) error {
 	return nil
 }
