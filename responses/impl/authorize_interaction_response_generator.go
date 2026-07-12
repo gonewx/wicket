@@ -180,6 +180,14 @@ func (g *AuthorizeInteractionResponseGenerator) HandleConsent(req *validators_mo
 	req.WasConsentShown = true
 
 	if !consent.Granted() {
+		// A page-supplied error travels back to the client as-is; a plain
+		// denial (no scopes granted, no error set) maps to access_denied.
+		if consent.Error != nil {
+			return &responses_models.InteractionResponse{
+				Error:            consentAuthorizationError(*consent.Error),
+				ErrorDescription: consent.ErrorDescription,
+			}
+		}
 		return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsAccessDenied}
 	}
 
@@ -219,6 +227,25 @@ func (g *AuthorizeInteractionResponseGenerator) subjectActive(req *validators_mo
 // sessionAge is the elapsed time since the subject last authenticated.
 func (g *AuthorizeInteractionResponseGenerator) sessionAge(req *validators_models.ValidatedAuthorizeRequest) time.Duration {
 	return g.clock.Now().Sub(extensions.GetAuthenticationTime(req.Subject))
+}
+
+// consentAuthorizationError maps an interaction authorization error onto the
+// authorize protocol error it represents.
+func consentAuthorizationError(e messages.AuthorizationError) error {
+	switch e {
+	case messages.InteractionRequired:
+		return gois.AuthorizeErrorsInteractionRequired
+	case messages.LoginRequired:
+		return gois.AuthorizeErrorsLoginRequired
+	case messages.AccountSelectionRequired:
+		return gois.AuthorizeErrorsAccountSelectionRequired
+	case messages.ConsentRequired:
+		return gois.AuthorizeErrorsConsentRequired
+	case messages.TemporarilyUnavailable:
+		return gois.AuthorizeErrorsTemporarilyUnavailable
+	default:
+		return gois.AuthorizeErrorsAccessDenied
+	}
 }
 
 func promptNone(req *validators_models.ValidatedAuthorizeRequest) bool {

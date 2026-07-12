@@ -316,3 +316,44 @@ func sameStringSet(got, want []string) bool {
 	}
 	return true
 }
+
+// TestHandleConsentReturnsPageSuppliedError covers an answer that carries an
+// explicit authorization error: the error and its description travel back to
+// the client instead of collapsing to access_denied.
+func TestHandleConsentReturnsPageSuppliedError(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		authError messages.AuthorizationError
+		want      error
+	}{
+		"temporarily unavailable": {authError: messages.TemporarilyUnavailable, want: gois.AuthorizeErrorsTemporarilyUnavailable},
+		"login required":          {authError: messages.LoginRequired, want: gois.AuthorizeErrorsLoginRequired},
+		"access denied":           {authError: messages.AccessDenied, want: gois.AuthorizeErrorsAccessDenied},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			consent := common.NewMockConsentService()
+			consent.RequiresConsentResult = true
+			req := consentRequest(t)
+			g := consentGenerator(consent)
+
+			e := tc.authError
+			answer := messages.NewConsentResponse()
+			answer.Error = &e
+			answer.ErrorDescription = "some description"
+
+			resp := g.HandleConsent(req, answer)
+
+			if !errors.Is(resp.Error, tc.want) {
+				t.Fatalf("Error = %v, want %v", resp.Error, tc.want)
+			}
+			if resp.ErrorDescription != "some description" {
+				t.Fatalf("ErrorDescription = %q, want the page-supplied description", resp.ErrorDescription)
+			}
+		})
+	}
+}
