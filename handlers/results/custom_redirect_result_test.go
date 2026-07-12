@@ -66,8 +66,9 @@ func TestCustomRedirectResult_Execute_redirects_to_custom_target(t *testing.T) {
 			a.Truef(strings.HasPrefix(location, customTarget), "location=%s", location)
 			a.Falsef(strings.HasPrefix(location, request.RedirectUri), "must not redirect to the client callback, location=%s", location)
 
-			returnURL := parseReturnURL(a, location, options.UserInteraction.CustomRedirectReturnUrlParameter)
-			assertParameterCarriage(a, returnURL, tc.useStore)
+			returnURLValue := extractReturnURL(a, location, options.UserInteraction.CustomRedirectReturnUrlParameter)
+			assertReturnUrlAccepted(a, options, urls, store, returnURLValue)
+			assertParameterCarriage(a, returnURLValue, tc.useStore)
 		})
 	}
 }

@@ -64,8 +64,9 @@ func TestLoginPageResult_Execute_redirects_to_login_page(t *testing.T) {
 			a.Truef(strings.HasPrefix(location, "https://server/account/login"), "location=%s", location)
 			a.Falsef(strings.HasPrefix(location, request.RedirectUri), "must not redirect to the client callback, location=%s", location)
 
-			returnURL := parseReturnURL(a, location, options.UserInteraction.LoginReturnUrlParameter)
-			assertParameterCarriage(a, returnURL, tc.useStore)
+			returnURLValue := extractReturnURL(a, location, options.UserInteraction.LoginReturnUrlParameter)
+			assertReturnUrlAccepted(a, options, urls, store, returnURLValue)
+			assertParameterCarriage(a, returnURLValue, tc.useStore)
 		})
 	}
 }
