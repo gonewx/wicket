@@ -4,6 +4,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
+	"github.com/gonewx/wicket/hosting"
 )
 
 type SchemeProvider struct {
@@ -133,18 +135,34 @@ func (p *SchemeProvider) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {
 type HandlerProvider struct {
 	schemes  auth.SchemeProvider
 	provider godi.Provider
+	handlers map[string]auth.Handler
 }
 
 func NewHandlerProvider(schemes auth.SchemeProvider, provider godi.Provider) *HandlerProvider {
-	return &HandlerProvider{schemes: schemes, provider: provider}
+	return &HandlerProvider{schemes: schemes, provider: provider, handlers: map[string]auth.Handler{}}
 }
 
+// GetHandler resolves the handler for a scheme name through the request scope,
+// keyed by the scheme name, initializes it, and reuses it for the remainder of
+// the request. An unregistered scheme yields no handler and no error; a
+// registered scheme with no resolvable handler yields an error naming it.
 func (p *HandlerProvider) GetHandler(request *http.Request, response http.ResponseWriter, schemeName string) (auth.Handler, error) {
+	if cached, ok := p.handlers[schemeName]; ok {
+		return cached, nil
+	}
 	scheme := p.schemes.GetScheme(schemeName)
 	if scheme == nil {
 		return nil, nil
 	}
-	return &unsupportedHandler{scheme: scheme}, nil
+	handler, ok := godi.GetKeyed[auth.Handler](p.provider, schemeName)
+	if !ok || handler == nil {
+		return nil, fmt.Errorf("no authentication handler registered for scheme %q", schemeName)
+	}
+	if err := handler.Initialize(request, response, scheme); err != nil {
+		return nil, err
+	}
+	p.handlers[schemeName] = handler
+	return handler, nil
 }
 
 type NoopClaimsTransformation struct{}
@@ -212,12 +230,50 @@ func (s *Service) SignOut(r *http.Request, w http.ResponseWriter, scheme string,
 	return fmt.Errorf("sign-out is unsupported")
 }
 
+type resultContextKey struct{}
+
+// ContextWithResult returns a context carrying the authentication result for
+// downstream consumers.
+func ContextWithResult(ctx context.Context, result *auth.Result) context.Context {
+	return context.WithValue(ctx, resultContextKey{}, result)
+}
+
+// ResultFromContext returns the authentication result placed on the context by
+// the middleware, or nil when the request is anonymous.
+func ResultFromContext(ctx context.Context) *auth.Result {
+	if result, ok := ctx.Value(resultContextKey{}).(*auth.Result); ok {
+		return result
+	}
+	return nil
+}
+
 func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if scheme := provider.GetDefaultAuthenticateScheme(); scheme != nil {
+				if scope := hosting.ScopeFrom(r.Context()); scope != nil {
+					if handlers, ok := godi.Get[auth.HandlerProvider](scope); ok && handlers != nil {
+						if handler, err := handlers.GetHandler(r, w, scheme.Name); err == nil && handler != nil {
+							if result, err := handler.Authenticate(); err == nil && result != nil && !result.None {
+								r = r.WithContext(ContextWithResult(r.Context(), result))
+							}
+						}
+					}
+				}
+			}
+			// The request-handler scheme short-circuit is inserted here once
+			// GetRequestHandlerSchemes enumerates schemes; it currently yields
+			// none, so the traversal is empty.
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// NewUnsupportedHandler builds a handler for a scheme whose concrete handler is
+// not yet available. It authenticates to no result and rejects challenge and
+// forbid, serving as the keyed registration for such schemes.
+func NewUnsupportedHandler() auth.Handler {
+	return &unsupportedHandler{}
 }
 
 type unsupportedHandler struct {

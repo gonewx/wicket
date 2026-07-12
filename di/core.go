@@ -187,6 +187,16 @@ func registerCore() {
 	godi.AddScopedFactory[auth.HandlerProvider](&r, func(p godi.Provider) auth.HandlerProvider {
 		return authcore.NewHandlerProvider(godi.GetRequired[auth.SchemeProvider](p), p)
 	})
+	// Handlers resolve keyed by scheme name; each built-in cookie scheme keys a
+	// transient handler so the handler provider can activate it per request. The
+	// concrete cookie handler is not yet available, so the keyed registration
+	// serves the neutral unsupported handler until it lands.
+	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.DefaultCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		return authcore.NewUnsupportedHandler()
+	})
+	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.ExternalCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		return authcore.NewUnsupportedHandler()
+	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L162 (AddScoped<IUserSession, DefaultUserSession>, Add).
 	// Form B keeps ServerUrls reading the live HttpContextAccessor request.
 	godi.AddScopedFactory[services.UserSession](&r, func(p godi.Provider) services.UserSession {

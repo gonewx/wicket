@@ -935,6 +935,18 @@ func (r *Root) NewReturnUrlParser() services.ReturnUrlParser {
 	})(r)
 }
 
+func (r *Root) NewHandler_gois_DefaultCookieAuthenticationScheme() auth.Handler {
+	return (func(p godi.Provider) auth.Handler {
+		return core.NewUnsupportedHandler()
+	})(r)
+}
+
+func (r *Root) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handler {
+	return (func(p godi.Provider) auth.Handler {
+		return core.NewUnsupportedHandler()
+	})(r)
+}
+
 func (r *Root) SystemClock() services.SystemClock { return r.f_SystemClock }
 
 func (r *Root) ServerConfig() *ServerConfig { return r.f_ServerConfig }
@@ -1576,6 +1588,15 @@ func (r *Root) IsKeyedService(t reflect.Type, key any) bool {
 	if key == godi.AnyKey {
 		return false
 	}
+	switch t {
+	case reflect.TypeFor[auth.Handler]():
+		switch key {
+		case gois.DefaultCookieAuthenticationScheme:
+			return true
+		case gois.ExternalCookieAuthenticationScheme:
+			return true
+		}
+	}
 	return false
 }
 
@@ -1589,6 +1610,15 @@ func (r *Root) GetKeyedService(t reflect.Type, key any) any {
 	if key == godi.AnyKey {
 		panic(godi.AnyKeySingleResolveError(t))
 	}
+	switch t {
+	case reflect.TypeFor[auth.Handler]():
+		switch key {
+		case gois.DefaultCookieAuthenticationScheme:
+			return r.NewHandler_gois_DefaultCookieAuthenticationScheme()
+		case gois.ExternalCookieAuthenticationScheme:
+			return r.NewHandler_gois_ExternalCookieAuthenticationScheme()
+		}
+	}
 	return nil
 }
 
@@ -1596,266 +1626,282 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 	if r.closed {
 		panic(godi.ProviderClosedError())
 	}
-	if key != nil {
+	if key == nil {
+		switch t {
+		case reflect.TypeFor[services.SystemClock]():
+			return []any{r.f_SystemClock}
+		case reflect.TypeFor[*ServerConfig]():
+			return []any{r.f_ServerConfig}
+		case reflect.TypeFor[*slog.Logger]():
+			return []any{r.f_Ptr_Logger}
+		case reflect.TypeFor[*hosting.Endpoint]():
+			return []any{r.f_Ptr_Endpoint, r.f_Ptr_Endpoint__2, r.f_Ptr_Endpoint__3, r.f_Ptr_Endpoint__4, r.f_Ptr_Endpoint__5, r.f_Ptr_Endpoint__6, r.f_Ptr_Endpoint__7, r.f_Ptr_Endpoint__8, r.f_Ptr_Endpoint__9, r.f_Ptr_Endpoint__10, r.f_Ptr_Endpoint__11}
+		case reflect.TypeFor[dp.DataProtectionProvider]():
+			return []any{r.f_DataProtectionProvider}
+		case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
+			return []any{r.f_UnnamedOptionsManager__options_WicketOptions}
+		case reflect.TypeFor[options2.Options[*auth.Options]]():
+			return []any{r.f_UnnamedOptionsManager__auth_Options}
+		case reflect.TypeFor[*core.SchemeProvider]():
+			return []any{r.f_Ptr_SchemeProvider}
+		case reflect.TypeFor[dynamicscheme.ProviderStore]():
+			return []any{r.f_ProviderStore}
+		case reflect.TypeFor[*dynamicscheme.Resolver]():
+			return []any{r.f_Ptr_Resolver}
+		case reflect.TypeFor[auth.ClaimsTransformation]():
+			return []any{r.f_NoopClaimsTransformation}
+		case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
+			return []any{r.f_ConfigureOptions__auth_Options}
+		case reflect.TypeFor[options2.Options[*cookies.AuthenticationOptions]]():
+			return []any{r.f_UnnamedOptionsManager__cookies_AuthenticationOptions}
+		case reflect.TypeFor[options2.ConfigureOptions[*cookies.AuthenticationOptions]]():
+			return []any{r.f_ConfigureOptions__cookies_AuthenticationOptions}
+		case reflect.TypeFor[options2.PostConfigureOptions[*cookies.AuthenticationOptions]]():
+			return []any{r.f_PostConfigureOptions__cookies_AuthenticationOptions, r.f_PostConfigureOptions__cookies_AuthenticationOptions__2}
+		case reflect.TypeFor[options2.ValidateOptions[*cookies.AuthenticationOptions]]():
+			return []any{r.f_ValidateOptions__cookies_AuthenticationOptions, r.f_ValidateOptions__cookies_AuthenticationOptions__2}
+		case reflect.TypeFor[*options.WicketOptions]():
+			return []any{r.f_Ptr_WicketOptions}
+		case reflect.TypeFor[*options.PersistentGrantOptions]():
+			return []any{r.f_Ptr_PersistentGrantOptions}
+		case reflect.TypeFor[storage.PersistedGrantStore]():
+			return []any{r.f_PersistedGrantStore}
+		case reflect.TypeFor[storage.DeviceFlowStore]():
+			return []any{r.f_DeviceFlowStore}
+		case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+			return []any{r.f_BackchannelAuthenticationRequestStore}
+		case reflect.TypeFor[*keymgmt.Manager]():
+			return []any{r.f_Ptr_Manager}
+		case reflect.TypeFor[services.DistributedCache]():
+			return []any{r.f_MemoryDistributedCache}
+		case reflect.TypeFor[session.Store]():
+			return []any{r.f_Store}
+		case reflect.TypeFor[accessor.HttpContextAccessor]():
+			return []any{r.f_DefaultHttpContextAccessor}
+		case reflect.TypeFor[auth.HandlerProvider]():
+			return []any{r.f_HandlerProvider}
+		case reflect.TypeFor[services.UserSession]():
+			return []any{r.f_UserSession}
+		case reflect.TypeFor[*core.Service]():
+			return []any{r.f_Service}
+		case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
+			return []any{r.NewAuthorizationParametersMessageStore()}
+		case reflect.TypeFor[hosting.EndpointRouter]():
+			return []any{r.NewEndpointRouter()}
+		case reflect.TypeFor[*handlers.AuthorizeHandler]():
+			return []any{r.NewPtr_AuthorizeHandler()}
+		case reflect.TypeFor[*handlers.AuthorizeCallbackHandler]():
+			return []any{r.NewPtr_AuthorizeCallbackHandler()}
+		case reflect.TypeFor[*handlers.TokenHandler]():
+			return []any{r.NewPtr_TokenHandler()}
+		case reflect.TypeFor[*handlers.DiscoveryHandler]():
+			return []any{r.NewPtr_DiscoveryHandler()}
+		case reflect.TypeFor[*handlers.DiscoveryKeyHandler]():
+			return []any{r.NewPtr_DiscoveryKeyHandler()}
+		case reflect.TypeFor[*handlers.CheckSessionHandler]():
+			return []any{r.NewPtr_CheckSessionHandler()}
+		case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
+			return []any{r.NewPtr_BackchannelAuthenticationHandler()}
+		case reflect.TypeFor[*handlers.IntrospectionHandler]():
+			return []any{r.NewPtr_IntrospectionHandler()}
+		case reflect.TypeFor[*handlers.UserInfoHandler]():
+			return []any{r.NewPtr_UserInfoHandler()}
+		case reflect.TypeFor[*handlers.EndSessionHandler]():
+			return []any{r.NewPtr_EndSessionHandler()}
+		case reflect.TypeFor[*handlers.EndSessionCallbackHandler]():
+			return []any{r.NewPtr_EndSessionCallbackHandler()}
+		case reflect.TypeFor[*infrastructure.MessageCookie[*messages.ConsentResponse]]():
+			return []any{r.NewPtr_MessageCookie__messages_ConsentResponse()}
+		case reflect.TypeFor[options2.OptionsFactory[*options.WicketOptions]]():
+			return []any{r.NewOptionsFactory__options_WicketOptions()}
+		case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
+			return []any{r.NewOptionsFactory__auth_Options()}
+		case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
+			return []any{r.NewPtr_Decorator_auth_SchemeProvider()}
+		case reflect.TypeFor[auth.SchemeProvider]():
+			return []any{r.NewAuthSchemeProvider()}
+		case reflect.TypeFor[*gois.Decorator[auth.Service]]():
+			return []any{r.NewPtr_Decorator_auth_Service()}
+		case reflect.TypeFor[auth.Service]():
+			return []any{r.NewService__2()}
+		case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
+			return []any{r.NewOptionsFactory__cookies_AuthenticationOptions()}
+		case reflect.TypeFor[*options.DynamicProviderOptions]():
+			return []any{r.NewPtr_DynamicProviderOptions()}
+		case reflect.TypeFor[*options.KeyManagementOptions]():
+			return []any{r.NewPtr_KeyManagementOptions()}
+		case reflect.TypeFor[services.ServerUrls]():
+			return []any{r.NewServerUrls()}
+		case reflect.TypeFor[services.IssuerNameService]():
+			return []any{r.NewIssuerNameService()}
+		case reflect.TypeFor[validators.SecretsListParser]():
+			return []any{r.NewSecretsListParser()}
+		case reflect.TypeFor[validators.SecretsListValidator]():
+			return []any{r.NewSecretsListValidator()}
+		case reflect.TypeFor[responses.TokenResponseGenerator]():
+			return []any{r.NewTokenResponseGenerator()}
+		case reflect.TypeFor[responses.UserInfoResponseGenerator]():
+			return []any{r.NewUserInfoResponseGenerator()}
+		case reflect.TypeFor[responses.IntrospectionResponseGenerator]():
+			return []any{r.NewIntrospectionResponseGenerator()}
+		case reflect.TypeFor[responses.AuthorizeInteractionResponseGenerator]():
+			return []any{r.NewAuthorizeInteractionResponseGenerator()}
+		case reflect.TypeFor[responses.AuthorizeResponseGenerator]():
+			return []any{r.NewAuthorizeResponseGenerator()}
+		case reflect.TypeFor[responses.DiscoveryResponseGenerator]():
+			return []any{r.NewDiscoveryResponseGenerator()}
+		case reflect.TypeFor[responses.TokenRevocationResponseGenerator]():
+			return []any{r.NewTokenRevocationResponseGenerator()}
+		case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
+			return []any{r.NewDeviceAuthorizationResponseGenerator()}
+		case reflect.TypeFor[validators.SecretParser]():
+			return []any{r.NewBasicAuthenticationSecretParser(), r.NewPostBodySecretParser()}
+		case reflect.TypeFor[validators.SecretValidator]():
+			return []any{r.NewHashedSharedSecretValidator()}
+		case reflect.TypeFor[*impl2.ExtensionGrantValidator]():
+			return []any{r.NewPtr_ExtensionGrantValidator()}
+		case reflect.TypeFor[*impl2.BearerTokenUsageValidator]():
+			return []any{r.NewBearerTokenUsageValidator()}
+		case reflect.TypeFor[validators.JwtRequestValidator]():
+			return []any{r.NewJwtRequestValidator()}
+		case reflect.TypeFor[*impl.ReturnUrlParser]():
+			return []any{r.NewPtr_ReturnUrlParser()}
+		case reflect.TypeFor[[]storage.SigningCredentialStore]():
+			return []any{r.NewSlice_SigningCredentialStore()}
+		case reflect.TypeFor[[]storage.ValidationKeysStore]():
+			return []any{r.NewSlice_ValidationKeysStore()}
+		case reflect.TypeFor[storage.ClientStore]():
+			return []any{r.NewClientStore()}
+		case reflect.TypeFor[services.CorsPolicyService]():
+			return []any{r.NewCorsPolicyService()}
+		case reflect.TypeFor[storage.ResourceStore]():
+			return []any{r.NewResourceStore()}
+		case reflect.TypeFor[*impl4.PersistentGrantSerializer]():
+			return []any{r.NewPtr_PersistentGrantSerializer()}
+		case reflect.TypeFor[storage.MessageStore[messages.LogoutMessage]]():
+			return []any{r.NewMessageStore_messages_LogoutMessage()}
+		case reflect.TypeFor[storage.MessageStore[messages.ErrorMessage]]():
+			return []any{r.NewMessageStore_messages_ErrorMessage()}
+		case reflect.TypeFor[storage.MessageStore[contexts.LogoutNotificationContext]]():
+			return []any{r.NewMessageStore_contexts_LogoutNotificationContext()}
+		case reflect.TypeFor[services.JwtRequestUriHttpClient]():
+			return []any{r.NewJwtRequestUriHttpClient()}
+		case reflect.TypeFor[services.BackChannelLogoutHttpClient]():
+			return []any{r.NewBackChannelLogoutHttpClient()}
+		case reflect.TypeFor[storage.ConsentMessageStore]():
+			return []any{r.NewConsentMessageStore()}
+		case reflect.TypeFor[services.HandleGenerationService]():
+			return []any{r.NewHandleGenerationService()}
+		case reflect.TypeFor[services.UserCodeGenerator]():
+			return []any{r.NewNumericUserCodeGenerator()}
+		case reflect.TypeFor[services.UserCodeService]():
+			return []any{r.NewUserCodeService()}
+		case reflect.TypeFor[validators.ScopeParser]():
+			return []any{r.NewScopeParser()}
+		case reflect.TypeFor[storage.AuthorizationCodeStore]():
+			return []any{r.NewAuthorizationCodeStore()}
+		case reflect.TypeFor[storage.RefreshTokenStore]():
+			return []any{r.NewRefreshTokenStore()}
+		case reflect.TypeFor[storage.ReferenceTokenStore]():
+			return []any{r.NewReferenceTokenStore()}
+		case reflect.TypeFor[storage.UserConsentStore]():
+			return []any{r.NewUserConsentStore()}
+		case reflect.TypeFor[services.PersistedGrantService]():
+			return []any{r.NewPersistedGrantService()}
+		case reflect.TypeFor[services.KeyMaterialService]():
+			return []any{r.NewKeyMaterialService()}
+		case reflect.TypeFor[services.TokenCreationService]():
+			return []any{r.NewTokenCreationService()}
+		case reflect.TypeFor[services.ProfileService]():
+			return []any{r.NewProfileService()}
+		case reflect.TypeFor[services.ClaimsService]():
+			return []any{r.NewClaimsService()}
+		case reflect.TypeFor[services.RefreshTokenService]():
+			return []any{r.NewRefreshTokenService()}
+		case reflect.TypeFor[services.DeviceFlowCodeService]():
+			return []any{r.NewDeviceFlowCodeService()}
+		case reflect.TypeFor[services.ConsentService]():
+			return []any{r.NewConsentService()}
+		case reflect.TypeFor[services.LogoutNotificationService]():
+			return []any{r.NewLogoutNotificationService()}
+		case reflect.TypeFor[services.BackchannelLogoutService]():
+			return []any{r.NewBackchannelLogoutService()}
+		case reflect.TypeFor[validators.ResourceValidator]():
+			return []any{r.NewResourceValidator()}
+		case reflect.TypeFor[services.DeviceFlowThrottlingService]():
+			return []any{r.NewDistributedDeviceFlowThrottlingService()}
+		case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
+			return []any{r.NewBackchannelAuthenticationThrottlingService()}
+		case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
+			return []any{r.NewBackchannelAuthenticationNotificationService()}
+		case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
+			return []any{r.NewBackchannelAuthenticationRequestIdValidator()}
+		case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
+			return []any{r.NewBackchannelAuthenticationUserValidator()}
+		case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
+			return []any{r.NewBackchannelAuthenticationRequestValidator()}
+		case reflect.TypeFor[services.TokenService]():
+			return []any{r.NewTokenService()}
+		case reflect.TypeFor[services.InteractionService]():
+			return []any{r.NewInteractionService()}
+		case reflect.TypeFor[services.SessionCoordinationService]():
+			return []any{r.NewSessionCoordinationService()}
+		case reflect.TypeFor[*tools.TokenTools]():
+			return []any{r.NewTokenTools()}
+		case reflect.TypeFor[validators.TokenRevocationRequestValidator]():
+			return []any{r.NewTokenRevocationRequestValidator()}
+		case reflect.TypeFor[validators.AuthorizeRequestValidator]():
+			return []any{r.NewAuthorizeRequestValidator()}
+		case reflect.TypeFor[validators.EndSessionRequestValidator]():
+			return []any{r.NewEndSessionRequestValidator()}
+		case reflect.TypeFor[validators.TokenRequestValidator]():
+			return []any{r.NewTokenRequestValidator()}
+		case reflect.TypeFor[validators.RedirectUriValidator]():
+			return []any{r.NewStrictRedirectUriValidator()}
+		case reflect.TypeFor[validators.TokenValidator]():
+			return []any{r.NewTokenValidator()}
+		case reflect.TypeFor[validators.IntrospectionRequestValidator]():
+			return []any{r.NewIntrospectionRequestValidator()}
+		case reflect.TypeFor[validators.ResourceOwnerPasswordValidator]():
+			return []any{r.NewResourceOwnerPasswordValidator()}
+		case reflect.TypeFor[validators.CustomTokenRequestValidator]():
+			return []any{r.NewCustomTokenRequestValidator()}
+		case reflect.TypeFor[validators.UserInfoRequestValidator]():
+			return []any{r.NewUserInfoRequestValidator()}
+		case reflect.TypeFor[validators.ClientConfigurationValidator]():
+			return []any{r.NewClientConfigurationValidator()}
+		case reflect.TypeFor[validators.DeviceAuthorizationRequestValidator]():
+			return []any{r.NewDeviceAuthorizationRequestValidator()}
+		case reflect.TypeFor[validators.DeviceCodeValidator]():
+			return []any{r.NewDeviceCodeValidator()}
+		case reflect.TypeFor[validators.CustomTokenValidator]():
+			return []any{r.NewCustomTokenValidator()}
+		case reflect.TypeFor[validators.CustomAuthorizeRequestValidator]():
+			return []any{r.NewCustomAuthorizeRequestValidator()}
+		case reflect.TypeFor[validators.ClientSecretValidator]():
+			return []any{r.NewClientSecretValidator()}
+		case reflect.TypeFor[validators.ApiSecretValidator]():
+			return []any{r.NewApiSecretValidator()}
+		case reflect.TypeFor[services.ReturnUrlParser]():
+			return []any{r.NewReturnUrlParser()}
+		}
+		return nil
+	}
+	if key == godi.AnyKey {
+		switch t {
+		case reflect.TypeFor[auth.Handler]():
+			return []any{r.NewHandler_gois_DefaultCookieAuthenticationScheme(), r.NewHandler_gois_ExternalCookieAuthenticationScheme()}
+		}
 		return nil
 	}
 	switch t {
-	case reflect.TypeFor[services.SystemClock]():
-		return []any{r.f_SystemClock}
-	case reflect.TypeFor[*ServerConfig]():
-		return []any{r.f_ServerConfig}
-	case reflect.TypeFor[*slog.Logger]():
-		return []any{r.f_Ptr_Logger}
-	case reflect.TypeFor[*hosting.Endpoint]():
-		return []any{r.f_Ptr_Endpoint, r.f_Ptr_Endpoint__2, r.f_Ptr_Endpoint__3, r.f_Ptr_Endpoint__4, r.f_Ptr_Endpoint__5, r.f_Ptr_Endpoint__6, r.f_Ptr_Endpoint__7, r.f_Ptr_Endpoint__8, r.f_Ptr_Endpoint__9, r.f_Ptr_Endpoint__10, r.f_Ptr_Endpoint__11}
-	case reflect.TypeFor[dp.DataProtectionProvider]():
-		return []any{r.f_DataProtectionProvider}
-	case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
-		return []any{r.f_UnnamedOptionsManager__options_WicketOptions}
-	case reflect.TypeFor[options2.Options[*auth.Options]]():
-		return []any{r.f_UnnamedOptionsManager__auth_Options}
-	case reflect.TypeFor[*core.SchemeProvider]():
-		return []any{r.f_Ptr_SchemeProvider}
-	case reflect.TypeFor[dynamicscheme.ProviderStore]():
-		return []any{r.f_ProviderStore}
-	case reflect.TypeFor[*dynamicscheme.Resolver]():
-		return []any{r.f_Ptr_Resolver}
-	case reflect.TypeFor[auth.ClaimsTransformation]():
-		return []any{r.f_NoopClaimsTransformation}
-	case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
-		return []any{r.f_ConfigureOptions__auth_Options}
-	case reflect.TypeFor[options2.Options[*cookies.AuthenticationOptions]]():
-		return []any{r.f_UnnamedOptionsManager__cookies_AuthenticationOptions}
-	case reflect.TypeFor[options2.ConfigureOptions[*cookies.AuthenticationOptions]]():
-		return []any{r.f_ConfigureOptions__cookies_AuthenticationOptions}
-	case reflect.TypeFor[options2.PostConfigureOptions[*cookies.AuthenticationOptions]]():
-		return []any{r.f_PostConfigureOptions__cookies_AuthenticationOptions, r.f_PostConfigureOptions__cookies_AuthenticationOptions__2}
-	case reflect.TypeFor[options2.ValidateOptions[*cookies.AuthenticationOptions]]():
-		return []any{r.f_ValidateOptions__cookies_AuthenticationOptions, r.f_ValidateOptions__cookies_AuthenticationOptions__2}
-	case reflect.TypeFor[*options.WicketOptions]():
-		return []any{r.f_Ptr_WicketOptions}
-	case reflect.TypeFor[*options.PersistentGrantOptions]():
-		return []any{r.f_Ptr_PersistentGrantOptions}
-	case reflect.TypeFor[storage.PersistedGrantStore]():
-		return []any{r.f_PersistedGrantStore}
-	case reflect.TypeFor[storage.DeviceFlowStore]():
-		return []any{r.f_DeviceFlowStore}
-	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
-		return []any{r.f_BackchannelAuthenticationRequestStore}
-	case reflect.TypeFor[*keymgmt.Manager]():
-		return []any{r.f_Ptr_Manager}
-	case reflect.TypeFor[services.DistributedCache]():
-		return []any{r.f_MemoryDistributedCache}
-	case reflect.TypeFor[session.Store]():
-		return []any{r.f_Store}
-	case reflect.TypeFor[accessor.HttpContextAccessor]():
-		return []any{r.f_DefaultHttpContextAccessor}
-	case reflect.TypeFor[auth.HandlerProvider]():
-		return []any{r.f_HandlerProvider}
-	case reflect.TypeFor[services.UserSession]():
-		return []any{r.f_UserSession}
-	case reflect.TypeFor[*core.Service]():
-		return []any{r.f_Service}
-	case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
-		return []any{r.NewAuthorizationParametersMessageStore()}
-	case reflect.TypeFor[hosting.EndpointRouter]():
-		return []any{r.NewEndpointRouter()}
-	case reflect.TypeFor[*handlers.AuthorizeHandler]():
-		return []any{r.NewPtr_AuthorizeHandler()}
-	case reflect.TypeFor[*handlers.AuthorizeCallbackHandler]():
-		return []any{r.NewPtr_AuthorizeCallbackHandler()}
-	case reflect.TypeFor[*handlers.TokenHandler]():
-		return []any{r.NewPtr_TokenHandler()}
-	case reflect.TypeFor[*handlers.DiscoveryHandler]():
-		return []any{r.NewPtr_DiscoveryHandler()}
-	case reflect.TypeFor[*handlers.DiscoveryKeyHandler]():
-		return []any{r.NewPtr_DiscoveryKeyHandler()}
-	case reflect.TypeFor[*handlers.CheckSessionHandler]():
-		return []any{r.NewPtr_CheckSessionHandler()}
-	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
-		return []any{r.NewPtr_BackchannelAuthenticationHandler()}
-	case reflect.TypeFor[*handlers.IntrospectionHandler]():
-		return []any{r.NewPtr_IntrospectionHandler()}
-	case reflect.TypeFor[*handlers.UserInfoHandler]():
-		return []any{r.NewPtr_UserInfoHandler()}
-	case reflect.TypeFor[*handlers.EndSessionHandler]():
-		return []any{r.NewPtr_EndSessionHandler()}
-	case reflect.TypeFor[*handlers.EndSessionCallbackHandler]():
-		return []any{r.NewPtr_EndSessionCallbackHandler()}
-	case reflect.TypeFor[*infrastructure.MessageCookie[*messages.ConsentResponse]]():
-		return []any{r.NewPtr_MessageCookie__messages_ConsentResponse()}
-	case reflect.TypeFor[options2.OptionsFactory[*options.WicketOptions]]():
-		return []any{r.NewOptionsFactory__options_WicketOptions()}
-	case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
-		return []any{r.NewOptionsFactory__auth_Options()}
-	case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
-		return []any{r.NewPtr_Decorator_auth_SchemeProvider()}
-	case reflect.TypeFor[auth.SchemeProvider]():
-		return []any{r.NewAuthSchemeProvider()}
-	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
-		return []any{r.NewPtr_Decorator_auth_Service()}
-	case reflect.TypeFor[auth.Service]():
-		return []any{r.NewService__2()}
-	case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
-		return []any{r.NewOptionsFactory__cookies_AuthenticationOptions()}
-	case reflect.TypeFor[*options.DynamicProviderOptions]():
-		return []any{r.NewPtr_DynamicProviderOptions()}
-	case reflect.TypeFor[*options.KeyManagementOptions]():
-		return []any{r.NewPtr_KeyManagementOptions()}
-	case reflect.TypeFor[services.ServerUrls]():
-		return []any{r.NewServerUrls()}
-	case reflect.TypeFor[services.IssuerNameService]():
-		return []any{r.NewIssuerNameService()}
-	case reflect.TypeFor[validators.SecretsListParser]():
-		return []any{r.NewSecretsListParser()}
-	case reflect.TypeFor[validators.SecretsListValidator]():
-		return []any{r.NewSecretsListValidator()}
-	case reflect.TypeFor[responses.TokenResponseGenerator]():
-		return []any{r.NewTokenResponseGenerator()}
-	case reflect.TypeFor[responses.UserInfoResponseGenerator]():
-		return []any{r.NewUserInfoResponseGenerator()}
-	case reflect.TypeFor[responses.IntrospectionResponseGenerator]():
-		return []any{r.NewIntrospectionResponseGenerator()}
-	case reflect.TypeFor[responses.AuthorizeInteractionResponseGenerator]():
-		return []any{r.NewAuthorizeInteractionResponseGenerator()}
-	case reflect.TypeFor[responses.AuthorizeResponseGenerator]():
-		return []any{r.NewAuthorizeResponseGenerator()}
-	case reflect.TypeFor[responses.DiscoveryResponseGenerator]():
-		return []any{r.NewDiscoveryResponseGenerator()}
-	case reflect.TypeFor[responses.TokenRevocationResponseGenerator]():
-		return []any{r.NewTokenRevocationResponseGenerator()}
-	case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
-		return []any{r.NewDeviceAuthorizationResponseGenerator()}
-	case reflect.TypeFor[validators.SecretParser]():
-		return []any{r.NewBasicAuthenticationSecretParser(), r.NewPostBodySecretParser()}
-	case reflect.TypeFor[validators.SecretValidator]():
-		return []any{r.NewHashedSharedSecretValidator()}
-	case reflect.TypeFor[*impl2.ExtensionGrantValidator]():
-		return []any{r.NewPtr_ExtensionGrantValidator()}
-	case reflect.TypeFor[*impl2.BearerTokenUsageValidator]():
-		return []any{r.NewBearerTokenUsageValidator()}
-	case reflect.TypeFor[validators.JwtRequestValidator]():
-		return []any{r.NewJwtRequestValidator()}
-	case reflect.TypeFor[*impl.ReturnUrlParser]():
-		return []any{r.NewPtr_ReturnUrlParser()}
-	case reflect.TypeFor[[]storage.SigningCredentialStore]():
-		return []any{r.NewSlice_SigningCredentialStore()}
-	case reflect.TypeFor[[]storage.ValidationKeysStore]():
-		return []any{r.NewSlice_ValidationKeysStore()}
-	case reflect.TypeFor[storage.ClientStore]():
-		return []any{r.NewClientStore()}
-	case reflect.TypeFor[services.CorsPolicyService]():
-		return []any{r.NewCorsPolicyService()}
-	case reflect.TypeFor[storage.ResourceStore]():
-		return []any{r.NewResourceStore()}
-	case reflect.TypeFor[*impl4.PersistentGrantSerializer]():
-		return []any{r.NewPtr_PersistentGrantSerializer()}
-	case reflect.TypeFor[storage.MessageStore[messages.LogoutMessage]]():
-		return []any{r.NewMessageStore_messages_LogoutMessage()}
-	case reflect.TypeFor[storage.MessageStore[messages.ErrorMessage]]():
-		return []any{r.NewMessageStore_messages_ErrorMessage()}
-	case reflect.TypeFor[storage.MessageStore[contexts.LogoutNotificationContext]]():
-		return []any{r.NewMessageStore_contexts_LogoutNotificationContext()}
-	case reflect.TypeFor[services.JwtRequestUriHttpClient]():
-		return []any{r.NewJwtRequestUriHttpClient()}
-	case reflect.TypeFor[services.BackChannelLogoutHttpClient]():
-		return []any{r.NewBackChannelLogoutHttpClient()}
-	case reflect.TypeFor[storage.ConsentMessageStore]():
-		return []any{r.NewConsentMessageStore()}
-	case reflect.TypeFor[services.HandleGenerationService]():
-		return []any{r.NewHandleGenerationService()}
-	case reflect.TypeFor[services.UserCodeGenerator]():
-		return []any{r.NewNumericUserCodeGenerator()}
-	case reflect.TypeFor[services.UserCodeService]():
-		return []any{r.NewUserCodeService()}
-	case reflect.TypeFor[validators.ScopeParser]():
-		return []any{r.NewScopeParser()}
-	case reflect.TypeFor[storage.AuthorizationCodeStore]():
-		return []any{r.NewAuthorizationCodeStore()}
-	case reflect.TypeFor[storage.RefreshTokenStore]():
-		return []any{r.NewRefreshTokenStore()}
-	case reflect.TypeFor[storage.ReferenceTokenStore]():
-		return []any{r.NewReferenceTokenStore()}
-	case reflect.TypeFor[storage.UserConsentStore]():
-		return []any{r.NewUserConsentStore()}
-	case reflect.TypeFor[services.PersistedGrantService]():
-		return []any{r.NewPersistedGrantService()}
-	case reflect.TypeFor[services.KeyMaterialService]():
-		return []any{r.NewKeyMaterialService()}
-	case reflect.TypeFor[services.TokenCreationService]():
-		return []any{r.NewTokenCreationService()}
-	case reflect.TypeFor[services.ProfileService]():
-		return []any{r.NewProfileService()}
-	case reflect.TypeFor[services.ClaimsService]():
-		return []any{r.NewClaimsService()}
-	case reflect.TypeFor[services.RefreshTokenService]():
-		return []any{r.NewRefreshTokenService()}
-	case reflect.TypeFor[services.DeviceFlowCodeService]():
-		return []any{r.NewDeviceFlowCodeService()}
-	case reflect.TypeFor[services.ConsentService]():
-		return []any{r.NewConsentService()}
-	case reflect.TypeFor[services.LogoutNotificationService]():
-		return []any{r.NewLogoutNotificationService()}
-	case reflect.TypeFor[services.BackchannelLogoutService]():
-		return []any{r.NewBackchannelLogoutService()}
-	case reflect.TypeFor[validators.ResourceValidator]():
-		return []any{r.NewResourceValidator()}
-	case reflect.TypeFor[services.DeviceFlowThrottlingService]():
-		return []any{r.NewDistributedDeviceFlowThrottlingService()}
-	case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
-		return []any{r.NewBackchannelAuthenticationThrottlingService()}
-	case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
-		return []any{r.NewBackchannelAuthenticationNotificationService()}
-	case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
-		return []any{r.NewBackchannelAuthenticationRequestIdValidator()}
-	case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
-		return []any{r.NewBackchannelAuthenticationUserValidator()}
-	case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
-		return []any{r.NewBackchannelAuthenticationRequestValidator()}
-	case reflect.TypeFor[services.TokenService]():
-		return []any{r.NewTokenService()}
-	case reflect.TypeFor[services.InteractionService]():
-		return []any{r.NewInteractionService()}
-	case reflect.TypeFor[services.SessionCoordinationService]():
-		return []any{r.NewSessionCoordinationService()}
-	case reflect.TypeFor[*tools.TokenTools]():
-		return []any{r.NewTokenTools()}
-	case reflect.TypeFor[validators.TokenRevocationRequestValidator]():
-		return []any{r.NewTokenRevocationRequestValidator()}
-	case reflect.TypeFor[validators.AuthorizeRequestValidator]():
-		return []any{r.NewAuthorizeRequestValidator()}
-	case reflect.TypeFor[validators.EndSessionRequestValidator]():
-		return []any{r.NewEndSessionRequestValidator()}
-	case reflect.TypeFor[validators.TokenRequestValidator]():
-		return []any{r.NewTokenRequestValidator()}
-	case reflect.TypeFor[validators.RedirectUriValidator]():
-		return []any{r.NewStrictRedirectUriValidator()}
-	case reflect.TypeFor[validators.TokenValidator]():
-		return []any{r.NewTokenValidator()}
-	case reflect.TypeFor[validators.IntrospectionRequestValidator]():
-		return []any{r.NewIntrospectionRequestValidator()}
-	case reflect.TypeFor[validators.ResourceOwnerPasswordValidator]():
-		return []any{r.NewResourceOwnerPasswordValidator()}
-	case reflect.TypeFor[validators.CustomTokenRequestValidator]():
-		return []any{r.NewCustomTokenRequestValidator()}
-	case reflect.TypeFor[validators.UserInfoRequestValidator]():
-		return []any{r.NewUserInfoRequestValidator()}
-	case reflect.TypeFor[validators.ClientConfigurationValidator]():
-		return []any{r.NewClientConfigurationValidator()}
-	case reflect.TypeFor[validators.DeviceAuthorizationRequestValidator]():
-		return []any{r.NewDeviceAuthorizationRequestValidator()}
-	case reflect.TypeFor[validators.DeviceCodeValidator]():
-		return []any{r.NewDeviceCodeValidator()}
-	case reflect.TypeFor[validators.CustomTokenValidator]():
-		return []any{r.NewCustomTokenValidator()}
-	case reflect.TypeFor[validators.CustomAuthorizeRequestValidator]():
-		return []any{r.NewCustomAuthorizeRequestValidator()}
-	case reflect.TypeFor[validators.ClientSecretValidator]():
-		return []any{r.NewClientSecretValidator()}
-	case reflect.TypeFor[validators.ApiSecretValidator]():
-		return []any{r.NewApiSecretValidator()}
-	case reflect.TypeFor[services.ReturnUrlParser]():
-		return []any{r.NewReturnUrlParser()}
+	case reflect.TypeFor[auth.Handler]():
+		switch key {
+		case gois.DefaultCookieAuthenticationScheme:
+			return []any{r.NewHandler_gois_DefaultCookieAuthenticationScheme()}
+		case gois.ExternalCookieAuthenticationScheme:
+			return []any{r.NewHandler_gois_ExternalCookieAuthenticationScheme()}
+		}
 	}
 	return nil
 }
@@ -2442,6 +2488,15 @@ func (s *scope) GetKeyedService(t reflect.Type, key any) any {
 	if key == godi.AnyKey {
 		panic(godi.AnyKeySingleResolveError(t))
 	}
+	switch t {
+	case reflect.TypeFor[auth.Handler]():
+		switch key {
+		case gois.DefaultCookieAuthenticationScheme:
+			return s.NewHandler_gois_DefaultCookieAuthenticationScheme()
+		case gois.ExternalCookieAuthenticationScheme:
+			return s.NewHandler_gois_ExternalCookieAuthenticationScheme()
+		}
+	}
 	return nil
 }
 
@@ -2449,266 +2504,282 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 	if s.closed || s.root.closed {
 		panic(godi.ProviderClosedError())
 	}
-	if key != nil {
+	if key == nil {
+		switch t {
+		case reflect.TypeFor[services.SystemClock]():
+			return []any{s.root.f_SystemClock}
+		case reflect.TypeFor[*ServerConfig]():
+			return []any{s.root.f_ServerConfig}
+		case reflect.TypeFor[*slog.Logger]():
+			return []any{s.root.f_Ptr_Logger}
+		case reflect.TypeFor[*hosting.Endpoint]():
+			return []any{s.root.f_Ptr_Endpoint, s.root.f_Ptr_Endpoint__2, s.root.f_Ptr_Endpoint__3, s.root.f_Ptr_Endpoint__4, s.root.f_Ptr_Endpoint__5, s.root.f_Ptr_Endpoint__6, s.root.f_Ptr_Endpoint__7, s.root.f_Ptr_Endpoint__8, s.root.f_Ptr_Endpoint__9, s.root.f_Ptr_Endpoint__10, s.root.f_Ptr_Endpoint__11}
+		case reflect.TypeFor[dp.DataProtectionProvider]():
+			return []any{s.root.f_DataProtectionProvider}
+		case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
+			return []any{s.root.f_UnnamedOptionsManager__options_WicketOptions}
+		case reflect.TypeFor[options2.Options[*auth.Options]]():
+			return []any{s.root.f_UnnamedOptionsManager__auth_Options}
+		case reflect.TypeFor[*core.SchemeProvider]():
+			return []any{s.root.f_Ptr_SchemeProvider}
+		case reflect.TypeFor[dynamicscheme.ProviderStore]():
+			return []any{s.root.f_ProviderStore}
+		case reflect.TypeFor[*dynamicscheme.Resolver]():
+			return []any{s.root.f_Ptr_Resolver}
+		case reflect.TypeFor[auth.ClaimsTransformation]():
+			return []any{s.root.f_NoopClaimsTransformation}
+		case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
+			return []any{s.root.f_ConfigureOptions__auth_Options}
+		case reflect.TypeFor[options2.Options[*cookies.AuthenticationOptions]]():
+			return []any{s.root.f_UnnamedOptionsManager__cookies_AuthenticationOptions}
+		case reflect.TypeFor[options2.ConfigureOptions[*cookies.AuthenticationOptions]]():
+			return []any{s.root.f_ConfigureOptions__cookies_AuthenticationOptions}
+		case reflect.TypeFor[options2.PostConfigureOptions[*cookies.AuthenticationOptions]]():
+			return []any{s.root.f_PostConfigureOptions__cookies_AuthenticationOptions, s.root.f_PostConfigureOptions__cookies_AuthenticationOptions__2}
+		case reflect.TypeFor[options2.ValidateOptions[*cookies.AuthenticationOptions]]():
+			return []any{s.root.f_ValidateOptions__cookies_AuthenticationOptions, s.root.f_ValidateOptions__cookies_AuthenticationOptions__2}
+		case reflect.TypeFor[*options.WicketOptions]():
+			return []any{s.root.f_Ptr_WicketOptions}
+		case reflect.TypeFor[*options.PersistentGrantOptions]():
+			return []any{s.root.f_Ptr_PersistentGrantOptions}
+		case reflect.TypeFor[storage.PersistedGrantStore]():
+			return []any{s.root.f_PersistedGrantStore}
+		case reflect.TypeFor[storage.DeviceFlowStore]():
+			return []any{s.root.f_DeviceFlowStore}
+		case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+			return []any{s.root.f_BackchannelAuthenticationRequestStore}
+		case reflect.TypeFor[*keymgmt.Manager]():
+			return []any{s.root.f_Ptr_Manager}
+		case reflect.TypeFor[services.DistributedCache]():
+			return []any{s.root.f_MemoryDistributedCache}
+		case reflect.TypeFor[session.Store]():
+			return []any{s.root.f_Store}
+		case reflect.TypeFor[accessor.HttpContextAccessor]():
+			return []any{s.f_DefaultHttpContextAccessor}
+		case reflect.TypeFor[auth.HandlerProvider]():
+			return []any{s.f_HandlerProvider}
+		case reflect.TypeFor[services.UserSession]():
+			return []any{s.f_UserSession}
+		case reflect.TypeFor[*core.Service]():
+			return []any{s.f_Service}
+		case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
+			return []any{s.NewAuthorizationParametersMessageStore()}
+		case reflect.TypeFor[hosting.EndpointRouter]():
+			return []any{s.NewEndpointRouter()}
+		case reflect.TypeFor[*handlers.AuthorizeHandler]():
+			return []any{s.NewPtr_AuthorizeHandler()}
+		case reflect.TypeFor[*handlers.AuthorizeCallbackHandler]():
+			return []any{s.NewPtr_AuthorizeCallbackHandler()}
+		case reflect.TypeFor[*handlers.TokenHandler]():
+			return []any{s.NewPtr_TokenHandler()}
+		case reflect.TypeFor[*handlers.DiscoveryHandler]():
+			return []any{s.NewPtr_DiscoveryHandler()}
+		case reflect.TypeFor[*handlers.DiscoveryKeyHandler]():
+			return []any{s.NewPtr_DiscoveryKeyHandler()}
+		case reflect.TypeFor[*handlers.CheckSessionHandler]():
+			return []any{s.NewPtr_CheckSessionHandler()}
+		case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
+			return []any{s.NewPtr_BackchannelAuthenticationHandler()}
+		case reflect.TypeFor[*handlers.IntrospectionHandler]():
+			return []any{s.NewPtr_IntrospectionHandler()}
+		case reflect.TypeFor[*handlers.UserInfoHandler]():
+			return []any{s.NewPtr_UserInfoHandler()}
+		case reflect.TypeFor[*handlers.EndSessionHandler]():
+			return []any{s.NewPtr_EndSessionHandler()}
+		case reflect.TypeFor[*handlers.EndSessionCallbackHandler]():
+			return []any{s.NewPtr_EndSessionCallbackHandler()}
+		case reflect.TypeFor[*infrastructure.MessageCookie[*messages.ConsentResponse]]():
+			return []any{s.NewPtr_MessageCookie__messages_ConsentResponse()}
+		case reflect.TypeFor[options2.OptionsFactory[*options.WicketOptions]]():
+			return []any{s.NewOptionsFactory__options_WicketOptions()}
+		case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
+			return []any{s.NewOptionsFactory__auth_Options()}
+		case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
+			return []any{s.NewPtr_Decorator_auth_SchemeProvider()}
+		case reflect.TypeFor[auth.SchemeProvider]():
+			return []any{s.NewAuthSchemeProvider()}
+		case reflect.TypeFor[*gois.Decorator[auth.Service]]():
+			return []any{s.NewPtr_Decorator_auth_Service()}
+		case reflect.TypeFor[auth.Service]():
+			return []any{s.NewService__2()}
+		case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
+			return []any{s.NewOptionsFactory__cookies_AuthenticationOptions()}
+		case reflect.TypeFor[*options.DynamicProviderOptions]():
+			return []any{s.NewPtr_DynamicProviderOptions()}
+		case reflect.TypeFor[*options.KeyManagementOptions]():
+			return []any{s.NewPtr_KeyManagementOptions()}
+		case reflect.TypeFor[services.ServerUrls]():
+			return []any{s.NewServerUrls()}
+		case reflect.TypeFor[services.IssuerNameService]():
+			return []any{s.NewIssuerNameService()}
+		case reflect.TypeFor[validators.SecretsListParser]():
+			return []any{s.NewSecretsListParser()}
+		case reflect.TypeFor[validators.SecretsListValidator]():
+			return []any{s.NewSecretsListValidator()}
+		case reflect.TypeFor[responses.TokenResponseGenerator]():
+			return []any{s.NewTokenResponseGenerator()}
+		case reflect.TypeFor[responses.UserInfoResponseGenerator]():
+			return []any{s.NewUserInfoResponseGenerator()}
+		case reflect.TypeFor[responses.IntrospectionResponseGenerator]():
+			return []any{s.NewIntrospectionResponseGenerator()}
+		case reflect.TypeFor[responses.AuthorizeInteractionResponseGenerator]():
+			return []any{s.NewAuthorizeInteractionResponseGenerator()}
+		case reflect.TypeFor[responses.AuthorizeResponseGenerator]():
+			return []any{s.NewAuthorizeResponseGenerator()}
+		case reflect.TypeFor[responses.DiscoveryResponseGenerator]():
+			return []any{s.NewDiscoveryResponseGenerator()}
+		case reflect.TypeFor[responses.TokenRevocationResponseGenerator]():
+			return []any{s.NewTokenRevocationResponseGenerator()}
+		case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
+			return []any{s.NewDeviceAuthorizationResponseGenerator()}
+		case reflect.TypeFor[validators.SecretParser]():
+			return []any{s.NewBasicAuthenticationSecretParser(), s.NewPostBodySecretParser()}
+		case reflect.TypeFor[validators.SecretValidator]():
+			return []any{s.NewHashedSharedSecretValidator()}
+		case reflect.TypeFor[*impl2.ExtensionGrantValidator]():
+			return []any{s.NewPtr_ExtensionGrantValidator()}
+		case reflect.TypeFor[*impl2.BearerTokenUsageValidator]():
+			return []any{s.NewBearerTokenUsageValidator()}
+		case reflect.TypeFor[validators.JwtRequestValidator]():
+			return []any{s.NewJwtRequestValidator()}
+		case reflect.TypeFor[*impl.ReturnUrlParser]():
+			return []any{s.NewPtr_ReturnUrlParser()}
+		case reflect.TypeFor[[]storage.SigningCredentialStore]():
+			return []any{s.NewSlice_SigningCredentialStore()}
+		case reflect.TypeFor[[]storage.ValidationKeysStore]():
+			return []any{s.NewSlice_ValidationKeysStore()}
+		case reflect.TypeFor[storage.ClientStore]():
+			return []any{s.NewClientStore()}
+		case reflect.TypeFor[services.CorsPolicyService]():
+			return []any{s.NewCorsPolicyService()}
+		case reflect.TypeFor[storage.ResourceStore]():
+			return []any{s.NewResourceStore()}
+		case reflect.TypeFor[*impl4.PersistentGrantSerializer]():
+			return []any{s.NewPtr_PersistentGrantSerializer()}
+		case reflect.TypeFor[storage.MessageStore[messages.LogoutMessage]]():
+			return []any{s.NewMessageStore_messages_LogoutMessage()}
+		case reflect.TypeFor[storage.MessageStore[messages.ErrorMessage]]():
+			return []any{s.NewMessageStore_messages_ErrorMessage()}
+		case reflect.TypeFor[storage.MessageStore[contexts.LogoutNotificationContext]]():
+			return []any{s.NewMessageStore_contexts_LogoutNotificationContext()}
+		case reflect.TypeFor[services.JwtRequestUriHttpClient]():
+			return []any{s.NewJwtRequestUriHttpClient()}
+		case reflect.TypeFor[services.BackChannelLogoutHttpClient]():
+			return []any{s.NewBackChannelLogoutHttpClient()}
+		case reflect.TypeFor[storage.ConsentMessageStore]():
+			return []any{s.NewConsentMessageStore()}
+		case reflect.TypeFor[services.HandleGenerationService]():
+			return []any{s.NewHandleGenerationService()}
+		case reflect.TypeFor[services.UserCodeGenerator]():
+			return []any{s.NewNumericUserCodeGenerator()}
+		case reflect.TypeFor[services.UserCodeService]():
+			return []any{s.NewUserCodeService()}
+		case reflect.TypeFor[validators.ScopeParser]():
+			return []any{s.NewScopeParser()}
+		case reflect.TypeFor[storage.AuthorizationCodeStore]():
+			return []any{s.NewAuthorizationCodeStore()}
+		case reflect.TypeFor[storage.RefreshTokenStore]():
+			return []any{s.NewRefreshTokenStore()}
+		case reflect.TypeFor[storage.ReferenceTokenStore]():
+			return []any{s.NewReferenceTokenStore()}
+		case reflect.TypeFor[storage.UserConsentStore]():
+			return []any{s.NewUserConsentStore()}
+		case reflect.TypeFor[services.PersistedGrantService]():
+			return []any{s.NewPersistedGrantService()}
+		case reflect.TypeFor[services.KeyMaterialService]():
+			return []any{s.NewKeyMaterialService()}
+		case reflect.TypeFor[services.TokenCreationService]():
+			return []any{s.NewTokenCreationService()}
+		case reflect.TypeFor[services.ProfileService]():
+			return []any{s.NewProfileService()}
+		case reflect.TypeFor[services.ClaimsService]():
+			return []any{s.NewClaimsService()}
+		case reflect.TypeFor[services.RefreshTokenService]():
+			return []any{s.NewRefreshTokenService()}
+		case reflect.TypeFor[services.DeviceFlowCodeService]():
+			return []any{s.NewDeviceFlowCodeService()}
+		case reflect.TypeFor[services.ConsentService]():
+			return []any{s.NewConsentService()}
+		case reflect.TypeFor[services.LogoutNotificationService]():
+			return []any{s.NewLogoutNotificationService()}
+		case reflect.TypeFor[services.BackchannelLogoutService]():
+			return []any{s.NewBackchannelLogoutService()}
+		case reflect.TypeFor[validators.ResourceValidator]():
+			return []any{s.NewResourceValidator()}
+		case reflect.TypeFor[services.DeviceFlowThrottlingService]():
+			return []any{s.NewDistributedDeviceFlowThrottlingService()}
+		case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
+			return []any{s.NewBackchannelAuthenticationThrottlingService()}
+		case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
+			return []any{s.NewBackchannelAuthenticationNotificationService()}
+		case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
+			return []any{s.NewBackchannelAuthenticationRequestIdValidator()}
+		case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
+			return []any{s.NewBackchannelAuthenticationUserValidator()}
+		case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
+			return []any{s.NewBackchannelAuthenticationRequestValidator()}
+		case reflect.TypeFor[services.TokenService]():
+			return []any{s.NewTokenService()}
+		case reflect.TypeFor[services.InteractionService]():
+			return []any{s.NewInteractionService()}
+		case reflect.TypeFor[services.SessionCoordinationService]():
+			return []any{s.NewSessionCoordinationService()}
+		case reflect.TypeFor[*tools.TokenTools]():
+			return []any{s.NewTokenTools()}
+		case reflect.TypeFor[validators.TokenRevocationRequestValidator]():
+			return []any{s.NewTokenRevocationRequestValidator()}
+		case reflect.TypeFor[validators.AuthorizeRequestValidator]():
+			return []any{s.NewAuthorizeRequestValidator()}
+		case reflect.TypeFor[validators.EndSessionRequestValidator]():
+			return []any{s.NewEndSessionRequestValidator()}
+		case reflect.TypeFor[validators.TokenRequestValidator]():
+			return []any{s.NewTokenRequestValidator()}
+		case reflect.TypeFor[validators.RedirectUriValidator]():
+			return []any{s.NewStrictRedirectUriValidator()}
+		case reflect.TypeFor[validators.TokenValidator]():
+			return []any{s.NewTokenValidator()}
+		case reflect.TypeFor[validators.IntrospectionRequestValidator]():
+			return []any{s.NewIntrospectionRequestValidator()}
+		case reflect.TypeFor[validators.ResourceOwnerPasswordValidator]():
+			return []any{s.NewResourceOwnerPasswordValidator()}
+		case reflect.TypeFor[validators.CustomTokenRequestValidator]():
+			return []any{s.NewCustomTokenRequestValidator()}
+		case reflect.TypeFor[validators.UserInfoRequestValidator]():
+			return []any{s.NewUserInfoRequestValidator()}
+		case reflect.TypeFor[validators.ClientConfigurationValidator]():
+			return []any{s.NewClientConfigurationValidator()}
+		case reflect.TypeFor[validators.DeviceAuthorizationRequestValidator]():
+			return []any{s.NewDeviceAuthorizationRequestValidator()}
+		case reflect.TypeFor[validators.DeviceCodeValidator]():
+			return []any{s.NewDeviceCodeValidator()}
+		case reflect.TypeFor[validators.CustomTokenValidator]():
+			return []any{s.NewCustomTokenValidator()}
+		case reflect.TypeFor[validators.CustomAuthorizeRequestValidator]():
+			return []any{s.NewCustomAuthorizeRequestValidator()}
+		case reflect.TypeFor[validators.ClientSecretValidator]():
+			return []any{s.NewClientSecretValidator()}
+		case reflect.TypeFor[validators.ApiSecretValidator]():
+			return []any{s.NewApiSecretValidator()}
+		case reflect.TypeFor[services.ReturnUrlParser]():
+			return []any{s.NewReturnUrlParser()}
+		}
+		return nil
+	}
+	if key == godi.AnyKey {
+		switch t {
+		case reflect.TypeFor[auth.Handler]():
+			return []any{s.NewHandler_gois_DefaultCookieAuthenticationScheme(), s.NewHandler_gois_ExternalCookieAuthenticationScheme()}
+		}
 		return nil
 	}
 	switch t {
-	case reflect.TypeFor[services.SystemClock]():
-		return []any{s.root.f_SystemClock}
-	case reflect.TypeFor[*ServerConfig]():
-		return []any{s.root.f_ServerConfig}
-	case reflect.TypeFor[*slog.Logger]():
-		return []any{s.root.f_Ptr_Logger}
-	case reflect.TypeFor[*hosting.Endpoint]():
-		return []any{s.root.f_Ptr_Endpoint, s.root.f_Ptr_Endpoint__2, s.root.f_Ptr_Endpoint__3, s.root.f_Ptr_Endpoint__4, s.root.f_Ptr_Endpoint__5, s.root.f_Ptr_Endpoint__6, s.root.f_Ptr_Endpoint__7, s.root.f_Ptr_Endpoint__8, s.root.f_Ptr_Endpoint__9, s.root.f_Ptr_Endpoint__10, s.root.f_Ptr_Endpoint__11}
-	case reflect.TypeFor[dp.DataProtectionProvider]():
-		return []any{s.root.f_DataProtectionProvider}
-	case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
-		return []any{s.root.f_UnnamedOptionsManager__options_WicketOptions}
-	case reflect.TypeFor[options2.Options[*auth.Options]]():
-		return []any{s.root.f_UnnamedOptionsManager__auth_Options}
-	case reflect.TypeFor[*core.SchemeProvider]():
-		return []any{s.root.f_Ptr_SchemeProvider}
-	case reflect.TypeFor[dynamicscheme.ProviderStore]():
-		return []any{s.root.f_ProviderStore}
-	case reflect.TypeFor[*dynamicscheme.Resolver]():
-		return []any{s.root.f_Ptr_Resolver}
-	case reflect.TypeFor[auth.ClaimsTransformation]():
-		return []any{s.root.f_NoopClaimsTransformation}
-	case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
-		return []any{s.root.f_ConfigureOptions__auth_Options}
-	case reflect.TypeFor[options2.Options[*cookies.AuthenticationOptions]]():
-		return []any{s.root.f_UnnamedOptionsManager__cookies_AuthenticationOptions}
-	case reflect.TypeFor[options2.ConfigureOptions[*cookies.AuthenticationOptions]]():
-		return []any{s.root.f_ConfigureOptions__cookies_AuthenticationOptions}
-	case reflect.TypeFor[options2.PostConfigureOptions[*cookies.AuthenticationOptions]]():
-		return []any{s.root.f_PostConfigureOptions__cookies_AuthenticationOptions, s.root.f_PostConfigureOptions__cookies_AuthenticationOptions__2}
-	case reflect.TypeFor[options2.ValidateOptions[*cookies.AuthenticationOptions]]():
-		return []any{s.root.f_ValidateOptions__cookies_AuthenticationOptions, s.root.f_ValidateOptions__cookies_AuthenticationOptions__2}
-	case reflect.TypeFor[*options.WicketOptions]():
-		return []any{s.root.f_Ptr_WicketOptions}
-	case reflect.TypeFor[*options.PersistentGrantOptions]():
-		return []any{s.root.f_Ptr_PersistentGrantOptions}
-	case reflect.TypeFor[storage.PersistedGrantStore]():
-		return []any{s.root.f_PersistedGrantStore}
-	case reflect.TypeFor[storage.DeviceFlowStore]():
-		return []any{s.root.f_DeviceFlowStore}
-	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
-		return []any{s.root.f_BackchannelAuthenticationRequestStore}
-	case reflect.TypeFor[*keymgmt.Manager]():
-		return []any{s.root.f_Ptr_Manager}
-	case reflect.TypeFor[services.DistributedCache]():
-		return []any{s.root.f_MemoryDistributedCache}
-	case reflect.TypeFor[session.Store]():
-		return []any{s.root.f_Store}
-	case reflect.TypeFor[accessor.HttpContextAccessor]():
-		return []any{s.f_DefaultHttpContextAccessor}
-	case reflect.TypeFor[auth.HandlerProvider]():
-		return []any{s.f_HandlerProvider}
-	case reflect.TypeFor[services.UserSession]():
-		return []any{s.f_UserSession}
-	case reflect.TypeFor[*core.Service]():
-		return []any{s.f_Service}
-	case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
-		return []any{s.NewAuthorizationParametersMessageStore()}
-	case reflect.TypeFor[hosting.EndpointRouter]():
-		return []any{s.NewEndpointRouter()}
-	case reflect.TypeFor[*handlers.AuthorizeHandler]():
-		return []any{s.NewPtr_AuthorizeHandler()}
-	case reflect.TypeFor[*handlers.AuthorizeCallbackHandler]():
-		return []any{s.NewPtr_AuthorizeCallbackHandler()}
-	case reflect.TypeFor[*handlers.TokenHandler]():
-		return []any{s.NewPtr_TokenHandler()}
-	case reflect.TypeFor[*handlers.DiscoveryHandler]():
-		return []any{s.NewPtr_DiscoveryHandler()}
-	case reflect.TypeFor[*handlers.DiscoveryKeyHandler]():
-		return []any{s.NewPtr_DiscoveryKeyHandler()}
-	case reflect.TypeFor[*handlers.CheckSessionHandler]():
-		return []any{s.NewPtr_CheckSessionHandler()}
-	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
-		return []any{s.NewPtr_BackchannelAuthenticationHandler()}
-	case reflect.TypeFor[*handlers.IntrospectionHandler]():
-		return []any{s.NewPtr_IntrospectionHandler()}
-	case reflect.TypeFor[*handlers.UserInfoHandler]():
-		return []any{s.NewPtr_UserInfoHandler()}
-	case reflect.TypeFor[*handlers.EndSessionHandler]():
-		return []any{s.NewPtr_EndSessionHandler()}
-	case reflect.TypeFor[*handlers.EndSessionCallbackHandler]():
-		return []any{s.NewPtr_EndSessionCallbackHandler()}
-	case reflect.TypeFor[*infrastructure.MessageCookie[*messages.ConsentResponse]]():
-		return []any{s.NewPtr_MessageCookie__messages_ConsentResponse()}
-	case reflect.TypeFor[options2.OptionsFactory[*options.WicketOptions]]():
-		return []any{s.NewOptionsFactory__options_WicketOptions()}
-	case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
-		return []any{s.NewOptionsFactory__auth_Options()}
-	case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
-		return []any{s.NewPtr_Decorator_auth_SchemeProvider()}
-	case reflect.TypeFor[auth.SchemeProvider]():
-		return []any{s.NewAuthSchemeProvider()}
-	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
-		return []any{s.NewPtr_Decorator_auth_Service()}
-	case reflect.TypeFor[auth.Service]():
-		return []any{s.NewService__2()}
-	case reflect.TypeFor[options2.OptionsFactory[*cookies.AuthenticationOptions]]():
-		return []any{s.NewOptionsFactory__cookies_AuthenticationOptions()}
-	case reflect.TypeFor[*options.DynamicProviderOptions]():
-		return []any{s.NewPtr_DynamicProviderOptions()}
-	case reflect.TypeFor[*options.KeyManagementOptions]():
-		return []any{s.NewPtr_KeyManagementOptions()}
-	case reflect.TypeFor[services.ServerUrls]():
-		return []any{s.NewServerUrls()}
-	case reflect.TypeFor[services.IssuerNameService]():
-		return []any{s.NewIssuerNameService()}
-	case reflect.TypeFor[validators.SecretsListParser]():
-		return []any{s.NewSecretsListParser()}
-	case reflect.TypeFor[validators.SecretsListValidator]():
-		return []any{s.NewSecretsListValidator()}
-	case reflect.TypeFor[responses.TokenResponseGenerator]():
-		return []any{s.NewTokenResponseGenerator()}
-	case reflect.TypeFor[responses.UserInfoResponseGenerator]():
-		return []any{s.NewUserInfoResponseGenerator()}
-	case reflect.TypeFor[responses.IntrospectionResponseGenerator]():
-		return []any{s.NewIntrospectionResponseGenerator()}
-	case reflect.TypeFor[responses.AuthorizeInteractionResponseGenerator]():
-		return []any{s.NewAuthorizeInteractionResponseGenerator()}
-	case reflect.TypeFor[responses.AuthorizeResponseGenerator]():
-		return []any{s.NewAuthorizeResponseGenerator()}
-	case reflect.TypeFor[responses.DiscoveryResponseGenerator]():
-		return []any{s.NewDiscoveryResponseGenerator()}
-	case reflect.TypeFor[responses.TokenRevocationResponseGenerator]():
-		return []any{s.NewTokenRevocationResponseGenerator()}
-	case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
-		return []any{s.NewDeviceAuthorizationResponseGenerator()}
-	case reflect.TypeFor[validators.SecretParser]():
-		return []any{s.NewBasicAuthenticationSecretParser(), s.NewPostBodySecretParser()}
-	case reflect.TypeFor[validators.SecretValidator]():
-		return []any{s.NewHashedSharedSecretValidator()}
-	case reflect.TypeFor[*impl2.ExtensionGrantValidator]():
-		return []any{s.NewPtr_ExtensionGrantValidator()}
-	case reflect.TypeFor[*impl2.BearerTokenUsageValidator]():
-		return []any{s.NewBearerTokenUsageValidator()}
-	case reflect.TypeFor[validators.JwtRequestValidator]():
-		return []any{s.NewJwtRequestValidator()}
-	case reflect.TypeFor[*impl.ReturnUrlParser]():
-		return []any{s.NewPtr_ReturnUrlParser()}
-	case reflect.TypeFor[[]storage.SigningCredentialStore]():
-		return []any{s.NewSlice_SigningCredentialStore()}
-	case reflect.TypeFor[[]storage.ValidationKeysStore]():
-		return []any{s.NewSlice_ValidationKeysStore()}
-	case reflect.TypeFor[storage.ClientStore]():
-		return []any{s.NewClientStore()}
-	case reflect.TypeFor[services.CorsPolicyService]():
-		return []any{s.NewCorsPolicyService()}
-	case reflect.TypeFor[storage.ResourceStore]():
-		return []any{s.NewResourceStore()}
-	case reflect.TypeFor[*impl4.PersistentGrantSerializer]():
-		return []any{s.NewPtr_PersistentGrantSerializer()}
-	case reflect.TypeFor[storage.MessageStore[messages.LogoutMessage]]():
-		return []any{s.NewMessageStore_messages_LogoutMessage()}
-	case reflect.TypeFor[storage.MessageStore[messages.ErrorMessage]]():
-		return []any{s.NewMessageStore_messages_ErrorMessage()}
-	case reflect.TypeFor[storage.MessageStore[contexts.LogoutNotificationContext]]():
-		return []any{s.NewMessageStore_contexts_LogoutNotificationContext()}
-	case reflect.TypeFor[services.JwtRequestUriHttpClient]():
-		return []any{s.NewJwtRequestUriHttpClient()}
-	case reflect.TypeFor[services.BackChannelLogoutHttpClient]():
-		return []any{s.NewBackChannelLogoutHttpClient()}
-	case reflect.TypeFor[storage.ConsentMessageStore]():
-		return []any{s.NewConsentMessageStore()}
-	case reflect.TypeFor[services.HandleGenerationService]():
-		return []any{s.NewHandleGenerationService()}
-	case reflect.TypeFor[services.UserCodeGenerator]():
-		return []any{s.NewNumericUserCodeGenerator()}
-	case reflect.TypeFor[services.UserCodeService]():
-		return []any{s.NewUserCodeService()}
-	case reflect.TypeFor[validators.ScopeParser]():
-		return []any{s.NewScopeParser()}
-	case reflect.TypeFor[storage.AuthorizationCodeStore]():
-		return []any{s.NewAuthorizationCodeStore()}
-	case reflect.TypeFor[storage.RefreshTokenStore]():
-		return []any{s.NewRefreshTokenStore()}
-	case reflect.TypeFor[storage.ReferenceTokenStore]():
-		return []any{s.NewReferenceTokenStore()}
-	case reflect.TypeFor[storage.UserConsentStore]():
-		return []any{s.NewUserConsentStore()}
-	case reflect.TypeFor[services.PersistedGrantService]():
-		return []any{s.NewPersistedGrantService()}
-	case reflect.TypeFor[services.KeyMaterialService]():
-		return []any{s.NewKeyMaterialService()}
-	case reflect.TypeFor[services.TokenCreationService]():
-		return []any{s.NewTokenCreationService()}
-	case reflect.TypeFor[services.ProfileService]():
-		return []any{s.NewProfileService()}
-	case reflect.TypeFor[services.ClaimsService]():
-		return []any{s.NewClaimsService()}
-	case reflect.TypeFor[services.RefreshTokenService]():
-		return []any{s.NewRefreshTokenService()}
-	case reflect.TypeFor[services.DeviceFlowCodeService]():
-		return []any{s.NewDeviceFlowCodeService()}
-	case reflect.TypeFor[services.ConsentService]():
-		return []any{s.NewConsentService()}
-	case reflect.TypeFor[services.LogoutNotificationService]():
-		return []any{s.NewLogoutNotificationService()}
-	case reflect.TypeFor[services.BackchannelLogoutService]():
-		return []any{s.NewBackchannelLogoutService()}
-	case reflect.TypeFor[validators.ResourceValidator]():
-		return []any{s.NewResourceValidator()}
-	case reflect.TypeFor[services.DeviceFlowThrottlingService]():
-		return []any{s.NewDistributedDeviceFlowThrottlingService()}
-	case reflect.TypeFor[services.BackchannelAuthenticationThrottlingService]():
-		return []any{s.NewBackchannelAuthenticationThrottlingService()}
-	case reflect.TypeFor[services.BackchannelAuthenticationNotificationService]():
-		return []any{s.NewBackchannelAuthenticationNotificationService()}
-	case reflect.TypeFor[validators.BackchannelAuthenticationRequestIdValidator]():
-		return []any{s.NewBackchannelAuthenticationRequestIdValidator()}
-	case reflect.TypeFor[validators.BackchannelAuthenticationUserValidator]():
-		return []any{s.NewBackchannelAuthenticationUserValidator()}
-	case reflect.TypeFor[validators.BackchannelAuthenticationRequestValidator]():
-		return []any{s.NewBackchannelAuthenticationRequestValidator()}
-	case reflect.TypeFor[services.TokenService]():
-		return []any{s.NewTokenService()}
-	case reflect.TypeFor[services.InteractionService]():
-		return []any{s.NewInteractionService()}
-	case reflect.TypeFor[services.SessionCoordinationService]():
-		return []any{s.NewSessionCoordinationService()}
-	case reflect.TypeFor[*tools.TokenTools]():
-		return []any{s.NewTokenTools()}
-	case reflect.TypeFor[validators.TokenRevocationRequestValidator]():
-		return []any{s.NewTokenRevocationRequestValidator()}
-	case reflect.TypeFor[validators.AuthorizeRequestValidator]():
-		return []any{s.NewAuthorizeRequestValidator()}
-	case reflect.TypeFor[validators.EndSessionRequestValidator]():
-		return []any{s.NewEndSessionRequestValidator()}
-	case reflect.TypeFor[validators.TokenRequestValidator]():
-		return []any{s.NewTokenRequestValidator()}
-	case reflect.TypeFor[validators.RedirectUriValidator]():
-		return []any{s.NewStrictRedirectUriValidator()}
-	case reflect.TypeFor[validators.TokenValidator]():
-		return []any{s.NewTokenValidator()}
-	case reflect.TypeFor[validators.IntrospectionRequestValidator]():
-		return []any{s.NewIntrospectionRequestValidator()}
-	case reflect.TypeFor[validators.ResourceOwnerPasswordValidator]():
-		return []any{s.NewResourceOwnerPasswordValidator()}
-	case reflect.TypeFor[validators.CustomTokenRequestValidator]():
-		return []any{s.NewCustomTokenRequestValidator()}
-	case reflect.TypeFor[validators.UserInfoRequestValidator]():
-		return []any{s.NewUserInfoRequestValidator()}
-	case reflect.TypeFor[validators.ClientConfigurationValidator]():
-		return []any{s.NewClientConfigurationValidator()}
-	case reflect.TypeFor[validators.DeviceAuthorizationRequestValidator]():
-		return []any{s.NewDeviceAuthorizationRequestValidator()}
-	case reflect.TypeFor[validators.DeviceCodeValidator]():
-		return []any{s.NewDeviceCodeValidator()}
-	case reflect.TypeFor[validators.CustomTokenValidator]():
-		return []any{s.NewCustomTokenValidator()}
-	case reflect.TypeFor[validators.CustomAuthorizeRequestValidator]():
-		return []any{s.NewCustomAuthorizeRequestValidator()}
-	case reflect.TypeFor[validators.ClientSecretValidator]():
-		return []any{s.NewClientSecretValidator()}
-	case reflect.TypeFor[validators.ApiSecretValidator]():
-		return []any{s.NewApiSecretValidator()}
-	case reflect.TypeFor[services.ReturnUrlParser]():
-		return []any{s.NewReturnUrlParser()}
+	case reflect.TypeFor[auth.Handler]():
+		switch key {
+		case gois.DefaultCookieAuthenticationScheme:
+			return []any{s.NewHandler_gois_DefaultCookieAuthenticationScheme()}
+		case gois.ExternalCookieAuthenticationScheme:
+			return []any{s.NewHandler_gois_ExternalCookieAuthenticationScheme()}
+		}
 	}
 	return nil
 }
@@ -3389,6 +3460,18 @@ func (s *scope) NewReturnUrlParser() services.ReturnUrlParser {
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[*ServerConfig](p).AuthorizationParametersMessageStore(),
 		)
+	})(s)
+}
+
+func (s *scope) NewHandler_gois_DefaultCookieAuthenticationScheme() auth.Handler {
+	return (func(p godi.Provider) auth.Handler {
+		return core.NewUnsupportedHandler()
+	})(s)
+}
+
+func (s *scope) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handler {
+	return (func(p godi.Provider) auth.Handler {
+		return core.NewUnsupportedHandler()
 	})(s)
 }
 
