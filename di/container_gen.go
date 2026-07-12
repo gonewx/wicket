@@ -79,6 +79,10 @@ type Root struct {
 	f_BackchannelAuthenticationRequestStore                  storage.BackchannelAuthenticationRequestStore
 	f_Ptr_Manager                                            *keymgmt.Manager
 	f_MemoryDistributedCache                                 services.DistributedCache
+	f_AuthorizationCodeStore                                 storage.AuthorizationCodeStore
+	f_RefreshTokenStore                                      storage.RefreshTokenStore
+	f_ReferenceTokenStore                                    storage.ReferenceTokenStore
+	f_UserConsentStore                                       storage.UserConsentStore
 	f_Store                                                  session.Store
 	f_DefaultHttpContextAccessor                             accessor.HttpContextAccessor
 	f_HandlerProvider                                        auth.HandlerProvider
@@ -263,6 +267,10 @@ func NewRoot() (*Root, error) {
 		return keymgmt.NewManager(cfg, store, provider, clock, entropy, godi.GetRequired[*slog.Logger](p))
 	})(r)
 	r.f_MemoryDistributedCache = memory2.NewMemoryDistributedCache()
+	r.f_AuthorizationCodeStore = impl4.NewAuthorizationCodeStore()
+	r.f_RefreshTokenStore = impl4.NewRefreshTokenStore()
+	r.f_ReferenceTokenStore = impl4.NewReferenceTokenStore()
+	r.f_UserConsentStore = impl4.NewUserConsentStore()
 	r.f_Store = (func(p godi.Provider) session.Store {
 		return session.NewMemoryStore(godi.GetRequired[services.SystemClock](p))
 	})(r)
@@ -503,7 +511,7 @@ func (r *Root) NewAuthorizeInteractionResponseGenerator() responses.AuthorizeInt
 }
 
 func (r *Root) NewAuthorizeResponseGenerator() responses.AuthorizeResponseGenerator {
-	return impl3.NewAuthorizeResponseGenerator(r.f_Ptr_WicketOptions, r.f_SystemClock, r.NewTokenService(), r.NewKeyMaterialService(), r.NewAuthorizationCodeStore(), r.f_Ptr_Logger)
+	return impl3.NewAuthorizeResponseGenerator(r.f_Ptr_WicketOptions, r.f_SystemClock, r.NewTokenService(), r.NewKeyMaterialService(), r.f_AuthorizationCodeStore, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGenerator {
@@ -511,7 +519,7 @@ func (r *Root) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGenera
 }
 
 func (r *Root) NewTokenRevocationResponseGenerator() responses.TokenRevocationResponseGenerator {
-	return impl3.NewTokenRevocationResponseGenerator(r.NewReferenceTokenStore(), r.NewRefreshTokenStore(), r.f_Ptr_Logger)
+	return impl3.NewTokenRevocationResponseGenerator(r.f_ReferenceTokenStore, r.f_RefreshTokenStore, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewDeviceAuthorizationResponseGenerator() responses.DeviceAuthorizationResponseGenerator {
@@ -671,22 +679,6 @@ func (r *Root) NewScopeParser() validators.ScopeParser {
 	return impl2.NewScopeParser()
 }
 
-func (r *Root) NewAuthorizationCodeStore() storage.AuthorizationCodeStore {
-	return impl4.NewAuthorizationCodeStore()
-}
-
-func (r *Root) NewRefreshTokenStore() storage.RefreshTokenStore {
-	return impl4.NewRefreshTokenStore()
-}
-
-func (r *Root) NewReferenceTokenStore() storage.ReferenceTokenStore {
-	return impl4.NewReferenceTokenStore()
-}
-
-func (r *Root) NewUserConsentStore() storage.UserConsentStore {
-	return impl4.NewUserConsentStore()
-}
-
 func (r *Root) NewPersistedGrantService() services.PersistedGrantService {
 	return impl.NewPersistedGrantService(r.f_PersistedGrantStore)
 }
@@ -715,7 +707,7 @@ func (r *Root) NewClaimsService() services.ClaimsService {
 }
 
 func (r *Root) NewRefreshTokenService() services.RefreshTokenService {
-	return impl.NewRefreshTokenService(r.NewRefreshTokenStore())
+	return impl.NewRefreshTokenService(r.f_RefreshTokenStore)
 }
 
 func (r *Root) NewDeviceFlowCodeService() services.DeviceFlowCodeService {
@@ -862,7 +854,7 @@ func (r *Root) NewEndSessionRequestValidator() validators.EndSessionRequestValid
 }
 
 func (r *Root) NewTokenRequestValidator() validators.TokenRequestValidator {
-	return impl2.NewTokenRequestValidator(r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.NewAuthorizationCodeStore(), r.NewPtr_ExtensionGrantValidator(), r.NewCustomTokenRequestValidator(), r.NewResourceValidator(), r.NewResourceStore(), r.NewRefreshTokenService(), r.NewResourceOwnerPasswordValidator(), r.NewProfileService(), r.NewDeviceCodeValidator(), r.NewBackchannelAuthenticationRequestIdValidator(), r.f_SystemClock, r.f_Ptr_Logger)
+	return impl2.NewTokenRequestValidator(r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.f_AuthorizationCodeStore, r.NewPtr_ExtensionGrantValidator(), r.NewCustomTokenRequestValidator(), r.NewResourceValidator(), r.NewResourceStore(), r.NewRefreshTokenService(), r.NewResourceOwnerPasswordValidator(), r.NewProfileService(), r.NewDeviceCodeValidator(), r.NewBackchannelAuthenticationRequestIdValidator(), r.f_SystemClock, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
@@ -870,7 +862,7 @@ func (r *Root) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
 }
 
 func (r *Root) NewTokenValidator() validators.TokenValidator {
-	return impl2.NewTokenValidator(r.f_Ptr_Logger, r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.NewReferenceTokenStore(), r.NewCustomTokenValidator(), r.NewClientStore(), r.NewProfileService(), r.NewKeyMaterialService(), r.NewSessionCoordinationService(), r.f_SystemClock)
+	return impl2.NewTokenValidator(r.f_Ptr_Logger, r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.f_ReferenceTokenStore, r.NewCustomTokenValidator(), r.NewClientStore(), r.NewProfileService(), r.NewKeyMaterialService(), r.NewSessionCoordinationService(), r.f_SystemClock)
 }
 
 func (r *Root) NewIntrospectionRequestValidator() validators.IntrospectionRequestValidator {
@@ -1051,6 +1043,16 @@ func (r *Root) Ptr_Manager() *keymgmt.Manager { return r.f_Ptr_Manager }
 
 func (r *Root) MemoryDistributedCache() services.DistributedCache { return r.f_MemoryDistributedCache }
 
+func (r *Root) AuthorizationCodeStore() storage.AuthorizationCodeStore {
+	return r.f_AuthorizationCodeStore
+}
+
+func (r *Root) RefreshTokenStore() storage.RefreshTokenStore { return r.f_RefreshTokenStore }
+
+func (r *Root) ReferenceTokenStore() storage.ReferenceTokenStore { return r.f_ReferenceTokenStore }
+
+func (r *Root) UserConsentStore() storage.UserConsentStore { return r.f_UserConsentStore }
+
 func (r *Root) Store() session.Store { return r.f_Store }
 
 func (r *Root) DefaultHttpContextAccessor() accessor.HttpContextAccessor {
@@ -1115,6 +1117,14 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_Ptr_Manager
 	case reflect.TypeFor[services.DistributedCache]():
 		return r.f_MemoryDistributedCache
+	case reflect.TypeFor[storage.AuthorizationCodeStore]():
+		return r.f_AuthorizationCodeStore
+	case reflect.TypeFor[storage.RefreshTokenStore]():
+		return r.f_RefreshTokenStore
+	case reflect.TypeFor[storage.ReferenceTokenStore]():
+		return r.f_ReferenceTokenStore
+	case reflect.TypeFor[storage.UserConsentStore]():
+		return r.f_UserConsentStore
 	case reflect.TypeFor[session.Store]():
 		return r.f_Store
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -1239,14 +1249,6 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewUserCodeService()
 	case reflect.TypeFor[validators.ScopeParser]():
 		return r.NewScopeParser()
-	case reflect.TypeFor[storage.AuthorizationCodeStore]():
-		return r.NewAuthorizationCodeStore()
-	case reflect.TypeFor[storage.RefreshTokenStore]():
-		return r.NewRefreshTokenStore()
-	case reflect.TypeFor[storage.ReferenceTokenStore]():
-		return r.NewReferenceTokenStore()
-	case reflect.TypeFor[storage.UserConsentStore]():
-		return r.NewUserConsentStore()
 	case reflect.TypeFor[services.PersistedGrantService]():
 		return r.NewPersistedGrantService()
 	case reflect.TypeFor[services.KeyMaterialService]():
@@ -1684,6 +1686,14 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.f_Ptr_Manager}
 		case reflect.TypeFor[services.DistributedCache]():
 			return []any{r.f_MemoryDistributedCache}
+		case reflect.TypeFor[storage.AuthorizationCodeStore]():
+			return []any{r.f_AuthorizationCodeStore}
+		case reflect.TypeFor[storage.RefreshTokenStore]():
+			return []any{r.f_RefreshTokenStore}
+		case reflect.TypeFor[storage.ReferenceTokenStore]():
+			return []any{r.f_ReferenceTokenStore}
+		case reflect.TypeFor[storage.UserConsentStore]():
+			return []any{r.f_UserConsentStore}
 		case reflect.TypeFor[session.Store]():
 			return []any{r.f_Store}
 		case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -1808,14 +1818,6 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewUserCodeService()}
 		case reflect.TypeFor[validators.ScopeParser]():
 			return []any{r.NewScopeParser()}
-		case reflect.TypeFor[storage.AuthorizationCodeStore]():
-			return []any{r.NewAuthorizationCodeStore()}
-		case reflect.TypeFor[storage.RefreshTokenStore]():
-			return []any{r.NewRefreshTokenStore()}
-		case reflect.TypeFor[storage.ReferenceTokenStore]():
-			return []any{r.NewReferenceTokenStore()}
-		case reflect.TypeFor[storage.UserConsentStore]():
-			return []any{r.NewUserConsentStore()}
 		case reflect.TypeFor[services.PersistedGrantService]():
 			return []any{r.NewPersistedGrantService()}
 		case reflect.TypeFor[services.KeyMaterialService]():
@@ -2008,6 +2010,14 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_Ptr_Manager
 	case reflect.TypeFor[services.DistributedCache]():
 		return s.root.f_MemoryDistributedCache
+	case reflect.TypeFor[storage.AuthorizationCodeStore]():
+		return s.root.f_AuthorizationCodeStore
+	case reflect.TypeFor[storage.RefreshTokenStore]():
+		return s.root.f_RefreshTokenStore
+	case reflect.TypeFor[storage.ReferenceTokenStore]():
+		return s.root.f_ReferenceTokenStore
+	case reflect.TypeFor[storage.UserConsentStore]():
+		return s.root.f_UserConsentStore
 	case reflect.TypeFor[session.Store]():
 		return s.root.f_Store
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -2132,14 +2142,6 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewUserCodeService()
 	case reflect.TypeFor[validators.ScopeParser]():
 		return s.NewScopeParser()
-	case reflect.TypeFor[storage.AuthorizationCodeStore]():
-		return s.NewAuthorizationCodeStore()
-	case reflect.TypeFor[storage.RefreshTokenStore]():
-		return s.NewRefreshTokenStore()
-	case reflect.TypeFor[storage.ReferenceTokenStore]():
-		return s.NewReferenceTokenStore()
-	case reflect.TypeFor[storage.UserConsentStore]():
-		return s.NewUserConsentStore()
 	case reflect.TypeFor[services.PersistedGrantService]():
 		return s.NewPersistedGrantService()
 	case reflect.TypeFor[services.KeyMaterialService]():
@@ -2270,6 +2272,14 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[services.DistributedCache]():
 		return true
+	case reflect.TypeFor[storage.AuthorizationCodeStore]():
+		return true
+	case reflect.TypeFor[storage.RefreshTokenStore]():
+		return true
+	case reflect.TypeFor[storage.ReferenceTokenStore]():
+		return true
+	case reflect.TypeFor[storage.UserConsentStore]():
+		return true
 	case reflect.TypeFor[session.Store]():
 		return true
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -2393,14 +2403,6 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[services.UserCodeService]():
 		return true
 	case reflect.TypeFor[validators.ScopeParser]():
-		return true
-	case reflect.TypeFor[storage.AuthorizationCodeStore]():
-		return true
-	case reflect.TypeFor[storage.RefreshTokenStore]():
-		return true
-	case reflect.TypeFor[storage.ReferenceTokenStore]():
-		return true
-	case reflect.TypeFor[storage.UserConsentStore]():
 		return true
 	case reflect.TypeFor[services.PersistedGrantService]():
 		return true
@@ -2562,6 +2564,14 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.root.f_Ptr_Manager}
 		case reflect.TypeFor[services.DistributedCache]():
 			return []any{s.root.f_MemoryDistributedCache}
+		case reflect.TypeFor[storage.AuthorizationCodeStore]():
+			return []any{s.root.f_AuthorizationCodeStore}
+		case reflect.TypeFor[storage.RefreshTokenStore]():
+			return []any{s.root.f_RefreshTokenStore}
+		case reflect.TypeFor[storage.ReferenceTokenStore]():
+			return []any{s.root.f_ReferenceTokenStore}
+		case reflect.TypeFor[storage.UserConsentStore]():
+			return []any{s.root.f_UserConsentStore}
 		case reflect.TypeFor[session.Store]():
 			return []any{s.root.f_Store}
 		case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -2686,14 +2696,6 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewUserCodeService()}
 		case reflect.TypeFor[validators.ScopeParser]():
 			return []any{s.NewScopeParser()}
-		case reflect.TypeFor[storage.AuthorizationCodeStore]():
-			return []any{s.NewAuthorizationCodeStore()}
-		case reflect.TypeFor[storage.RefreshTokenStore]():
-			return []any{s.NewRefreshTokenStore()}
-		case reflect.TypeFor[storage.ReferenceTokenStore]():
-			return []any{s.NewReferenceTokenStore()}
-		case reflect.TypeFor[storage.UserConsentStore]():
-			return []any{s.NewUserConsentStore()}
 		case reflect.TypeFor[services.PersistedGrantService]():
 			return []any{s.NewPersistedGrantService()}
 		case reflect.TypeFor[services.KeyMaterialService]():
@@ -3041,7 +3043,7 @@ func (s *scope) NewAuthorizeInteractionResponseGenerator() responses.AuthorizeIn
 }
 
 func (s *scope) NewAuthorizeResponseGenerator() responses.AuthorizeResponseGenerator {
-	return impl3.NewAuthorizeResponseGenerator(s.root.f_Ptr_WicketOptions, s.root.f_SystemClock, s.NewTokenService(), s.NewKeyMaterialService(), s.NewAuthorizationCodeStore(), s.root.f_Ptr_Logger)
+	return impl3.NewAuthorizeResponseGenerator(s.root.f_Ptr_WicketOptions, s.root.f_SystemClock, s.NewTokenService(), s.NewKeyMaterialService(), s.root.f_AuthorizationCodeStore, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGenerator {
@@ -3049,7 +3051,7 @@ func (s *scope) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGener
 }
 
 func (s *scope) NewTokenRevocationResponseGenerator() responses.TokenRevocationResponseGenerator {
-	return impl3.NewTokenRevocationResponseGenerator(s.NewReferenceTokenStore(), s.NewRefreshTokenStore(), s.root.f_Ptr_Logger)
+	return impl3.NewTokenRevocationResponseGenerator(s.root.f_ReferenceTokenStore, s.root.f_RefreshTokenStore, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewDeviceAuthorizationResponseGenerator() responses.DeviceAuthorizationResponseGenerator {
@@ -3209,22 +3211,6 @@ func (s *scope) NewScopeParser() validators.ScopeParser {
 	return impl2.NewScopeParser()
 }
 
-func (s *scope) NewAuthorizationCodeStore() storage.AuthorizationCodeStore {
-	return impl4.NewAuthorizationCodeStore()
-}
-
-func (s *scope) NewRefreshTokenStore() storage.RefreshTokenStore {
-	return impl4.NewRefreshTokenStore()
-}
-
-func (s *scope) NewReferenceTokenStore() storage.ReferenceTokenStore {
-	return impl4.NewReferenceTokenStore()
-}
-
-func (s *scope) NewUserConsentStore() storage.UserConsentStore {
-	return impl4.NewUserConsentStore()
-}
-
 func (s *scope) NewPersistedGrantService() services.PersistedGrantService {
 	return impl.NewPersistedGrantService(s.root.f_PersistedGrantStore)
 }
@@ -3253,7 +3239,7 @@ func (s *scope) NewClaimsService() services.ClaimsService {
 }
 
 func (s *scope) NewRefreshTokenService() services.RefreshTokenService {
-	return impl.NewRefreshTokenService(s.NewRefreshTokenStore())
+	return impl.NewRefreshTokenService(s.root.f_RefreshTokenStore)
 }
 
 func (s *scope) NewDeviceFlowCodeService() services.DeviceFlowCodeService {
@@ -3400,7 +3386,7 @@ func (s *scope) NewEndSessionRequestValidator() validators.EndSessionRequestVali
 }
 
 func (s *scope) NewTokenRequestValidator() validators.TokenRequestValidator {
-	return impl2.NewTokenRequestValidator(s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.NewAuthorizationCodeStore(), s.NewPtr_ExtensionGrantValidator(), s.NewCustomTokenRequestValidator(), s.NewResourceValidator(), s.NewResourceStore(), s.NewRefreshTokenService(), s.NewResourceOwnerPasswordValidator(), s.NewProfileService(), s.NewDeviceCodeValidator(), s.NewBackchannelAuthenticationRequestIdValidator(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
+	return impl2.NewTokenRequestValidator(s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.root.f_AuthorizationCodeStore, s.NewPtr_ExtensionGrantValidator(), s.NewCustomTokenRequestValidator(), s.NewResourceValidator(), s.NewResourceStore(), s.NewRefreshTokenService(), s.NewResourceOwnerPasswordValidator(), s.NewProfileService(), s.NewDeviceCodeValidator(), s.NewBackchannelAuthenticationRequestIdValidator(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
@@ -3408,7 +3394,7 @@ func (s *scope) NewStrictRedirectUriValidator() validators.RedirectUriValidator 
 }
 
 func (s *scope) NewTokenValidator() validators.TokenValidator {
-	return impl2.NewTokenValidator(s.root.f_Ptr_Logger, s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.NewReferenceTokenStore(), s.NewCustomTokenValidator(), s.NewClientStore(), s.NewProfileService(), s.NewKeyMaterialService(), s.NewSessionCoordinationService(), s.root.f_SystemClock)
+	return impl2.NewTokenValidator(s.root.f_Ptr_Logger, s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.root.f_ReferenceTokenStore, s.NewCustomTokenValidator(), s.NewClientStore(), s.NewProfileService(), s.NewKeyMaterialService(), s.NewSessionCoordinationService(), s.root.f_SystemClock)
 }
 
 func (s *scope) NewIntrospectionRequestValidator() validators.IntrospectionRequestValidator {
@@ -3594,6 +3580,18 @@ func (s *scope) Ptr_Manager() *keymgmt.Manager { return s.root.f_Ptr_Manager }
 func (s *scope) MemoryDistributedCache() services.DistributedCache {
 	return s.root.f_MemoryDistributedCache
 }
+
+func (s *scope) AuthorizationCodeStore() storage.AuthorizationCodeStore {
+	return s.root.f_AuthorizationCodeStore
+}
+
+func (s *scope) RefreshTokenStore() storage.RefreshTokenStore { return s.root.f_RefreshTokenStore }
+
+func (s *scope) ReferenceTokenStore() storage.ReferenceTokenStore {
+	return s.root.f_ReferenceTokenStore
+}
+
+func (s *scope) UserConsentStore() storage.UserConsentStore { return s.root.f_UserConsentStore }
 
 func (s *scope) Store() session.Store { return s.root.f_Store }
 

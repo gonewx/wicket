@@ -68,13 +68,21 @@ func registerPluggableServicesAndValidators() {
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L214 (TryAddTransient)
 	godi.AddTransient[validators.ScopeParser, validators_impl.ScopeParser](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L200 (TryAddTransient)
-	godi.AddTransient[storage.AuthorizationCodeStore, storage_impl.AuthorizationCodeStore](&r)
+	// The in-process store keeps its grant state in an instance map, so it must
+	// live as long as the container or every issued handle is lost immediately.
+	godi.AddSingleton[storage.AuthorizationCodeStore, storage_impl.AuthorizationCodeStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L201 (TryAddTransient)
-	godi.AddTransient[storage.RefreshTokenStore, storage_impl.RefreshTokenStore](&r)
+	// The in-process store keeps its grant state in an instance map, so it must
+	// live as long as the container or every issued handle is lost immediately.
+	godi.AddSingleton[storage.RefreshTokenStore, storage_impl.RefreshTokenStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L202 (TryAddTransient)
-	godi.AddTransient[storage.ReferenceTokenStore, storage_impl.ReferenceTokenStore](&r)
+	// The in-process store keeps its grant state in an instance map, so it must
+	// live as long as the container or every issued handle is lost immediately.
+	godi.AddSingleton[storage.ReferenceTokenStore, storage_impl.ReferenceTokenStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L203 (TryAddTransient)
-	godi.AddTransient[storage.UserConsentStore, storage_impl.UserConsentStore](&r)
+	// The in-process store keeps its grant state in an instance map, so it must
+	// live as long as the container or every issued handle is lost immediately.
+	godi.AddSingleton[storage.UserConsentStore, storage_impl.UserConsentStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L183 (TryAddTransient)
 	godi.AddTransient[services.PersistedGrantService, services_impl.PersistedGrantService](&r)
 	godi.AddTransient[services.KeyMaterialService, services_impl.KeyMaterialService](&r)
