@@ -1,6 +1,7 @@
 package e2e_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,12 +127,25 @@ func TestBaselineFinalViewClosureE2E(t *testing.T) {
 		if _, exclusion := exclusionFinalStatuses[row.FinalStatus]; !exclusion {
 			continue
 		}
+		// An exclusion is only legitimate while it stays anchored to its
+		// resolution record. A row that reaches an exclusion status without a
+		// note never went through the final-view fold that records one, so the
+		// anchor is asserted on the synthesized view, not only at fold time.
+		if strings.TrimSpace(row.Note) == "" {
+			t.Fatalf("excluded routing matrix row %s carries no resolution anchor in the final view", row.GoisPath)
+		}
 		rel := strings.TrimSpace(row.WicketPath)
 		if rel == "" || rel == "-" {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(root, rel)); err == nil {
+		// Absence is confirmed only by a genuine not-exist result. os.Lstat
+		// catches any directory entry (including a dangling symlink), and any
+		// other stat error fails closed rather than passing as "absent".
+		switch _, err := os.Lstat(filepath.Join(root, rel)); {
+		case err == nil:
 			t.Fatalf("excluded routing matrix row %s has a file present at %s", row.GoisPath, rel)
+		case !errors.Is(err, os.ErrNotExist):
+			t.Fatalf("excluded routing matrix row %s: cannot confirm %s is absent: %v", row.GoisPath, rel, err)
 		}
 	}
 }

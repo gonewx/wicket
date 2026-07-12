@@ -46,6 +46,11 @@ type routingMatrixRow struct {
 	WicketPath  string
 	FinalStatus string
 	LandingPath string
+	// Note anchors an exclusion outcome to its resolution record. It is
+	// populated only when a final-view file folds a row into an exclusion
+	// status, so a row that reaches an exclusion status without going through
+	// that fold carries no anchor and the closure guard can catch it.
+	Note string
 }
 
 // synthesizedRoutingMatrix reads the base matrix and folds every supplement
@@ -144,14 +149,16 @@ func applyRoutingMatrixExclusions(t *testing.T, path string, rows []routingMatri
 		if _, exclusion := exclusionFinalStatuses[status]; !exclusion {
 			t.Fatalf("%s row %d moves gois_path %q to non-exclusion status %q", base, rowNo+2, gois, status)
 		}
-		if landing := strings.TrimSpace(record[landingIndex]); landing != "" {
+		if landing := strings.TrimSpace(record[landingIndex]); landing != "" && landing != "-" {
 			t.Fatalf("%s row %d excludes gois_path %q but carries landing path %q", base, rowNo+2, gois, landing)
 		}
-		if strings.TrimSpace(record[noteIndex]) == "" {
+		note := strings.TrimSpace(record[noteIndex])
+		if note == "" {
 			t.Fatalf("%s row %d excludes gois_path %q without a resolution anchor", base, rowNo+2, gois)
 		}
 		rows[idx].FinalStatus = status
 		rows[idx].LandingPath = ""
+		rows[idx].Note = note
 	}
 }
 

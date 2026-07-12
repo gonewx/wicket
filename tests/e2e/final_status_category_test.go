@@ -19,6 +19,14 @@ func TestFinalStatusCategoryConsistencyE2E(t *testing.T) {
 		"blockedStubStatuses":    blockedStubStatuses,
 		"disposedFinalStatuses":  disposedFinalStatuses,
 	}
+	// An empty category would satisfy every membership, disjointness, and
+	// subset check below vacuously, so a set silently emptied out would pass
+	// this guard while defeating its purpose. Assert each is populated first.
+	for name, set := range categories {
+		if len(set) == 0 {
+			t.Fatalf("%s is empty; the category invariants would hold only vacuously", name)
+		}
+	}
 	for name, set := range categories {
 		for status := range set {
 			if _, ok := knownFinalStatuses[status]; !ok {
