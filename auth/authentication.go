@@ -9,12 +9,22 @@ import (
 	"github.com/gonewx/wicket/claims"
 )
 
+// Properties carries authentication state across a request. It holds two layers
+// of data with distinct persistence rules: Items (string keyed strings) is the
+// serializable, cross-request layer, while parameters is an in-process-only
+// layer that is never serialized. Typed properties (persistence, redirect,
+// issued/expires timestamps, refresh) are not separate fields; they are encoded
+// as reserved-key entries inside Items.
 type Properties struct {
-	Items map[string]string
+	Items      map[string]string
+	parameters map[string]any
 }
 
 func NewProperties() *Properties {
-	return &Properties{Items: map[string]string{}}
+	return &Properties{
+		Items:      map[string]string{},
+		parameters: map[string]any{},
+	}
 }
 
 func (p *Properties) GetTokens() []*Token {
