@@ -4,9 +4,12 @@
 package impl
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -614,17 +617,32 @@ func (ConsentService) GrantConsent(*messages.AuthorizationRequest, *messages.Con
 func (ConsentService) DenyAuthorization(*messages.AuthorizationRequest, string) error { return nil }
 
 type InteractionService struct {
-	consent services.ConsentService
-	logout  storage.MessageStore[messages.LogoutMessage]
-	errors  storage.MessageStore[messages.ErrorMessage]
+	consent      services.ConsentService
+	logout       storage.MessageStore[messages.LogoutMessage]
+	errors       storage.MessageStore[messages.ErrorMessage]
+	consentStore storage.ConsentMessageStore
+	user         services.UserSession
+	parser       *ReturnUrlParser
+	clock        services.SystemClock
 }
 
 func NewInteractionService(clock services.SystemClock, logout storage.MessageStore[messages.LogoutMessage], errors storage.MessageStore[messages.ErrorMessage], consentStore storage.ConsentMessageStore, grants services.PersistedGrantService, user services.UserSession, logger *slog.Logger, parser *ReturnUrlParser, urls services.ServerUrls, notifications storage.MessageStore[contexts.LogoutNotificationContext]) *InteractionService {
-	return &InteractionService{consent: NewConsentService(), logout: logout, errors: errors}
+	return &InteractionService{
+		consent:      NewConsentService(),
+		logout:       logout,
+		errors:       errors,
+		consentStore: consentStore,
+		user:         user,
+		parser:       parser,
+		clock:        clock,
+	}
 }
 
 func (s *InteractionService) GetAuthorizationContext(returnUrl string) (*messages.AuthorizationRequest, error) {
-	return &messages.AuthorizationRequest{}, nil
+	if s.parser == nil {
+		return nil, nil
+	}
+	return s.parser.Parse(returnUrl)
 }
 func (s *InteractionService) GetLogoutContext(logoutId string) (*messages.LogoutRequest, error) {
 	if s.logout == nil || logoutId == "" {
@@ -646,8 +664,32 @@ func (s *InteractionService) GetErrorContext(errorId string) (*messages.ErrorMes
 	}
 	return message.Data, nil
 }
+// GrantConsent records the consent answer under the key the authorize callback
+// derives from the subject and the original request parameters, so the callback
+// can pick the answer up and complete the flow.
 func (s *InteractionService) GrantConsent(request *messages.AuthorizationRequest, response *messages.ConsentResponse, subject string) error {
-	return s.consent.GrantConsent(request, response, subject)
+	if s.consentStore == nil || request == nil {
+		return s.consent.GrantConsent(request, response, subject)
+	}
+	subjectId := subject
+	if subjectId == "" && s.user != nil {
+		subjectId = extensions.GetSubjectIdFromPrincipal(s.user.GetUser())
+	}
+	key := consentAnswerKey(subjectId, request.Parameters)
+	message := messages.NewMessage(response)
+	if s.clock != nil {
+		message.Created = s.clock.Now().Unix()
+	}
+	return s.consentStore.Write(key, message)
+}
+
+// consentAnswerKey derives the storage key for a consent answer from the
+// subject identifier and the original authorize parameters. The derivation must
+// stay in lockstep with the authorize callback, which reads the answer back
+// under the same key.
+func consentAnswerKey(subjectId string, parameters url.Values) string {
+	sum := sha256.Sum256([]byte(subjectId + "|" + parameters.Encode()))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 func (s *InteractionService) DenyAuthorization(request *messages.AuthorizationRequest, subject string) error {
 	return s.consent.DenyAuthorization(request, subject)
