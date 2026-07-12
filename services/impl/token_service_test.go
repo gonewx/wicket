@@ -201,6 +201,7 @@ func TestCreateTokenIssuerAndLifetimeAssembly(t *testing.T) {
 		ValidatedRequest: &validators_models.ValidatedRequest{
 			IssuerName:          "https://issuer.wicket.test",
 			AccessTokenLifetime: 3600,
+			ClientId:            "relying-party",
 			Client:              client,
 		},
 	}
@@ -216,4 +217,5 @@ func TestCreateTokenIssuerAndLifetimeAssembly(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "https://issuer.wicket.test", identityToken.Issuer)
 	require.Equal(t, 300, identityToken.Lifetime)
+	require.Equal(t, []string{"relying-party"}, identityToken.Audiences)
 }

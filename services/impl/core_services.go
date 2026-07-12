@@ -534,6 +534,11 @@ func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreati
 	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesIdentityToken, Claims: claims}
 	if request.ValidatedRequest != nil {
 		token.Issuer = request.ValidatedRequest.IssuerName
+		// An identity token is addressed to the requesting client (OIDC Core
+		// §2: aud MUST contain the relying party's client_id).
+		if request.ValidatedRequest.ClientId != "" {
+			token.Audiences = []string{request.ValidatedRequest.ClientId}
+		}
 		if request.ValidatedRequest.Client != nil {
 			token.Lifetime = request.ValidatedRequest.Client.IdentityTokenLifetime
 		}
@@ -685,24 +690,28 @@ func (ConsentService) GrantConsent(*messages.AuthorizationRequest, *messages.Con
 func (ConsentService) DenyAuthorization(*messages.AuthorizationRequest, string) error { return nil }
 
 type InteractionService struct {
-	consent      services.ConsentService
-	logout       storage.MessageStore[messages.LogoutMessage]
-	errors       storage.MessageStore[messages.ErrorMessage]
-	consentStore storage.ConsentMessageStore
-	user         services.UserSession
-	parser       *ReturnUrlParser
-	clock        services.SystemClock
+	consent       services.ConsentService
+	logout        storage.MessageStore[messages.LogoutMessage]
+	errors        storage.MessageStore[messages.ErrorMessage]
+	consentStore  storage.ConsentMessageStore
+	user          services.UserSession
+	parser        *ReturnUrlParser
+	clock         services.SystemClock
+	urls          services.ServerUrls
+	notifications storage.MessageStore[contexts.LogoutNotificationContext]
 }
 
 func NewInteractionService(clock services.SystemClock, logout storage.MessageStore[messages.LogoutMessage], errors storage.MessageStore[messages.ErrorMessage], consentStore storage.ConsentMessageStore, grants services.PersistedGrantService, user services.UserSession, logger *slog.Logger, parser *ReturnUrlParser, urls services.ServerUrls, notifications storage.MessageStore[contexts.LogoutNotificationContext]) *InteractionService {
 	return &InteractionService{
-		consent:      NewConsentService(),
-		logout:       logout,
-		errors:       errors,
-		consentStore: consentStore,
-		user:         user,
-		parser:       parser,
-		clock:        clock,
+		consent:       NewConsentService(),
+		logout:        logout,
+		errors:        errors,
+		consentStore:  consentStore,
+		user:          user,
+		parser:        parser,
+		clock:         clock,
+		urls:          urls,
+		notifications: notifications,
 	}
 }
 
@@ -720,7 +729,37 @@ func (s *InteractionService) GetLogoutContext(logoutId string) (*messages.Logout
 	if err != nil || message == nil {
 		return messages.NewLogoutRequest("", nil), err
 	}
-	return messages.NewLogoutRequest("", message.Data), nil
+	iframeUrl, err := s.signOutIframeUrl(message.Data)
+	if err != nil {
+		return nil, err
+	}
+	return messages.NewLogoutRequest(iframeUrl, message.Data), nil
+}
+
+// signOutIframeUrl publishes the front-channel notification context for an
+// authenticated sign-out and returns the callback iframe address carrying its
+// handle. A logout without a session or without client participation has no
+// front-channel work, so no iframe is offered.
+func (s *InteractionService) signOutIframeUrl(logout *messages.LogoutMessage) (string, error) {
+	if logout == nil || s.notifications == nil || s.urls == nil {
+		return "", nil
+	}
+	if logout.SessionId == "" || len(logout.ClientIds) == 0 {
+		return "", nil
+	}
+
+	context := contexts.LogoutNotificationContext{
+		SubjectId: logout.SubjectId,
+		SessionId: logout.SessionId,
+		ClientIds: logout.ClientIds,
+	}
+	handle, err := s.notifications.Write(messages.NewMessageWithCreated(&context, s.clock.Now().Unix()))
+	if err != nil {
+		return "", fmt.Errorf("write end-session notification: %w", err)
+	}
+
+	callback := strings.TrimRight(s.urls.BaseUrl(), "/") + utils.EnsureLeadingSlash(gois.ProtocolRoutePathsEndSessionCallback)
+	return utils.AddQuery(callback, gois.UIConstantsDefaultRoutePathParamsEndSessionCallback, handle), nil
 }
 func (s *InteractionService) GetErrorContext(errorId string) (*messages.ErrorMessage, error) {
 	if s.errors == nil || errorId == "" {
