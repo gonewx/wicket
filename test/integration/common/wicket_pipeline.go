@@ -347,6 +347,18 @@ func (p *WicketPipeline) Initialize() {
 	p.Options = godi.GetRequired[*config_options.WicketOptions](p.Root)
 	p.Options.KeyManagement.Enabled = false
 
+	// Host wiring the cookie-options post-configuration would normally apply:
+	// interaction pages default to the host account routes.
+	if p.Options.UserInteraction.LoginUrl == "" {
+		p.Options.UserInteraction.LoginUrl = gois.UIConstantsDefaultRoutePathsLogin
+	}
+	if p.Options.UserInteraction.LoginReturnUrlParameter == "" {
+		p.Options.UserInteraction.LoginReturnUrlParameter = gois.UIConstantsDefaultRoutePathParamsLogin
+	}
+	if p.Options.UserInteraction.LogoutUrl == "" {
+		p.Options.UserInteraction.LogoutUrl = gois.UIConstantsDefaultRoutePathsLogout
+	}
+
 	p.UserStore = test.NewTestUserStore(p.Users)
 
 	p.Profile = test.NewTestUserProfileService(p.UserStore, p.Server.Logger)
