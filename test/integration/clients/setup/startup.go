@@ -13,6 +13,7 @@ import (
 
 	"github.com/gonewx/godi"
 	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/di"
@@ -79,7 +80,7 @@ func developerSigningStores(signingAlgorithm jwa.SignatureAlgorithm) ([]storage.
 	if err != nil {
 		panic(err)
 	}
-	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(string(signingAlgorithm)))
+	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(string(signingAlgorithm)), tokens.WithKid(thumbprintKid(raw)))
 	if err != nil {
 		panic(err)
 	}
@@ -92,4 +93,17 @@ func developerSigningStores(signingAlgorithm jwa.SignatureAlgorithm) ([]storage.
 	}, []storage.ValidationKeysStore{
 		storage_memory.NewMemoryValidationKeysStore([]*models.SecurityKeyInfo{keyInfo}),
 	}
+}
+
+// thumbprintKid derives the RFC 7638 thumbprint key id the validation-key
+// aggregation publishes, so the signed token's kid header matches the JWKS.
+func thumbprintKid(raw any) string {
+	key, err := jwk.FromRaw(raw)
+	if err != nil {
+		panic(err)
+	}
+	if err := jwk.AssignKeyID(key); err != nil {
+		panic(err)
+	}
+	return key.KeyID()
 }

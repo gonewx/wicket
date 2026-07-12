@@ -17,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -33,14 +34,36 @@ func NewTestCert() *TestCert {
 	return &TestCert{}
 }
 
+var (
+	generatedKeyPemOnce sync.Once
+	generatedKeyPem     []byte
+	generatedKeyPemErr  error
+)
+
+// loadCertFile prefers an on-disk key file next to the test binary and falls
+// back to one process-wide generated RSA key, so packages without the fixture
+// file can still build their key-based client secrets.
 func loadCertFile() ([]byte, error) {
 	certFile := path.Join(utils.AppBasePath(), "gois.example.com-key.pem")
-	src, err := os.ReadFile(certFile)
-	if err != nil {
-		return nil, err
+	if src, err := os.ReadFile(certFile); err == nil {
+		return src, nil
 	}
 
-	return src, nil
+	generatedKeyPemOnce.Do(func() {
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			generatedKeyPemErr = err
+			return
+		}
+		der, err := x509.MarshalPKCS8PrivateKey(key)
+		if err != nil {
+			generatedKeyPemErr = err
+			return
+		}
+		generatedKeyPem = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	})
+
+	return generatedKeyPem, generatedKeyPemErr
 }
 
 func (c *TestCert) Load() ([]byte, error) {

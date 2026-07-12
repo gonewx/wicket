@@ -36,6 +36,7 @@ import (
 	"github.com/gonewx/wicket/utils"
 	"github.com/gonewx/wicket/validators"
 	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 )
 
 var (
@@ -421,7 +422,14 @@ func (p *WicketPipeline) AddDeveloperSigningCredential(signingAlgorithm jwa.Sign
 	if err != nil {
 		panic(err)
 	}
-	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(string(signingAlgorithm)))
+	kidKey, err := jwk.FromRaw(raw)
+	if err != nil {
+		panic(err)
+	}
+	if err := jwk.AssignKeyID(kidKey); err != nil {
+		panic(err)
+	}
+	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(string(signingAlgorithm)), tokens.WithKid(kidKey.KeyID()))
 	if err != nil {
 		panic(err)
 	}
