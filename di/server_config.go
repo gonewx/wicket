@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/gonewx/godi"
+	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/storage"
 	storage_models "github.com/gonewx/wicket/storage/models"
@@ -31,6 +33,8 @@ type ServerConfig struct {
 	persistedGrantStoreProvider                   func() storage.PersistedGrantStore
 	deviceFlowStoreProvider                       func() storage.DeviceFlowStore
 	backchannelAuthenticationRequestStoreProvider func() storage.BackchannelAuthenticationRequestStore
+
+	authenticationHandlerProviders map[string]func(godi.Provider) auth.Handler
 
 	backchannelAuthenticationUserValidator          validators.BackchannelAuthenticationUserValidator
 	resourceOwnerValidator                          validators.ResourceOwnerPasswordValidator
@@ -232,6 +236,25 @@ func (c *ServerConfig) ResourceOwnerValidator() validators.ResourceOwnerPassword
 		return nil
 	}
 	return c.resourceOwnerValidator
+}
+
+// SetAuthenticationHandlerProvider installs a host-provided factory for the
+// authentication handler keyed by the given scheme name. The composition root
+// consults this seam before falling back to the built-in placeholder, so a
+// host can supply the concrete handler for a scheme whose default registration
+// is not yet available.
+func (c *ServerConfig) SetAuthenticationHandlerProvider(scheme string, provider func(godi.Provider) auth.Handler) {
+	if c.authenticationHandlerProviders == nil {
+		c.authenticationHandlerProviders = map[string]func(godi.Provider) auth.Handler{}
+	}
+	c.authenticationHandlerProviders[scheme] = provider
+}
+
+func (c *ServerConfig) AuthenticationHandlerProvider(scheme string) func(godi.Provider) auth.Handler {
+	if c == nil {
+		return nil
+	}
+	return c.authenticationHandlerProviders[scheme]
 }
 
 func (c *ServerConfig) SetProfileProvider(provider func() services.ProfileService) {

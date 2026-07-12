@@ -17,6 +17,7 @@ import (
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
+	authcore "github.com/gonewx/wicket/auth/core"
 	claimspkg "github.com/gonewx/wicket/claims"
 	client_messages "github.com/gonewx/wicket/client/messages"
 	config_options "github.com/gonewx/wicket/config/options"
@@ -181,7 +182,7 @@ func (p *WicketPipeline) issueLoginCookie(r *http.Request, w http.ResponseWriter
 		panic(err)
 	}
 
-	err = svc.SignIn(r, w, "", p.Subject, props)
+	err = svc.SignIn(r, w, gois.DefaultCookieAuthenticationScheme, p.Subject, props)
 	if err != nil {
 		panic(err)
 	}
@@ -401,6 +402,16 @@ func (p *WicketPipeline) configureServices() {
 	cfg.SetResourceOwnerValidator(p.ResourceOwnerValidator)
 	cfg.SetProfileProvider(func() services.ProfileService { return p.Profile })
 	cfg.SetBackChannelLogoutHttpClient(p.BackChannelClient)
+	cfg.SetAuthenticationHandlerProvider(gois.DefaultCookieAuthenticationScheme, func(prov godi.Provider) auth.Handler {
+		return newTestCookieAuthenticationHandler(godi.GetRequired[services.UserSession](prov))
+	})
+	// Host startup registers the default cookie scheme so the scheme registry
+	// can resolve it; the handler itself comes from the seam above.
+	if err := godi.GetRequired[*authcore.SchemeProvider](p.Root).AddScheme(
+		auth.NewScheme(gois.DefaultCookieAuthenticationScheme, "testCookieAuthenticationHandler"),
+	); err != nil {
+		panic(err)
+	}
 	cfg.Freeze()
 
 }

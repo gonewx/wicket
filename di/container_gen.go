@@ -937,12 +937,22 @@ func (r *Root) NewReturnUrlParser() services.ReturnUrlParser {
 
 func (r *Root) NewHandler_gois_DefaultCookieAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.DefaultCookieAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return core.NewUnsupportedHandler()
 	})(r)
 }
 
 func (r *Root) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.ExternalCookieAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return core.NewUnsupportedHandler()
 	})(r)
 }
@@ -3465,12 +3475,22 @@ func (s *scope) NewReturnUrlParser() services.ReturnUrlParser {
 
 func (s *scope) NewHandler_gois_DefaultCookieAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.DefaultCookieAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return core.NewUnsupportedHandler()
 	})(s)
 }
 
 func (s *scope) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.ExternalCookieAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return core.NewUnsupportedHandler()
 	})(s)
 }

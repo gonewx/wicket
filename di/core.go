@@ -189,13 +189,24 @@ func registerCore() {
 	})
 	// Handlers resolve keyed by scheme name; each built-in cookie scheme keys a
 	// transient handler so the handler provider can activate it per request. The
-	// concrete cookie handler is not yet available, so the keyed registration
-	// serves the neutral unsupported handler until it lands.
+	// host may supply a handler through the ServerConfig seam; the concrete
+	// cookie handler is not yet available, so without a seam value the keyed
+	// registration serves the neutral unsupported handler until it lands.
 	// TODO: pending Epic 5 implementation
 	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.DefaultCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.DefaultCookieAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return authcore.NewUnsupportedHandler()
 	})
 	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.ExternalCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.ExternalCookieAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return authcore.NewUnsupportedHandler()
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L162 (AddScoped<IUserSession, DefaultUserSession>, Add).
