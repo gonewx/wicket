@@ -16,13 +16,14 @@ import (
 	"github.com/gonewx/wicket/dynamicscheme"
 )
 
-// fakeInner is a controllable static-registry stand-in exposing the ten
+// fakeInner is a controllable static-registry stand-in exposing the eleven
 // auth.SchemeProvider methods.
 type fakeInner struct {
 	all         []*auth.Scheme
 	byName      map[string]*auth.Scheme
 	defaultAuth *auth.Scheme
 	added       []*auth.Scheme
+	removed     []string
 }
 
 func newFakeInner(schemes ...*auth.Scheme) *fakeInner {
@@ -37,15 +38,20 @@ func newFakeInner(schemes ...*auth.Scheme) *fakeInner {
 	return &fakeInner{all: schemes, byName: byName, defaultAuth: def}
 }
 
-func (f *fakeInner) GetAllSchemes() []*auth.Scheme                 { return f.all }
-func (f *fakeInner) GetScheme(name string) *auth.Scheme            { return f.byName[name] }
-func (f *fakeInner) GetDefaultAuthenticateScheme() *auth.Scheme    { return f.defaultAuth }
-func (f *fakeInner) GetDefaultChallengeScheme() *auth.Scheme       { return f.defaultAuth }
-func (f *fakeInner) GetDefaultForbidScheme() *auth.Scheme          { return f.defaultAuth }
-func (f *fakeInner) GetDefaultSignInScheme() *auth.Scheme          { return f.defaultAuth }
-func (f *fakeInner) GetDefaultSignOutScheme() *auth.Scheme         { return f.defaultAuth }
-func (f *fakeInner) AddScheme(s *auth.Scheme) error                { f.added = append(f.added, s); return nil }
-func (f *fakeInner) TryAddScheme(s *auth.Scheme) bool              { f.added = append(f.added, s); return true }
+func (f *fakeInner) GetAllSchemes() []*auth.Scheme              { return f.all }
+func (f *fakeInner) GetScheme(name string) *auth.Scheme         { return f.byName[name] }
+func (f *fakeInner) GetDefaultAuthenticateScheme() *auth.Scheme { return f.defaultAuth }
+func (f *fakeInner) GetDefaultChallengeScheme() *auth.Scheme    { return f.defaultAuth }
+func (f *fakeInner) GetDefaultForbidScheme() *auth.Scheme       { return f.defaultAuth }
+func (f *fakeInner) GetDefaultSignInScheme() *auth.Scheme       { return f.defaultAuth }
+func (f *fakeInner) GetDefaultSignOutScheme() *auth.Scheme      { return f.defaultAuth }
+func (f *fakeInner) AddScheme(s *auth.Scheme) error             { f.added = append(f.added, s); return nil }
+func (f *fakeInner) TryAddScheme(s *auth.Scheme) bool           { f.added = append(f.added, s); return true }
+func (f *fakeInner) RemoveScheme(name string) bool {
+	f.removed = append(f.removed, name)
+	_, ok := f.byName[name]
+	return ok
+}
 func (f *fakeInner) GetRequestHandlerSchemes() ([]*auth.Scheme, error) { return nil, nil }
 
 type fixedClock struct{ t time.Time }
@@ -248,8 +254,8 @@ func TestUseSchemeAuthMiddleware(t *testing.T) {
 		sameHTTP bool // disabled returns next unchanged
 	}{
 		"disabled returns next": {&config_options.DynamicProviderOptions{Enabled: false}, true},
-		"nil options no-op":      {nil, true},
-		"enabled wraps":          {&config_options.DynamicProviderOptions{Enabled: true}, false},
+		"nil options no-op":     {nil, true},
+		"enabled wraps":         {&config_options.DynamicProviderOptions{Enabled: true}, false},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {

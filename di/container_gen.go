@@ -61,7 +61,7 @@ type Root struct {
 	f_DataProtectionProvider                                 dp.DataProtectionProvider
 	f_UnnamedOptionsManager__options_WicketOptions           options2.Options[*options.WicketOptions]
 	f_UnnamedOptionsManager__auth_Options                    options2.Options[*auth.Options]
-	f_SchemeProvider                                         *core.SchemeProvider
+	f_Ptr_SchemeProvider                                     *core.SchemeProvider
 	f_ProviderStore                                          dynamicscheme.ProviderStore
 	f_Ptr_Resolver                                           *dynamicscheme.Resolver
 	f_NoopClaimsTransformation                               auth.ClaimsTransformation
@@ -139,7 +139,13 @@ func NewRoot() (*Root, error) {
 		})
 	})(r)
 	r.f_UnnamedOptionsManager__auth_Options = options2.NewUnnamedOptionsManager[*auth.Options](r.NewOptionsFactory__auth_Options())
-	r.f_SchemeProvider = core.NewSchemeProvider()
+	r.f_Ptr_SchemeProvider = (func(p godi.Provider) *core.SchemeProvider {
+		opts, err := godi.GetRequired[options2.Options[*auth.Options]](p).Value()
+		if err != nil {
+			panic(fmt.Errorf("resolve auth options for scheme provider: %w", err))
+		}
+		return core.NewSchemeProvider(opts)
+	})(r)
 	r.f_Ptr_WicketOptions = (func(p godi.Provider) *options.WicketOptions {
 		v, err := godi.GetRequired[options2.Options[*options.WicketOptions]](p).Value()
 		if err != nil {
@@ -967,7 +973,7 @@ func (r *Root) UnnamedOptionsManager__auth_Options() options2.Options[*auth.Opti
 	return r.f_UnnamedOptionsManager__auth_Options
 }
 
-func (r *Root) SchemeProvider() *core.SchemeProvider { return r.f_SchemeProvider }
+func (r *Root) Ptr_SchemeProvider() *core.SchemeProvider { return r.f_Ptr_SchemeProvider }
 
 func (r *Root) ProviderStore() dynamicscheme.ProviderStore { return r.f_ProviderStore }
 
@@ -1056,7 +1062,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[options2.Options[*auth.Options]]():
 		return r.f_UnnamedOptionsManager__auth_Options
 	case reflect.TypeFor[*core.SchemeProvider]():
-		return r.f_SchemeProvider
+		return r.f_Ptr_SchemeProvider
 	case reflect.TypeFor[dynamicscheme.ProviderStore]():
 		return r.f_ProviderStore
 	case reflect.TypeFor[*dynamicscheme.Resolver]():
@@ -1609,7 +1615,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 	case reflect.TypeFor[options2.Options[*auth.Options]]():
 		return []any{r.f_UnnamedOptionsManager__auth_Options}
 	case reflect.TypeFor[*core.SchemeProvider]():
-		return []any{r.f_SchemeProvider}
+		return []any{r.f_Ptr_SchemeProvider}
 	case reflect.TypeFor[dynamicscheme.ProviderStore]():
 		return []any{r.f_ProviderStore}
 	case reflect.TypeFor[*dynamicscheme.Resolver]():
@@ -1915,7 +1921,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[options2.Options[*auth.Options]]():
 		return s.root.f_UnnamedOptionsManager__auth_Options
 	case reflect.TypeFor[*core.SchemeProvider]():
-		return s.root.f_SchemeProvider
+		return s.root.f_Ptr_SchemeProvider
 	case reflect.TypeFor[dynamicscheme.ProviderStore]():
 		return s.root.f_ProviderStore
 	case reflect.TypeFor[*dynamicscheme.Resolver]():
@@ -2462,7 +2468,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 	case reflect.TypeFor[options2.Options[*auth.Options]]():
 		return []any{s.root.f_UnnamedOptionsManager__auth_Options}
 	case reflect.TypeFor[*core.SchemeProvider]():
-		return []any{s.root.f_SchemeProvider}
+		return []any{s.root.f_Ptr_SchemeProvider}
 	case reflect.TypeFor[dynamicscheme.ProviderStore]():
 		return []any{s.root.f_ProviderStore}
 	case reflect.TypeFor[*dynamicscheme.Resolver]():
@@ -3426,7 +3432,7 @@ func (s *scope) UnnamedOptionsManager__auth_Options() options2.Options[*auth.Opt
 	return s.root.f_UnnamedOptionsManager__auth_Options
 }
 
-func (s *scope) SchemeProvider() *core.SchemeProvider { return s.root.f_SchemeProvider }
+func (s *scope) Ptr_SchemeProvider() *core.SchemeProvider { return s.root.f_Ptr_SchemeProvider }
 
 func (s *scope) ProviderStore() dynamicscheme.ProviderStore { return s.root.f_ProviderStore }
 

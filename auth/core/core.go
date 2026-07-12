@@ -15,10 +15,14 @@ import (
 
 type SchemeProvider struct {
 	schemes []*auth.Scheme
+	options *auth.Options
 }
 
-func NewSchemeProvider() *SchemeProvider {
-	return &SchemeProvider{}
+func NewSchemeProvider(options *auth.Options) *SchemeProvider {
+	if options == nil {
+		options = auth.NewOptions()
+	}
+	return &SchemeProvider{options: options}
 }
 
 func (p *SchemeProvider) GetAllSchemes() []*auth.Scheme {
@@ -34,17 +38,61 @@ func (p *SchemeProvider) GetScheme(name string) *auth.Scheme {
 	return nil
 }
 
-func (p *SchemeProvider) GetDefaultAuthenticateScheme() *auth.Scheme { return firstScheme(p.schemes) }
-func (p *SchemeProvider) GetDefaultChallengeScheme() *auth.Scheme    { return firstScheme(p.schemes) }
-func (p *SchemeProvider) GetDefaultForbidScheme() *auth.Scheme       { return firstScheme(p.schemes) }
-func (p *SchemeProvider) GetDefaultSignInScheme() *auth.Scheme       { return firstScheme(p.schemes) }
-func (p *SchemeProvider) GetDefaultSignOutScheme() *auth.Scheme      { return firstScheme(p.schemes) }
+// Default-scheme resolution comes strictly from configuration, never from an
+// implicitly-chosen registered scheme. Each category consults its own configured
+// default and falls back through a chain that ends at the overall DefaultScheme.
+// Sign-out falls back to the sign-in default; forbid falls back to the challenge
+// default. Fallback does not check whether the resolved scheme declares the
+// matching handler capability.
 
-func firstScheme(schemes []*auth.Scheme) *auth.Scheme {
-	if len(schemes) == 0 {
+func (p *SchemeProvider) GetDefaultAuthenticateScheme() *auth.Scheme {
+	return p.schemeByName(p.defaultAuthenticateName())
+}
+
+func (p *SchemeProvider) GetDefaultChallengeScheme() *auth.Scheme {
+	return p.schemeByName(p.defaultChallengeName())
+}
+
+func (p *SchemeProvider) GetDefaultForbidScheme() *auth.Scheme {
+	return p.schemeByName(firstNonEmpty(p.options.DefaultForbidScheme, p.defaultChallengeName()))
+}
+
+func (p *SchemeProvider) GetDefaultSignInScheme() *auth.Scheme {
+	return p.schemeByName(p.defaultSignInName())
+}
+
+func (p *SchemeProvider) GetDefaultSignOutScheme() *auth.Scheme {
+	return p.schemeByName(firstNonEmpty(p.options.DefaultSignOutScheme, p.defaultSignInName()))
+}
+
+func (p *SchemeProvider) defaultAuthenticateName() string {
+	return firstNonEmpty(p.options.DefaultAuthenticateScheme, p.options.DefaultScheme)
+}
+
+func (p *SchemeProvider) defaultChallengeName() string {
+	return firstNonEmpty(p.options.DefaultChallengeScheme, p.options.DefaultScheme)
+}
+
+func (p *SchemeProvider) defaultSignInName() string {
+	return firstNonEmpty(p.options.DefaultSignInScheme, p.options.DefaultScheme)
+}
+
+// schemeByName resolves a configured default name to a registered scheme; an
+// empty name (no default configured) yields no scheme.
+func (p *SchemeProvider) schemeByName(name string) *auth.Scheme {
+	if name == "" {
 		return nil
 	}
-	return schemes[0]
+	return p.GetScheme(name)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (p *SchemeProvider) AddScheme(scheme *auth.Scheme) error {
@@ -64,6 +112,18 @@ func (p *SchemeProvider) TryAddScheme(scheme *auth.Scheme) bool {
 	}
 	p.schemes = append(p.schemes, scheme)
 	return true
+}
+
+// RemoveScheme drops the named scheme and reports whether it was present. A
+// removed name is released for re-registration.
+func (p *SchemeProvider) RemoveScheme(name string) bool {
+	for i, scheme := range p.schemes {
+		if scheme.Name == name {
+			p.schemes = append(p.schemes[:i], p.schemes[i+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 func (p *SchemeProvider) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {

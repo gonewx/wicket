@@ -59,13 +59,14 @@ func (p *MockAuthenticationSchemeProvider) TryAddScheme(scheme *auth.Scheme) boo
 	_ = p.AddScheme(scheme)
 	return true
 }
-func (p *MockAuthenticationSchemeProvider) RemoveScheme(name string) {
+func (p *MockAuthenticationSchemeProvider) RemoveScheme(name string) bool {
 	for i, s := range p.Schemes {
 		if s.Name == name {
 			p.Schemes = append(p.Schemes[:i], p.Schemes[i+1:]...)
-			return
+			return true
 		}
 	}
+	return false
 }
 func (p *MockAuthenticationSchemeProvider) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {
 	return p.Schemes, nil

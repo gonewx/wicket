@@ -113,6 +113,7 @@ type SchemeProvider interface {
 	GetDefaultSignOutScheme() *Scheme
 	AddScheme(*Scheme) error
 	TryAddScheme(*Scheme) bool
+	RemoveScheme(string) bool
 	GetRequestHandlerSchemes() ([]*Scheme, error)
 }
 

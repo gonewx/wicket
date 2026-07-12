@@ -135,14 +135,18 @@ func registerCore() {
 	godi.AddSingleton[dp.DataProtectionProvider, impl.DataProtectionProvider](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L49 (AddRequiredPlatformServices -> services.AddOptions())
 	AddOptions[*config_options.WicketOptions](&r)
-	// Container *auth.Options currently only closes
-	// PostConfigureInternalCookieOptions dependencies; SchemeProvider still
-	// consumes the builder-side instance until Epic 4 containerizes schemes.
 	AddOptions[*auth.Options](&r)
-	// (TryAddSingleton<IAuthenticationSchemeProvider, AuthenticationSchemeProvider>),
-	// rewritten by Core.cs#L358 AddDecorator: remove the interface mapping and
-	// self-register the original concrete type with its original Singleton lifetime.
-	godi.AddSingleton[*authcore.SchemeProvider, authcore.SchemeProvider](&r)
+	// The static scheme registry resolves its default-scheme configuration from
+	// the container *auth.Options snapshot. The factory reads the resolved value
+	// so default-scheme selection reflects configured options; it self-registers
+	// the concrete type with a singleton lifetime.
+	godi.AddSingletonFactory[*authcore.SchemeProvider](&r, func(p godi.Provider) *authcore.SchemeProvider {
+		opts, err := godi.GetRequired[optspkg.Options[*auth.Options]](p).Value()
+		if err != nil {
+			panic(fmt.Errorf("resolve auth options for scheme provider: %w", err))
+		}
+		return authcore.NewSchemeProvider(opts)
+	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L390 (Decorator descriptor is Transient).
 	godi.AddTransientFactory[*gois.Decorator[auth.SchemeProvider]](&r, func(p godi.Provider) *gois.Decorator[auth.SchemeProvider] {
 		return gois.NewDecorator[auth.SchemeProvider](godi.GetRequired[*authcore.SchemeProvider](p))

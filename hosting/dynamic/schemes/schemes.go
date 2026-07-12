@@ -129,6 +129,10 @@ func (p AuthSchemeProvider) TryAddScheme(scheme *auth.Scheme) bool {
 	return p.inner != nil && p.inner.TryAddScheme(scheme)
 }
 
+func (p AuthSchemeProvider) RemoveScheme(name string) bool {
+	return p.inner != nil && p.inner.RemoveScheme(name)
+}
+
 func (p AuthSchemeProvider) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {
 	if p.inner == nil {
 		return nil, nil
