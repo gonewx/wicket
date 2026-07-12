@@ -210,8 +210,12 @@ func (g *AuthorizeResponseGenerator) createCode(req *validators_models.Validated
 	code.Subject = req.Subject
 	code.SessionId = req.SessionId
 	code.Description = req.Description
-	code.CodeChallenge = utils.Sha256(req.CodeChallenge)
-	code.CodeChallengeMethod = req.CodeChallengeMethod
+	// Only a present challenge is hashed; hashing the empty string would brand
+	// every non-PKCE code with a bogus challenge and force verifier checks.
+	if req.CodeChallenge != "" {
+		code.CodeChallenge = utils.Sha256(req.CodeChallenge)
+		code.CodeChallengeMethod = req.CodeChallengeMethod
+	}
 	code.IsOpenId = req.IsOpenIdRequest
 	code.RequestedScopes = req.ValidatedResources.RawScopeValues()
 	code.RequestedResourceGaps = req.RequestedResourceIndiators
