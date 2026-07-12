@@ -189,6 +189,27 @@ func TestAuthorizeRequestChallengeGuards(t *testing.T) {
 	}
 }
 
+func TestChallengeLengthBoundariesAreAccepted(t *testing.T) {
+	for name, verifier := range map[string]string{
+		"shortest allowed length": strings.Repeat("a", 43),
+		"longest allowed length":  strings.Repeat("a", 128),
+	} {
+		t.Run(name, func(t *testing.T) {
+			a := require.New(t)
+
+			pipeline := newPkcePipeline()
+			a.NoError(pipeline.Login("bob"))
+
+			code := requestAuthorization(t, pipeline, "code_plain_client", verifier, "plain")
+			a.NotEmpty(code)
+
+			status, body := redeemPkceCode(t, pipeline, "code_plain_client", code, verifier)
+			a.Equal(http.StatusOK, status, body)
+			a.NotEmpty(gjson.Get(body, "access_token").String())
+		})
+	}
+}
+
 func TestTokenRequestVerifierGuards(t *testing.T) {
 	for name, tc := range map[string]struct {
 		verifier string

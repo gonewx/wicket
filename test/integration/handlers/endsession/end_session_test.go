@@ -376,7 +376,11 @@ func TestSignoutCallbackUsesCleanupParameterForNonOidcClient(t *testing.T) {
 	frameUrl := signoutFrameUrl(t, pipeline, "session-1", "client4")
 
 	// The non-OIDC protocol type exercises the cleanup-parameter branch.
-	pipeline.Clients[2].ProtocolType = gois.ProtocolTypesSaml2p
+	for _, client := range pipeline.Clients {
+		if client.ClientId == "client4" {
+			client.ProtocolType = gois.ProtocolTypesSaml2p
+		}
+	}
 
 	response, err := pipeline.BrowserClient.Get(frameUrl)
 	a.NoError(err)
