@@ -187,3 +187,33 @@ func TestCreateSecurityTokenJwtIdAssembly(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateTokenIssuerAndLifetimeAssembly: both created token kinds carry the
+// validated request's issuer, the access token carries the validated access
+// token lifetime, and the identity token carries the client's identity token
+// lifetime — otherwise the signed JWT expires at its own issue time and names
+// no issuer.
+func TestCreateTokenIssuerAndLifetimeAssembly(t *testing.T) {
+	client := storage_models.NewClient()
+	client.IdentityTokenLifetime = 300
+
+	request := &responses_models.TokenCreationRequest{
+		ValidatedRequest: &validators_models.ValidatedRequest{
+			IssuerName:          "https://issuer.wicket.test",
+			AccessTokenLifetime: 3600,
+			Client:              client,
+		},
+	}
+
+	svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+
+	accessToken, err := svc.CreateAccessToken(request)
+	require.NoError(t, err)
+	require.Equal(t, "https://issuer.wicket.test", accessToken.Issuer)
+	require.Equal(t, 3600, accessToken.Lifetime)
+
+	identityToken, err := svc.CreateIdentityToken(request)
+	require.NoError(t, err)
+	require.Equal(t, "https://issuer.wicket.test", identityToken.Issuer)
+	require.Equal(t, 300, identityToken.Lifetime)
+}

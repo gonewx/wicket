@@ -495,7 +495,35 @@ func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreation
 			),
 		)
 	}
-	return &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: tokenClaims, Audiences: audiences}, nil
+	// The token itself names the requesting client and the granted scopes
+	// (RFC 9068 §2.2); any same-typed claims carried in from the subject are
+	// dropped first so each stays single-valued per grant.
+	if request.ValidatedRequest != nil && request.ValidatedRequest.ClientId != "" {
+		tokenClaims = append(
+			utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesClientId }),
+			claims.NewClaim(
+				claims.WithClaimType(gois.JwtClaimTypesClientId),
+				claims.WithClaimValue(request.ValidatedRequest.ClientId),
+			),
+		)
+	}
+	if request.ValidatedResources != nil {
+		if scopes := request.ValidatedResources.RawScopeValues(); len(scopes) > 0 {
+			tokenClaims = utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesScope })
+			for _, scope := range scopes {
+				tokenClaims = append(tokenClaims, claims.NewClaim(
+					claims.WithClaimType(gois.JwtClaimTypesScope),
+					claims.WithClaimValue(scope),
+				))
+			}
+		}
+	}
+	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: tokenClaims, Audiences: audiences}
+	if request.ValidatedRequest != nil {
+		token.Issuer = request.ValidatedRequest.IssuerName
+		token.Lifetime = request.ValidatedRequest.AccessTokenLifetime
+	}
+	return token, nil
 }
 
 func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
@@ -503,7 +531,14 @@ func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreati
 	if request.Subject != nil {
 		claims = request.Subject.Claims()
 	}
-	return &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesIdentityToken, Claims: claims}, nil
+	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesIdentityToken, Claims: claims}
+	if request.ValidatedRequest != nil {
+		token.Issuer = request.ValidatedRequest.IssuerName
+		if request.ValidatedRequest.Client != nil {
+			token.Lifetime = request.ValidatedRequest.Client.IdentityTokenLifetime
+		}
+	}
+	return token, nil
 }
 
 func (s *TokenService) CreateSecurityToken(token *storage_models.Token) (string, error) {
