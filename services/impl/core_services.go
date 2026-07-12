@@ -5,6 +5,7 @@ package impl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -508,14 +509,12 @@ func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreation
 		)
 	}
 	if request.ValidatedResources != nil {
-		if scopes := request.ValidatedResources.RawScopeValues(); len(scopes) > 0 {
-			tokenClaims = utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesScope })
-			for _, scope := range scopes {
-				tokenClaims = append(tokenClaims, claims.NewClaim(
-					claims.WithClaimType(gois.JwtClaimTypesScope),
-					claims.WithClaimValue(scope),
-				))
-			}
+		tokenClaims = utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesScope })
+		for _, scope := range request.ValidatedResources.RawScopeValues() {
+			tokenClaims = append(tokenClaims, claims.NewClaim(
+				claims.WithClaimType(gois.JwtClaimTypesScope),
+				claims.WithClaimValue(scope),
+			))
 		}
 	}
 	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: tokenClaims, Audiences: audiences}
@@ -577,7 +576,6 @@ func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreati
 	return token, nil
 }
 
-
 // identitySigningAlgorithm resolves the algorithm the identity token will be
 // signed with, which fixes the hash size of the derived at_hash/c_hash claims.
 func (s *TokenService) identitySigningAlgorithm(request *responses_models.TokenCreationRequest) (string, error) {
@@ -586,8 +584,11 @@ func (s *TokenService) identitySigningAlgorithm(request *responses_models.TokenC
 		allowed = request.ValidatedRequest.Client.AllowedIdentityTokenSigningAlgorithms
 	}
 	credential, err := s.keys.GetSigningCredentials(allowed)
-	if err != nil || credential == nil {
+	if err != nil {
 		return "", fmt.Errorf("create identity token: resolve signing credential: %w", err)
+	}
+	if credential == nil {
+		return "", errors.New("create identity token: no signing credential available")
 	}
 	return credential.Algorithm, nil
 }
@@ -817,6 +818,7 @@ func (s *InteractionService) GetErrorContext(errorId string) (*messages.ErrorMes
 	}
 	return message.Data, nil
 }
+
 // GrantConsent records the consent answer under the key the authorize callback
 // derives from the subject and the original request parameters, so the callback
 // can pick the answer up and complete the flow.
