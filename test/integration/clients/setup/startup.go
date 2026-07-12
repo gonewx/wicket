@@ -85,7 +85,7 @@ func developerSigningStores(signingAlgorithm jwa.SignatureAlgorithm) ([]storage.
 		panic(err)
 	}
 	keyInfo := &models.SecurityKeyInfo{
-		Key:              credential.Key,
+		Key:              raw.Public(),
 		SigningAlgorithm: credential.Algorithm,
 	}
 	return []storage.SigningCredentialStore{

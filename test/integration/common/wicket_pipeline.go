@@ -5,6 +5,7 @@
 package common
 
 import (
+	"crypto"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -443,7 +444,7 @@ func (p *WicketPipeline) AddSigningCredential(credential *tokens.SigningCredenti
 	p.SigningCredentialStores = append(p.SigningCredentialStores, storage_memory.NewMemorySigningCredentialStore(credential))
 	p.AddValidationKey([]*models.SecurityKeyInfo{
 		{
-			Key:              credential.Key,
+			Key:              publicKeyOf(credential.Key),
 			SigningAlgorithm: credential.Algorithm,
 		},
 	})
@@ -630,4 +631,13 @@ func (h *mockExternalAuthenticationHandler) SignOut(properties *auth.Properties)
 
 func (h *mockExternalAuthenticationHandler) FinishResponse() error {
 	return nil
+}
+
+// publicKeyOf projects a signing key to its public form. Validation keys feed
+// the published JWKS, so a private key must never be handed to that store.
+func publicKeyOf(key any) any {
+	if signer, ok := key.(interface{ Public() crypto.PublicKey }); ok {
+		return signer.Public()
+	}
+	return key
 }
