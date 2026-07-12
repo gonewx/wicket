@@ -112,6 +112,33 @@ func TestCreateAccessTokenSessionBinding(t *testing.T) {
 	}
 }
 
+// TestCreateAccessTokenSessionIdSingleClaim: a subject that already carries a
+// session-id claim must not stack a second one — the token keeps exactly one
+// session-id claim, the one bound to the validated request, so the claim never
+// serializes as a JSON array.
+func TestCreateAccessTokenSessionIdSingleClaim(t *testing.T) {
+	svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+
+	identity := claimspkg.NewClaimsIdentity(
+		claimspkg.WithAuthenticationType("test"),
+		claimspkg.WithClaims([]*claimspkg.Claim{
+			claimspkg.NewClaim(
+				claimspkg.WithClaimType(gois.JwtClaimTypesSessionId),
+				claimspkg.WithClaimValue("carried-over-session"),
+			),
+		}),
+	)
+	request := accessTokenRequest(nil, "session-123")
+	request.Subject = claimspkg.NewClaimsPrincipal(claimspkg.WithClaimsPrincipalIdentity(identity))
+
+	token, err := svc.CreateAccessToken(request)
+
+	require.NoError(t, err)
+	sidClaims := claimsOfType(token.Claims, gois.JwtClaimTypesSessionId)
+	require.Len(t, sidClaims, 1)
+	require.Equal(t, "session-123", sidClaims[0].Value)
+}
+
 // TestCreateSecurityTokenJwtIdAssembly: a jwt id is assembled only for access
 // tokens whose client opted in; identity tokens never receive one, and an
 // opted-in access token replaces any pre-set id with a freshly generated value.

@@ -452,12 +452,17 @@ func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreation
 		sort.Strings(audiences)
 	}
 	// A session-bound access token carries the session id so downstream
-	// validation can coordinate server-side session lifetime.
+	// validation can coordinate server-side session lifetime. Any session id
+	// carried in from the subject's claims is dropped first so the token never
+	// ends up with more than one, which would serialize as a JSON array.
 	if request.ValidatedRequest != nil && request.ValidatedRequest.SessionId != "" {
-		tokenClaims = append(tokenClaims, claims.NewClaim(
-			claims.WithClaimType(gois.JwtClaimTypesSessionId),
-			claims.WithClaimValue(request.ValidatedRequest.SessionId),
-		))
+		tokenClaims = append(
+			utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesSessionId }),
+			claims.NewClaim(
+				claims.WithClaimType(gois.JwtClaimTypesSessionId),
+				claims.WithClaimValue(request.ValidatedRequest.SessionId),
+			),
+		)
 	}
 	return &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: tokenClaims, Audiences: audiences}, nil
 }
