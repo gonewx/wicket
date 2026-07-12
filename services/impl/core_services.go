@@ -4,12 +4,9 @@
 package impl
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -675,7 +672,7 @@ func (s *InteractionService) GrantConsent(request *messages.AuthorizationRequest
 	if subjectId == "" && s.user != nil {
 		subjectId = extensions.GetSubjectIdFromPrincipal(s.user.GetUser())
 	}
-	key := consentAnswerKey(subjectId, request.Parameters)
+	key := storage.ConsentMessageKey(subjectId, request.Parameters)
 	message := messages.NewMessage(response)
 	if s.clock != nil {
 		message.Created = s.clock.Now().Unix()
@@ -683,14 +680,6 @@ func (s *InteractionService) GrantConsent(request *messages.AuthorizationRequest
 	return s.consentStore.Write(key, message)
 }
 
-// consentAnswerKey derives the storage key for a consent answer from the
-// subject identifier and the original authorize parameters. The derivation must
-// stay in lockstep with the authorize callback, which reads the answer back
-// under the same key.
-func consentAnswerKey(subjectId string, parameters url.Values) string {
-	sum := sha256.Sum256([]byte(subjectId + "|" + parameters.Encode()))
-	return base64.RawURLEncoding.EncodeToString(sum[:])
-}
 func (s *InteractionService) DenyAuthorization(request *messages.AuthorizationRequest, subject string) error {
 	return s.consent.DenyAuthorization(request, subject)
 }

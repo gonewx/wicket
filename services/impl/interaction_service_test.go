@@ -10,6 +10,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/models/messages"
+	"github.com/gonewx/wicket/storage"
 )
 
 // recordingConsentStore captures the key and message handed to Write so tests
@@ -73,7 +74,7 @@ func TestInteractionServiceGrantConsentStoresAnswerUnderDerivedKey(t *testing.T)
 	if store.writes != 1 {
 		t.Fatalf("writes = %d, want 1", store.writes)
 	}
-	if want := consentAnswerKey("alice", parameters); store.key != want {
+	if want := storage.ConsentMessageKey("alice", parameters); store.key != want {
 		t.Fatalf("stored key = %q, want %q", store.key, want)
 	}
 	if store.message == nil || store.message.Data != response {
@@ -102,7 +103,7 @@ func TestInteractionServiceGrantConsentFallsBackToSessionSubject(t *testing.T) {
 	if err := svc.GrantConsent(consentRequestWithParameters(parameters), &messages.ConsentResponse{}, ""); err != nil {
 		t.Fatalf("GrantConsent: %v", err)
 	}
-	if want := consentAnswerKey("bob", parameters); store.key != want {
+	if want := storage.ConsentMessageKey("bob", parameters); store.key != want {
 		t.Fatalf("stored key = %q, want %q", store.key, want)
 	}
 }
@@ -128,26 +129,6 @@ func TestInteractionServiceGrantConsentWithoutStoreDoesNotFail(t *testing.T) {
 				t.Fatalf("GrantConsent: %v", err)
 			}
 		})
-	}
-}
-
-// TestConsentAnswerKeyDerivation verifies the key is deterministic across
-// parameter insertion order and distinguishes both subject and parameters —
-// the properties the write side and the callback read side both depend on.
-func TestConsentAnswerKeyDerivation(t *testing.T) {
-	t.Parallel()
-
-	base := url.Values{"client_id": {"client"}, "scope": {"openid"}}
-	reordered := url.Values{"scope": {"openid"}, "client_id": {"client"}}
-	if consentAnswerKey("alice", base) != consentAnswerKey("alice", reordered) {
-		t.Fatalf("key differs across parameter insertion order")
-	}
-	if consentAnswerKey("alice", base) == consentAnswerKey("bob", base) {
-		t.Fatalf("key does not distinguish subjects")
-	}
-	other := url.Values{"client_id": {"client"}, "scope": {"openid profile"}}
-	if consentAnswerKey("alice", base) == consentAnswerKey("alice", other) {
-		t.Fatalf("key does not distinguish request parameters")
 	}
 }
 
