@@ -369,6 +369,12 @@ func (v *TokenValidator) validateJwt(jwtString string, validationKeys []*models.
 				})
 			}
 		} else {
+			// jwx surfaces registered temporal claims as time.Time; the claim
+			// value must stay the numeric-date form the token carried
+			// (RFC 7519 §2), so downstream responses serialize numbers.
+			if instant, ok := value.(time.Time); ok {
+				value = instant.Unix()
+			}
 			resultClaims = append(resultClaims, &claimspkg.Claim{
 				Type:           k,
 				Value:          value,
