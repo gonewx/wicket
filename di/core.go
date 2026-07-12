@@ -191,6 +191,7 @@ func registerCore() {
 	// transient handler so the handler provider can activate it per request. The
 	// concrete cookie handler is not yet available, so the keyed registration
 	// serves the neutral unsupported handler until it lands.
+	// TODO: pending Epic 5 implementation
 	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.DefaultCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
 		return authcore.NewUnsupportedHandler()
 	})

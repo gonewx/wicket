@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/auth"
@@ -15,7 +16,11 @@ import (
 	"github.com/gonewx/wicket/hosting"
 )
 
+// SchemeProvider is registered as a singleton shared across requests, and the
+// registration surface is public, so registry reads and writes synchronize on
+// a lock even though assembly-time registration is single-threaded today.
 type SchemeProvider struct {
+	mu      sync.RWMutex
 	schemes []*auth.Scheme
 	options *auth.Options
 }
@@ -28,10 +33,19 @@ func NewSchemeProvider(options *auth.Options) *SchemeProvider {
 }
 
 func (p *SchemeProvider) GetAllSchemes() []*auth.Scheme {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return append([]*auth.Scheme(nil), p.schemes...)
 }
 
 func (p *SchemeProvider) GetScheme(name string) *auth.Scheme {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.findScheme(name)
+}
+
+// findScheme scans the registry without locking; callers hold p.mu.
+func (p *SchemeProvider) findScheme(name string) *auth.Scheme {
 	for _, scheme := range p.schemes {
 		if scheme.Name == name {
 			return scheme
@@ -101,7 +115,9 @@ func (p *SchemeProvider) AddScheme(scheme *auth.Scheme) error {
 	if scheme == nil {
 		return fmt.Errorf("auth scheme is nil")
 	}
-	if p.GetScheme(scheme.Name) != nil {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.findScheme(scheme.Name) != nil {
 		return fmt.Errorf("auth scheme %q already exists", scheme.Name)
 	}
 	p.schemes = append(p.schemes, scheme)
@@ -109,7 +125,12 @@ func (p *SchemeProvider) AddScheme(scheme *auth.Scheme) error {
 }
 
 func (p *SchemeProvider) TryAddScheme(scheme *auth.Scheme) bool {
-	if scheme == nil || p.GetScheme(scheme.Name) != nil {
+	if scheme == nil {
+		return false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.findScheme(scheme.Name) != nil {
 		return false
 	}
 	p.schemes = append(p.schemes, scheme)
@@ -119,6 +140,8 @@ func (p *SchemeProvider) TryAddScheme(scheme *auth.Scheme) bool {
 // RemoveScheme drops the named scheme and reports whether it was present. A
 // removed name is released for re-registration.
 func (p *SchemeProvider) RemoveScheme(name string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	for i, scheme := range p.schemes {
 		if scheme.Name == name {
 			p.schemes = append(p.schemes[:i], p.schemes[i+1:]...)
@@ -132,6 +155,8 @@ func (p *SchemeProvider) RemoveScheme(name string) bool {
 // handlers. The capability travels on the scheme record because handlers are
 // resolved per request and the registry is the only static knowledge source.
 func (p *SchemeProvider) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	var schemes []*auth.Scheme
 	for _, scheme := range p.schemes {
 		if scheme.HandlesRequests {
@@ -262,8 +287,16 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 			if scheme := provider.GetDefaultAuthenticateScheme(); scheme != nil {
 				if scope := hosting.ScopeFrom(r.Context()); scope != nil {
 					if handlers, ok := godi.Get[auth.HandlerProvider](scope); ok && handlers != nil {
-						if handler, err := handlers.GetHandler(r, w, scheme.Name); err == nil && handler != nil {
-							if result, err := handler.Authenticate(); err == nil && result != nil && !result.None {
+						handler, err := handlers.GetHandler(r, w, scheme.Name)
+						switch {
+						case err != nil:
+							logWarn(logger, "authentication handler resolution failed", scheme.Name, err)
+						case handler != nil:
+							result, err := handler.Authenticate()
+							switch {
+							case err != nil:
+								logWarn(logger, "authentication failed for the default scheme", scheme.Name, err)
+							case result != nil && !result.None:
 								r = r.WithContext(ContextWithResult(r.Context(), result))
 							}
 						}
@@ -273,8 +306,18 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 			// The request-handler scheme short-circuit is inserted here once
 			// GetRequestHandlerSchemes enumerates schemes; it currently yields
 			// none, so the traversal is empty.
+			// TODO: pending Epic 5 implementation
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+// logWarn records a middleware authentication failure. The middleware never
+// fails the request on an authentication error — the request proceeds
+// anonymously — so the log entry is the only diagnostic signal.
+func logWarn(logger *slog.Logger, message, scheme string, err error) {
+	if logger != nil {
+		logger.Warn(message, slog.String("scheme", scheme), slog.Any("error", err))
 	}
 }
 

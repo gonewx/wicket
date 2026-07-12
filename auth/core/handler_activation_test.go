@@ -208,9 +208,9 @@ func TestServiceAuthenticateReturnsResult(t *testing.T) {
 	require.Same(t, principal, result.Principal)
 }
 
-// TestMiddlewareAuthenticatesDefaultScheme covers block 3b segment one: the
-// middleware authenticates the default authenticate scheme and places the result
-// in the request context for downstream consumption.
+// TestMiddlewareAuthenticatesDefaultScheme verifies that the middleware
+// authenticates the default authenticate scheme and places the result in the
+// request context for downstream consumption.
 func TestMiddlewareAuthenticatesDefaultScheme(t *testing.T) {
 	t.Parallel()
 
