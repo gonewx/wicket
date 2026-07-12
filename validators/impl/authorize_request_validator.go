@@ -178,6 +178,7 @@ func (v *AuthorizeRequestValidator) loadRequestObject(request *validators_models
 
 			jwt, err := v.jwtRequestUriHttpClient.GetJwt(jwtRequestUri, request.Client)
 			if err != nil {
+				v.logger.Error("request_uri fetch failure", slog.String("err", err.Error()))
 				return invalid(request, gois.AuthorizeErrorsInvalidRequestUri, "")
 			}
 
