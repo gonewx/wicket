@@ -1,6 +1,8 @@
 package e2e_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -21,6 +23,8 @@ var knownFinalStatuses = map[string]struct{}{
 	"blocked-rewrite":         {},
 	"blocked-backfill":        {},
 	"rolled-back-blocked":     {},
+	"excluded":                {},
+	"erratum-reclassified":    {},
 }
 
 // blockedStubStatuses are the outcomes whose wicket file must remain a skip
@@ -100,6 +104,34 @@ func TestBaselineDispositionReconciliationE2E(t *testing.T) {
 	for rel := range stubFiles {
 		if _, ok := blockedStubs[rel]; !ok {
 			t.Fatalf("skip stub %s is not claimed by any blocked matrix row", rel)
+		}
+	}
+}
+
+// TestBaselineFinalViewClosureE2E asserts the closure invariants of the final
+// view: no row may remain blocked (every one of the 144 rows is disposed,
+// excluded with an anchored resolution, or archived), and no excluded row's
+// wicket path may appear in the tree — an exclusion records a decision not to
+// implement a surface, so a test file landing there must arrive through a new
+// resolution, never silently. Removing a final-view file or one of its rows
+// re-surfaces a blocked row and fails this guard closed.
+func TestBaselineFinalViewClosureE2E(t *testing.T) {
+	t.Parallel()
+
+	root := projectRoot(t)
+	for _, row := range synthesizedRoutingMatrix(t) {
+		if _, blocked := blockedFinalStatuses[row.FinalStatus]; blocked {
+			t.Fatalf("routing matrix row %s remains blocked as %q in the final view", row.GoisPath, row.FinalStatus)
+		}
+		if _, exclusion := exclusionFinalStatuses[row.FinalStatus]; !exclusion {
+			continue
+		}
+		rel := strings.TrimSpace(row.WicketPath)
+		if rel == "" || rel == "-" {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(root, rel)); err == nil {
+			t.Fatalf("excluded routing matrix row %s has a file present at %s", row.GoisPath, rel)
 		}
 	}
 }
