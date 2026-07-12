@@ -175,18 +175,18 @@ func (v *AuthorizeRequestValidator) loadRequestObject(request *validators_models
 			if len(jwtRequestUri) > 512 {
 				return invalid(request, gois.AuthorizeErrorsInvalidRequestUri, "request_uri is too long")
 			}
-		}
 
-		jwt, err := v.jwtRequestUriHttpClient.GetJwt(jwtRequestUri, request.Client)
-		if err != nil {
-			return invalid(request, err, "")
-		}
+			jwt, err := v.jwtRequestUriHttpClient.GetJwt(jwtRequestUri, request.Client)
+			if err != nil {
+				return invalid(request, gois.AuthorizeErrorsInvalidRequestUri, "")
+			}
 
-		if jwt == "" {
-			return invalid(request, gois.AuthorizeErrorsInvalidRequestUri, "no value returned from request_uri")
-		}
+			if jwt == "" {
+				return invalid(request, gois.AuthorizeErrorsInvalidRequestUri, "no value returned from request_uri")
+			}
 
-		jwtRequest = jwt
+			jwtRequest = jwt
+		}
 	} else {
 		if jwtRequestUri != "" {
 			return invalid(request, gois.AuthorizeErrorsRequestUriNotSupported, "")
