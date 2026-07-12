@@ -4,6 +4,7 @@
 package common
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,24 @@ import (
 	claimspkg "github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/services"
 )
+
+// restoreClaimValue maps a json.Number back onto the numeric type the claim
+// carried before serialization: integral values return as int64, fractional
+// ones as float64. Typed claim consumers (for example the authentication-time
+// epoch) then see the same dynamic type across the cookie round-trip.
+func restoreClaimValue(v any) any {
+	number, ok := v.(json.Number)
+	if !ok {
+		return v
+	}
+	if i, err := number.Int64(); err == nil {
+		return i
+	}
+	if f, err := number.Float64(); err == nil {
+		return f
+	}
+	return number.String()
+}
 
 var _ auth.Handler = (*testCookieAuthenticationHandler)(nil)
 var _ auth.SignInHandler = (*testCookieAuthenticationHandler)(nil)
@@ -87,7 +106,11 @@ func (h *testCookieAuthenticationHandler) Authenticate() (*auth.Result, error) {
 		return auth.NoResult(), nil
 	}
 	var t ticket
-	if err := json.Unmarshal(raw, &t); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	// Numbers decode as json.Number so integral claim values can be restored
+	// to the type they were signed in with instead of widening to float64.
+	decoder.UseNumber()
+	if err := decoder.Decode(&t); err != nil {
 		return auth.NoResult(), nil
 	}
 
@@ -101,7 +124,7 @@ func (h *testCookieAuthenticationHandler) Authenticate() (*auth.Result, error) {
 		for _, c := range id.Claims {
 			identity.AddClaim(&claimspkg.Claim{
 				Type:           c.Type,
-				Value:          c.Value,
+				Value:          restoreClaimValue(c.Value),
 				ValueType:      c.ValueType,
 				Issuer:         c.Issuer,
 				OriginalIssuer: c.OriginalIssuer,
