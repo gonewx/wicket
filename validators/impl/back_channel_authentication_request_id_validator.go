@@ -2,5 +2,7 @@
 // Licensed under the Apache License, Version 2.0.
 // Modifications Copyright 2026 Decker.
 
-// TODO: pending Epic 2/3 implementation.
+// The backchannel authentication request-id validation behavior lives in
+// BackchannelAuthenticationRequestIdValidator (default_seams.go); this file is
+// retained as the provenance placeholder for the Apache-origin path.
 package impl
