@@ -527,11 +527,42 @@ func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreation
 }
 
 func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
-	claims := []*claims.Claim(nil)
+	tokenClaims := []*claims.Claim(nil)
 	if request.Subject != nil {
-		claims = request.Subject.Claims()
+		tokenClaims = request.Subject.Claims()
 	}
-	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesIdentityToken, Claims: claims}
+	appendClaim := func(claimType string, value string) {
+		if value == "" {
+			return
+		}
+		tokenClaims = append(
+			utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != claimType }),
+			claims.NewClaim(claims.WithClaimType(claimType), claims.WithClaimValue(value)),
+		)
+	}
+	appendClaim(gois.JwtClaimTypesNonce, request.Nonce)
+	appendClaim(gois.JwtClaimTypesStateHash, request.StateHash)
+	if request.AccessTokenToHash != "" || request.AuthorizationCodeToHash != "" {
+		algorithm, err := s.identitySigningAlgorithm(request)
+		if err != nil {
+			return nil, err
+		}
+		if request.AccessTokenToHash != "" {
+			hash, err := utils.CreateHashClaimValue(request.AccessTokenToHash, algorithm)
+			if err != nil {
+				return nil, fmt.Errorf("create identity token: hash access token: %w", err)
+			}
+			appendClaim(gois.JwtClaimTypesAccessTokenHash, hash)
+		}
+		if request.AuthorizationCodeToHash != "" {
+			hash, err := utils.CreateHashClaimValue(request.AuthorizationCodeToHash, algorithm)
+			if err != nil {
+				return nil, fmt.Errorf("create identity token: hash authorization code: %w", err)
+			}
+			appendClaim(gois.JwtClaimTypesAuthorizationCodeHash, hash)
+		}
+	}
+	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesIdentityToken, Claims: tokenClaims}
 	if request.ValidatedRequest != nil {
 		token.Issuer = request.ValidatedRequest.IssuerName
 		// An identity token is addressed to the requesting client (OIDC Core
@@ -544,6 +575,21 @@ func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreati
 		}
 	}
 	return token, nil
+}
+
+
+// identitySigningAlgorithm resolves the algorithm the identity token will be
+// signed with, which fixes the hash size of the derived at_hash/c_hash claims.
+func (s *TokenService) identitySigningAlgorithm(request *responses_models.TokenCreationRequest) (string, error) {
+	var allowed []string
+	if request.ValidatedRequest != nil && request.ValidatedRequest.Client != nil {
+		allowed = request.ValidatedRequest.Client.AllowedIdentityTokenSigningAlgorithms
+	}
+	credential, err := s.keys.GetSigningCredentials(allowed)
+	if err != nil || credential == nil {
+		return "", fmt.Errorf("create identity token: resolve signing credential: %w", err)
+	}
+	return credential.Algorithm, nil
 }
 
 func (s *TokenService) CreateSecurityToken(token *storage_models.Token) (string, error) {
