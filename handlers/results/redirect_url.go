@@ -44,9 +44,10 @@ func redirectUrl(
 		returnURL = utils.AddQueryString(returnURL, params)
 	}
 
-	if utils.IsLocalUrl(returnURL) {
-		returnURL = urls.GetWicketRelativeUrl(returnURL)
-	}
+	// The callback route is server-relative and carries no leading slash, so
+	// normalize it unconditionally: GetWicketRelativeUrl adds the leading slash
+	// the return URL parser requires to recognize a local return URL.
+	returnURL = urls.GetWicketRelativeUrl(returnURL)
 
 	target := targetURL
 	if utils.IsLocalUrl(target) {
