@@ -52,7 +52,15 @@ func (f *fakeInner) RemoveScheme(name string) bool {
 	_, ok := f.byName[name]
 	return ok
 }
-func (f *fakeInner) GetRequestHandlerSchemes() ([]*auth.Scheme, error) { return nil, nil }
+func (f *fakeInner) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {
+	var schemes []*auth.Scheme
+	for _, s := range f.all {
+		if s != nil && s.HandlesRequests {
+			schemes = append(schemes, s)
+		}
+	}
+	return schemes, nil
+}
 
 type fixedClock struct{ t time.Time }
 
@@ -278,4 +286,90 @@ func names(schemes []*auth.Scheme) []string {
 		out = append(out, s.Name)
 	}
 	return out
+}
+
+func requestHandlerScheme(name string) *auth.Scheme {
+	scheme := auth.NewScheme(name, "oidc")
+	scheme.HandlesRequests = true
+	return scheme
+}
+
+func TestAuthSchemeProviderRequestHandlerSchemesSymmetry(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		enabled   bool
+		inner     *fakeInner
+		resolver  func(t *testing.T) *dynamicscheme.Resolver
+		wantNames []string
+	}{
+		"disabled is pure pass-through of the static view": {
+			enabled: false,
+			inner:   newFakeInner(requestHandlerScheme("static"), auth.NewScheme("plain", "cookie")),
+			resolver: func(t *testing.T) *dynamicscheme.Resolver {
+				return dynamicscheme.NewResolver(dynamicscheme.NewMemoryStore(), fixedClock{}, false, time.Minute)
+			},
+			wantNames: []string{"static"},
+		},
+		"enabled merges dynamic providers behind the static view": {
+			enabled: true,
+			inner:   newFakeInner(requestHandlerScheme("static"), auth.NewScheme("plain", "cookie")),
+			resolver: func(t *testing.T) *dynamicscheme.Resolver {
+				return enabledResolver(t, dynProvider("dynamic", true), dynProvider("off", false))
+			},
+			wantNames: []string{"static", "dynamic"},
+		},
+		"static name shadows the dynamic row": {
+			enabled: true,
+			inner:   newFakeInner(requestHandlerScheme("shared")),
+			resolver: func(t *testing.T) *dynamicscheme.Resolver {
+				return enabledResolver(t, dynProvider("shared", true), dynProvider("extra", true))
+			},
+			wantNames: []string{"shared", "extra"},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			provider := NewAuthSchemeProvider(decorate(tc.inner), &config_options.DynamicProviderOptions{Enabled: tc.enabled}, tc.resolver(t), nil)
+
+			schemes, err := provider.GetRequestHandlerSchemes()
+			if err != nil {
+				t.Fatalf("GetRequestHandlerSchemes error: %v", err)
+			}
+			got := map[string]bool{}
+			for _, scheme := range schemes {
+				if !scheme.HandlesRequests {
+					t.Fatalf("scheme %s lost its request-handling capability", scheme.Name)
+				}
+				got[scheme.Name] = true
+			}
+			if len(got) != len(tc.wantNames) {
+				t.Fatalf("GetRequestHandlerSchemes = %v, want %v", names(schemes), tc.wantNames)
+			}
+			for _, want := range tc.wantNames {
+				if !got[want] {
+					t.Fatalf("GetRequestHandlerSchemes = %v, missing %s", names(schemes), want)
+				}
+			}
+		})
+	}
+}
+
+func TestAuthSchemeProviderRequestHandlerSchemesDegradeToStatic(t *testing.T) {
+	t.Parallel()
+
+	resolver := dynamicscheme.NewResolver(errStore{}, fixedClock{}, true, time.Minute)
+	inner := newFakeInner(requestHandlerScheme("static"))
+	provider := NewAuthSchemeProvider(decorate(inner), &config_options.DynamicProviderOptions{Enabled: true}, resolver, nil)
+
+	schemes, err := provider.GetRequestHandlerSchemes()
+	if err != nil {
+		t.Fatalf("GetRequestHandlerSchemes error: %v", err)
+	}
+	if len(schemes) != 1 || schemes[0].Name != "static" {
+		t.Fatalf("GetRequestHandlerSchemes = %v, want [static]", names(schemes))
+	}
 }

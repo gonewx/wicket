@@ -47,6 +47,10 @@ func NoResult() *Result {
 type Scheme struct {
 	Name        string
 	HandlerType string
+	// HandlesRequests marks a scheme whose handler participates in request
+	// processing (for example a remote callback), so the middleware can
+	// enumerate it ahead of the default authentication pass.
+	HandlesRequests bool
 }
 
 func NewScheme(name string, handlerType string) *Scheme {

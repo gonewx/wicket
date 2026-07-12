@@ -169,3 +169,30 @@ func TestSchemeProviderRemoveReleasesNameForReuse(t *testing.T) {
 	// The released name can be registered again.
 	require.True(t, provider.TryAddScheme(auth.NewScheme("signin2", "cookie")))
 }
+
+func TestSchemeProviderRequestHandlerSchemesFilterByCapability(t *testing.T) {
+	t.Parallel()
+
+	provider := NewSchemeProvider(auth.NewOptions())
+
+	require.NoError(t, provider.AddScheme(auth.NewScheme("plain", "cookie")))
+	callback := auth.NewScheme("callback", "oidc")
+	callback.HandlesRequests = true
+	require.NoError(t, provider.AddScheme(callback))
+
+	schemes, err := provider.GetRequestHandlerSchemes()
+	require.NoError(t, err)
+	require.Len(t, schemes, 1)
+	require.Equal(t, "callback", schemes[0].Name)
+}
+
+func TestSchemeProviderRequestHandlerSchemesEmptyWithoutCapability(t *testing.T) {
+	t.Parallel()
+
+	provider := NewSchemeProvider(auth.NewOptions())
+	require.NoError(t, provider.AddScheme(auth.NewScheme("plain", "cookie")))
+
+	schemes, err := provider.GetRequestHandlerSchemes()
+	require.NoError(t, err)
+	require.Empty(t, schemes)
+}

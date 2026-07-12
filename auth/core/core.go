@@ -128,8 +128,17 @@ func (p *SchemeProvider) RemoveScheme(name string) bool {
 	return false
 }
 
+// GetRequestHandlerSchemes lists the registered schemes marked as request
+// handlers. The capability travels on the scheme record because handlers are
+// resolved per request and the registry is the only static knowledge source.
 func (p *SchemeProvider) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {
-	return nil, nil
+	var schemes []*auth.Scheme
+	for _, scheme := range p.schemes {
+		if scheme.HandlesRequests {
+			schemes = append(schemes, scheme)
+		}
+	}
+	return schemes, nil
 }
 
 type HandlerProvider struct {

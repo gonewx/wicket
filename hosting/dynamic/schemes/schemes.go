@@ -137,7 +137,30 @@ func (p AuthSchemeProvider) GetRequestHandlerSchemes() ([]*auth.Scheme, error) {
 	if p.inner == nil {
 		return nil, nil
 	}
-	return p.inner.GetRequestHandlerSchemes()
+	static, err := p.inner.GetRequestHandlerSchemes()
+	if err != nil || !p.dynamicEnabled() {
+		return static, err
+	}
+	providers, resolveErr := p.resolver.All()
+	if resolveErr != nil {
+		p.logDynamicError("list dynamic request handler schemes", resolveErr)
+		return static, nil
+	}
+	seen := make(map[string]struct{}, len(static))
+	merged := make([]*auth.Scheme, 0, len(static)+len(providers))
+	for _, scheme := range static {
+		if scheme != nil {
+			seen[scheme.Name] = struct{}{}
+		}
+		merged = append(merged, scheme)
+	}
+	for _, provider := range providers {
+		if _, ok := seen[provider.Scheme]; ok {
+			continue
+		}
+		merged = append(merged, schemeFromProvider(provider))
+	}
+	return merged, nil
 }
 
 // innerDefault delegates a default-scheme lookup to the static registry.
@@ -162,9 +185,12 @@ func (p AuthSchemeProvider) logDynamicError(action string, err error) {
 
 // schemeFromProvider adapts a dynamic provider record to an authentication
 // scheme: the provider scheme becomes the scheme name and the protocol becomes
-// the handler type.
+// the handler type. Dynamic providers exist to activate remote callbacks, so
+// their schemes carry the request-handling capability.
 func schemeFromProvider(provider *dynamicscheme.Provider) *auth.Scheme {
-	return auth.NewScheme(provider.Scheme, provider.Protocol)
+	scheme := auth.NewScheme(provider.Scheme, provider.Protocol)
+	scheme.HandlesRequests = true
+	return scheme
 }
 
 // UseSchemeAuthMiddleware returns request middleware for dynamic scheme
