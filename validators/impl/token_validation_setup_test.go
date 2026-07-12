@@ -32,7 +32,7 @@ var tokenTestNow = time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 
 // tokenTestIssuer is the issuer shared by the signing helpers and the validator
 // so the issuer claim round-trips through JWT validation.
-const tokenTestIssuer = "https://idsvr.com"
+const tokenTestIssuer = "https://issuer.wicket.test"
 
 // createReferenceTokenStore builds an empty in-memory reference token store.
 func createReferenceTokenStore() *storage_impl.ReferenceTokenStore {

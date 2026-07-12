@@ -47,7 +47,7 @@ func TestCreateTokenHeaderKidResolvesThroughValidationKeys(t *testing.T) {
 
 	token := &storage_models.Token{
 		Type:      gois.TokenTypesAccessToken,
-		Issuer:    "https://idsvr.com",
+		Issuer:    "https://issuer.wicket.test",
 		Audiences: []string{"resource"},
 		Lifetime:  600,
 		Claims: []*claimspkg.Claim{
