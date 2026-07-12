@@ -9,6 +9,7 @@ import (
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/accessor"
+	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/handlers"
 	"github.com/gonewx/wicket/hosting"
 	"github.com/gonewx/wicket/responses"
@@ -16,6 +17,7 @@ import (
 	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/utils"
 	"github.com/gonewx/wicket/validators"
+	validators_impl "github.com/gonewx/wicket/validators/impl"
 )
 
 func newServerConfigLogger(config *ServerConfig, fallback *slog.Logger) *slog.Logger {
@@ -84,16 +86,29 @@ func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
 	)
 }
 
-func newDiscoveryHandlerFromProvider(godi.Provider) *handlers.DiscoveryHandler {
-	return handlers.NewDiscoveryHandler()
+func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler {
+	return handlers.NewDiscoveryHandler(
+		godi.GetRequired[responses.DiscoveryResponseGenerator](p),
+		godi.GetRequired[services.ServerUrls](p),
+		godi.GetRequired[services.IssuerNameService](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
-func newDiscoveryKeyHandlerFromProvider(godi.Provider) *handlers.DiscoveryKeyHandler {
-	return handlers.NewDiscoveryKeyHandler()
+func newDiscoveryKeyHandlerFromProvider(p godi.Provider) *handlers.DiscoveryKeyHandler {
+	return handlers.NewDiscoveryKeyHandler(
+		godi.GetRequired[responses.DiscoveryResponseGenerator](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
-func newCheckSessionHandlerFromProvider(godi.Provider) *handlers.CheckSessionHandler {
-	return handlers.NewCheckSessionHandler()
+func newCheckSessionHandlerFromProvider(p godi.Provider) *handlers.CheckSessionHandler {
+	return handlers.NewCheckSessionHandler(
+		godi.GetRequired[*config_options.WicketOptions](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
 func newBackchannelAuthenticationHandlerFromProvider(p godi.Provider) *handlers.BackchannelAuthenticationHandler {
@@ -103,18 +118,38 @@ func newBackchannelAuthenticationHandlerFromProvider(p godi.Provider) *handlers.
 	)
 }
 
-func newIntrospectionHandlerFromProvider(godi.Provider) *handlers.IntrospectionHandler {
-	return handlers.NewIntrospectionHandler()
+func newIntrospectionHandlerFromProvider(p godi.Provider) *handlers.IntrospectionHandler {
+	return handlers.NewIntrospectionHandler(
+		godi.GetRequired[validators.ApiSecretValidator](p),
+		godi.GetRequired[validators.IntrospectionRequestValidator](p),
+		godi.GetRequired[responses.IntrospectionResponseGenerator](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
-func newUserInfoHandlerFromProvider(godi.Provider) *handlers.UserInfoHandler {
-	return handlers.NewUserInfoHandler()
+func newUserInfoHandlerFromProvider(p godi.Provider) *handlers.UserInfoHandler {
+	return handlers.NewUserInfoHandler(
+		godi.GetRequired[*validators_impl.BearerTokenUsageValidator](p),
+		godi.GetRequired[validators.UserInfoRequestValidator](p),
+		godi.GetRequired[responses.UserInfoResponseGenerator](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
-func newEndSessionHandlerFromProvider(godi.Provider) *handlers.EndSessionHandler {
-	return handlers.NewEndSessionHandler()
+func newEndSessionHandlerFromProvider(p godi.Provider) *handlers.EndSessionHandler {
+	return handlers.NewEndSessionHandler(
+		godi.GetRequired[validators.EndSessionRequestValidator](p),
+		godi.GetRequired[services.UserSession](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }
 
-func newEndSessionCallbackHandlerFromProvider(godi.Provider) *handlers.EndSessionCallbackHandler {
-	return handlers.NewEndSessionCallbackHandler()
+func newEndSessionCallbackHandlerFromProvider(p godi.Provider) *handlers.EndSessionCallbackHandler {
+	return handlers.NewEndSessionCallbackHandler(
+		godi.GetRequired[validators.EndSessionRequestValidator](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
 }

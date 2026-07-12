@@ -2,7 +2,6 @@ package e2e_test
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -44,20 +43,17 @@ func TestPendingDependencyInterfacesResolveFromContainerE2E(t *testing.T) {
 	if !valid {
 		t.Fatal("SessionCoordinationService returned invalid, want true (pass-through when disabled)")
 	}
-	body, err := root.NewJwtRequestUriHttpClient().GetJwt("http://127.0.0.1:1/request.jwt", nil)
-	if err == nil {
-		t.Fatal("JwtRequestUriHttpClient returned nil error, want neutral pending error")
-	}
-	if body != "" {
-		t.Fatalf("JwtRequestUriHttpClient body = %q, want empty string", body)
-	}
-	want := "pending Epic " + "2/3 implementation"
-	if !strings.Contains(err.Error(), want) {
-		t.Fatalf("JwtRequestUriHttpClient error = %q, want substring %q", err.Error(), want)
+	if client := root.NewJwtRequestUriHttpClient(); client == nil {
+		t.Fatal("JwtRequestUriHttpClient did not resolve")
 	}
 
-	request := httptest.NewRequest(http.MethodGet, "http://wicket.test/connect/token", nil)
+	// Every protocol endpoint handler must assemble from the container; the
+	// endpoint behaviors themselves are asserted by the integration suites.
 	for name, handler := range map[string]endpointProcessor{
+		"authorize":            root.NewPtr_AuthorizeHandler(),
+		"authorize_callback":   root.NewPtr_AuthorizeCallbackHandler(),
+		"token":                root.NewPtr_TokenHandler(),
+		"backchannel_auth":     root.NewPtr_BackchannelAuthenticationHandler(),
 		"discovery":            root.NewPtr_DiscoveryHandler(),
 		"discovery_keys":       root.NewPtr_DiscoveryKeyHandler(),
 		"check_session":        root.NewPtr_CheckSessionHandler(),
@@ -66,12 +62,8 @@ func TestPendingDependencyInterfacesResolveFromContainerE2E(t *testing.T) {
 		"end_session":          root.NewPtr_EndSessionHandler(),
 		"end_session_callback": root.NewPtr_EndSessionCallbackHandler(),
 	} {
-		err := handler.Process(httptest.NewRecorder(), request)
-		if err == nil {
-			t.Fatalf("%s handler returned nil error, want neutral pending error", name)
-		}
-		if !strings.Contains(err.Error(), want) {
-			t.Fatalf("%s handler error = %q, want substring %q", name, err.Error(), want)
+		if handler == nil {
+			t.Fatalf("%s handler did not resolve from the container", name)
 		}
 	}
 }
@@ -88,7 +80,13 @@ func TestPendingInterfaceFilesAvoidSourceContactMarkersE2E(t *testing.T) {
 		"config/options/backchannel_authentication_options.go",
 		"di/options/options.go",
 		"dp/dp.go",
-		"handlers/handlers.go",
+		"handlers/check_session_handler.go",
+		"handlers/discovery_handler.go",
+		"handlers/discovery_key_handler.go",
+		"handlers/end_session_callback_handler.go",
+		"handlers/end_session_handler.go",
+		"handlers/introspection_handler.go",
+		"handlers/user_info_handler.go",
 		"hosting/context.go",
 		"hosting/dynamic/schemes/schemes.go",
 		"hosting/middleware.go",

@@ -53,7 +53,6 @@ type IssuerNameService interface {
 // JwtRequestUriHttpClient retrieves JWT request objects.
 // input: URL -> behavior: fetch body -> output: body or error.
 type JwtRequestUriHttpClient interface {
-	Get(string) (string, error)
 	GetJwt(string, *models.Client) (string, error)
 }
 

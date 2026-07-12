@@ -4,7 +4,9 @@
 package impl
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -117,13 +119,42 @@ func NewJwtRequestUriHttpClient(client *http.Client, options *config_options.Wic
 	return &JwtRequestUriHttpClient{client: client, options: options}
 }
 
-func (c *JwtRequestUriHttpClient) Get(uri string) (string, error) {
-	return "", fmt.Errorf("JWT request URI retrieval pending Epic 2/3 implementation")
+// GetJwt fetches a request object from the given request_uri. The response
+// body is bounded by the configured JWT input length so a misbehaving server
+// cannot amplify memory, and every failure (transport, non-2xx, oversized
+// body) surfaces as an error for the caller to classify as invalid_request_uri.
+func (c *JwtRequestUriHttpClient) GetJwt(uri string, client *storage_models.Client) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), jwtRequestUriFetchTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	if err != nil {
+		return "", fmt.Errorf("build request object fetch: %w", err)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetch request object: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return "", fmt.Errorf("request object fetch returned status %d", resp.StatusCode)
+	}
+
+	limit := c.options.InputLengthRestrictions.Jwt
+	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(limit)+1))
+	if err != nil {
+		return "", fmt.Errorf("read request object body: %w", err)
+	}
+	if len(body) > limit {
+		return "", fmt.Errorf("request object body exceeds the %d byte limit", limit)
+	}
+
+	return string(body), nil
 }
 
-func (c *JwtRequestUriHttpClient) GetJwt(uri string, client *storage_models.Client) (string, error) {
-	return c.Get(uri)
-}
+const jwtRequestUriFetchTimeout = 10 * time.Second
 
 type UserSession struct {
 	accessor        accessor.HttpContextAccessor

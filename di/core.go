@@ -369,7 +369,6 @@ func registerCore() {
 	godi.AddTransient[responses.TokenRevocationResponseGenerator, responses_impl.TokenRevocationResponseGenerator](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L319 (TryAddTransient)
 	godi.AddTransient[responses.DeviceAuthorizationResponseGenerator, responses_impl.DeviceAuthorizationResponseGenerator](&r)
-	// TODO: pending Epic 2/3 implementation.
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L332 (AddTransient)
 	godi.AddTransient[validators.SecretParser, validators_impl.BasicAuthenticationSecretParser](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L333 (AddTransient)
@@ -391,5 +390,4 @@ func registerCore() {
 	godi.AddTransientFactory[*impl.ReturnUrlParser](&r, func(p godi.Provider) *impl.ReturnUrlParser {
 		return impl.NewReturnUrlParser(godi.GetServices[services.ReturnUrlParser](p))
 	})
-	// TODO: pending Epic 2/3 implementation.
 }

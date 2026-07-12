@@ -56,7 +56,6 @@ func registerPluggableServicesAndValidators() {
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L193 (TryAddTransient)
 	godi.AddTransient[storage.ConsentMessageStore, storage_impl.ConsentMessageStore](&r)
 
-	// TODO: pending Epic 2/3 implementation.
 
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L205 (TryAddTransient)
 	godi.AddTransient[services.HandleGenerationService, services_impl.HandleGenerationService](&r)
@@ -76,7 +75,6 @@ func registerPluggableServicesAndValidators() {
 	godi.AddTransient[storage.ReferenceTokenStore, storage_impl.ReferenceTokenStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L203 (TryAddTransient)
 	godi.AddTransient[storage.UserConsentStore, storage_impl.UserConsentStore](&r)
-	// TODO: pending Epic 2/3 implementation.
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L183 (TryAddTransient)
 	godi.AddTransient[services.PersistedGrantService, services_impl.PersistedGrantService](&r)
 	godi.AddTransient[services.KeyMaterialService, services_impl.KeyMaterialService](&r)
