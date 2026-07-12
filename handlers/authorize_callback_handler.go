@@ -106,12 +106,16 @@ func (h *AuthorizeCallbackHandler) result(r *http.Request) (endpointResult, erro
 // recoverParameters restores the original authorize parameters. When an
 // authorization-parameters store is configured the callback carries a stored
 // handle; otherwise the parameters travel inline on the callback query string.
+// A callback that carries no handle keeps its inline parameters even when a
+// store is configured — reading an empty handle could otherwise yield an
+// empty-but-valid message that silently blanks the real parameters.
 func (h *AuthorizeCallbackHandler) recoverParameters(r *http.Request) url.Values {
 	values := r.URL.Query()
 	if h.parameters != nil {
-		storeId := values.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName)
-		if message, err := h.parameters.Read(storeId); err == nil && message != nil && message.Data != nil {
-			values = message.Data
+		if storeId := values.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName); storeId != "" {
+			if message, err := h.parameters.Read(storeId); err == nil && message != nil && message.Data != nil {
+				values = message.Data
+			}
 		}
 	}
 	return values

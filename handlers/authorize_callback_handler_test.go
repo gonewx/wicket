@@ -15,6 +15,7 @@ import (
 	"github.com/gonewx/wicket/models"
 	"github.com/gonewx/wicket/models/messages"
 	responses_models "github.com/gonewx/wicket/responses/models"
+	test_common "github.com/gonewx/wicket/test/common"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
@@ -185,5 +186,28 @@ func TestAuthorizeCallbackHandlerRejectsNonGet(t *testing.T) {
 	}
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+// TestAuthorizeCallbackHandlerRecoverParameters verifies the two recovery
+// forms with a parameters store configured: a callback that carries a stored
+// handle resolves the stored parameters, while a callback without a handle
+// keeps its inline parameters instead of having them blanked by an
+// empty-handle read.
+func TestAuthorizeCallbackHandlerRecoverParameters(t *testing.T) {
+	t.Parallel()
+
+	handler := &AuthorizeCallbackHandler{parameters: test_common.NewQueryStringAuthorizationParametersMessageStore()}
+
+	req, values := callbackRequest()
+	if got := handler.recoverParameters(req); got.Encode() != values.Encode() {
+		t.Fatalf("recovered without handle = %q, want inline %q", got.Encode(), values.Encode())
+	}
+
+	stored := url.Values{gois.AuthorizeRequestClientId: {"stored-client"}}
+	target := "https://wicket.test" + gois.ProtocolRoutePathsAuthorizeCallback + "?" +
+		url.Values{gois.AuthorizationParamsStoreMessageStoreIdParameterName: {stored.Encode()}}.Encode()
+	if got := handler.recoverParameters(httptest.NewRequest(http.MethodGet, target, nil)); got.Encode() != stored.Encode() {
+		t.Fatalf("recovered with handle = %q, want stored %q", got.Encode(), stored.Encode())
 	}
 }
