@@ -109,7 +109,8 @@ func (h *AuthorizeCallbackHandler) result(r *http.Request) (endpointResult, erro
 func (h *AuthorizeCallbackHandler) recoverParameters(r *http.Request) url.Values {
 	values := r.URL.Query()
 	if h.parameters != nil {
-		if message, err := h.parameters.Read(r.URL.RawQuery); err == nil && message != nil && message.Data != nil {
+		storeId := values.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName)
+		if message, err := h.parameters.Read(storeId); err == nil && message != nil && message.Data != nil {
 			values = message.Data
 		}
 	}
