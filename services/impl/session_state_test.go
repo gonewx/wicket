@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
+	gois "github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/accessor"
 	"github.com/gonewx/wicket/auth"
+	authcore "github.com/gonewx/wicket/auth/core"
 	"github.com/gonewx/wicket/claims"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/services"
 	sessionpkg "github.com/gonewx/wicket/session"
-	gois "github.com/gonewx/wicket"
 )
 
 type sessionStateClock struct{ now time.Time }
@@ -35,9 +36,9 @@ type recordingAccessor struct {
 	rw  http.ResponseWriter
 }
 
-func (a *recordingAccessor) Request() *http.Request               { return a.req }
-func (a *recordingAccessor) SetRequest(r *http.Request)           { a.req = r }
-func (a *recordingAccessor) ResponseWriter() http.ResponseWriter  { return a.rw }
+func (a *recordingAccessor) Request() *http.Request                  { return a.req }
+func (a *recordingAccessor) SetRequest(r *http.Request)              { a.req = r }
+func (a *recordingAccessor) ResponseWriter() http.ResponseWriter     { return a.rw }
 func (a *recordingAccessor) SetResponseWriter(w http.ResponseWriter) { a.rw = w }
 
 func principalWithSubject(sub string) *claims.ClaimsPrincipal {
@@ -196,6 +197,127 @@ func TestUserSessionGetUserReflectsCreation(t *testing.T) {
 			if sub := extensions.GetSubjectIdFromPrincipal(user); sub != "alice" {
 				t.Fatalf("GetUser subject = %q, want alice", sub)
 			}
+		})
+	}
+}
+
+// recoveryHandler returns a preset authentication result so the ticket-recovery
+// path in GetUser can be exercised without a real handler.
+type recoveryHandler struct {
+	result *auth.Result
+}
+
+func (h *recoveryHandler) Initialize(*http.Request, http.ResponseWriter, *auth.Scheme) error {
+	return nil
+}
+func (h *recoveryHandler) Authenticate() (*auth.Result, error) { return h.result, nil }
+func (h *recoveryHandler) Challenge(*auth.Properties) error    { return nil }
+func (h *recoveryHandler) Forbid(*auth.Properties) error       { return nil }
+
+// recoveryHandlerProvider hands back a preset handler for any scheme name.
+type recoveryHandlerProvider struct {
+	handler auth.Handler
+}
+
+func (p *recoveryHandlerProvider) GetHandler(*http.Request, http.ResponseWriter, string) (auth.Handler, error) {
+	return p.handler, nil
+}
+
+func recoverySchemes(t *testing.T) auth.SchemeProvider {
+	t.Helper()
+	options := auth.NewOptions()
+	options.DefaultScheme = "recovery"
+	schemes := authcore.NewSchemeProvider(options)
+	if err := schemes.AddScheme(auth.NewScheme("recovery", "handler")); err != nil {
+		t.Fatalf("AddScheme: %v", err)
+	}
+	return schemes
+}
+
+// TestUserSessionGetUserRecoversFromTicket verifies GetUser restores the
+// authenticated user from the authentication ticket when no session was created
+// in the current request, and returns nil when the ticket yields no result. The
+// behavior is identical in the disabled and enabled states.
+func TestUserSessionGetUserRecoversFromTicket(t *testing.T) {
+	t.Parallel()
+
+	for name, enabled := range map[string]bool{
+		"disabled": false,
+		"enabled":  true,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("recovers", func(t *testing.T) {
+				t.Parallel()
+
+				clock := newSessionStateClock()
+				store := sessionpkg.NewMemoryStore(clock)
+				rec := httptest.NewRecorder()
+				acc := &recordingAccessor{req: httptest.NewRequest(http.MethodGet, "/", nil), rw: rec}
+
+				principal := principalWithSubject("bob")
+				handlers := &recoveryHandlerProvider{handler: &recoveryHandler{result: &auth.Result{Principal: principal}}}
+
+				opts := &config_options.WicketOptions{
+					ServerSideSessions: &config_options.ServerSideSessionOptions{Enabled: enabled},
+				}
+				us := NewUserSession(acc, handlers, opts, clock, nil, nil, recoverySchemes(t), store)
+
+				user := us.GetUser()
+				if user == nil {
+					t.Fatal("GetUser must recover the authenticated user from the ticket")
+				}
+				if sub := extensions.GetSubjectIdFromPrincipal(user); sub != "bob" {
+					t.Fatalf("recovered subject = %q, want bob", sub)
+				}
+			})
+
+			t.Run("anonymous", func(t *testing.T) {
+				t.Parallel()
+
+				clock := newSessionStateClock()
+				store := sessionpkg.NewMemoryStore(clock)
+				rec := httptest.NewRecorder()
+				acc := &recordingAccessor{req: httptest.NewRequest(http.MethodGet, "/", nil), rw: rec}
+
+				handlers := &recoveryHandlerProvider{handler: &recoveryHandler{result: auth.NoResult()}}
+
+				opts := &config_options.WicketOptions{
+					ServerSideSessions: &config_options.ServerSideSessionOptions{Enabled: enabled},
+				}
+				us := NewUserSession(acc, handlers, opts, clock, nil, nil, recoverySchemes(t), store)
+
+				if us.GetUser() != nil {
+					t.Fatal("GetUser must return nil when the ticket yields no result")
+				}
+			})
+
+			t.Run("created wins", func(t *testing.T) {
+				t.Parallel()
+
+				clock := newSessionStateClock()
+				store := sessionpkg.NewMemoryStore(clock)
+				rec := httptest.NewRecorder()
+				acc := &recordingAccessor{req: httptest.NewRequest(http.MethodGet, "/", nil), rw: rec}
+
+				ticket := principalWithSubject("ticket")
+				handlers := &recoveryHandlerProvider{handler: &recoveryHandler{result: &auth.Result{Principal: ticket}}}
+
+				opts := &config_options.WicketOptions{
+					ServerSideSessions: &config_options.ServerSideSessionOptions{Enabled: enabled},
+				}
+				us := NewUserSession(acc, handlers, opts, clock, nil, nil, recoverySchemes(t), store)
+
+				if _, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{}); err != nil {
+					t.Fatalf("CreateSessionId: %v", err)
+				}
+
+				user := us.GetUser()
+				if sub := extensions.GetSubjectIdFromPrincipal(user); sub != "alice" {
+					t.Fatalf("GetUser subject = %q, want alice (current-request session wins over ticket)", sub)
+				}
+			})
 		})
 	}
 }

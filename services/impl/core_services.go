@@ -126,19 +126,21 @@ func (c *JwtRequestUriHttpClient) GetJwt(uri string, client *storage_models.Clie
 }
 
 type UserSession struct {
-	accessor       accessor.HttpContextAccessor
-	items          map[string]any
-	user           *claims.ClaimsPrincipal
-	session        string
-	clients        []string
-	store          sessionpkg.Store
-	clock          services.SystemClock
-	logger         *slog.Logger
-	enabled        bool
-	lifetime       time.Duration
-	cookieName     string
-	cookieSecure   bool
-	cookieSameSite http.SameSite
+	accessor        accessor.HttpContextAccessor
+	handlerProvider auth.HandlerProvider
+	schemes         auth.SchemeProvider
+	items           map[string]any
+	user            *claims.ClaimsPrincipal
+	session         string
+	clients         []string
+	store           sessionpkg.Store
+	clock           services.SystemClock
+	logger          *slog.Logger
+	enabled         bool
+	lifetime        time.Duration
+	cookieName      string
+	cookieSecure    bool
+	cookieSameSite  http.SameSite
 }
 
 func NewUserSession(
@@ -170,16 +172,18 @@ func NewUserSession(
 		}
 	}
 	return &UserSession{
-		accessor:       accessor,
-		items:          map[string]any{},
-		store:          store,
-		clock:          clock,
-		logger:         logger,
-		enabled:        enabled,
-		lifetime:       lifetime,
-		cookieName:     cookieName,
-		cookieSecure:   cookieSecure,
-		cookieSameSite: cookieSameSite,
+		accessor:        accessor,
+		handlerProvider: handlerProvider,
+		schemes:         schemes,
+		items:           map[string]any{},
+		store:           store,
+		clock:           clock,
+		logger:          logger,
+		enabled:         enabled,
+		lifetime:        lifetime,
+		cookieName:      cookieName,
+		cookieSecure:    cookieSecure,
+		cookieSameSite:  cookieSameSite,
 	}
 }
 
@@ -318,7 +322,38 @@ func (s *UserSession) GetClientList() ([]string, error) {
 	return append([]string(nil), s.clients...), nil
 }
 
-func (s *UserSession) GetUser() *claims.ClaimsPrincipal { return s.user }
+// GetUser returns the user established for the current request. When no session
+// was created in this request, it restores the authenticated user from the
+// authentication ticket via the default authenticate scheme's handler. It is a
+// read-only recovery: no session is written and no cookie is emitted. A nil
+// handler provider, absent default scheme, or empty result yields nil.
+func (s *UserSession) GetUser() *claims.ClaimsPrincipal {
+	if s.user != nil {
+		return s.user
+	}
+	if s.handlerProvider == nil || s.schemes == nil {
+		return nil
+	}
+	scheme := s.schemes.GetDefaultAuthenticateScheme()
+	if scheme == nil {
+		return nil
+	}
+	var request *http.Request
+	var response http.ResponseWriter
+	if s.accessor != nil {
+		request = s.accessor.Request()
+	}
+	response = s.responseWriter()
+	handler, err := s.handlerProvider.GetHandler(request, response, scheme.Name)
+	if err != nil || handler == nil {
+		return nil
+	}
+	result, err := handler.Authenticate()
+	if err != nil || result == nil || result.None {
+		return nil
+	}
+	return result.Principal
+}
 
 func (s *UserSession) AddClientId(clientId string) error {
 	if !utils.Contains(s.clients, clientId) {
