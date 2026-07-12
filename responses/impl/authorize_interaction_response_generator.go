@@ -230,9 +230,12 @@ func (g *AuthorizeInteractionResponseGenerator) sessionAge(req *validators_model
 }
 
 // consentAuthorizationError maps an interaction authorization error onto the
-// authorize protocol error it represents.
+// authorize protocol error it represents. An unrecognized value falls back to
+// access_denied — refusing the grant rather than leaking a broader error.
 func consentAuthorizationError(e messages.AuthorizationError) error {
 	switch e {
+	case messages.AccessDenied:
+		return gois.AuthorizeErrorsAccessDenied
 	case messages.InteractionRequired:
 		return gois.AuthorizeErrorsInteractionRequired
 	case messages.LoginRequired:
