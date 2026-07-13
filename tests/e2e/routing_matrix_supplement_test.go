@@ -20,6 +20,15 @@ const routingMatrixSupplementGlob = "test-baseline-routing-matrix-supplement-*.c
 // path, and it must carry a non-empty note anchoring the resolution record.
 const routingMatrixFinalViewGlob = "test-baseline-routing-matrix-final-*.csv"
 
+// routingMatrixRegressionGlob matches the append-only regression-fulfillment
+// files that resolve an excluded row back into a backed disposition once a
+// later resolution implements the surface the exclusion recorded as
+// unimplemented. This is the only sanctioned direction out of an exclusion:
+// the fold runs after every final view, so it acts on rows that are excluded
+// in the synthesized view, and it demands the full disposition proof (a
+// disposed status, a real landing path, and a non-empty fulfillment anchor).
+const routingMatrixRegressionGlob = "test-baseline-routing-matrix-regression-*.csv"
+
 // exclusionFinalStatuses are the terminal outcomes a final-view row may assign
 // to a still-blocked base row. They never admit a landing path and never
 // exempt a file from the presence guard: an exclusion is a recorded decision
@@ -99,7 +108,80 @@ func synthesizedRoutingMatrix(t *testing.T) []routingMatrixRow {
 	for _, finalView := range routingMatrixFinalViewFiles(t, evidenceRoot) {
 		applyRoutingMatrixExclusions(t, finalView, rows, byGois)
 	}
+	for _, regression := range routingMatrixRegressionFiles(t, evidenceRoot) {
+		applyRoutingMatrixRegressionFulfillments(t, regression, rows, byGois)
+	}
 	return rows
+}
+
+// routingMatrixRegressionFiles returns the regression-fulfillment CSVs in
+// deterministic order, mirroring the supplement and final-view folding.
+func routingMatrixRegressionFiles(t *testing.T, evidenceRoot string) []string {
+	t.Helper()
+
+	matches, err := filepath.Glob(filepath.Join(evidenceRoot, routingMatrixRegressionGlob))
+	if err != nil {
+		t.Fatalf("glob routing matrix regression fulfillments: %v", err)
+	}
+	sort.Strings(matches)
+	return matches
+}
+
+// applyRoutingMatrixRegressionFulfillments folds one regression-fulfillment
+// file into rows. The legality checks make this the exact dual of an
+// exclusion, and strictly narrower: the target row must currently be
+// "excluded" in the synthesized view — an erratum-reclassified row records a
+// lineage correction that carries no fulfillment obligation, and a disposed,
+// archived, or blocked row was never excluded to begin with, so every one of
+// those fails closed. The outcome must be a disposed status backed by a real
+// landing path, and the note must stay non-empty so the fulfillment remains
+// anchored to its resolution record. A row folded here exits the exclusion
+// presence guard and enters the landing-path consumption exactly as any other
+// disposed row: no assertion is weakened, the row simply changes category
+// with full proof attached.
+func applyRoutingMatrixRegressionFulfillments(t *testing.T, path string, rows []routingMatrixRow, byGois map[string]int) {
+	t.Helper()
+
+	records := readCsvRecords(t, path)
+	header := csvHeader(t, path, records)
+	goisIndex := header("gois_path")
+	statusIndex := header("final_status")
+	landingIndex := header("wicket_landing_path")
+	noteIndex := header("note")
+
+	base := filepath.Base(path)
+	for rowNo, record := range records[1:] {
+		if len(record) <= goisIndex || len(record) <= statusIndex ||
+			len(record) <= landingIndex || len(record) <= noteIndex {
+			t.Fatalf("%s row %d has too few columns", base, rowNo+2)
+		}
+		gois := strings.TrimSpace(record[goisIndex])
+		idx, ok := byGois[gois]
+		if !ok {
+			t.Fatalf("%s row %d fulfills unknown gois_path %q", base, rowNo+2, gois)
+		}
+		if _, exclusion := exclusionFinalStatuses[rows[idx].FinalStatus]; !exclusion {
+			t.Fatalf("%s row %d fulfills gois_path %q whose current status %q is not an exclusion", base, rowNo+2, gois, rows[idx].FinalStatus)
+		}
+		if rows[idx].FinalStatus == "erratum-reclassified" {
+			t.Fatalf("%s row %d fulfills gois_path %q whose erratum reclassification records no fulfillment obligation", base, rowNo+2, gois)
+		}
+		status := strings.TrimSpace(record[statusIndex])
+		if _, disposed := disposedFinalStatuses[status]; !disposed {
+			t.Fatalf("%s row %d moves gois_path %q to non-disposed status %q", base, rowNo+2, gois, status)
+		}
+		landing := strings.TrimSpace(record[landingIndex])
+		if landing == "" || landing == "-" {
+			t.Fatalf("%s row %d fulfills gois_path %q but names no landing path", base, rowNo+2, gois)
+		}
+		note := strings.TrimSpace(record[noteIndex])
+		if note == "" {
+			t.Fatalf("%s row %d fulfills gois_path %q without a fulfillment anchor", base, rowNo+2, gois)
+		}
+		rows[idx].FinalStatus = status
+		rows[idx].LandingPath = landing
+		rows[idx].Note = note
+	}
 }
 
 // routingMatrixFinalViewFiles returns the final-view CSVs in deterministic
