@@ -35,7 +35,7 @@ func NewHandler(
 }
 
 func (h *Handler) CreateTicket(identity *claimspkg.ClaimsIdentity, properties *auth.Properties, tokens *oauth.TokenResponse) (*auth.Ticket, error) {
-	req, err := http.NewRequest(http.MethodGet, UserInformationEndpoint, nil)
+	req, err := http.NewRequest(http.MethodGet, h.Options.UserInformationEndpoint(), nil)
 	if err != nil {
 		return nil, err
 	}
