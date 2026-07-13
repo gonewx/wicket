@@ -193,11 +193,14 @@ func schemeFromProvider(provider *dynamicscheme.Provider) *auth.Scheme {
 	return scheme
 }
 
-// UseSchemeAuthMiddleware returns request middleware for dynamic scheme
-// providers. When disabled it is a no-op. When enabled the returned middleware
-// currently passes the request through: per-request callback activation depends
-// on the endpoint/handler pipeline and is out of scope here. The options
-// argument is consumed to choose the branch.
+// UseSchemeAuthMiddleware returns request middleware for the dynamic scheme
+// subsystem. When the subsystem is disabled it is a no-op; when enabled it is a
+// pass-through. Callback dispatch for every request-handler scheme — static and
+// dynamic alike — is performed in a single place by the authentication
+// middleware, which drives the merged scheme view (GetRequestHandlerSchemes
+// already folds dynamic providers into the static registry). This middleware
+// stays as the dynamic subsystem's activation seam so the two never dispatch the
+// same callback twice. The options argument selects the branch.
 func UseSchemeAuthMiddleware(logger *slog.Logger, dynamicProviders *config_options.DynamicProviderOptions) func(http.Handler) http.Handler {
 	enabled := dynamicProviders != nil && dynamicProviders.Enabled
 	if !enabled {
