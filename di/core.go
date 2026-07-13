@@ -228,6 +228,11 @@ func registerCore() {
 		return optspkg.NewOptionsMonitor[*google.Options](godi.GetRequired[optspkg.OptionsFactory[*google.Options]](p))
 	})
 	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.GoogleAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.GoogleAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return google.NewHandler(
 			godi.GetRequired[optspkg.OptionsMonitor[*google.Options]](p),
 			godi.GetRequired[*slog.Logger](p),

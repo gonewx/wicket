@@ -993,6 +993,11 @@ func (r *Root) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handler
 
 func (r *Root) NewHandler_gois_GoogleAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.GoogleAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return google.NewHandler(
 			godi.GetRequired[options2.OptionsMonitor[*google.Options]](p),
 			godi.GetRequired[*slog.Logger](p),
@@ -3673,6 +3678,11 @@ func (s *scope) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handle
 
 func (s *scope) NewHandler_gois_GoogleAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.GoogleAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
 		return google.NewHandler(
 			godi.GetRequired[options2.OptionsMonitor[*google.Options]](p),
 			godi.GetRequired[*slog.Logger](p),
