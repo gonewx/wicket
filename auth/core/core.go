@@ -243,6 +243,11 @@ func (s *Service) Forbid(r *http.Request, w http.ResponseWriter, scheme string, 
 }
 
 func (s *Service) SignIn(r *http.Request, w http.ResponseWriter, scheme string, principal *claims.ClaimsPrincipal, properties *auth.Properties) error {
+	if scheme == "" {
+		if def := s.schemes.GetDefaultSignInScheme(); def != nil {
+			scheme = def.Name
+		}
+	}
 	handler, err := s.handlers.GetHandler(r, w, scheme)
 	if err != nil || handler == nil {
 		return err
@@ -254,6 +259,11 @@ func (s *Service) SignIn(r *http.Request, w http.ResponseWriter, scheme string, 
 }
 
 func (s *Service) SignOut(r *http.Request, w http.ResponseWriter, scheme string, properties *auth.Properties) error {
+	if scheme == "" {
+		if def := s.schemes.GetDefaultSignOutScheme(); def != nil {
+			scheme = def.Name
+		}
+	}
 	handler, err := s.handlers.GetHandler(r, w, scheme)
 	if err != nil || handler == nil {
 		return err
@@ -303,10 +313,39 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 					}
 				}
 			}
-			// The request-handler scheme short-circuit is inserted here once
-			// GetRequestHandlerSchemes enumerates schemes; it currently yields
-			// none, so the traversal is empty.
-			// TODO: pending Epic 5 implementation
+			// Request-handler schemes claim their own callback paths — an
+			// external identity provider return leg, for instance. They are
+			// enumerated ahead of the default pass and driven when one owns the
+			// current request; a handled request has already written its own
+			// response, so the pipeline short-circuits here and never descends.
+			// A resolution or processing failure only warns: the request falls
+			// through to the default pass rather than failing outright.
+			if schemes, err := provider.GetRequestHandlerSchemes(); err != nil {
+				logWarn(logger, "request-handler scheme enumeration failed", "", err)
+			} else if len(schemes) > 0 {
+				if scope := hosting.ScopeFrom(r.Context()); scope != nil {
+					if handlers, ok := godi.Get[auth.HandlerProvider](scope); ok && handlers != nil {
+						for _, scheme := range schemes {
+							handler, err := handlers.GetHandler(r, w, scheme.Name)
+							if err != nil {
+								logWarn(logger, "request-handler resolution failed", scheme.Name, err)
+								continue
+							}
+							requestHandler, ok := handler.(auth.RequestHandler)
+							if !ok || !requestHandler.ShouldHandleRequest() {
+								continue
+							}
+							handled, err := requestHandler.HandleRequest()
+							if err != nil {
+								logWarn(logger, "request-handler processing failed", scheme.Name, err)
+							}
+							if handled {
+								return
+							}
+						}
+					}
+				}
+			}
 			next.ServeHTTP(w, r)
 		})
 	}
