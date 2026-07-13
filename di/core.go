@@ -15,6 +15,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	authcookies "github.com/gonewx/wicket/auth/cookies"
 	authcore "github.com/gonewx/wicket/auth/core"
+	"github.com/gonewx/wicket/auth/google"
 	oauthcore "github.com/gonewx/wicket/auth/oauth/core"
 	"github.com/gonewx/wicket/config"
 	config_options "github.com/gonewx/wicket/config/options"
@@ -213,10 +214,25 @@ func registerCore() {
 	// OAuth options and handler registration. The options factory and monitor
 	// follow the same pattern as *auth.Options above; the handler is keyed but
 	// not yet bound to a concrete scheme — host startup calls AddScheme for
-	// concrete OAuth providers (Google, Facebook, etc.) in a later story.
+	// concrete OAuth providers (Google, Facebook, etc.).
 	AddOptions[*oauthcore.Options](&r)
 	godi.AddTransientFactory[optspkg.OptionsMonitor[*oauthcore.Options]](&r, func(p godi.Provider) optspkg.OptionsMonitor[*oauthcore.Options] {
 		return optspkg.NewOptionsMonitor[*oauthcore.Options](godi.GetRequired[optspkg.OptionsFactory[*oauthcore.Options]](p))
+	})
+	// Google provider: options assembly + PostConfigure + handler factory.
+	AddOptions[*google.Options](&r)
+	godi.AddSingletonFactory[optspkg.PostConfigureOptions[*google.Options]](&r, func(p godi.Provider) optspkg.PostConfigureOptions[*google.Options] {
+		return oauthcore.NewPostConfigureOptions[*google.Options](godi.GetRequired[dp.DataProtectionProvider](p))
+	})
+	godi.AddTransientFactory[optspkg.OptionsMonitor[*google.Options]](&r, func(p godi.Provider) optspkg.OptionsMonitor[*google.Options] {
+		return optspkg.NewOptionsMonitor[*google.Options](godi.GetRequired[optspkg.OptionsFactory[*google.Options]](p))
+	})
+	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.GoogleAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		return google.NewHandler(
+			godi.GetRequired[optspkg.OptionsMonitor[*google.Options]](p),
+			godi.GetRequired[*slog.Logger](p),
+			godi.GetRequired[services.SystemClock](p),
+		)
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L162 (AddScoped<IUserSession, DefaultUserSession>, Add).
 	// Form B keeps ServerUrls reading the live HttpContextAccessor request.

@@ -9,6 +9,13 @@ const DefaultIssuer = "LOCAL AUTHORITY"
 
 const Name = "name"
 
+const (
+	NameIdentifier = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+	GivenName      = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
+	Surname        = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"
+	Email          = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+)
+
 type Claim struct {
 	Type           string
 	Value          any
