@@ -561,11 +561,10 @@ func TestGoogleBuildChallengeUrlStateNotContainConsumedParams(t *testing.T) {
 	assert.NotEmpty(t, stateStr)
 
 	stateProps := opts.StateDataFormat().Unprotect(stateStr)
-	if stateProps != nil {
-		assert.NotContains(t, stateProps.Items, "access_type")
-		assert.NotContains(t, stateProps.Items, "prompt")
-		assert.NotContains(t, stateProps.Items, "login_hint")
-	}
+	require.NotNil(t, stateProps, "state must be recoverable via Unprotect for the consumed-params assertions to hold")
+	assert.NotContains(t, stateProps.Items, "access_type")
+	assert.NotContains(t, stateProps.Items, "prompt")
+	assert.NotContains(t, stateProps.Items, "login_hint")
 }
 
 func TestGoogleClaimActionsMappings(t *testing.T) {
