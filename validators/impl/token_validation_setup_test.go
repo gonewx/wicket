@@ -52,6 +52,8 @@ func (reversibleKeyProvider) Create(string) dp.DataProtector { return reversible
 
 type reversibleKeyProtector struct{}
 
+func (p reversibleKeyProtector) Create(string) dp.DataProtector { return p }
+
 func (reversibleKeyProtector) Protect(data []byte) []byte { return append([]byte("p:"), data...) }
 func (reversibleKeyProtector) Unprotect(data []byte) ([]byte, error) {
 	if len(data) < 2 {

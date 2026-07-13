@@ -45,6 +45,8 @@ func (reversibleProvider) Create(string) dp.DataProtector { return reversiblePro
 
 type reversibleProtector struct{}
 
+func (p reversibleProtector) Create(string) dp.DataProtector { return p }
+
 func (reversibleProtector) Protect(data []byte) []byte {
 	return append([]byte("protected:"), data...)
 }
@@ -529,6 +531,8 @@ type identityProvider struct{}
 func (identityProvider) Create(string) dp.DataProtector { return identityProtector{} }
 
 type identityProtector struct{}
+
+func (p identityProtector) Create(string) dp.DataProtector { return p }
 
 func (identityProtector) Protect(data []byte) []byte { return append([]byte(nil), data...) }
 

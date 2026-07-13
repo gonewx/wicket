@@ -12,6 +12,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/auth/cookies"
 	"github.com/gonewx/wicket/auth/core"
+	core2 "github.com/gonewx/wicket/auth/oauth/core"
 	"github.com/gonewx/wicket/config"
 	"github.com/gonewx/wicket/config/options"
 	options2 "github.com/gonewx/wicket/di/options"
@@ -64,6 +65,7 @@ type Root struct {
 	f_Ptr_SchemeProvider                                     *core.SchemeProvider
 	f_ProviderStore                                          dynamicscheme.ProviderStore
 	f_Ptr_Resolver                                           *dynamicscheme.Resolver
+	f_UnnamedOptionsManager__core_Options                    options2.Options[*core2.Options]
 	f_NoopClaimsTransformation                               auth.ClaimsTransformation
 	f_ConfigureOptions__auth_Options                         options2.ConfigureOptions[*auth.Options]
 	f_UnnamedOptionsManager__cookies_AuthenticationOptions   options2.Options[*cookies.AuthenticationOptions]
@@ -187,6 +189,7 @@ func NewRoot() (*Root, error) {
 		}
 		return dynamicscheme.NewResolver(godi.GetRequired[dynamicscheme.ProviderStore](p), clock, enabled, cacheTTL)
 	})(r)
+	r.f_UnnamedOptionsManager__core_Options = options2.NewUnnamedOptionsManager[*core2.Options](r.NewOptionsFactory__core_Options())
 	r.f_NoopClaimsTransformation = core.NewNoopClaimsTransformation()
 	r.f_ConfigureOptions__cookies_AuthenticationOptions = (func(p godi.Provider) options2.ConfigureOptions[*cookies.AuthenticationOptions] {
 		return config.NewConfigureInternalCookieOptions(godi.GetRequired[*options.WicketOptions](p))
@@ -395,6 +398,22 @@ func (r *Root) NewPtr_Decorator_auth_SchemeProvider() *gois.Decorator[auth.Schem
 
 func (r *Root) NewAuthSchemeProvider() auth.SchemeProvider {
 	return schemes.NewAuthSchemeProvider(r.NewPtr_Decorator_auth_SchemeProvider(), r.NewPtr_DynamicProviderOptions(), r.f_Ptr_Resolver, r.f_Ptr_Logger)
+}
+
+func (r *Root) NewOptionsFactory__core_Options() options2.OptionsFactory[*core2.Options] {
+	return (func(p godi.Provider) options2.OptionsFactory[*core2.Options] {
+		return options2.NewOptionsFactory[*core2.Options](
+			godi.GetServices[options2.ConfigureOptions[*core2.Options]](p),
+			godi.GetServices[options2.PostConfigureOptions[*core2.Options]](p),
+			godi.GetServices[options2.ValidateOptions[*core2.Options]](p),
+		)
+	})(r)
+}
+
+func (r *Root) NewOptionsMonitor__core_Options() options2.OptionsMonitor[*core2.Options] {
+	return (func(p godi.Provider) options2.OptionsMonitor[*core2.Options] {
+		return options2.NewOptionsMonitor[*core2.Options](godi.GetRequired[options2.OptionsFactory[*core2.Options]](p))
+	})(r)
 }
 
 func (r *Root) NewPtr_Decorator_auth_Service() *gois.Decorator[auth.Service] {
@@ -993,6 +1012,10 @@ func (r *Root) ProviderStore() dynamicscheme.ProviderStore { return r.f_Provider
 
 func (r *Root) Ptr_Resolver() *dynamicscheme.Resolver { return r.f_Ptr_Resolver }
 
+func (r *Root) UnnamedOptionsManager__core_Options() options2.Options[*core2.Options] {
+	return r.f_UnnamedOptionsManager__core_Options
+}
+
 func (r *Root) NoopClaimsTransformation() auth.ClaimsTransformation {
 	return r.f_NoopClaimsTransformation
 }
@@ -1091,6 +1114,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_ProviderStore
 	case reflect.TypeFor[*dynamicscheme.Resolver]():
 		return r.f_Ptr_Resolver
+	case reflect.TypeFor[options2.Options[*core2.Options]]():
+		return r.f_UnnamedOptionsManager__core_Options
 	case reflect.TypeFor[auth.ClaimsTransformation]():
 		return r.f_NoopClaimsTransformation
 	case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -1171,6 +1196,10 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewPtr_Decorator_auth_SchemeProvider()
 	case reflect.TypeFor[auth.SchemeProvider]():
 		return r.NewAuthSchemeProvider()
+	case reflect.TypeFor[options2.OptionsFactory[*core2.Options]]():
+		return r.NewOptionsFactory__core_Options()
+	case reflect.TypeFor[options2.OptionsMonitor[*core2.Options]]():
+		return r.NewOptionsMonitor__core_Options()
 	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 		return r.NewPtr_Decorator_auth_Service()
 	case reflect.TypeFor[auth.Service]():
@@ -1392,6 +1421,12 @@ func (r *Root) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[*dynamicscheme.Resolver]():
 		return true
 	case reflect.TypeFor[auth.HandlerProvider]():
+		return true
+	case reflect.TypeFor[options2.Options[*core2.Options]]():
+		return true
+	case reflect.TypeFor[options2.OptionsFactory[*core2.Options]]():
+		return true
+	case reflect.TypeFor[options2.OptionsMonitor[*core2.Options]]():
 		return true
 	case reflect.TypeFor[services.UserSession]():
 		return true
@@ -1660,6 +1695,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.f_ProviderStore}
 		case reflect.TypeFor[*dynamicscheme.Resolver]():
 			return []any{r.f_Ptr_Resolver}
+		case reflect.TypeFor[options2.Options[*core2.Options]]():
+			return []any{r.f_UnnamedOptionsManager__core_Options}
 		case reflect.TypeFor[auth.ClaimsTransformation]():
 			return []any{r.f_NoopClaimsTransformation}
 		case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -1740,6 +1777,10 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewPtr_Decorator_auth_SchemeProvider()}
 		case reflect.TypeFor[auth.SchemeProvider]():
 			return []any{r.NewAuthSchemeProvider()}
+		case reflect.TypeFor[options2.OptionsFactory[*core2.Options]]():
+			return []any{r.NewOptionsFactory__core_Options()}
+		case reflect.TypeFor[options2.OptionsMonitor[*core2.Options]]():
+			return []any{r.NewOptionsMonitor__core_Options()}
 		case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 			return []any{r.NewPtr_Decorator_auth_Service()}
 		case reflect.TypeFor[auth.Service]():
@@ -1984,6 +2025,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_ProviderStore
 	case reflect.TypeFor[*dynamicscheme.Resolver]():
 		return s.root.f_Ptr_Resolver
+	case reflect.TypeFor[options2.Options[*core2.Options]]():
+		return s.root.f_UnnamedOptionsManager__core_Options
 	case reflect.TypeFor[auth.ClaimsTransformation]():
 		return s.root.f_NoopClaimsTransformation
 	case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -2064,6 +2107,10 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewPtr_Decorator_auth_SchemeProvider()
 	case reflect.TypeFor[auth.SchemeProvider]():
 		return s.NewAuthSchemeProvider()
+	case reflect.TypeFor[options2.OptionsFactory[*core2.Options]]():
+		return s.NewOptionsFactory__core_Options()
+	case reflect.TypeFor[options2.OptionsMonitor[*core2.Options]]():
+		return s.NewOptionsMonitor__core_Options()
 	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 		return s.NewPtr_Decorator_auth_Service()
 	case reflect.TypeFor[auth.Service]():
@@ -2246,6 +2293,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[*dynamicscheme.Resolver]():
 		return true
+	case reflect.TypeFor[options2.Options[*core2.Options]]():
+		return true
 	case reflect.TypeFor[auth.ClaimsTransformation]():
 		return true
 	case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -2325,6 +2374,10 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
 		return true
 	case reflect.TypeFor[auth.SchemeProvider]():
+		return true
+	case reflect.TypeFor[options2.OptionsFactory[*core2.Options]]():
+		return true
+	case reflect.TypeFor[options2.OptionsMonitor[*core2.Options]]():
 		return true
 	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 		return true
@@ -2538,6 +2591,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.root.f_ProviderStore}
 		case reflect.TypeFor[*dynamicscheme.Resolver]():
 			return []any{s.root.f_Ptr_Resolver}
+		case reflect.TypeFor[options2.Options[*core2.Options]]():
+			return []any{s.root.f_UnnamedOptionsManager__core_Options}
 		case reflect.TypeFor[auth.ClaimsTransformation]():
 			return []any{s.root.f_NoopClaimsTransformation}
 		case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -2618,6 +2673,10 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewPtr_Decorator_auth_SchemeProvider()}
 		case reflect.TypeFor[auth.SchemeProvider]():
 			return []any{s.NewAuthSchemeProvider()}
+		case reflect.TypeFor[options2.OptionsFactory[*core2.Options]]():
+			return []any{s.NewOptionsFactory__core_Options()}
+		case reflect.TypeFor[options2.OptionsMonitor[*core2.Options]]():
+			return []any{s.NewOptionsMonitor__core_Options()}
 		case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 			return []any{s.NewPtr_Decorator_auth_Service()}
 		case reflect.TypeFor[auth.Service]():
@@ -2927,6 +2986,22 @@ func (s *scope) NewPtr_Decorator_auth_SchemeProvider() *gois.Decorator[auth.Sche
 
 func (s *scope) NewAuthSchemeProvider() auth.SchemeProvider {
 	return schemes.NewAuthSchemeProvider(s.NewPtr_Decorator_auth_SchemeProvider(), s.NewPtr_DynamicProviderOptions(), s.root.f_Ptr_Resolver, s.root.f_Ptr_Logger)
+}
+
+func (s *scope) NewOptionsFactory__core_Options() options2.OptionsFactory[*core2.Options] {
+	return (func(p godi.Provider) options2.OptionsFactory[*core2.Options] {
+		return options2.NewOptionsFactory[*core2.Options](
+			godi.GetServices[options2.ConfigureOptions[*core2.Options]](p),
+			godi.GetServices[options2.PostConfigureOptions[*core2.Options]](p),
+			godi.GetServices[options2.ValidateOptions[*core2.Options]](p),
+		)
+	})(s)
+}
+
+func (s *scope) NewOptionsMonitor__core_Options() options2.OptionsMonitor[*core2.Options] {
+	return (func(p godi.Provider) options2.OptionsMonitor[*core2.Options] {
+		return options2.NewOptionsMonitor[*core2.Options](godi.GetRequired[options2.OptionsFactory[*core2.Options]](p))
+	})(s)
 }
 
 func (s *scope) NewPtr_Decorator_auth_Service() *gois.Decorator[auth.Service] {
@@ -3526,6 +3601,10 @@ func (s *scope) Ptr_SchemeProvider() *core.SchemeProvider { return s.root.f_Ptr_
 func (s *scope) ProviderStore() dynamicscheme.ProviderStore { return s.root.f_ProviderStore }
 
 func (s *scope) Ptr_Resolver() *dynamicscheme.Resolver { return s.root.f_Ptr_Resolver }
+
+func (s *scope) UnnamedOptionsManager__core_Options() options2.Options[*core2.Options] {
+	return s.root.f_UnnamedOptionsManager__core_Options
+}
 
 func (s *scope) NoopClaimsTransformation() auth.ClaimsTransformation {
 	return s.root.f_NoopClaimsTransformation

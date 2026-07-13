@@ -7,17 +7,18 @@ This product contains code derived from the following projects:
 Bucket A — ASP.NET Core / Microsoft.IdentityModel (MIT License)
 ==========================================================================
 
-The current provenance ledger identifies no Bucket A files migrated into
-wicket. As of that ledger, wicket does not contain code derived from
-ASP.NET Core or Microsoft.IdentityModel under this bucket.
+The following files in wicket are derived from the ASP.NET Core
+authentication libraries and are used under the MIT License. Each file
+carries the original MIT copyright header identifying the .NET Foundation
+and Contributors.
 
   Copyright (c) .NET Foundation and Contributors
   Licensed under the MIT License
   https://github.com/dotnet/aspnetcore
   https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet
 
-This section is reserved for future Bucket A attribution if a later
-evidence ledger identifies MIT-derived files for migration.
+A machine-readable manifest of all MIT-derived files is maintained in the
+provenance evidence repository (mit-migration-manifest-*.csv).
 
 ==========================================================================
 Bucket B — IdentityServer4 ≤4.1.x (Apache License 2.0)

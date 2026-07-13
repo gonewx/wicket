@@ -156,6 +156,40 @@ func (i *ClaimsIdentity) FindAll(claimType string) []*Claim {
 	return out
 }
 
+func (i *ClaimsIdentity) Clone() *ClaimsIdentity {
+	if i == nil {
+		return nil
+	}
+	cloned := &ClaimsIdentity{
+		authenticationType: i.authenticationType,
+		NameClaimType:      i.NameClaimType,
+		RoleClaimType:      i.RoleClaimType,
+	}
+	for _, c := range i.claims {
+		cloned.claims = append(cloned.claims, &Claim{
+			Type:           c.Type,
+			Value:          c.Value,
+			ValueType:      c.ValueType,
+			Issuer:         c.Issuer,
+			OriginalIssuer: c.OriginalIssuer,
+		})
+	}
+	return cloned
+}
+
+func (i *ClaimsIdentity) TryRemoveClaim(claim *Claim) bool {
+	if i == nil || claim == nil {
+		return false
+	}
+	for idx, c := range i.claims {
+		if c == claim {
+			i.claims = append(i.claims[:idx], i.claims[idx+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
 type ClaimsPrincipal struct {
 	Identities []*ClaimsIdentity
 }

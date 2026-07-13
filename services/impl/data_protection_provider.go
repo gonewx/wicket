@@ -26,6 +26,10 @@ type dataProtector struct {
 // Protect encodes the payload as base64url so the protected form is safe to
 // carry in cookies and URLs, matching what consumers expect from a protected
 // payload. It provides transport-safe encoding, not confidentiality.
+func (p dataProtector) Create(purpose string) dp.DataProtector {
+	return dataProtector{purpose: p.purpose + "." + purpose}
+}
+
 func (p dataProtector) Protect(data []byte) []byte {
 	out := make([]byte, base64.RawURLEncoding.EncodedLen(len(data)))
 	base64.RawURLEncoding.Encode(out, data)

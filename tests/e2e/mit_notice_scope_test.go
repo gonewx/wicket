@@ -1,6 +1,7 @@
 package e2e_test
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,14 +41,48 @@ func TestMitNoticeScopeE2E(t *testing.T) {
 		}
 	}
 
+	manifestPaths := readMitManifestPaths(t, evidenceRoot)
+	if len(manifestPaths) == 0 {
+		t.Fatal("no MIT migration manifest files found in evidence repository")
+	}
+
+	mitHeaderFiles := scanMitHeaderFiles(t, projectRoot(t))
+
+	for _, mp := range manifestPaths {
+		fullPath := filepath.Join(projectRoot(t), mp)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			t.Fatalf("manifest declares %s but file does not exist in wicket", mp)
+		}
+		if !mitHeaderFiles[mp] {
+			t.Fatalf("manifest declares %s but file does not carry MIT header", mp)
+		}
+	}
+
+	for path := range mitHeaderFiles {
+		found := false
+		for _, mp := range manifestPaths {
+			if mp == path {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("file %s carries MIT header but is not listed in any manifest", path)
+		}
+	}
+
 	notice := readProjectFile(t, "NOTICE")
-	for _, want := range []string{
-		"The current provenance ledger identifies no " + "Buc" + "ket A files migrated into\nwicket.",
-		"wicket does not contain code derived from\nASP.NET Core or Microsoft.IdentityModel under this " + "buc" + "ket.",
-		"This section is reserved for future " + "Buc" + "ket A attribution",
+	if strings.Contains(notice, "identifies no") && strings.Contains(notice, "files migrated") {
+		t.Fatal("NOTICE still contains the empty-declaration text after MIT files were migrated")
+	}
+
+	for _, required := range []string{
+		"derived from the ASP.NET Core",
+		"MIT License",
+		"mit-migration-manifest-*.csv",
 	} {
-		if !strings.Contains(notice, want) {
-			t.Fatalf("NOTICE missing %q:\n%s", want, notice)
+		if !strings.Contains(notice, required) {
+			t.Fatalf("NOTICE missing required attribution text %q", required)
 		}
 	}
 
@@ -85,4 +120,75 @@ func readProjectFile(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(content)
+}
+
+func readMitManifestPaths(t *testing.T, evidenceRoot string) []string {
+	t.Helper()
+	pattern := filepath.Join(evidenceRoot, "mit-migration-manifest-*.csv")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		t.Fatalf("glob manifest: %v", err)
+	}
+	var paths []string
+	for _, match := range matches {
+		f, err := os.Open(match)
+		if err != nil {
+			t.Fatalf("open manifest %s: %v", match, err)
+		}
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "wicket_path,") {
+				continue
+			}
+			fields := strings.SplitN(line, ",", 2)
+			if len(fields) > 0 && fields[0] != "" {
+				paths = append(paths, fields[0])
+			}
+		}
+		f.Close()
+	}
+	return paths
+}
+
+func scanMitHeaderFiles(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	result := make(map[string]bool)
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			base := filepath.Base(path)
+			if base == ".git" || base == "_bmad-output" || base == ".claude" || base == ".codegraph" || base == "vendor" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		lineCount := 0
+		for scanner.Scan() && lineCount < 5 {
+			line := scanner.Text()
+			if strings.Contains(line, ".NET Foundation and Contributors") &&
+				strings.Contains(line, "Copyright") {
+				rel, _ := filepath.Rel(root, path)
+				result[rel] = true
+				break
+			}
+			lineCount++
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk project tree: %v", err)
+	}
+	return result
 }

@@ -35,9 +35,15 @@ func (p *Properties) GetTokens() []*Token {
 }
 
 type Result struct {
+	Ticket     *Ticket
 	Principal  *claims.ClaimsPrincipal
 	Properties *Properties
+	Failure    error
 	None       bool
+}
+
+func (r *Result) Succeeded() bool {
+	return r != nil && r.Ticket != nil
 }
 
 func NoResult() *Result {

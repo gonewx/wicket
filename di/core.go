@@ -15,6 +15,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	authcookies "github.com/gonewx/wicket/auth/cookies"
 	authcore "github.com/gonewx/wicket/auth/core"
+	oauthcore "github.com/gonewx/wicket/auth/oauth/core"
 	"github.com/gonewx/wicket/config"
 	config_options "github.com/gonewx/wicket/config/options"
 	optspkg "github.com/gonewx/wicket/di/options"
@@ -208,6 +209,14 @@ func registerCore() {
 			}
 		}
 		return authcore.NewUnsupportedHandler()
+	})
+	// OAuth options and handler registration. The options factory and monitor
+	// follow the same pattern as *auth.Options above; the handler is keyed but
+	// not yet bound to a concrete scheme — host startup calls AddScheme for
+	// concrete OAuth providers (Google, Facebook, etc.) in a later story.
+	AddOptions[*oauthcore.Options](&r)
+	godi.AddTransientFactory[optspkg.OptionsMonitor[*oauthcore.Options]](&r, func(p godi.Provider) optspkg.OptionsMonitor[*oauthcore.Options] {
+		return optspkg.NewOptionsMonitor[*oauthcore.Options](godi.GetRequired[optspkg.OptionsFactory[*oauthcore.Options]](p))
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L162 (AddScoped<IUserSession, DefaultUserSession>, Add).
 	// Form B keeps ServerUrls reading the live HttpContextAccessor request.

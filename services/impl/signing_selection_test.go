@@ -44,6 +44,8 @@ func (reversibleProvider) Create(string) dp.DataProtector { return reversiblePro
 
 type reversibleProtector struct{}
 
+func (p reversibleProtector) Create(string) dp.DataProtector { return p }
+
 func (reversibleProtector) Protect(data []byte) []byte { return append([]byte("p:"), data...) }
 func (reversibleProtector) Unprotect(data []byte) ([]byte, error) {
 	if len(data) < 2 {

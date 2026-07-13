@@ -12,6 +12,7 @@ type DataProtectionProvider interface {
 // DataProtector protects and restores opaque byte payloads.
 // input: bytes -> behavior: encode/decode without external side effects -> output: bytes or error.
 type DataProtector interface {
+	Create(string) DataProtector
 	Protect([]byte) []byte
 	Unprotect([]byte) ([]byte, error)
 }
