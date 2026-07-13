@@ -14,7 +14,9 @@ import (
 func ScopeMiddleware(root godi.Provider) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			next.ServeHTTP(w, r.WithContext(ContextWithScope(r.Context(), root)))
+			scope := root.CreateScope()
+			defer scope.Close()
+			next.ServeHTTP(w, r.WithContext(ContextWithScope(r.Context(), scope)))
 		})
 	}
 }
