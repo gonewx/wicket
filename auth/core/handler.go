@@ -134,11 +134,9 @@ func (h *Handler[T]) Authenticate() (*auth.Result, error) {
 	if result.Failure == nil {
 		ticket := result.Ticket
 		if ticket != nil && ticket.Principal != nil {
-			if h.Logger.Enabled(h.request.Context(), slog.LevelDebug) {
-				h.Logger.Debug("auth.Scheme was successfully authenticated.", slog.String("auth.Scheme", h.Scheme.Name))
-			} else {
-				h.Logger.Debug("auth.Scheme was not authenticated.", slog.String("auth.Scheme", h.Scheme.Name))
-			}
+			h.Logger.Debug("auth.Scheme was successfully authenticated.", slog.String("auth.Scheme", h.Scheme.Name))
+		} else {
+			h.Logger.Debug("auth.Scheme was not authenticated.", slog.String("auth.Scheme", h.Scheme.Name))
 		}
 	} else {
 		h.Logger.Debug("auth.Scheme was not authenticated. Failure message:", slog.String("auth.Scheme", h.Scheme.Name), slog.String("Failure message", result.Failure.Error()))

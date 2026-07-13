@@ -31,7 +31,7 @@ func (o *PostConfigureOptions[T]) PostConfigure(name string, options T) error {
 	}
 
 	if options.Backchannel() == nil {
-		c := http.DefaultClient
+		c := &http.Client{}
 		if options.BackchannelHttpHandler() != nil {
 			c.Transport = options.BackchannelHttpHandler()
 		}

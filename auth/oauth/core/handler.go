@@ -226,6 +226,7 @@ func (h *Handler[T]) ExchangeCode(ctx *CodeExchangeContext) (*oauth.TokenRespons
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
 	if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
 		body, err := io.ReadAll(response.Body)
@@ -285,7 +286,10 @@ func (h *Handler[T]) CreateTicket(identity *claimspkg.ClaimsIdentity, properties
 
 func (h *Handler[T]) HandleChallenge(properties *auth.Properties) error {
 	if properties.RedirectUri() == nil || strings.TrimSpace(*properties.RedirectUri()) == "" {
-		redirectUri := h.OriginalPathBase() + h.OriginalPath() + h.Request().URL.Query().Encode()
+		redirectUri := h.OriginalPathBase() + h.OriginalPath()
+		if rawQuery := h.Request().URL.RawQuery; rawQuery != "" {
+			redirectUri += "?" + rawQuery
+		}
 		properties.SetRedirectUri(&redirectUri)
 	}
 	cookiet := h.Response().Header().Get("Set-Cookie")
@@ -293,7 +297,9 @@ func (h *Handler[T]) HandleChallenge(properties *auth.Properties) error {
 	h.Logger.Debug("HandleChallenge show cookie.", slog.String("Cookie", cookiet))
 
 	// OAuth2 10.12 CSRF
-	_ = h.GenerateCorrelationId(properties)
+	if err := h.GenerateCorrelationId(properties); err != nil {
+		return err
+	}
 
 	authorizationEndpoint, err := h.override.BuildChallengeUrl(properties, h.BuildRedirectUri(h.Options.CallbackPath()))
 	if err != nil {
@@ -357,9 +363,9 @@ func (h *Handler[T]) BuildChallengeUrl(properties *auth.Properties, redirectUri 
 		// Store this for use during the code redemption.
 		properties.Items[oauth.CodeVerifierKey] = codeVerifier
 
-		h := sha256.New()
-		h.Write(bytes)
-		challengeBytes := h.Sum(nil)
+		hasher := sha256.New()
+		hasher.Write([]byte(codeVerifier))
+		challengeBytes := hasher.Sum(nil)
 		codeChallenge := base64.RawURLEncoding.EncodeToString(challengeBytes)
 
 		parameters[oauth.CodeChallengeKey] = []string{codeChallenge}

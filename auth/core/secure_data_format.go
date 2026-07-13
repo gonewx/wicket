@@ -92,7 +92,7 @@ func (f *secureDataFormat[T]) UnprotectWithPurpose(protectedText string, purpose
 	var data T
 	err = json.Unmarshal(userData, &data)
 	if err != nil {
-		return &data
+		return zero
 	}
 	return &data
 }

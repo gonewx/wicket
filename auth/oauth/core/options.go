@@ -94,10 +94,6 @@ func (o *Options) Validate() error {
 		return fmt.Errorf("Exception_OptionMustBeProvided (tokenEndpoint): %w", gois.ArgumentNullException)
 	}
 
-	if strings.TrimSpace(o.clientId) == "" {
-		return fmt.Errorf("Exception_OptionMustBeProvided (clientId): %w", gois.ArgumentNullException)
-	}
-
 	if strings.TrimSpace(o.CallbackPath()) == "" {
 		return fmt.Errorf("Exception_OptionMustBeProvided (CallbackPath): %w", gois.ArgumentNullException)
 	}
