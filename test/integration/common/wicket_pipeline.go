@@ -610,6 +610,10 @@ func newMockExternalAuthenticationHandler(request *http.Request) *mockExternalAu
 	}
 }
 
+func (h *mockExternalAuthenticationHandler) ShouldHandleRequest() bool {
+	return h.request.URL.Path == FederatedSignOutPath
+}
+
 func (h *mockExternalAuthenticationHandler) HandleRequest() (bool, error) {
 	if h.request.URL.Path == FederatedSignOutPath {
 		return h.OnFederatedSignout()

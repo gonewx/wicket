@@ -63,6 +63,15 @@ func NewScheme(name string, handlerType string) *Scheme {
 	return &Scheme{Name: name, HandlerType: handlerType}
 }
 
+// NewRequestHandlerScheme builds a scheme whose handler participates in request
+// processing — an external identity provider callback, for instance — so the
+// middleware enumerates it ahead of the default authenticate pass. It sets the
+// request-handling capability that the dynamic subsystem assigns to its runtime
+// provider schemes, giving static registrations the same standing.
+func NewRequestHandlerScheme(name string, handlerType string) *Scheme {
+	return &Scheme{Name: name, HandlerType: handlerType, HandlesRequests: true}
+}
+
 type Options struct {
 	DefaultScheme             string
 	DefaultAuthenticateScheme string
@@ -105,8 +114,15 @@ type SignOutHandler interface {
 	SignOut(*Properties) error
 }
 
+// RequestHandler is a handler that can claim a request and process it before the
+// default authentication pass — a remote callback endpoint being the canonical
+// case. The middleware asks ShouldHandleRequest whether the handler owns the
+// current request, then drives HandleRequest, whose bool reports whether the
+// response was written (handled) and the pipeline should short-circuit.
 type RequestHandler interface {
 	Handler
+	ShouldHandleRequest() bool
+	HandleRequest() (bool, error)
 }
 
 type HandlerProvider interface {
