@@ -332,7 +332,12 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 								continue
 							}
 							requestHandler, ok := handler.(auth.RequestHandler)
-							if !ok || !requestHandler.ShouldHandleRequest() {
+							if !ok {
+								logWarn(logger, "request-handler scheme resolved a handler that does not implement the request-handler contract", scheme.Name,
+									fmt.Errorf("handler type does not satisfy auth.RequestHandler"))
+								continue
+							}
+							if !requestHandler.ShouldHandleRequest() {
 								continue
 							}
 							handled, err := requestHandler.HandleRequest()
