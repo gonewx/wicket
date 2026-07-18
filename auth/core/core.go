@@ -314,13 +314,13 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 				}
 			}
 			// Request-handler schemes claim their own callback paths — an
-			// external identity provider return leg, for instance. They are
-			// enumerated ahead of the default pass and driven when one owns the
-			// current request; a handled request has already written its own
-			// response, so the pipeline short-circuits here and never descends.
-			// A resolution, contract, or processing failure only warns: the
-			// request falls through to the default pass rather than failing
-			// outright.
+			// external identity provider return leg, for instance. After the
+			// default authenticate pass above, they are enumerated and driven
+			// when one owns the current request; a handled request has already
+			// written its own response, so the pipeline short-circuits here
+			// and never descends. A resolution, contract, or processing
+			// failure only warns: the request falls through to the downstream
+			// pipeline rather than failing outright.
 			if schemes, err := provider.GetRequestHandlerSchemes(); err != nil {
 				logWarn(logger, "request-handler scheme enumeration failed", "", err)
 			} else if len(schemes) > 0 {

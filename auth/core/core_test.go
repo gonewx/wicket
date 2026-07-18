@@ -5,6 +5,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -60,10 +61,11 @@ func (plainHandler) Challenge(*auth.Properties) error                           
 func (plainHandler) Forbid(*auth.Properties) error                                     { return nil }
 
 // TestMiddlewareRequestHandlerDispatch covers the callback dispatch: a scheme
-// marked as a request handler is enumerated ahead of the default pass, resolved
-// through the request scope, and driven when it owns the request; a handled
-// request short-circuits the pipeline, everything else passes through, and a
-// resolution failure warns without failing the request.
+// marked as a request handler is enumerated after the default authenticate
+// pass, resolved through the request scope, and driven when it owns the
+// request; a handled request short-circuits the pipeline, everything else
+// passes through, and a resolution or processing failure warns without
+// failing the request.
 func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
@@ -72,6 +74,7 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 		nonConforming   bool // factory yields a handler missing auth.RequestHandler
 		should          bool
 		handled         bool
+		handleErr       error
 		wantNextCalled  bool
 		wantHandleCalls int
 		wantStatus      int // asserted only when non-zero
@@ -97,6 +100,16 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 			registerScheme: false, registerFactory: false,
 			wantNextCalled: true, wantHandleCalls: 0,
 		},
+		"processing error without handling warns and passes through": {
+			registerScheme: true, registerFactory: true, should: true,
+			handleErr:      errors.New("token exchange failed"),
+			wantNextCalled: true, wantHandleCalls: 1, wantWarn: true,
+		},
+		"processing error while handled warns and still short-circuits": {
+			registerScheme: true, registerFactory: true, should: true, handled: true,
+			handleErr:      errors.New("post-write failure"),
+			wantNextCalled: false, wantHandleCalls: 1, wantStatus: http.StatusFound, wantWarn: true,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -104,7 +117,7 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 
 			schemes := NewSchemeProvider(auth.NewOptions())
 			provider := newKeyedProvider()
-			spy := &requestHandlerSpy{should: tc.should, handled: tc.handled}
+			spy := &requestHandlerSpy{should: tc.should, handled: tc.handled, handleErr: tc.handleErr}
 			if tc.registerScheme {
 				if err := schemes.AddScheme(auth.NewRequestHandlerScheme("ext", "handler")); err != nil {
 					t.Fatalf("AddScheme: %v", err)
@@ -163,11 +176,14 @@ type signCaptureHandler struct {
 func (h *signCaptureHandler) Initialize(*http.Request, http.ResponseWriter, *auth.Scheme) error {
 	return nil
 }
-func (h *signCaptureHandler) Authenticate() (*auth.Result, error)                  { return auth.NoResult(), nil }
-func (h *signCaptureHandler) Challenge(*auth.Properties) error                     { return nil }
-func (h *signCaptureHandler) Forbid(*auth.Properties) error                        { return nil }
-func (h *signCaptureHandler) SignIn(*claims.ClaimsPrincipal, *auth.Properties) error { h.signedIn = true; return nil }
-func (h *signCaptureHandler) SignOut(*auth.Properties) error                       { h.signedOut = true; return nil }
+func (h *signCaptureHandler) Authenticate() (*auth.Result, error) { return auth.NoResult(), nil }
+func (h *signCaptureHandler) Challenge(*auth.Properties) error    { return nil }
+func (h *signCaptureHandler) Forbid(*auth.Properties) error       { return nil }
+func (h *signCaptureHandler) SignIn(*claims.ClaimsPrincipal, *auth.Properties) error {
+	h.signedIn = true
+	return nil
+}
+func (h *signCaptureHandler) SignOut(*auth.Properties) error { h.signedOut = true; return nil }
 
 // TestServiceEmptySchemeResolvesToDefault verifies that sign-in and sign-out with
 // an empty scheme resolve to the configured default sign-in / sign-out scheme
