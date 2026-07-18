@@ -318,8 +318,9 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 			// enumerated ahead of the default pass and driven when one owns the
 			// current request; a handled request has already written its own
 			// response, so the pipeline short-circuits here and never descends.
-			// A resolution or processing failure only warns: the request falls
-			// through to the default pass rather than failing outright.
+			// A resolution, contract, or processing failure only warns: the
+			// request falls through to the default pass rather than failing
+			// outright.
 			if schemes, err := provider.GetRequestHandlerSchemes(); err != nil {
 				logWarn(logger, "request-handler scheme enumeration failed", "", err)
 			} else if len(schemes) > 0 {
@@ -331,10 +332,13 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 								logWarn(logger, "request-handler resolution failed", scheme.Name, err)
 								continue
 							}
+							if handler == nil {
+								continue
+							}
 							requestHandler, ok := handler.(auth.RequestHandler)
 							if !ok {
-								logWarn(logger, "request-handler scheme resolved a handler that does not implement the request-handler contract", scheme.Name,
-									fmt.Errorf("handler type does not satisfy auth.RequestHandler"))
+								logWarn(logger, "request-handler contract not implemented", scheme.Name,
+									fmt.Errorf("handler type %T does not implement auth.RequestHandler", handler))
 								continue
 							}
 							if !requestHandler.ShouldHandleRequest() {
@@ -356,9 +360,9 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 	}
 }
 
-// logWarn records a middleware authentication failure. The middleware never
-// fails the request on an authentication error — the request proceeds
-// anonymously — so the log entry is the only diagnostic signal.
+// logWarn records a middleware failure. The middleware never fails the
+// request on an error — the request proceeds anonymously — so the log entry
+// is the only diagnostic signal.
 func logWarn(logger *slog.Logger, message, scheme string, err error) {
 	if logger != nil {
 		logger.Warn(message, slog.String("scheme", scheme), slog.Any("error", err))

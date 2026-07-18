@@ -49,6 +49,16 @@ func (h *requestHandlerSpy) HandleRequest() (bool, error) {
 
 var _ auth.RequestHandler = (*requestHandlerSpy)(nil)
 
+// plainHandler is an auth.Handler double that deliberately does not implement
+// auth.RequestHandler, standing in for a scheme registered as a request
+// handler whose resolved handler misses the contract.
+type plainHandler struct{}
+
+func (plainHandler) Initialize(*http.Request, http.ResponseWriter, *auth.Scheme) error { return nil }
+func (plainHandler) Authenticate() (*auth.Result, error)                               { return auth.NoResult(), nil }
+func (plainHandler) Challenge(*auth.Properties) error                                  { return nil }
+func (plainHandler) Forbid(*auth.Properties) error                                     { return nil }
+
 // TestMiddlewareRequestHandlerDispatch covers the callback dispatch: a scheme
 // marked as a request handler is enumerated ahead of the default pass, resolved
 // through the request scope, and driven when it owns the request; a handled
@@ -59,6 +69,7 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 	cases := map[string]struct {
 		registerScheme  bool // register the "ext" request-handler scheme
 		registerFactory bool // provide a factory for it (false => resolution error)
+		nonConforming   bool // factory yields a handler missing auth.RequestHandler
 		should          bool
 		handled         bool
 		wantNextCalled  bool
@@ -76,6 +87,10 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 		},
 		"resolution error passes through and warns": {
 			registerScheme: true, registerFactory: false,
+			wantNextCalled: true, wantHandleCalls: 0, wantWarn: true,
+		},
+		"non-conforming handler passes through and warns": {
+			registerScheme: true, registerFactory: true, nonConforming: true,
 			wantNextCalled: true, wantHandleCalls: 0, wantWarn: true,
 		},
 		"no request-handler scheme passes through": {
@@ -101,7 +116,11 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 				}
 			}
 			if tc.registerFactory {
-				provider.factories["ext"] = func() auth.Handler { return spy }
+				if tc.nonConforming {
+					provider.factories["ext"] = func() auth.Handler { return plainHandler{} }
+				} else {
+					provider.factories["ext"] = func() auth.Handler { return spy }
+				}
 			}
 			handlers := NewHandlerProvider(schemes, provider)
 			provider.services[reflect.TypeFor[auth.HandlerProvider]()] = auth.HandlerProvider(handlers)
