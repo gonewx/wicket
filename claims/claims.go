@@ -14,6 +14,9 @@ const (
 	GivenName      = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
 	Surname        = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"
 	Email          = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+	DateOfBirth    = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/dateofbirth"
+	Gender         = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/gender"
+	Locality       = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/locality"
 )
 
 type Claim struct {

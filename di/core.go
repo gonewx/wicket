@@ -15,6 +15,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	authcookies "github.com/gonewx/wicket/auth/cookies"
 	authcore "github.com/gonewx/wicket/auth/core"
+	"github.com/gonewx/wicket/auth/facebook"
 	"github.com/gonewx/wicket/auth/google"
 	oauthcore "github.com/gonewx/wicket/auth/oauth/core"
 	"github.com/gonewx/wicket/config"
@@ -235,6 +236,26 @@ func registerCore() {
 		}
 		return google.NewHandler(
 			godi.GetRequired[optspkg.OptionsMonitor[*google.Options]](p),
+			godi.GetRequired[*slog.Logger](p),
+			godi.GetRequired[services.SystemClock](p),
+		)
+	})
+	// Facebook provider: options assembly + PostConfigure + handler factory.
+	AddOptions[*facebook.Options](&r)
+	godi.AddSingletonFactory[optspkg.PostConfigureOptions[*facebook.Options]](&r, func(p godi.Provider) optspkg.PostConfigureOptions[*facebook.Options] {
+		return oauthcore.NewPostConfigureOptions[*facebook.Options](godi.GetRequired[dp.DataProtectionProvider](p))
+	})
+	godi.AddTransientFactory[optspkg.OptionsMonitor[*facebook.Options]](&r, func(p godi.Provider) optspkg.OptionsMonitor[*facebook.Options] {
+		return optspkg.NewOptionsMonitor[*facebook.Options](godi.GetRequired[optspkg.OptionsFactory[*facebook.Options]](p))
+	})
+	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.FacebookAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.FacebookAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
+		return facebook.NewHandler(
+			godi.GetRequired[optspkg.OptionsMonitor[*facebook.Options]](p),
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[services.SystemClock](p),
 		)

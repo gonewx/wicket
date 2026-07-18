@@ -12,6 +12,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/auth/cookies"
 	"github.com/gonewx/wicket/auth/core"
+	"github.com/gonewx/wicket/auth/facebook"
 	"github.com/gonewx/wicket/auth/google"
 	core2 "github.com/gonewx/wicket/auth/oauth/core"
 	"github.com/gonewx/wicket/config"
@@ -69,6 +70,8 @@ type Root struct {
 	f_UnnamedOptionsManager__core_Options                    options2.Options[*core2.Options]
 	f_UnnamedOptionsManager__google_Options                  options2.Options[*google.Options]
 	f_PostConfigureOptions__google_Options                   options2.PostConfigureOptions[*google.Options]
+	f_UnnamedOptionsManager__facebook_Options                options2.Options[*facebook.Options]
+	f_PostConfigureOptions__facebook_Options                 options2.PostConfigureOptions[*facebook.Options]
 	f_NoopClaimsTransformation                               auth.ClaimsTransformation
 	f_ConfigureOptions__auth_Options                         options2.ConfigureOptions[*auth.Options]
 	f_UnnamedOptionsManager__cookies_AuthenticationOptions   options2.Options[*cookies.AuthenticationOptions]
@@ -197,6 +200,10 @@ func NewRoot() (*Root, error) {
 		return core2.NewPostConfigureOptions[*google.Options](godi.GetRequired[dp.DataProtectionProvider](p))
 	})(r)
 	r.f_UnnamedOptionsManager__google_Options = options2.NewUnnamedOptionsManager[*google.Options](r.NewOptionsFactory__google_Options())
+	r.f_PostConfigureOptions__facebook_Options = (func(p godi.Provider) options2.PostConfigureOptions[*facebook.Options] {
+		return core2.NewPostConfigureOptions[*facebook.Options](godi.GetRequired[dp.DataProtectionProvider](p))
+	})(r)
+	r.f_UnnamedOptionsManager__facebook_Options = options2.NewUnnamedOptionsManager[*facebook.Options](r.NewOptionsFactory__facebook_Options())
 	r.f_NoopClaimsTransformation = core.NewNoopClaimsTransformation()
 	r.f_ConfigureOptions__cookies_AuthenticationOptions = (func(p godi.Provider) options2.ConfigureOptions[*cookies.AuthenticationOptions] {
 		return config.NewConfigureInternalCookieOptions(godi.GetRequired[*options.WicketOptions](p))
@@ -436,6 +443,22 @@ func (r *Root) NewOptionsFactory__google_Options() options2.OptionsFactory[*goog
 func (r *Root) NewOptionsMonitor__google_Options() options2.OptionsMonitor[*google.Options] {
 	return (func(p godi.Provider) options2.OptionsMonitor[*google.Options] {
 		return options2.NewOptionsMonitor[*google.Options](godi.GetRequired[options2.OptionsFactory[*google.Options]](p))
+	})(r)
+}
+
+func (r *Root) NewOptionsFactory__facebook_Options() options2.OptionsFactory[*facebook.Options] {
+	return (func(p godi.Provider) options2.OptionsFactory[*facebook.Options] {
+		return options2.NewOptionsFactory[*facebook.Options](
+			godi.GetServices[options2.ConfigureOptions[*facebook.Options]](p),
+			godi.GetServices[options2.PostConfigureOptions[*facebook.Options]](p),
+			godi.GetServices[options2.ValidateOptions[*facebook.Options]](p),
+		)
+	})(r)
+}
+
+func (r *Root) NewOptionsMonitor__facebook_Options() options2.OptionsMonitor[*facebook.Options] {
+	return (func(p godi.Provider) options2.OptionsMonitor[*facebook.Options] {
+		return options2.NewOptionsMonitor[*facebook.Options](godi.GetRequired[options2.OptionsFactory[*facebook.Options]](p))
 	})(r)
 }
 
@@ -1006,6 +1029,21 @@ func (r *Root) NewHandler_gois_GoogleAuthenticationScheme() auth.Handler {
 	})(r)
 }
 
+func (r *Root) NewHandler_gois_FacebookAuthenticationScheme() auth.Handler {
+	return (func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.FacebookAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
+		return facebook.NewHandler(
+			godi.GetRequired[options2.OptionsMonitor[*facebook.Options]](p),
+			godi.GetRequired[*slog.Logger](p),
+			godi.GetRequired[services.SystemClock](p),
+		)
+	})(r)
+}
+
 func (r *Root) SystemClock() services.SystemClock { return r.f_SystemClock }
 
 func (r *Root) ServerConfig() *ServerConfig { return r.f_ServerConfig }
@@ -1060,6 +1098,14 @@ func (r *Root) UnnamedOptionsManager__google_Options() options2.Options[*google.
 
 func (r *Root) PostConfigureOptions__google_Options() options2.PostConfigureOptions[*google.Options] {
 	return r.f_PostConfigureOptions__google_Options
+}
+
+func (r *Root) UnnamedOptionsManager__facebook_Options() options2.Options[*facebook.Options] {
+	return r.f_UnnamedOptionsManager__facebook_Options
+}
+
+func (r *Root) PostConfigureOptions__facebook_Options() options2.PostConfigureOptions[*facebook.Options] {
+	return r.f_PostConfigureOptions__facebook_Options
 }
 
 func (r *Root) NoopClaimsTransformation() auth.ClaimsTransformation {
@@ -1166,6 +1212,10 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_UnnamedOptionsManager__google_Options
 	case reflect.TypeFor[options2.PostConfigureOptions[*google.Options]]():
 		return r.f_PostConfigureOptions__google_Options
+	case reflect.TypeFor[options2.Options[*facebook.Options]]():
+		return r.f_UnnamedOptionsManager__facebook_Options
+	case reflect.TypeFor[options2.PostConfigureOptions[*facebook.Options]]():
+		return r.f_PostConfigureOptions__facebook_Options
 	case reflect.TypeFor[auth.ClaimsTransformation]():
 		return r.f_NoopClaimsTransformation
 	case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -1254,6 +1304,10 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewOptionsFactory__google_Options()
 	case reflect.TypeFor[options2.OptionsMonitor[*google.Options]]():
 		return r.NewOptionsMonitor__google_Options()
+	case reflect.TypeFor[options2.OptionsFactory[*facebook.Options]]():
+		return r.NewOptionsFactory__facebook_Options()
+	case reflect.TypeFor[options2.OptionsMonitor[*facebook.Options]]():
+		return r.NewOptionsMonitor__facebook_Options()
 	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 		return r.NewPtr_Decorator_auth_Service()
 	case reflect.TypeFor[auth.Service]():
@@ -1490,6 +1544,14 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[options2.OptionsMonitor[*google.Options]]():
 		return true
+	case reflect.TypeFor[options2.Options[*facebook.Options]]():
+		return true
+	case reflect.TypeFor[options2.OptionsFactory[*facebook.Options]]():
+		return true
+	case reflect.TypeFor[options2.PostConfigureOptions[*facebook.Options]]():
+		return true
+	case reflect.TypeFor[options2.OptionsMonitor[*facebook.Options]]():
+		return true
 	case reflect.TypeFor[services.UserSession]():
 		return true
 	case reflect.TypeFor[auth.ClaimsTransformation]():
@@ -1706,6 +1768,8 @@ func (r *Root) IsKeyedService(t reflect.Type, key any) bool {
 			return true
 		case gois.GoogleAuthenticationScheme:
 			return true
+		case gois.FacebookAuthenticationScheme:
+			return true
 		}
 	}
 	return false
@@ -1730,6 +1794,8 @@ func (r *Root) GetKeyedService(t reflect.Type, key any) any {
 			return r.NewHandler_gois_ExternalCookieAuthenticationScheme()
 		case gois.GoogleAuthenticationScheme:
 			return r.NewHandler_gois_GoogleAuthenticationScheme()
+		case gois.FacebookAuthenticationScheme:
+			return r.NewHandler_gois_FacebookAuthenticationScheme()
 		}
 	}
 	return nil
@@ -1767,6 +1833,10 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.f_UnnamedOptionsManager__google_Options}
 		case reflect.TypeFor[options2.PostConfigureOptions[*google.Options]]():
 			return []any{r.f_PostConfigureOptions__google_Options}
+		case reflect.TypeFor[options2.Options[*facebook.Options]]():
+			return []any{r.f_UnnamedOptionsManager__facebook_Options}
+		case reflect.TypeFor[options2.PostConfigureOptions[*facebook.Options]]():
+			return []any{r.f_PostConfigureOptions__facebook_Options}
 		case reflect.TypeFor[auth.ClaimsTransformation]():
 			return []any{r.f_NoopClaimsTransformation}
 		case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -1855,6 +1925,10 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewOptionsFactory__google_Options()}
 		case reflect.TypeFor[options2.OptionsMonitor[*google.Options]]():
 			return []any{r.NewOptionsMonitor__google_Options()}
+		case reflect.TypeFor[options2.OptionsFactory[*facebook.Options]]():
+			return []any{r.NewOptionsFactory__facebook_Options()}
+		case reflect.TypeFor[options2.OptionsMonitor[*facebook.Options]]():
+			return []any{r.NewOptionsMonitor__facebook_Options()}
 		case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 			return []any{r.NewPtr_Decorator_auth_Service()}
 		case reflect.TypeFor[auth.Service]():
@@ -2017,7 +2091,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 	if key == godi.AnyKey {
 		switch t {
 		case reflect.TypeFor[auth.Handler]():
-			return []any{r.NewHandler_gois_DefaultCookieAuthenticationScheme(), r.NewHandler_gois_ExternalCookieAuthenticationScheme(), r.NewHandler_gois_GoogleAuthenticationScheme()}
+			return []any{r.NewHandler_gois_DefaultCookieAuthenticationScheme(), r.NewHandler_gois_ExternalCookieAuthenticationScheme(), r.NewHandler_gois_GoogleAuthenticationScheme(), r.NewHandler_gois_FacebookAuthenticationScheme()}
 		}
 		return nil
 	}
@@ -2030,6 +2104,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewHandler_gois_ExternalCookieAuthenticationScheme()}
 		case gois.GoogleAuthenticationScheme:
 			return []any{r.NewHandler_gois_GoogleAuthenticationScheme()}
+		case gois.FacebookAuthenticationScheme:
+			return []any{r.NewHandler_gois_FacebookAuthenticationScheme()}
 		}
 	}
 	return nil
@@ -2107,6 +2183,10 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_UnnamedOptionsManager__google_Options
 	case reflect.TypeFor[options2.PostConfigureOptions[*google.Options]]():
 		return s.root.f_PostConfigureOptions__google_Options
+	case reflect.TypeFor[options2.Options[*facebook.Options]]():
+		return s.root.f_UnnamedOptionsManager__facebook_Options
+	case reflect.TypeFor[options2.PostConfigureOptions[*facebook.Options]]():
+		return s.root.f_PostConfigureOptions__facebook_Options
 	case reflect.TypeFor[auth.ClaimsTransformation]():
 		return s.root.f_NoopClaimsTransformation
 	case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -2195,6 +2275,10 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewOptionsFactory__google_Options()
 	case reflect.TypeFor[options2.OptionsMonitor[*google.Options]]():
 		return s.NewOptionsMonitor__google_Options()
+	case reflect.TypeFor[options2.OptionsFactory[*facebook.Options]]():
+		return s.NewOptionsFactory__facebook_Options()
+	case reflect.TypeFor[options2.OptionsMonitor[*facebook.Options]]():
+		return s.NewOptionsMonitor__facebook_Options()
 	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 		return s.NewPtr_Decorator_auth_Service()
 	case reflect.TypeFor[auth.Service]():
@@ -2383,6 +2467,10 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[options2.PostConfigureOptions[*google.Options]]():
 		return true
+	case reflect.TypeFor[options2.Options[*facebook.Options]]():
+		return true
+	case reflect.TypeFor[options2.PostConfigureOptions[*facebook.Options]]():
+		return true
 	case reflect.TypeFor[auth.ClaimsTransformation]():
 		return true
 	case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -2470,6 +2558,10 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[options2.OptionsFactory[*google.Options]]():
 		return true
 	case reflect.TypeFor[options2.OptionsMonitor[*google.Options]]():
+		return true
+	case reflect.TypeFor[options2.OptionsFactory[*facebook.Options]]():
+		return true
+	case reflect.TypeFor[options2.OptionsMonitor[*facebook.Options]]():
 		return true
 	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 		return true
@@ -2654,6 +2746,8 @@ func (s *scope) GetKeyedService(t reflect.Type, key any) any {
 			return s.NewHandler_gois_ExternalCookieAuthenticationScheme()
 		case gois.GoogleAuthenticationScheme:
 			return s.NewHandler_gois_GoogleAuthenticationScheme()
+		case gois.FacebookAuthenticationScheme:
+			return s.NewHandler_gois_FacebookAuthenticationScheme()
 		}
 	}
 	return nil
@@ -2691,6 +2785,10 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.root.f_UnnamedOptionsManager__google_Options}
 		case reflect.TypeFor[options2.PostConfigureOptions[*google.Options]]():
 			return []any{s.root.f_PostConfigureOptions__google_Options}
+		case reflect.TypeFor[options2.Options[*facebook.Options]]():
+			return []any{s.root.f_UnnamedOptionsManager__facebook_Options}
+		case reflect.TypeFor[options2.PostConfigureOptions[*facebook.Options]]():
+			return []any{s.root.f_PostConfigureOptions__facebook_Options}
 		case reflect.TypeFor[auth.ClaimsTransformation]():
 			return []any{s.root.f_NoopClaimsTransformation}
 		case reflect.TypeFor[options2.ConfigureOptions[*auth.Options]]():
@@ -2779,6 +2877,10 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewOptionsFactory__google_Options()}
 		case reflect.TypeFor[options2.OptionsMonitor[*google.Options]]():
 			return []any{s.NewOptionsMonitor__google_Options()}
+		case reflect.TypeFor[options2.OptionsFactory[*facebook.Options]]():
+			return []any{s.NewOptionsFactory__facebook_Options()}
+		case reflect.TypeFor[options2.OptionsMonitor[*facebook.Options]]():
+			return []any{s.NewOptionsMonitor__facebook_Options()}
 		case reflect.TypeFor[*gois.Decorator[auth.Service]]():
 			return []any{s.NewPtr_Decorator_auth_Service()}
 		case reflect.TypeFor[auth.Service]():
@@ -2941,7 +3043,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 	if key == godi.AnyKey {
 		switch t {
 		case reflect.TypeFor[auth.Handler]():
-			return []any{s.NewHandler_gois_DefaultCookieAuthenticationScheme(), s.NewHandler_gois_ExternalCookieAuthenticationScheme(), s.NewHandler_gois_GoogleAuthenticationScheme()}
+			return []any{s.NewHandler_gois_DefaultCookieAuthenticationScheme(), s.NewHandler_gois_ExternalCookieAuthenticationScheme(), s.NewHandler_gois_GoogleAuthenticationScheme(), s.NewHandler_gois_FacebookAuthenticationScheme()}
 		}
 		return nil
 	}
@@ -2954,6 +3056,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewHandler_gois_ExternalCookieAuthenticationScheme()}
 		case gois.GoogleAuthenticationScheme:
 			return []any{s.NewHandler_gois_GoogleAuthenticationScheme()}
+		case gois.FacebookAuthenticationScheme:
+			return []any{s.NewHandler_gois_FacebookAuthenticationScheme()}
 		}
 	}
 	return nil
@@ -3121,6 +3225,22 @@ func (s *scope) NewOptionsFactory__google_Options() options2.OptionsFactory[*goo
 func (s *scope) NewOptionsMonitor__google_Options() options2.OptionsMonitor[*google.Options] {
 	return (func(p godi.Provider) options2.OptionsMonitor[*google.Options] {
 		return options2.NewOptionsMonitor[*google.Options](godi.GetRequired[options2.OptionsFactory[*google.Options]](p))
+	})(s)
+}
+
+func (s *scope) NewOptionsFactory__facebook_Options() options2.OptionsFactory[*facebook.Options] {
+	return (func(p godi.Provider) options2.OptionsFactory[*facebook.Options] {
+		return options2.NewOptionsFactory[*facebook.Options](
+			godi.GetServices[options2.ConfigureOptions[*facebook.Options]](p),
+			godi.GetServices[options2.PostConfigureOptions[*facebook.Options]](p),
+			godi.GetServices[options2.ValidateOptions[*facebook.Options]](p),
+		)
+	})(s)
+}
+
+func (s *scope) NewOptionsMonitor__facebook_Options() options2.OptionsMonitor[*facebook.Options] {
+	return (func(p godi.Provider) options2.OptionsMonitor[*facebook.Options] {
+		return options2.NewOptionsMonitor[*facebook.Options](godi.GetRequired[options2.OptionsFactory[*facebook.Options]](p))
 	})(s)
 }
 
@@ -3691,6 +3811,21 @@ func (s *scope) NewHandler_gois_GoogleAuthenticationScheme() auth.Handler {
 	})(s)
 }
 
+func (s *scope) NewHandler_gois_FacebookAuthenticationScheme() auth.Handler {
+	return (func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.FacebookAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
+		return facebook.NewHandler(
+			godi.GetRequired[options2.OptionsMonitor[*facebook.Options]](p),
+			godi.GetRequired[*slog.Logger](p),
+			godi.GetRequired[services.SystemClock](p),
+		)
+	})(s)
+}
+
 func (s *scope) SystemClock() services.SystemClock { return s.root.f_SystemClock }
 
 func (s *scope) ServerConfig() *ServerConfig { return s.root.f_ServerConfig }
@@ -3747,6 +3882,14 @@ func (s *scope) UnnamedOptionsManager__google_Options() options2.Options[*google
 
 func (s *scope) PostConfigureOptions__google_Options() options2.PostConfigureOptions[*google.Options] {
 	return s.root.f_PostConfigureOptions__google_Options
+}
+
+func (s *scope) UnnamedOptionsManager__facebook_Options() options2.Options[*facebook.Options] {
+	return s.root.f_UnnamedOptionsManager__facebook_Options
+}
+
+func (s *scope) PostConfigureOptions__facebook_Options() options2.PostConfigureOptions[*facebook.Options] {
+	return s.root.f_PostConfigureOptions__facebook_Options
 }
 
 func (s *scope) NoopClaimsTransformation() auth.ClaimsTransformation {
