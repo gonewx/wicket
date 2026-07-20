@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 
 	gois "github.com/gonewx/wicket"
@@ -441,8 +442,10 @@ func TestFacebookHandlerConstruction(t *testing.T) {
 
 	opts := newTestOptions(nil)
 	h := newTestHandler(opts)
-	require.NotNil(t, h)
-	require.NotNil(t, h.Handler)
+	initHandler(t, h)
+
+	require.Same(t, opts, h.Options, "handler must resolve the exact options instance from the monitor")
+	assert.Equal(t, "Facebook", h.Scheme.Name)
 }
 
 type mockTransportFunc func(req *http.Request) (*http.Response, error)
@@ -671,9 +674,12 @@ func TestFacebookUserInfoRequestShape(t *testing.T) {
 func TestFacebookAppSecretProofDeterministic(t *testing.T) {
 	t.Parallel()
 
+	var mu sync.Mutex
 	proofs := make([]string, 0, 2)
 	mockFacebook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		proofs = append(proofs, r.URL.Query().Get("appsecret_proof"))
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		body, _ := json.Marshal(map[string]any{"id": "u1"})
@@ -694,6 +700,8 @@ func TestFacebookAppSecretProofDeterministic(t *testing.T) {
 	_, err = h.CreateTicket(identity, auth.NewProperties(), tokens)
 	require.NoError(t, err)
 
+	mu.Lock()
+	defer mu.Unlock()
 	require.Len(t, proofs, 2)
 	assert.NotEmpty(t, proofs[0])
 	assert.Equal(t, proofs[0], proofs[1], "same token and secret must yield the same proof")
