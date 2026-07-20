@@ -7,7 +7,6 @@ import (
 	"errors"
 	"time"
 
-	gois "github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/claims"
 	jwxjwt "github.com/lestrrat-go/jwx/v2/jwt"
 )
@@ -111,7 +110,7 @@ func (h *SecurityTokenHandler) validateClaims(
 // single identity is authenticated as the JWT bearer scheme.
 func principalFromToken(token jwxjwt.Token) *claims.ClaimsPrincipal {
 	identity := claims.NewClaimsIdentity(
-		claims.WithAuthenticationType(gois.JwtBearerAuthenticationScheme),
+		claims.WithAuthenticationType(AuthenticationScheme),
 	)
 	for name, value := range token.PrivateClaims() {
 		identity.AddClaim(claims.NewClaim(
