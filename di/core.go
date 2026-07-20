@@ -17,6 +17,7 @@ import (
 	authcore "github.com/gonewx/wicket/auth/core"
 	"github.com/gonewx/wicket/auth/facebook"
 	"github.com/gonewx/wicket/auth/google"
+	"github.com/gonewx/wicket/auth/jwt"
 	oauthcore "github.com/gonewx/wicket/auth/oauth/core"
 	"github.com/gonewx/wicket/config"
 	config_options "github.com/gonewx/wicket/config/options"
@@ -256,6 +257,25 @@ func registerCore() {
 		}
 		return facebook.NewHandler(
 			godi.GetRequired[optspkg.OptionsMonitor[*facebook.Options]](p),
+			godi.GetRequired[*slog.Logger](p),
+			godi.GetRequired[services.SystemClock](p),
+		)
+	})
+	// JWT bearer scheme: options assembly + handler factory. Unlike the OAuth
+	// providers above it needs no PostConfigure — jwt.Options embeds the plain
+	// SchemeOptions and carries no data-protection or state-format dependency.
+	AddOptions[*jwt.Options](&r)
+	godi.AddTransientFactory[optspkg.OptionsMonitor[*jwt.Options]](&r, func(p godi.Provider) optspkg.OptionsMonitor[*jwt.Options] {
+		return optspkg.NewOptionsMonitor[*jwt.Options](godi.GetRequired[optspkg.OptionsFactory[*jwt.Options]](p))
+	})
+	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.JwtBearerAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.JwtBearerAuthenticationScheme); provider != nil {
+			if h := provider(p); h != nil {
+				return h
+			}
+		}
+		return jwt.NewHandler(
+			godi.GetRequired[optspkg.OptionsMonitor[*jwt.Options]](p),
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[services.SystemClock](p),
 		)
