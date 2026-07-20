@@ -65,16 +65,27 @@ type TokenValidationParameters struct {
 	// validation deterministic under test.
 	Clock services.SystemClock
 
+	// ClockSkew is the tolerance applied to the exp/nbf/iat comparisons, absorbing
+	// small clock differences between the token issuer and this validator. Zero
+	// disables the tolerance (exact comparison).
+	ClockSkew time.Duration
+
 	// ValidateOptions are additional jwx validate options applied alongside the
 	// temporal checks.
 	ValidateOptions []jwxjwt.ValidateOption
 }
 
+// DefaultClockSkew is the temporal tolerance applied when none is configured,
+// matching the long-standing default of the reference implementation.
+const DefaultClockSkew = 5 * time.Minute
+
 // NewTokenValidationParameters returns parameters with safe defaults: signed
-// tokens are required and the token lifetime is validated.
+// tokens are required, the token lifetime is validated, and a small clock skew
+// tolerance is applied.
 func NewTokenValidationParameters() *TokenValidationParameters {
 	return &TokenValidationParameters{
 		RequireSignedTokens: true,
 		ValidateLifetime:    true,
+		ClockSkew:           DefaultClockSkew,
 	}
 }

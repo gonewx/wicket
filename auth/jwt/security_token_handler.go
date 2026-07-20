@@ -86,17 +86,20 @@ func (h *SecurityTokenHandler) validateClaims(
 	if parameters.ValidAudience != "" {
 		opts = append(opts, jwxjwt.WithAudience(parameters.ValidAudience))
 	}
+	if parameters.ClockSkew > 0 {
+		opts = append(opts, jwxjwt.WithAcceptableSkew(parameters.ClockSkew))
+	}
 	opts = append(opts, parameters.ValidateOptions...)
 
 	if parameters.ValidateLifetime {
 		// jwt.Validate always runs the exp/nbf/iat validators alongside the
-		// issuer/audience options assembled above.
+		// issuer/audience options and the acceptable skew assembled above.
 		return jwxjwt.Validate(token, opts...)
 	}
 
 	// Lifetime validation disabled: run only the non-temporal options by
-	// skipping jwt.Validate's built-in temporal validators. jwx has no toggle
-	// for that, so the issuer/audience checks are applied directly.
+	// skipping jwt.Validate's built-in temporal validators. jwx v2.0.6 has no
+	// toggle for that, so the issuer/audience checks are applied directly.
 	if parameters.ValidIssuer != "" && token.Issuer() != parameters.ValidIssuer {
 		return errTokenIssuerMismatch
 	}
@@ -119,7 +122,11 @@ func principalFromToken(token jwxjwt.Token) *claims.ClaimsPrincipal {
 		))
 	}
 	addStandardClaim(identity, "iss", token.Issuer())
-	addStandardClaim(identity, "sub", token.Subject())
+	// The registered "sub" claim carries the subject. Project it onto the
+	// wicket-wide NameIdentifier type so downstream consumers (session,
+	// userinfo, authorization gates) can locate the subject the same way they
+	// do for every other scheme.
+	addStandardClaim(identity, claims.NameIdentifier, token.Subject())
 	addStandardClaim(identity, "jti", token.JwtID())
 	for _, aud := range token.Audience() {
 		addStandardClaim(identity, "aud", aud)

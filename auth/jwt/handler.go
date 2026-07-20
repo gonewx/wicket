@@ -97,9 +97,20 @@ func (h *Handler) HandleAuthenticate() (*auth.Result, error) {
 
 	//Note: Don't use configuration manager
 
+	// Wire the injected clock into the validation parameters when the caller left
+	// it unset, so lifetime checks honor the same clock as the rest of the auth
+	// stack rather than jwx's wall clock. A shallow copy keeps the shared options
+	// singleton unmutated across concurrent requests.
+	validationParameters := h.Options.TokenValidationParameters
+	if validationParameters != nil && validationParameters.Clock == nil && h.Clock != nil {
+		effective := *validationParameters
+		effective.Clock = h.Clock
+		validationParameters = &effective
+	}
+
 	for _, validator := range h.Options.SecurityTokenValidators {
 		if validator.CanReadToken(token) {
-			principal, validatedToken, err := validator.ValidateToken(token, h.Options.TokenValidationParameters)
+			principal, validatedToken, err := validator.ValidateToken(token, validationParameters)
 			if err != nil {
 				h.Logger.Debug("validator.ValidateToken failed: ", slog.String("err", err.Error()))
 				continue
