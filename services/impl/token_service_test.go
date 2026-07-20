@@ -152,10 +152,10 @@ func TestCreateSecurityTokenJwtIdAssembly(t *testing.T) {
 		presetJwtId  string
 		wantJwtId    bool
 	}{
-		"identity without opt-in": {tokenType: gois.TokenTypesIdentityToken, includeJwtId: false, wantJwtId: false},
-		"access without opt-in":   {tokenType: gois.TokenTypesAccessToken, includeJwtId: false, wantJwtId: false},
-		"identity with opt-in":    {tokenType: gois.TokenTypesIdentityToken, includeJwtId: true, wantJwtId: false},
-		"access with opt-in":      {tokenType: gois.TokenTypesAccessToken, includeJwtId: true, wantJwtId: true},
+		"identity without opt-in":                {tokenType: gois.TokenTypesIdentityToken, includeJwtId: false, wantJwtId: false},
+		"access without opt-in":                  {tokenType: gois.TokenTypesAccessToken, includeJwtId: false, wantJwtId: false},
+		"identity with opt-in":                   {tokenType: gois.TokenTypesIdentityToken, includeJwtId: true, wantJwtId: false},
+		"access with opt-in":                     {tokenType: gois.TokenTypesAccessToken, includeJwtId: true, wantJwtId: true},
 		"legacy-versioned access without opt-in": {tokenType: gois.TokenTypesAccessToken, includeJwtId: false, version: 1, wantJwtId: false},
 		"access with opt-in replaces preset id":  {tokenType: gois.TokenTypesAccessToken, includeJwtId: true, presetJwtId: presetJwtId, wantJwtId: true},
 	} {

@@ -214,10 +214,10 @@ func TestTokenRequestVerifierGuards(t *testing.T) {
 	for name, tc := range map[string]struct {
 		verifier string
 	}{
-		"missing verifier":         {verifier: ""},
-		"verifier too short":       {verifier: strings.Repeat("a", 42)},
-		"verifier too long":        {verifier: strings.Repeat("a", 129)},
-		"verifier does not match":  {verifier: strings.Repeat("b", 50)},
+		"missing verifier":        {verifier: ""},
+		"verifier too short":      {verifier: strings.Repeat("a", 42)},
+		"verifier too long":       {verifier: strings.Repeat("a", 129)},
+		"verifier does not match": {verifier: strings.Repeat("b", 50)},
 	} {
 		t.Run(name, func(t *testing.T) {
 			a := require.New(t)

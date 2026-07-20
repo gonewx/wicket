@@ -14,7 +14,7 @@ type testClock struct {
 	now time.Time
 }
 
-func (c *testClock) Now() time.Time { return c.now }
+func (c *testClock) Now() time.Time          { return c.now }
 func (c *testClock) Advance(d time.Duration) { c.now = c.now.Add(d) }
 
 func newTestClock() *testClock {
@@ -319,7 +319,7 @@ func TestCoordinatorDisabled(t *testing.T) {
 	for name, tt := range map[string]struct {
 		sessionID string
 	}{
-		"nil input":     {sessionID: ""},
+		"nil input":      {sessionID: ""},
 		"any session id": {sessionID: "some-id"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -427,13 +427,17 @@ func TestCoordinatorEnabledStoreError(t *testing.T) {
 
 type failingStore struct{}
 
-func (failingStore) GetSession(string) (*Record, error)                 { return nil, fmt.Errorf("store unavailable") }
-func (failingStore) CreateSession(*Record) error                        { return fmt.Errorf("store unavailable") }
-func (failingStore) UpdateSession(*Record) error                        { return fmt.Errorf("store unavailable") }
-func (failingStore) DeleteSession(string) error                         { return fmt.Errorf("store unavailable") }
-func (failingStore) GetSessionsBySubjectID(string) ([]*Record, error)   { return nil, fmt.Errorf("store unavailable") }
-func (failingStore) DeleteSessionsBySubjectID(string) (int, error)      { return 0, fmt.Errorf("store unavailable") }
-func (failingStore) AddClientID(string, string) error                   { return fmt.Errorf("store unavailable") }
+func (failingStore) GetSession(string) (*Record, error) { return nil, fmt.Errorf("store unavailable") }
+func (failingStore) CreateSession(*Record) error        { return fmt.Errorf("store unavailable") }
+func (failingStore) UpdateSession(*Record) error        { return fmt.Errorf("store unavailable") }
+func (failingStore) DeleteSession(string) error         { return fmt.Errorf("store unavailable") }
+func (failingStore) GetSessionsBySubjectID(string) ([]*Record, error) {
+	return nil, fmt.Errorf("store unavailable")
+}
+func (failingStore) DeleteSessionsBySubjectID(string) (int, error) {
+	return 0, fmt.Errorf("store unavailable")
+}
+func (failingStore) AddClientID(string, string) error { return fmt.Errorf("store unavailable") }
 
 func TestCoordinatorRenewedUpdate(t *testing.T) {
 	t.Parallel()

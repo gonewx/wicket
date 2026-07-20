@@ -133,7 +133,6 @@ func introspect(t *testing.T, pipeline *integration_common.WicketPipeline, api s
 	return response, string(body)
 }
 
-
 // audienceValues normalizes the aud member: RFC 7519 permits both the single
 // string and the array form for one audience; wicket serializes uniformly as
 // an array.

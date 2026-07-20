@@ -43,12 +43,12 @@ func (s *subjectOnlySession) RemoveSessionIdCookie() error { return nil }
 func (s *subjectOnlySession) CreateSessionId(*claims.ClaimsPrincipal, *auth.Properties) (string, error) {
 	return "", nil
 }
-func (s *subjectOnlySession) GetSessionId() string               { return "" }
-func (s *subjectOnlySession) GetClientList() ([]string, error)   { return nil, nil }
-func (s *subjectOnlySession) GetUser() *claims.ClaimsPrincipal   { return s.user }
-func (s *subjectOnlySession) AddClientId(string) error           { return nil }
-func (s *subjectOnlySession) Item(string) (any, bool)            { return nil, false }
-func (s *subjectOnlySession) SetItem(string, any)                {}
+func (s *subjectOnlySession) GetSessionId() string             { return "" }
+func (s *subjectOnlySession) GetClientList() ([]string, error) { return nil, nil }
+func (s *subjectOnlySession) GetUser() *claims.ClaimsPrincipal { return s.user }
+func (s *subjectOnlySession) AddClientId(string) error         { return nil }
+func (s *subjectOnlySession) Item(string) (any, bool)          { return nil, false }
+func (s *subjectOnlySession) SetItem(string, any)              {}
 
 func consentRequestWithParameters(parameters url.Values) *messages.AuthorizationRequest {
 	return &messages.AuthorizationRequest{Parameters: parameters}

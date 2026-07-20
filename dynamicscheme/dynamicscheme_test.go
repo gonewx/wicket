@@ -353,8 +353,8 @@ func TestResolverSnapshotRobustAgainstMisbehavingStore(t *testing.T) {
 	store := scriptedStore{all: []*Provider{
 		provider("c", true),
 		provider("a", true),
-		provider("a", true), // duplicate key
-		provider("", true),  // empty scheme
+		provider("a", true),  // duplicate key
+		provider("", true),   // empty scheme
 		nil,                  // nil entry
 		provider("b", false), // individually disabled
 	}}

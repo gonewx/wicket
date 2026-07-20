@@ -35,11 +35,11 @@ func TestAuthorizeBaseHandlerDispatchPrecedence(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		validation func() *validators_models.AuthorizeRequestValidationResult
+		validation  func() *validators_models.AuthorizeRequestValidationResult
 		interaction *responses_models.InteractionResponse
-		response   *responses_models.AuthorizeResponse
-		generator  error
-		assert     func(t *testing.T, result endpointResult)
+		response    *responses_models.AuthorizeResponse
+		generator   error
+		assert      func(t *testing.T, result endpointResult)
 	}{
 		"validation error precedes interaction": {
 			validation: func() *validators_models.AuthorizeRequestValidationResult {

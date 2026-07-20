@@ -393,11 +393,11 @@ func (s *failingStore) List() ([]*Record, error) {
 	}
 	return s.inner.List()
 }
-func (s *failingStore) Get(h string) (*Record, error)             { return s.inner.Get(h) }
-func (s *failingStore) Create(r *Record) error                    { return s.inner.Create(r) }
-func (s *failingStore) Update(r *Record, v uint64) error          { return s.inner.Update(r, v) }
-func (s *failingStore) Delete(h string) error                     { return s.inner.Delete(h) }
-func (s *failingStore) breakNow()                                 { s.mu.Lock(); s.failActive = true; s.mu.Unlock() }
+func (s *failingStore) Get(h string) (*Record, error)    { return s.inner.Get(h) }
+func (s *failingStore) Create(r *Record) error           { return s.inner.Create(r) }
+func (s *failingStore) Update(r *Record, v uint64) error { return s.inner.Update(r, v) }
+func (s *failingStore) Delete(h string) error            { return s.inner.Delete(h) }
+func (s *failingStore) breakNow()                        { s.mu.Lock(); s.failActive = true; s.mu.Unlock() }
 
 func TestManagerStorageDisruptionKeepsLastGoodSigningKey(t *testing.T) {
 	t.Parallel()

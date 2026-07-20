@@ -50,9 +50,9 @@ func newRedirectUriPipeline() *integration_common.WicketPipeline {
 
 func TestRejectedRedirectUris(t *testing.T) {
 	for name, redirectUri := range map[string]string{
-		"unregistered redirect_uri":              "https://bad",
-		"missing redirect_uri among multiple":    "",
-		"query parameters in a different order":  "https://code_client/callback?baz=quux&foo=bar",
+		"unregistered redirect_uri":             "https://bad",
+		"missing redirect_uri among multiple":   "",
+		"query parameters in a different order": "https://code_client/callback?baz=quux&foo=bar",
 	} {
 		t.Run(name, func(t *testing.T) {
 			a := require.New(t)

@@ -16,8 +16,8 @@ import (
 	claimspkg "github.com/gonewx/wicket/claims"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/keymgmt"
-	test_common "github.com/gonewx/wicket/test/common"
 	storage_models "github.com/gonewx/wicket/storage/models"
+	test_common "github.com/gonewx/wicket/test/common"
 )
 
 func rs256Manager() *keymgmt.Manager {

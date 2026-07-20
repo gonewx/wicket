@@ -462,4 +462,3 @@ func TestRequestUriFetchFailureIsRejected(t *testing.T) {
 	a.NotEmpty(fixture.pipeline.ErrorMessage.Error)
 	a.Nil(fixture.pipeline.LoginRequest)
 }
-

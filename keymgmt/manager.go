@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	core_models "github.com/gonewx/wicket/models"
 	"github.com/gonewx/wicket/dp"
+	core_models "github.com/gonewx/wicket/models"
 	"github.com/gonewx/wicket/tokens"
 )
 

@@ -9,8 +9,8 @@ import (
 
 	authcore "github.com/gonewx/wicket/auth/core"
 	"github.com/gonewx/wicket/auth/oauth"
-	"github.com/gonewx/wicket/dp"
 	optspkg "github.com/gonewx/wicket/di/options"
+	"github.com/gonewx/wicket/dp"
 )
 
 var _ optspkg.PostConfigureOptions[*Options] = (*PostConfigureOptions[*Options])(nil)

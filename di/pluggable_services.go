@@ -56,7 +56,6 @@ func registerPluggableServicesAndValidators() {
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L193 (TryAddTransient)
 	godi.AddTransient[storage.ConsentMessageStore, storage_impl.ConsentMessageStore](&r)
 
-
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L205 (TryAddTransient)
 	godi.AddTransient[services.HandleGenerationService, services_impl.HandleGenerationService](&r)
 	// Core.cs#L191 DefaultCorsPolicyService 注册已随 3.5 删除：InMemory.cs#L130-L138

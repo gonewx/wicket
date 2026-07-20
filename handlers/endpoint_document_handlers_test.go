@@ -37,9 +37,9 @@ func (g *fakeDiscoveryResponseGenerator) CreateJwkDocument() ([]*models.JsonWebK
 
 type fakeServerUrls struct{ base string }
 
-func (u *fakeServerUrls) Origin() string                        { return u.base }
-func (u *fakeServerUrls) BasePath() string                      { return "" }
-func (u *fakeServerUrls) BaseUrl() string                       { return u.base }
+func (u *fakeServerUrls) Origin() string                         { return u.base }
+func (u *fakeServerUrls) BasePath() string                       { return "" }
+func (u *fakeServerUrls) BaseUrl() string                        { return u.base }
 func (u *fakeServerUrls) GetWicketRelativeUrl(rel string) string { return u.base + rel }
 
 type fakeIssuerNameService struct{ issuer string }
