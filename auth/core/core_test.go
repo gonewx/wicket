@@ -63,9 +63,10 @@ func (plainHandler) Forbid(*auth.Properties) error                              
 // TestMiddlewareRequestHandlerDispatch covers the callback dispatch: a scheme
 // marked as a request handler is enumerated after the default authenticate
 // pass, resolved through the request scope, and driven when it owns the
-// request; a handled request short-circuits the pipeline, everything else
-// passes through, and a resolution or processing failure warns without
-// failing the request.
+// request; a handled request short-circuits the pipeline, a resolution or
+// contract failure passes through to the downstream pipeline, and a leg that
+// owns the request but fails to process it terminates with a definite failure
+// response rather than falling through.
 func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {

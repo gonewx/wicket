@@ -75,9 +75,11 @@ func NewRequestHandlerScheme(name string, handlerType string) *Scheme {
 
 // ExternalLoginFailedError is the stable, neutral error code the middleware
 // appends as the error query parameter when an external login leg fails and a
-// failure redirect path is configured. It is a wicket signal to the consuming
-// application, distinct from an upstream provider error code (an OAuth
-// access_denied, say), so the consumer can render its own failure page.
+// failure redirect path is configured. It is a single wicket signal to the
+// consuming application covering every non-completing failure of the leg —
+// token exchange, correlation, userinfo, and an unhandled provider
+// access_denied alike — so the consumer can render its own failure page. It
+// does not distinguish the underlying cause; that detail stays in the log.
 const ExternalLoginFailedError = "external_login_failed"
 
 type Options struct {
