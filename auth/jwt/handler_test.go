@@ -197,7 +197,7 @@ func serve(t *testing.T, opts *jwt.Options, authHeader string, downstream http.H
 	request = request.WithContext(hosting.ContextWithScope(request.Context(), provider))
 	response := httptest.NewRecorder()
 
-	core.Middleware(schemes, discardLogger())(downstream).ServeHTTP(response, request)
+	core.Middleware(schemes, discardLogger(), "")(downstream).ServeHTTP(response, request)
 	return response
 }
 

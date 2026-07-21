@@ -17,6 +17,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	authcore "github.com/gonewx/wicket/auth/core"
 	config_options "github.com/gonewx/wicket/config/options"
+	optspkg "github.com/gonewx/wicket/di/options"
 	"github.com/gonewx/wicket/hosting"
 	dynamicschemes "github.com/gonewx/wicket/hosting/dynamic/schemes"
 	"github.com/gonewx/wicket/storage"
@@ -71,7 +72,11 @@ func (s *Server) UseWicket() func(http.Handler) http.Handler {
 	schemeAuthMiddleware := dynamicschemes.UseSchemeAuthMiddleware(s.Logger, dynamicProviders)
 
 	schemeProvider := godi.GetRequired[auth.SchemeProvider](s.provider)
-	authCoreMiddleware := authcore.Middleware(schemeProvider, s.Logger)
+	authOptions, err := godi.GetRequired[optspkg.Options[*auth.Options]](s.provider).Value()
+	if err != nil {
+		panic(fmt.Errorf("resolve auth options for middleware: %w", err))
+	}
+	authCoreMiddleware := authcore.Middleware(schemeProvider, s.Logger, authOptions.ExternalFailurePath)
 
 	// AD-10: startup assembly resolves endpoint routing from the injected Provider,
 	// matching dotnet app.ApplicationServices.

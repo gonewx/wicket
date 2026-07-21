@@ -234,7 +234,7 @@ func TestMiddlewareAuthenticatesDefaultScheme(t *testing.T) {
 		seen = ResultFromContext(r.Context())
 	})
 
-	middleware := Middleware(schemes, nil)
+	middleware := Middleware(schemes, nil, "")
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	request = request.WithContext(hosting.ContextWithScope(request.Context(), provider))
 	response := httptest.NewRecorder()
@@ -261,7 +261,7 @@ func TestMiddlewareNoDefaultSchemePassesThrough(t *testing.T) {
 		seen = ResultFromContext(r.Context())
 	})
 
-	middleware := Middleware(schemes, nil)
+	middleware := Middleware(schemes, nil, "")
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	request = request.WithContext(hosting.ContextWithScope(request.Context(), provider))
 	response := httptest.NewRecorder()

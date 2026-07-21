@@ -150,7 +150,7 @@ func TestMiddlewareAnonymousRequestPassesThrough(t *testing.T) {
 	request = request.WithContext(hosting.ContextWithScope(request.Context(), scope))
 	response := httptest.NewRecorder()
 
-	authcore.Middleware(provider, logger)(next).ServeHTTP(response, request)
+	authcore.Middleware(provider, logger, "")(next).ServeHTTP(response, request)
 
 	require.True(t, nextCalled, "the middleware must always invoke the next handler")
 	require.Equal(t, http.StatusNoContent, response.Code)

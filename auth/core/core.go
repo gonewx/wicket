@@ -14,6 +14,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/hosting"
+	"github.com/gonewx/wicket/utils"
 )
 
 // SchemeProvider is registered as a singleton shared across requests, and the
@@ -291,7 +292,12 @@ func ResultFromContext(ctx context.Context) *auth.Result {
 	return nil
 }
 
-func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Handler) http.Handler {
+// Middleware drives the authentication passes for each request. failurePath
+// selects the external login failure response: when non-empty, a failed
+// request-handler leg redirects there with a neutral error query parameter;
+// when empty, it terminates the request with a 500 so the failure surfaces
+// rather than falling through to a bare 404.
+func Middleware(provider auth.SchemeProvider, logger *slog.Logger, failurePath string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if scheme := provider.GetDefaultAuthenticateScheme(); scheme != nil {
@@ -318,9 +324,11 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 			// default authenticate pass above, they are enumerated and driven
 			// when one owns the current request; a handled request has already
 			// written its own response, so the pipeline short-circuits here
-			// and never descends. A resolution, contract, or processing
-			// failure only warns: the request falls through to the downstream
-			// pipeline rather than failing outright.
+			// and never descends. A resolution or contract failure means no
+			// scheme owns the request, so it falls through to the downstream
+			// pipeline; a processing failure — a leg that owns the request but
+			// cannot complete it — terminates the request with a definite
+			// failure response so it never falls through to a bare 404.
 			if schemes, err := provider.GetRequestHandlerSchemes(); err != nil {
 				logWarn(logger, "request-handler scheme enumeration failed", "", err)
 			} else if len(schemes) > 0 {
@@ -348,7 +356,17 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 							if err != nil {
 								logWarn(logger, "request-handler processing failed", scheme.Name, err)
 							}
+							// A handled leg wrote its own response, so it
+							// short-circuits regardless of any post-write error
+							// and must not be written over. An unhandled leg
+							// that errored owns the request but could not
+							// complete it, so it terminates with a definite
+							// failure response rather than falling through.
 							if handled {
+								return
+							}
+							if err != nil {
+								writeExternalFailure(w, r, failurePath)
 								return
 							}
 						}
@@ -360,9 +378,24 @@ func Middleware(provider auth.SchemeProvider, logger *slog.Logger) func(http.Han
 	}
 }
 
-// logWarn records a middleware failure. The middleware never fails the
-// request on an error — the request proceeds anonymously — so the log entry
-// is the only diagnostic signal.
+// writeExternalFailure produces the terminal response for a failed external
+// login leg. With a configured failure path it redirects there carrying a
+// neutral error code for the consumer to render; without one it writes a 500
+// with a stable, generic body. The underlying error detail stays in the log
+// and never reaches the response, so a token-exchange or correlation failure
+// does not leak internals to the caller.
+func writeExternalFailure(w http.ResponseWriter, r *http.Request, failurePath string) {
+	if failurePath != "" {
+		http.Redirect(w, r, utils.AddQuery(failurePath, "error", auth.ExternalLoginFailedError), http.StatusFound)
+		return
+	}
+	http.Error(w, "External login failed.", http.StatusInternalServerError)
+}
+
+// logWarn records a middleware diagnostic. Most failures do not fail the
+// request — the request proceeds anonymously or falls through — so the log
+// entry is the only signal; a failed request-handler leg is the exception and
+// is turned into a definite failure response by the caller.
 func logWarn(logger *slog.Logger, message, scheme string, err error) {
 	if logger != nil {
 		logger.Warn(message, slog.String("scheme", scheme), slog.Any("error", err))

@@ -75,9 +75,11 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 		should          bool
 		handled         bool
 		handleErr       error
+		failurePath     string // middleware failure-redirect path ("" => 500)
 		wantNextCalled  bool
 		wantHandleCalls int
-		wantStatus      int // asserted only when non-zero
+		wantStatus      int    // asserted only when non-zero
+		wantLocation    string // redirect Location; asserted only when non-empty
 		wantWarn        bool
 	}{
 		"handled short-circuits": {
@@ -100,14 +102,29 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 			registerScheme: false, registerFactory: false,
 			wantNextCalled: true, wantHandleCalls: 0,
 		},
-		"processing error without handling warns and passes through": {
+		// A leg that owns the request but errors before writing terminates
+		// the request. With no failure path configured the terminal response
+		// is a 500, never a fall-through to the downstream 404.
+		"processing error without handling writes 500 and warns": {
 			registerScheme: true, registerFactory: true, should: true,
 			handleErr:      errors.New("token exchange failed"),
-			wantNextCalled: true, wantHandleCalls: 1, wantWarn: true,
+			wantNextCalled: false, wantHandleCalls: 1, wantStatus: http.StatusInternalServerError, wantWarn: true,
 		},
+		// The same failure with a configured path redirects there carrying the
+		// neutral error code instead of writing a 500.
+		"processing error without handling redirects to configured failure path": {
+			registerScheme: true, registerFactory: true, should: true,
+			handleErr:      errors.New("token exchange failed"),
+			failurePath:    "/account/login-failed",
+			wantNextCalled: false, wantHandleCalls: 1, wantStatus: http.StatusFound,
+			wantLocation: "/account/login-failed?error=" + auth.ExternalLoginFailedError, wantWarn: true,
+		},
+		// A handled leg already wrote its response, so a post-write error must
+		// not be written over — the handler's status stands even with a path
+		// configured.
 		"processing error while handled warns and still short-circuits": {
 			registerScheme: true, registerFactory: true, should: true, handled: true,
-			handleErr:      errors.New("post-write failure"),
+			handleErr: errors.New("post-write failure"), failurePath: "/account/login-failed",
 			wantNextCalled: false, wantHandleCalls: 1, wantStatus: http.StatusFound, wantWarn: true,
 		},
 	}
@@ -145,7 +162,7 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 
 			var logBuf bytes.Buffer
 			logger := slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelWarn}))
-			middleware := Middleware(schemes, logger)
+			middleware := Middleware(schemes, logger, tc.failurePath)
 			request := httptest.NewRequest(http.MethodGet, "/signin-ext", nil)
 			request = request.WithContext(hosting.ContextWithScope(request.Context(), provider))
 			response := httptest.NewRecorder()
@@ -156,6 +173,9 @@ func TestMiddlewareRequestHandlerDispatch(t *testing.T) {
 			require.Equal(t, tc.wantHandleCalls, spy.handleCalls, "HandleRequest calls")
 			if tc.wantStatus != 0 {
 				require.Equal(t, tc.wantStatus, response.Code, "handler-written status")
+			}
+			if tc.wantLocation != "" {
+				require.Equal(t, tc.wantLocation, response.Header().Get("Location"), "failure redirect Location")
 			}
 			if tc.wantWarn {
 				require.Contains(t, strings.ToLower(logBuf.String()), "warn", "expected a warning log")

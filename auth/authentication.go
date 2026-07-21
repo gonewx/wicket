@@ -73,6 +73,13 @@ func NewRequestHandlerScheme(name string, handlerType string) *Scheme {
 	return &Scheme{Name: name, HandlerType: handlerType, HandlesRequests: true}
 }
 
+// ExternalLoginFailedError is the stable, neutral error code the middleware
+// appends as the error query parameter when an external login leg fails and a
+// failure redirect path is configured. It is a wicket signal to the consuming
+// application, distinct from an upstream provider error code (an OAuth
+// access_denied, say), so the consumer can render its own failure page.
+const ExternalLoginFailedError = "external_login_failed"
+
 type Options struct {
 	DefaultScheme             string
 	DefaultAuthenticateScheme string
@@ -80,6 +87,13 @@ type Options struct {
 	DefaultForbidScheme       string
 	DefaultSignInScheme       string
 	DefaultSignOutScheme      string
+	// ExternalFailurePath, when set, is where the middleware redirects a failed
+	// external login leg (token exchange, correlation, or userinfo failure)
+	// instead of writing a 500. The consuming application owns the target page
+	// and reads the appended error query parameter to render its own message.
+	// Empty keeps the default terminal 500 response so an unconfigured failure
+	// path is observable at deploy time rather than silently redirecting.
+	ExternalFailurePath string
 }
 
 func NewOptions() *Options {
