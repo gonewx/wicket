@@ -200,3 +200,68 @@ func TestBuildPassesThroughFields(t *testing.T) {
 		t.Fatalf("expected MaxAge %v, got %v", maxAge, opts.MaxAge)
 	}
 }
+
+// fixedClock is a deterministic time source for asserting that Build stamps
+// expiry through the injected clock rather than the wall clock.
+type fixedClock struct {
+	t time.Time
+}
+
+func (c fixedClock) Now() time.Time { return c.t }
+
+func TestBuildStampsExpiryFromInjectedClock(t *testing.T) {
+	t.Parallel()
+
+	exp := 30 * time.Minute
+	fixed := time.Date(2026, 7, 21, 8, 0, 0, 0, time.UTC)
+
+	cases := map[string]struct {
+		setClock   bool
+		wantStamp  time.Time
+		wantByWall bool
+	}{
+		"injected clock stamps expiry": {
+			setClock:  true,
+			wantStamp: fixed,
+		},
+		"nil clock falls back to wall clock": {
+			wantByWall: true,
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			b := NewBaseBuilder()
+			b.Expiration = &exp
+			if tc.setClock {
+				b.SetClock(fixedClock{t: fixed})
+			}
+
+			req, _ := http.NewRequest("GET", "http://example.com/", nil)
+			before := time.Now()
+			opts := b.Build(req)
+			after := time.Now()
+
+			if opts.Expires == nil {
+				t.Fatal("expected non-nil Expires when Expiration is set")
+			}
+
+			if tc.wantByWall {
+				lo := before.Add(exp)
+				hi := after.Add(exp)
+				if opts.Expires.Before(lo) || opts.Expires.After(hi) {
+					t.Fatalf("expected wall-clock expiry within [%v, %v], got %v", lo, hi, *opts.Expires)
+				}
+				return
+			}
+
+			want := tc.wantStamp.Add(exp)
+			if !opts.Expires.Equal(want) {
+				t.Fatalf("expected expires %v from injected clock, got %v", want, *opts.Expires)
+			}
+		})
+	}
+}

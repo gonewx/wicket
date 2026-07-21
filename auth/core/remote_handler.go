@@ -243,6 +243,10 @@ func (h *RemoteHandler[T]) GenerateCorrelationId(properties *auth.Properties) er
 
 	correlationId := base64.RawURLEncoding.EncodeToString(bytes)
 
+	// Stamp the correlation cookie through the injected clock. Options are cloned
+	// per request by the monitor, so the clock is set at the use site rather than
+	// once at construction.
+	h.Options.CorrelationCookie().SetClock(h.Clock)
 	cookieOptions := h.Options.CorrelationCookie().Build(h.Request())
 
 	properties.Items[CorrelationProperty] = correlationId
@@ -300,6 +304,9 @@ func (h *RemoteHandler[T]) ValidateCorrelationId(properties *auth.Properties) (b
 		return false, nil
 	}
 
+	// Stamp the correlation cookie through the injected clock (see
+	// GenerateCorrelationId — set at the use site to survive per-request cloning).
+	h.Options.CorrelationCookie().SetClock(h.Clock)
 	cookieOptions := h.Options.CorrelationCookie().Build(h.Request())
 	cookie := &http.Cookie{
 		Name:     cookieName,

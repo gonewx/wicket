@@ -224,7 +224,7 @@ func (ccb *correlationCookieBuilder) AdditionalPath() string {
 
 func (ccb *correlationCookieBuilder) Build(req *http.Request) *cookiespkg.Options {
 	ccb.RequestPathBaseBuilder.AdditionalPath = ccb.AdditionalPath()
-	return ccb.RequestPathBaseBuilder.BuildWithExpires(req, time.Now())
+	return ccb.RequestPathBaseBuilder.BuildWithExpires(req, ccb.Now())
 }
 
 func (ccb *correlationCookieBuilder) BuildWithExpires(req *http.Request, expiresFrom time.Time) *cookiespkg.Options {

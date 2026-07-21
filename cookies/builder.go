@@ -16,6 +16,13 @@ const (
 	CookieSecurePolicyNone
 )
 
+// Clock is an injectable time source. A builder with no clock set falls back to
+// the wall clock, so a zero-value builder stays usable and cookie expiry becomes
+// testable under a fixed clock.
+type Clock interface {
+	Now() time.Time
+}
+
 type Options struct {
 	Domain      string
 	Path        string
@@ -38,6 +45,7 @@ type Builder interface {
 	SetSecurePolicy(policy CookieSecurePolicy)
 	IsEssential() bool
 	SetIsEssential(isEssential bool)
+	SetClock(clock Clock)
 	Build(req *http.Request) *Options
 	BuildWithExpires(req *http.Request, expiresFrom time.Time) *Options
 }
@@ -52,6 +60,7 @@ type BaseBuilder struct {
 	Expiration   *time.Duration
 	MaxAge       *time.Duration
 	isEssential  bool
+	clock        Clock
 }
 
 func NewBaseBuilder() *BaseBuilder {
@@ -70,9 +79,20 @@ func (b *BaseBuilder) SecurePolicy() CookieSecurePolicy          { return b.secu
 func (b *BaseBuilder) SetSecurePolicy(policy CookieSecurePolicy) { b.securePolicy = policy }
 func (b *BaseBuilder) IsEssential() bool                         { return b.isEssential }
 func (b *BaseBuilder) SetIsEssential(isEssential bool)           { b.isEssential = isEssential }
+func (b *BaseBuilder) SetClock(clock Clock)                      { b.clock = clock }
+
+// Now reports the build-stamp time from the injected clock, falling back to the
+// wall clock when none is set. Overriding builders reuse it through embedding so
+// cookie expiry stays testable under a fixed clock.
+func (b *BaseBuilder) Now() time.Time {
+	if b.clock != nil {
+		return b.clock.Now()
+	}
+	return time.Now()
+}
 
 func (b *BaseBuilder) Build(req *http.Request) *Options {
-	return b.BuildWithExpires(req, time.Now())
+	return b.BuildWithExpires(req, b.Now())
 }
 
 func (b *BaseBuilder) BuildWithExpires(req *http.Request, expiresFrom time.Time) *Options {
