@@ -1,0 +1,37 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {"started": "2026-07-23T00:00:00Z", "last_updated": "2026-07-23T00:00:00Z", "completed": "2026-07-23T00:00:00Z"},
+  "mode": "initial_scan",
+  "scan_level": "deep",
+  "project_root": "/mnt/disk0/project/auth/wicket",
+  "project_knowledge": "/mnt/disk0/project/auth/wicket/docs",
+  "completed_steps": [
+    {"step": "step_1", "status": "completed", "summary": "Classified as monolith with 1 part, project_type: backend"},
+    {"step": "step_2", "status": "completed", "summary": "Found 3 existing docs (PROVENANCE.md, NOTICE, LICENSE)"},
+    {"step": "step_3", "status": "completed", "summary": "Tech stack: Go 1.27rc1 + godi DI + jwx/v3"},
+    {"step": "step_4", "status": "completed", "summary": "Conditional analysis: API scan + data models"},
+    {"step": "step_5", "status": "completed", "summary": "Source tree documented with 25+ critical folders"},
+    {"step": "step_6", "status": "completed", "summary": "Dev setup and build commands documented"},
+    {"step": "step_8", "status": "completed", "summary": "Architecture docs written for 1 part"},
+    {"step": "step_9", "status": "completed", "summary": "All supporting docs written"},
+    {"step": "step_10", "status": "completed", "summary": "Master index generated"},
+    {"step": "step_11", "status": "completed", "summary": "Validation and review complete"},
+    {"step": "step_12", "status": "completed", "summary": "Workflow complete"}
+  ],
+  "current_step": "completed",
+  "project_types": [{"part_id": "wicket", "project_type_id": "backend", "display_name": "Backend API/Service"}],
+  "findings": {
+    "project_classification": "monolith, 1 part, Go backend (OIDC/OAuth server library)",
+    "technology_stack": "Go 1.27rc1, godi DI, jwx/v3, gjson, uuid"
+  },
+  "outputs_generated": [
+    "project-scan-report.json",
+    "project-overview.md",
+    "architecture.md",
+    "source-tree-analysis.md",
+    "development-guide.md",
+    "api-contracts.md",
+    "index.md"
+  ],
+  "resume_instructions": "Workflow completed"
+}
