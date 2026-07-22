@@ -104,7 +104,7 @@ func (v *verifier) resolveKeySet(ctx context.Context, kid string) (jwk.Set, erro
 func mapParseError(err error) error {
 	msg := err.Error()
 	switch {
-	case strings.Contains(msg, `"exp"`):
+	case strings.Contains(msg, `"exp"`), strings.Contains(msg, `"nbf"`), strings.Contains(msg, `"iat"`):
 		return fmt.Errorf("%w: %v", ErrTokenExpired, err)
 	case strings.Contains(msg, `"iss"`):
 		return fmt.Errorf("%w: %v", ErrInvalidIssuer, err)
@@ -117,6 +117,9 @@ func mapParseError(err error) error {
 
 func projectToken(token jwt.Token) (*VerifiedToken, error) {
 	sub, _ := token.Subject()
+	if sub == "" {
+		return nil, ErrMalformedToken
+	}
 	iss, _ := token.Issuer()
 	aud, _ := token.Audience()
 
