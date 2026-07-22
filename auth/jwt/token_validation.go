@@ -8,8 +8,8 @@ import (
 
 	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/services"
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	jwxjwt "github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	jwxjwt "github.com/lestrrat-go/jwx/v3/jwt"
 )
 
 // SecurityToken is a token that has passed validation. It exposes the temporal

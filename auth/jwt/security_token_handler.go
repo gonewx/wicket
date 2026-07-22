@@ -4,20 +4,14 @@
 package jwt
 
 import (
-	"errors"
 	"time"
 
 	"github.com/gonewx/wicket/claims"
-	jwxjwt "github.com/lestrrat-go/jwx/v2/jwt"
-)
-
-var (
-	errTokenIssuerMismatch   = errors.New("token issuer does not match the expected value")
-	errTokenAudienceMismatch = errors.New("token audience does not contain the expected value")
+	jwxjwt "github.com/lestrrat-go/jwx/v3/jwt"
 )
 
 // SecurityTokenHandler is the default SecurityTokenValidator. It delegates all
-// cryptography and standard-claim validation to jwx/v2 and holds no signing key
+// cryptography and standard-claim validation to jwx/v3 and holds no signing key
 // material of its own.
 type SecurityTokenHandler struct{}
 
@@ -76,7 +70,7 @@ func (h *SecurityTokenHandler) validateClaims(
 	token jwxjwt.Token,
 	parameters *TokenValidationParameters,
 ) error {
-	opts := make([]jwxjwt.ValidateOption, 0, 4)
+	opts := make([]jwxjwt.ValidateOption, 0, 5)
 	if parameters.Clock != nil {
 		opts = append(opts, jwxjwt.WithClock(parameters.Clock))
 	}
@@ -90,23 +84,16 @@ func (h *SecurityTokenHandler) validateClaims(
 		opts = append(opts, jwxjwt.WithAcceptableSkew(parameters.ClockSkew))
 	}
 	opts = append(opts, parameters.ValidateOptions...)
+	opts = append(opts, jwxjwt.WithTruncation(time.Second))
 
 	if parameters.ValidateLifetime {
-		// jwt.Validate always runs the exp/nbf/iat validators alongside the
-		// issuer/audience options and the acceptable skew assembled above.
 		return jwxjwt.Validate(token, opts...)
 	}
 
-	// Lifetime validation disabled: run only the non-temporal options by
-	// skipping jwt.Validate's built-in temporal validators. jwx v2.0.6 has no
-	// toggle for that, so the issuer/audience checks are applied directly.
-	if parameters.ValidIssuer != "" && token.Issuer() != parameters.ValidIssuer {
-		return errTokenIssuerMismatch
-	}
-	if parameters.ValidAudience != "" && !containsString(token.Audience(), parameters.ValidAudience) {
-		return errTokenAudienceMismatch
-	}
-	return nil
+	// Lifetime validation disabled: reset the default temporal validators
+	// (exp/nbf/iat) while retaining issuer/audience/clock/skew constraints.
+	opts = append(opts, jwxjwt.WithResetValidators(true))
+	return jwxjwt.Validate(token, opts...)
 }
 
 // principalFromToken projects the token's claims onto a ClaimsPrincipal whose
@@ -115,21 +102,29 @@ func principalFromToken(token jwxjwt.Token) *claims.ClaimsPrincipal {
 	identity := claims.NewClaimsIdentity(
 		claims.WithAuthenticationType(AuthenticationScheme),
 	)
-	for name, value := range token.PrivateClaims() {
+	for _, name := range token.Keys() {
+		switch name {
+		case "iss", "sub", "aud", "exp", "nbf", "iat", "jti":
+			continue
+		}
+		var value any
+		if err := token.Get(name, &value); err != nil {
+			continue
+		}
 		identity.AddClaim(claims.NewClaim(
 			claims.WithClaimType(name),
 			claims.WithClaimValue(value),
 		))
 	}
-	addStandardClaim(identity, "iss", token.Issuer())
-	// The registered "sub" claim carries the subject. Project it onto the
-	// wicket-wide NameIdentifier type so downstream consumers (session,
-	// userinfo, authorization gates) can locate the subject the same way they
-	// do for every other scheme.
-	addStandardClaim(identity, claims.NameIdentifier, token.Subject())
-	addStandardClaim(identity, "jti", token.JwtID())
-	for _, aud := range token.Audience() {
-		addStandardClaim(identity, "aud", aud)
+	iss, _ := token.Issuer()
+	addStandardClaim(identity, "iss", iss)
+	sub, _ := token.Subject()
+	addStandardClaim(identity, claims.NameIdentifier, sub)
+	jti, _ := token.JwtID()
+	addStandardClaim(identity, "jti", jti)
+	aud, _ := token.Audience()
+	for _, a := range aud {
+		addStandardClaim(identity, "aud", a)
 	}
 	return claims.NewClaimsPrincipal(claims.WithClaimsPrincipalIdentity(identity))
 }
@@ -144,20 +139,11 @@ func addStandardClaim(identity *claims.ClaimsIdentity, name, value string) {
 	))
 }
 
-func containsString(values []string, target string) bool {
-	for _, v := range values {
-		if v == target {
-			return true
-		}
-	}
-	return false
-}
-
 // validatedToken adapts a validated jwx token to the SecurityToken face the
 // handler reads for authentication properties.
 type validatedToken struct {
 	token jwxjwt.Token
 }
 
-func (t *validatedToken) ValidTo() time.Time   { return t.token.Expiration() }
-func (t *validatedToken) ValidFrom() time.Time { return t.token.NotBefore() }
+func (t *validatedToken) ValidTo() time.Time   { exp, _ := t.token.Expiration(); return exp }
+func (t *validatedToken) ValidFrom() time.Time { nbf, _ := t.token.NotBefore(); return nbf }

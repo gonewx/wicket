@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/gonewx/wicket/auth/core"
 )

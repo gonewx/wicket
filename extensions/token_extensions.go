@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/gonewx/wicket"
 	claimspkg "github.com/gonewx/wicket/claims"
@@ -101,7 +101,7 @@ func CreateJwtPayload(token *storage_models.Token, options *config_options.Wicke
 	// other claims.
 	for _, claimType := range simpleClaimTypes {
 		// we ignore claims. that are added by the above code for token verification
-		if _, ok := payload.Get(claimType); !ok {
+		if !payload.Has(claimType) {
 			claims := utils.Where(token.Claims, func(c *claimspkg.Claim) bool { return c.Type == claimType })
 
 			if len(claims) > 1 {

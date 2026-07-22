@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/gonewx/wicket"
 	config_options "github.com/gonewx/wicket/config/options"
@@ -67,8 +67,13 @@ func (s *TokenCreationService) CreateToken(token *storage_models.Token) (string,
 		}
 	}
 
+	alg, ok := jwa.LookupSignatureAlgorithm(credential.Algorithm)
+	if !ok {
+		return "", fmt.Errorf("create token: unknown algorithm %q", credential.Algorithm)
+	}
+
 	signed, err := jwt.Sign(payload, jwt.WithKey(
-		jwa.SignatureAlgorithm(credential.Algorithm),
+		alg,
 		credential.Key,
 		jws.WithProtectedHeaders(headers),
 	))

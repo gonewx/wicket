@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	jwxjwt "github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	jwxjwt "github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/auth"
@@ -48,10 +48,10 @@ const (
 // deterministic.
 func newSigningKey(t *testing.T, raw string, kid string) jwk.Key {
 	t.Helper()
-	key, err := jwk.FromRaw([]byte(raw))
+	key, err := jwk.Import([]byte(raw))
 	require.NoError(t, err)
 	require.NoError(t, key.Set(jwk.KeyIDKey, kid))
-	require.NoError(t, key.Set(jwk.AlgorithmKey, jwa.HS256))
+	require.NoError(t, key.Set(jwk.AlgorithmKey, jwa.HS256()))
 	return key
 }
 
@@ -77,7 +77,7 @@ func signToken(t *testing.T, key jwk.Key, mutate func(jwxjwt.Token)) string {
 	if mutate != nil {
 		mutate(tok)
 	}
-	signed, err := jwxjwt.Sign(tok, jwxjwt.WithKey(jwa.HS256, key))
+	signed, err := jwxjwt.Sign(tok, jwxjwt.WithKey(jwa.HS256(), key))
 	require.NoError(t, err)
 	return string(signed)
 }

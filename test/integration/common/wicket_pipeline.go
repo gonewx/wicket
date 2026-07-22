@@ -36,8 +36,8 @@ import (
 	"github.com/gonewx/wicket/tokens"
 	"github.com/gonewx/wicket/utils"
 	"github.com/gonewx/wicket/validators"
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 )
 
 var (
@@ -388,7 +388,7 @@ func (p *WicketPipeline) Initialize() {
 func (p *WicketPipeline) configureServices() {
 	p.ResourceOwnerValidator = test.NewTestUserResourceOwnerPasswordValidator(p.UserStore, godi.GetRequired[services.SystemClock](p.Root))
 	p.BackChannelClient = &http.Client{Transport: p.BackChannelMessageHandler}
-	p.AddDeveloperSigningCredential(jwa.RS256)
+	p.AddDeveloperSigningCredential(jwa.RS256())
 
 	cfg := p.Root.ServerConfig()
 	cfg.SetSigningCredentialStoresProvider(func() []storage.SigningCredentialStore {
@@ -435,14 +435,15 @@ func (p *WicketPipeline) AddDeveloperSigningCredential(signingAlgorithm jwa.Sign
 	if err != nil {
 		panic(err)
 	}
-	kidKey, err := jwk.FromRaw(raw)
+	kidKey, err := jwk.Import(raw)
 	if err != nil {
 		panic(err)
 	}
 	if err := jwk.AssignKeyID(kidKey); err != nil {
 		panic(err)
 	}
-	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(string(signingAlgorithm)), tokens.WithKid(kidKey.KeyID()))
+	kid, _ := kidKey.KeyID()
+	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(signingAlgorithm.String()), tokens.WithKid(kid))
 	if err != nil {
 		panic(err)
 	}

@@ -10,9 +10,9 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/gonewx/wicket"
 	claimspkg "github.com/gonewx/wicket/claims"
@@ -79,9 +79,7 @@ func (v *JwtRequestValidator) Validate(ctx *validators_contexts.JwtRequestValida
 		return nil, err
 	}
 
-	_, tryGetRequest := jwtSecurityToken.Get(gois.AuthorizeRequestRequest)
-	_, tryGetRequestUri := jwtSecurityToken.Get(gois.AuthorizeRequestRequestUri)
-	if tryGetRequest || tryGetRequestUri {
+	if jwtSecurityToken.Has(gois.AuthorizeRequestRequest) || jwtSecurityToken.Has(gois.AuthorizeRequestRequestUri) {
 		return nil, fmt.Errorf("JWT payload must not contain request or request_uri")
 	}
 
@@ -94,9 +92,9 @@ func (v *JwtRequestValidator) Validate(ctx *validators_contexts.JwtRequestValida
 }
 
 func (v *JwtRequestValidator) ValidateJwt(ctx *validators_contexts.JwtRequestValidationContext, keys jwk.Set) (jwt.Token, error) {
-	pubSet, _ := jwk.PublicSetOf(keys)
+	pubSet, _ := jwk.PublicSetOf(keys, jwk.WithAllowSymmetric(true))
 
-	token, err := jwt.Parse([]byte(ctx.JwtTokenString), jwt.WithKeySet(pubSet))
+	token, err := jwt.Parse([]byte(ctx.JwtTokenString), jwt.WithKeySet(pubSet, jws.WithInferAlgorithmFromKey(true)))
 	if err != nil {
 		return nil, err
 	}
@@ -114,18 +112,18 @@ func (v *JwtRequestValidator) ValidateJwt(ctx *validators_contexts.JwtRequestVal
 		strictJarValidation = v.options.StrictJarValidation
 	}
 	if strictJarValidation {
-		validator := jwt.ValidatorFunc(func(_ context.Context, t jwt.Token) jwt.ValidationError {
+		validator := jwt.ValidatorFunc(func(_ context.Context, t jwt.Token) error {
 			jwsMsg, err := jws.Parse([]byte(ctx.JwtTokenString))
 			if err != nil {
-				return jwt.NewValidationError(err)
+				return err
 			}
-			typ, ok := jwsMsg.Signatures()[0].ProtectedHeaders().Get("typ")
+			typ, ok := jwsMsg.Signatures()[0].ProtectedHeaders().Type()
 			if !ok {
-				return jwt.NewValidationError(fmt.Errorf("cannot found type [%s]", typ))
+				return fmt.Errorf("cannot found type [%s]", typ)
 			}
 
 			if typ != string(gois.JwtTypesAuthorizationRequest) {
-				return jwt.NewValidationError(fmt.Errorf("invalid type [%s]", typ))
+				return fmt.Errorf("invalid type [%s]", typ)
 			}
 			return nil
 		})
@@ -143,8 +141,6 @@ func (v *JwtRequestValidator) ValidateJwt(ctx *validators_contexts.JwtRequestVal
 
 // Processes the JWT contents
 func (v *JwtRequestValidator) ProcessPayload(validationCtx *validators_contexts.JwtRequestValidationContext, token jwt.Token) []*claimspkg.Claim {
-	ctx := context.Background()
-
 	// filter JWT validation values
 	filter := gois.JwtRequestClaimTypesFilter
 	if validationCtx.IncludeJti {
@@ -159,27 +155,23 @@ func (v *JwtRequestValidator) ProcessPayload(validationCtx *validators_contexts.
 
 	claims := make([]*claimspkg.Claim, 0)
 
-	issuer, ok := token.Get(tokjwt.JwtRegisteredClaimNamesSub)
-	if !ok {
+	var issuer any
+	if err := token.Get(tokjwt.JwtRegisteredClaimNamesSub, &issuer); err != nil {
 		issuer = claimspkg.DefaultIssuer
 	}
 
-	iterator := token.Iterate(ctx)
-	for iterator.Next(ctx) {
-		pair := iterator.Pair()
-		if pair == nil {
+	for _, key := range token.Keys() {
+		var value any
+		if err := token.Get(key, &value); err != nil {
 			continue
 		}
 
-		key := pair.Key
-		value := pair.Value
-
-		if !utils.Contains(filter, key.(string)) {
+		if !utils.Contains(filter, key) {
 			switch v := value.(type) {
 			case []any:
 				for _, vv := range v {
 					claims = append(claims, claimspkg.NewClaim(
-						claimspkg.WithClaimType(key.(string)),
+						claimspkg.WithClaimType(key),
 						claimspkg.WithClaimValue(vv),
 						claimspkg.WithClaimIssuer(issuer.(string)),
 						claimspkg.WithClaimOriginalIssuer(issuer.(string)),
@@ -189,7 +181,7 @@ func (v *JwtRequestValidator) ProcessPayload(validationCtx *validators_contexts.
 			}
 
 			claims = append(claims, claimspkg.NewClaim(
-				claimspkg.WithClaimType(key.(string)),
+				claimspkg.WithClaimType(key),
 				claimspkg.WithClaimValue(value),
 				claimspkg.WithClaimIssuer(issuer.(string)),
 				claimspkg.WithClaimOriginalIssuer(issuer.(string)),

@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 
 	"github.com/gonewx/wicket/tokens"
 )
@@ -63,7 +63,7 @@ func LoadKey() (jwk.Key, error) {
 	if err := key.Set(jwk.KeyIDKey, strings.ToUpper(hex.EncodeToString(thumbprint))); err != nil {
 		return nil, err
 	}
-	if err := key.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
+	if err := key.Set(jwk.AlgorithmKey, jwa.RS256()); err != nil {
 		return nil, err
 	}
 
@@ -83,6 +83,6 @@ func LoadSigningCredentials() (*tokens.SigningCredentials, error) {
 
 	return tokens.NewSigningCredentials(
 		key,
-		tokens.WithAlgorithm(string(jwa.RS256)),
+		tokens.WithAlgorithm(jwa.RS256().String()),
 	)
 }

@@ -12,10 +12,10 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/require"
 
 	"github.com/gonewx/wicket"
@@ -48,10 +48,10 @@ func newRequestObjectFixture(t *testing.T) *requestObjectFixture {
 
 	rsaKey, err := testcert.CreateRsaSecurityKey()
 	require.NoError(t, err)
-	rsaJwk, err := jwk.FromRaw(rsaKey)
+	rsaJwk, err := jwk.Import(rsaKey)
 	require.NoError(t, err)
 	require.NoError(t, jwk.AssignKeyID(rsaJwk))
-	require.NoError(t, rsaJwk.Set(jwk.AlgorithmKey, jwa.RS256))
+	require.NoError(t, rsaJwk.Set(jwk.AlgorithmKey, jwa.RS256()))
 	rsaJwkJson, err := json.Marshal(rsaJwk)
 	require.NoError(t, err)
 
@@ -144,8 +144,8 @@ func signRequestObject(t *testing.T, issuer string, audience string, signingKey 
 
 	headers := jws.NewHeaders()
 	require.NoError(t, headers.Set(jws.TypeKey, typHeader))
-	if signingKey.KeyID() != "" {
-		require.NoError(t, headers.Set(jws.KeyIDKey, signingKey.KeyID()))
+	if kid, ok := signingKey.KeyID(); ok && kid != "" {
+		require.NoError(t, headers.Set(jws.KeyIDKey, kid))
 	}
 
 	signed, err := jwt.Sign(token, jwt.WithKey(algorithm, signingKey, jws.WithProtectedHeaders(headers)))
@@ -157,7 +157,7 @@ func (f *requestObjectFixture) certSigningKey(t *testing.T) jwk.Key {
 	t.Helper()
 	credential, err := integration_common.NewTestCert().LoadSigningCredentials()
 	require.NoError(t, err)
-	key, err := jwk.FromRaw(credential.Key)
+	key, err := jwk.Import(credential.Key)
 	require.NoError(t, err)
 	require.NoError(t, jwk.AssignKeyID(key))
 	return key
@@ -240,13 +240,13 @@ func TestRequestObjectRequiredButMissingFails(t *testing.T) {
 func TestValidRequestObjectSignatures(t *testing.T) {
 	for name, sign := range map[string]func(*testing.T, *requestObjectFixture) string{
 		"x509 certificate key": func(t *testing.T, f *requestObjectFixture) string {
-			return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256, f.requestClaims(), "JWT")
+			return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256(), f.requestClaims(), "JWT")
 		},
 		"symmetric jwk": func(t *testing.T, f *requestObjectFixture) string {
-			return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.symmetricSigningKey(t), jwa.HS256, f.requestClaims(), "JWT")
+			return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.symmetricSigningKey(t), jwa.HS256(), f.requestClaims(), "JWT")
 		},
 		"rsa jwk": func(t *testing.T, f *requestObjectFixture) string {
-			return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.rsaJwk, jwa.RS256, f.requestClaims(), "JWT")
+			return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.rsaJwk, jwa.RS256(), f.requestClaims(), "JWT")
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -266,7 +266,7 @@ func TestQueryParametersOutsideTheRequestObjectAreMergedButNotTrusted(t *testing
 	delete(requestClaims, "state")
 	delete(requestClaims, "nonce")
 
-	requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.certSigningKey(t), jwa.RS256, requestClaims, "JWT")
+	requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.certSigningKey(t), jwa.RS256(), requestClaims, "JWT")
 
 	fixture.authorize(t, requestJwt, url.Values{"state": {"state"}, "nonce": {"nonce"}})
 
@@ -287,7 +287,7 @@ func TestStrictRequestObjectTypeValidation(t *testing.T) {
 		fixture := newRequestObjectFixture(t)
 		fixture.pipeline.Options.StrictJarValidation = true
 
-		requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.rsaJwk, jwa.RS256, fixture.requestClaims(), "oauth-authz-req+jwt")
+		requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.rsaJwk, jwa.RS256(), fixture.requestClaims(), "oauth-authz-req+jwt")
 		fixture.authorize(t, requestJwt, nil)
 
 		a.NotNil(fixture.pipeline.LoginRequest)
@@ -299,7 +299,7 @@ func TestStrictRequestObjectTypeValidation(t *testing.T) {
 		fixture := newRequestObjectFixture(t)
 		fixture.pipeline.Options.StrictJarValidation = true
 
-		requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.rsaJwk, jwa.RS256, fixture.requestClaims(), "JWT")
+		requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.rsaJwk, jwa.RS256(), fixture.requestClaims(), "JWT")
 		fixture.authorize(t, requestJwt, nil)
 
 		a.NotNil(fixture.pipeline.ErrorMessage)
@@ -328,7 +328,7 @@ func TestComplexRequestObjectValuesSurviveTheRoundTrip(t *testing.T) {
 	requestClaims["someObj"] = string(payloadJson)
 	requestClaims["someArr"] = []string{"a", "b", "c"}
 
-	requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.certSigningKey(t), jwa.RS256, requestClaims, "JWT")
+	requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.certSigningKey(t), jwa.RS256(), requestClaims, "JWT")
 	fixture.authorize(t, requestJwt, nil)
 
 	loginRequest := fixture.pipeline.LoginRequest
@@ -351,7 +351,7 @@ func TestRequestObjectRejections(t *testing.T) {
 			mutate: func(t *testing.T, f *requestObjectFixture) (string, url.Values) {
 				requestClaims := f.requestClaims()
 				delete(requestClaims, "client_id")
-				signed := signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256, requestClaims, "JWT")
+				signed := signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256(), requestClaims, "JWT")
 				return signed, url.Values{"omit_client_id": {"1"}}
 			},
 			wantError: "invalid_request",
@@ -360,19 +360,19 @@ func TestRequestObjectRejections(t *testing.T) {
 			mutate: func(t *testing.T, f *requestObjectFixture) (string, url.Values) {
 				requestClaims := f.requestClaims()
 				delete(requestClaims, "client_id")
-				return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256, requestClaims, "JWT"), nil
+				return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256(), requestClaims, "JWT"), nil
 			},
 			wantError: "invalid_request_object",
 		},
 		"wrong audience": {
 			mutate: func(t *testing.T, f *requestObjectFixture) (string, url.Values) {
-				return signRequestObject(t, f.client.ClientId, "invalid", f.certSigningKey(t), jwa.RS256, f.requestClaims(), "JWT"), nil
+				return signRequestObject(t, f.client.ClientId, "invalid", f.certSigningKey(t), jwa.RS256(), f.requestClaims(), "JWT"), nil
 			},
 			wantError: "invalid_request_object",
 		},
 		"issuer does not match the client": {
 			mutate: func(t *testing.T, f *requestObjectFixture) (string, url.Values) {
-				return signRequestObject(t, "invalid", f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256, f.requestClaims(), "JWT"), nil
+				return signRequestObject(t, "invalid", f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256(), f.requestClaims(), "JWT"), nil
 			},
 			wantError: "invalid_request_object",
 		},
@@ -380,7 +380,7 @@ func TestRequestObjectRejections(t *testing.T) {
 			mutate: func(t *testing.T, f *requestObjectFixture) (string, url.Values) {
 				requestClaims := f.requestClaims()
 				requestClaims["request"] = "request"
-				return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256, requestClaims, "JWT"), nil
+				return signRequestObject(t, f.client.ClientId, f.pipeline.TestServer.URL, f.certSigningKey(t), jwa.RS256(), requestClaims, "JWT"), nil
 			},
 			wantError: "invalid_request_object",
 		},
@@ -417,7 +417,7 @@ func TestRequestUriFetchesTheRequestObject(t *testing.T) {
 	fixture := newRequestObjectFixture(t)
 	fixture.pipeline.Options.Endpoints.EnableJwtRequestUri = true
 
-	requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.certSigningKey(t), jwa.RS256, fixture.requestClaims(), "JWT")
+	requestJwt := signRequestObject(t, fixture.client.ClientId, fixture.pipeline.TestServer.URL, fixture.certSigningKey(t), jwa.RS256(), fixture.requestClaims(), "JWT")
 
 	objectServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(requestJwt))

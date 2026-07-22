@@ -22,9 +22,9 @@ import (
 	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/di"
 	svcimpl "github.com/gonewx/wicket/services/impl"
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	jwxjwt "github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	jwxjwt "github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,10 +50,10 @@ const (
 // are fully reproducible across runs.
 func newJWTSigningKey(t *testing.T, raw string) jwk.Key {
 	t.Helper()
-	key, err := jwk.FromRaw([]byte(raw))
+	key, err := jwk.Import([]byte(raw))
 	require.NoError(t, err)
 	require.NoError(t, key.Set(jwk.KeyIDKey, jwtE2EKid))
-	require.NoError(t, key.Set(jwk.AlgorithmKey, jwa.HS256))
+	require.NoError(t, key.Set(jwk.AlgorithmKey, jwa.HS256()))
 	return key
 }
 
@@ -69,7 +69,7 @@ func signJWTE2EToken(t *testing.T, key jwk.Key, mutate func(jwxjwt.Token)) strin
 	if mutate != nil {
 		mutate(tok)
 	}
-	signed, err := jwxjwt.Sign(tok, jwxjwt.WithKey(jwa.HS256, key))
+	signed, err := jwxjwt.Sign(tok, jwxjwt.WithKey(jwa.HS256(), key))
 	require.NoError(t, err)
 	return string(signed)
 }

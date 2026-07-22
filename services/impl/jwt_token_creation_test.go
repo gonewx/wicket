@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/gonewx/wicket"
 	claimspkg "github.com/gonewx/wicket/claims"
@@ -65,7 +65,7 @@ func TestCreateTokenHeaderKidResolvesThroughValidationKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse jws: %v", err)
 	}
-	headerKid, ok := msg.Signatures()[0].ProtectedHeaders().Get(jws.KeyIDKey)
+	headerKid, ok := msg.Signatures()[0].ProtectedHeaders().KeyID()
 	if !ok || headerKid == "" {
 		t.Fatal("signed token carries no kid header")
 	}
@@ -83,7 +83,7 @@ func TestCreateTokenHeaderKidResolvesThroughValidationKeys(t *testing.T) {
 		if vk.KeyId == headerKid {
 			found = true
 		}
-		k, err := jwk.FromRaw(vk.Key)
+		k, err := jwk.Import(vk.Key)
 		if err != nil {
 			t.Fatalf("jwk from raw: %v", err)
 		}

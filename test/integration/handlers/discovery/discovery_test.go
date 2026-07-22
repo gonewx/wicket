@@ -12,8 +12,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 
@@ -34,11 +34,12 @@ func ecdsaCredential(t *testing.T, curve elliptic.Curve, algorithm jwa.Signature
 	raw, err := ecdsa.GenerateKey(curve, rand.Reader)
 	require.NoError(t, err)
 
-	key, err := jwk.FromRaw(raw)
+	key, err := jwk.Import(raw)
 	require.NoError(t, err)
 	require.NoError(t, jwk.AssignKeyID(key))
 
-	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(string(algorithm)), tokens.WithKid(key.KeyID()))
+	kid, _ := key.KeyID()
+	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(algorithm.String()), tokens.WithKid(kid))
 	require.NoError(t, err)
 	return credential
 }
@@ -80,7 +81,7 @@ func TestSigningAlgorithmsSupportedMatchTheRegisteredKeys(t *testing.T) {
 
 	pipeline := integration_common.NewWicketPipeline()
 	pipeline.Initialize()
-	pipeline.AddSigningCredential(ecdsaCredential(t, elliptic.P256(), jwa.ES256))
+	pipeline.AddSigningCredential(ecdsaCredential(t, elliptic.P256(), jwa.ES256()))
 
 	data := getBody(t, pipeline, integration_common.DiscoveryEndpoint)
 
@@ -90,8 +91,8 @@ func TestSigningAlgorithmsSupportedMatchTheRegisteredKeys(t *testing.T) {
 		values = append(values, algorithm.String())
 	}
 	a.Len(values, 2)
-	a.Contains(values, string(jwa.RS256))
-	a.Contains(values, string(jwa.ES256))
+	a.Contains(values, jwa.RS256().String())
+	a.Contains(values, jwa.ES256().String())
 }
 
 func TestDiscoveryDocumentIsValidJson(t *testing.T) {
@@ -110,7 +111,7 @@ func TestJwksEllipticCurveEntriesCarryCrv(t *testing.T) {
 
 	pipeline := integration_common.NewWicketPipeline()
 	pipeline.Initialize()
-	pipeline.AddSigningCredential(ecdsaCredential(t, elliptic.P256(), jwa.ES256))
+	pipeline.AddSigningCredential(ecdsaCredential(t, elliptic.P256(), jwa.ES256()))
 
 	data := getBody(t, pipeline, integration_common.DiscoveryKeysEndpoint)
 
@@ -121,7 +122,7 @@ func TestJwksEllipticCurveEntriesCarryCrv(t *testing.T) {
 	for _, key := range keys {
 		if gjson.Get(key.String(), "kty").String() == "EC" {
 			found = true
-			a.Equal(string(jwa.P256), gjson.Get(key.String(), "crv").String())
+			a.Equal(jwa.P256().String(), gjson.Get(key.String(), "crv").String())
 		}
 	}
 	a.True(found)
@@ -136,14 +137,14 @@ func TestJwksEntriesCarryAlg(t *testing.T) {
 
 	keys := gjson.Get(data, "keys").Array()
 	a.NotEmpty(keys)
-	a.Equal(string(jwa.RS256), gjson.Get(keys[0].String(), "alg").String())
+	a.Equal(jwa.RS256().String(), gjson.Get(keys[0].String(), "alg").String())
 }
 
 func TestJwksEcdsaKeysAreParsable(t *testing.T) {
 	a := require.New(t)
 
 	curves := []elliptic.Curve{elliptic.P256(), elliptic.P384(), elliptic.P521()}
-	algorithms := []jwa.SignatureAlgorithm{jwa.ES256, jwa.ES384, jwa.ES512}
+	algorithms := []jwa.SignatureAlgorithm{jwa.ES256(), jwa.ES384(), jwa.ES512()}
 
 	for i, curve := range curves {
 		pipeline := integration_common.NewWicketPipeline()
@@ -160,7 +161,7 @@ func TestJwksEcdsaKeysAreParsable(t *testing.T) {
 		a.True(ok)
 
 		var parsedKey any
-		a.NoError(matchingKey.Raw(&parsedKey))
+		a.NoError(jwk.Export(matchingKey, &parsedKey))
 		a.IsType(&ecdsa.PublicKey{}, parsedKey)
 	}
 }
@@ -171,13 +172,13 @@ func TestJwksKeysWithDifferentAlgorithmsKeepTheirOwnAlg(t *testing.T) {
 	pipeline := integration_common.NewWicketPipeline()
 	pipeline.Initialize()
 
-	credential := ecdsaCredential(t, elliptic.P256(), jwa.ES256)
+	credential := ecdsaCredential(t, elliptic.P256(), jwa.ES256())
 	pipeline.AddSigningCredential(credential)
 
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	a.NoError(err)
 	pipeline.AddValidationKey([]*models.SecurityKeyInfo{
-		{Key: rsaKey, SigningAlgorithm: string(jwa.RS256)},
+		{Key: rsaKey, SigningAlgorithm: jwa.RS256().String()},
 	})
 
 	data := getBody(t, pipeline, integration_common.DiscoveryKeysEndpoint)
@@ -187,13 +188,16 @@ func TestJwksKeysWithDifferentAlgorithmsKeepTheirOwnAlg(t *testing.T) {
 
 	matchingKey, ok := jwks.LookupKeyID(credential.Kid)
 	a.True(ok)
-	a.Equal(string(jwa.ES256), matchingKey.Algorithm().String())
+	alg, _ := matchingKey.Algorithm()
+	a.Equal(jwa.ES256().String(), alg.String())
 
-	rsaJwk, err := jwk.FromRaw(rsaKey)
+	rsaJwk, err := jwk.Import(rsaKey)
 	a.NoError(err)
 	a.NoError(jwk.AssignKeyID(rsaJwk))
 
-	matchingKey, ok = jwks.LookupKeyID(rsaJwk.KeyID())
+	rsaKid, _ := rsaJwk.KeyID()
+	matchingKey, ok = jwks.LookupKeyID(rsaKid)
 	a.True(ok)
-	a.Equal(string(jwa.RS256), matchingKey.Algorithm().String())
+	alg, _ = matchingKey.Algorithm()
+	a.Equal(jwa.RS256().String(), alg.String())
 }

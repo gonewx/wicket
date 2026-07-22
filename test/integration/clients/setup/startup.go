@@ -12,8 +12,8 @@ import (
 	"net/http/httptest"
 
 	"github.com/gonewx/godi"
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/di"
@@ -51,7 +51,7 @@ func ConfigureServices(logger *slog.Logger) *httptest.Server {
 	profileProvider := func() services.ProfileService {
 		return NewCustomProfileService(userStore, srv.Logger)
 	}
-	signingCredentialStores, validationKeysStores := developerSigningStores(jwa.RS256)
+	signingCredentialStores, validationKeysStores := developerSigningStores(jwa.RS256())
 
 	cfg := root.ServerConfig()
 	cfg.SetSigningCredentialStores(signingCredentialStores)
@@ -80,7 +80,7 @@ func developerSigningStores(signingAlgorithm jwa.SignatureAlgorithm) ([]storage.
 	if err != nil {
 		panic(err)
 	}
-	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(string(signingAlgorithm)), tokens.WithKid(thumbprintKid(raw)))
+	credential, err := tokens.NewSigningCredentials(raw, tokens.WithAlgorithm(signingAlgorithm.String()), tokens.WithKid(thumbprintKid(raw)))
 	if err != nil {
 		panic(err)
 	}
@@ -98,12 +98,13 @@ func developerSigningStores(signingAlgorithm jwa.SignatureAlgorithm) ([]storage.
 // thumbprintKid derives the RFC 7638 thumbprint key id the validation-key
 // aggregation publishes, so the signed token's kid header matches the JWKS.
 func thumbprintKid(raw any) string {
-	key, err := jwk.FromRaw(raw)
+	key, err := jwk.Import(raw)
 	if err != nil {
 		panic(err)
 	}
 	if err := jwk.AssignKeyID(key); err != nil {
 		panic(err)
 	}
-	return key.KeyID()
+	kid, _ := key.KeyID()
+	return kid
 }

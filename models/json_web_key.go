@@ -7,7 +7,7 @@ package models
 import (
 	"encoding/json"
 
-	jwkpkg "github.com/lestrrat-go/jwx/v2/jwk"
+	jwkpkg "github.com/lestrrat-go/jwx/v3/jwk"
 )
 
 type JsonWebKey struct {

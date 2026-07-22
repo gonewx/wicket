@@ -7,7 +7,7 @@ package models
 import (
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/claims"

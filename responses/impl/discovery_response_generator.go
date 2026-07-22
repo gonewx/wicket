@@ -19,7 +19,7 @@ import (
 	"github.com/gonewx/wicket/utils"
 	"github.com/gonewx/wicket/validators"
 	validators_impl "github.com/gonewx/wicket/validators/impl"
-	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 )
 
 type DiscoveryResponseGenerator struct {
@@ -372,7 +372,7 @@ func (g *DiscoveryResponseGenerator) CreateJwkDocument() ([]*models.JsonWebKey, 
 	}
 
 	for _, key := range validationKeys {
-		k, err := jwk.FromRaw(key.Key)
+		k, err := jwk.Import(key.Key)
 		if err != nil {
 			return nil, err
 		}

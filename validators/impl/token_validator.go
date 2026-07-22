@@ -5,16 +5,15 @@
 package impl
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/claims"
@@ -261,7 +260,7 @@ func (v *TokenValidator) parseJwt(jwtString string, validationKeys []*models.Sec
 
 	set := jwk.NewSet()
 	for _, key := range validationKeys {
-		k, err := jwk.FromRaw(key.Key)
+		k, err := jwk.Import(key.Key)
 		if err != nil {
 			return nil, err
 		}
@@ -294,7 +293,7 @@ func (v *TokenValidator) parseJwt(jwtString string, validationKeys []*models.Sec
 			if err != nil {
 				return nil, err
 			}
-			typ, ok := jwsMsg.Signatures()[0].ProtectedHeaders().Get("typ")
+			typ, ok := jwsMsg.Signatures()[0].ProtectedHeaders().Type()
 			if !ok {
 				return nil, errors.New("typ not found")
 			}
@@ -309,7 +308,7 @@ func (v *TokenValidator) parseJwt(jwtString string, validationKeys []*models.Sec
 func (v *TokenValidator) validateJwt(jwtString string, validationKeys []*models.SecurityKeyInfo, validateLifetime bool, audience string) *validators_models.TokenValidationResult {
 	token, err := v.parseJwt(jwtString, validationKeys, validateLifetime, audience)
 	if err != nil {
-		if errors.Is(err, jwt.ErrTokenExpired()) {
+		if errors.Is(err, jwt.TokenExpiredError()) {
 			v.logger.Error("JWT token validation expired error", slog.String("error", err.Error()))
 			return v.invalid(gois.ProtectedResourceErrorsExpiredToken)
 		} else {
@@ -325,8 +324,8 @@ func (v *TokenValidator) validateJwt(jwtString string, validationKeys []*models.
 
 	// load the client that belongs to the client_id claim
 	var client *storage_models.Client
-	clientId, ok := token.Get(gois.JwtClaimTypesClientId)
-	if ok {
+	var clientId any
+	if err := token.Get(gois.JwtClaimTypesClientId, &clientId); err == nil {
 		cid, ok := clientId.(string)
 		if !ok || cid == "" {
 			v.logger.Error("No client id in token")
@@ -340,19 +339,17 @@ func (v *TokenValidator) validateJwt(jwtString string, validationKeys []*models.
 		}
 	}
 
-	claims, err := token.AsMap(context.Background())
-	if err != nil {
-		v.logger.Error("Token as map error", slog.String("error", err.Error()))
-		return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
-	}
-
-	issuer := token.Issuer()
+	issuer, _ := token.Issuer()
 	if issuer == "" {
 		issuer = claimspkg.DefaultIssuer
 	}
 
 	resultClaims := make([]*claimspkg.Claim, 0)
-	for k, value := range claims {
+	for _, k := range token.Keys() {
+		var value any
+		if err := token.Get(k, &value); err != nil {
+			continue
+		}
 		if k == gois.JwtClaimTypesScope {
 			// check the scope format (array vs space delimited string)
 			scopes, err := parseScopes(value)
@@ -431,7 +428,8 @@ func (v *TokenValidator) getClientIdFromJwt(token string) (string, error) {
 
 	}
 
-	clientId := utils.FirstOrDefault(tk.Audience())
+	aud, _ := tk.Audience()
+	clientId := utils.FirstOrDefault(aud)
 
 	if err != nil {
 		v.logger.Error("Malformed JWT token", slog.String("error", err.Error()))

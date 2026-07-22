@@ -19,8 +19,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/tokens"
@@ -99,7 +99,7 @@ func (c *TestCert) LoadKey() (jwk.Key, error) {
 	if err := jwk.AssignKeyID(key); err != nil {
 		return nil, err
 	}
-	if err := key.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
+	if err := key.Set(jwk.AlgorithmKey, jwa.RS256()); err != nil {
 		return nil, err
 	}
 
@@ -113,12 +113,12 @@ func (c *TestCert) LoadSigningCredentials() (*tokens.SigningCredentials, error) 
 	}
 
 	var securityKey any
-	err = key.Raw(&securityKey)
+	err = jwk.Export(key, &securityKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return tokens.NewSigningCredentials(securityKey, tokens.WithAlgorithm(string(jwa.RS256)))
+	return tokens.NewSigningCredentials(securityKey, tokens.WithAlgorithm(jwa.RS256().String()))
 }
 
 func (c *TestCert) LoadSigningCredentialsFromRaw(raw string, alg jwa.SignatureAlgorithm) (*tokens.SigningCredentials, error) {
@@ -128,14 +128,14 @@ func (c *TestCert) LoadSigningCredentialsFromRaw(raw string, alg jwa.SignatureAl
 	}
 
 	var securityKey any
-	err = key.Raw(&securityKey)
+	err = jwk.Export(key, &securityKey)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := []gois.Option[tokens.SigningCredentials]{tokens.WithAlgorithm(string(alg))}
-	if key.KeyID() != "" {
-		opts = append(opts, tokens.WithKid(key.KeyID()))
+	opts := []gois.Option[tokens.SigningCredentials]{tokens.WithAlgorithm(alg.String())}
+	if kid, ok := key.KeyID(); ok && kid != "" {
+		opts = append(opts, tokens.WithKid(kid))
 	}
 
 	return tokens.NewSigningCredentials(securityKey, opts...)

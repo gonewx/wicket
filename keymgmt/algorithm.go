@@ -11,7 +11,7 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 )
 
 // JWA signing algorithm identifiers this manager can generate and select. Values
@@ -112,7 +112,7 @@ func generateKey(alg string, entropy Entropy) (*generatedKey, error) {
 // derivePublicID computes a stable JWKS kid from public key material using the
 // RFC 7638 JWK thumbprint, so the same public key always yields the same kid.
 func derivePublicID(pub crypto.PublicKey) (string, error) {
-	key, err := jwk.FromRaw(pub)
+	key, err := jwk.Import(pub)
 	if err != nil {
 		return "", fmt.Errorf("derive key id: %w", err)
 	}
