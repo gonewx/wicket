@@ -149,8 +149,10 @@ func NewRoot() (*Root, error) {
 	r.f_DataProtectionProvider = impl.NewDataProtectionProvider()
 	r.f_UnnamedOptionsManager__options_WicketOptions = options2.NewUnnamedOptionsManager[*options.WicketOptions](r.NewOptionsFactory__options_WicketOptions())
 	r.f_ConfigureOptions__auth_Options = (func(p godi.Provider) options2.ConfigureOptions[*auth.Options] {
+		serverConfig := godi.GetRequired[*ServerConfig](p)
 		return options2.NewConfigureNameOptions(options2.DefaultName, func(o *auth.Options) error {
 			o.DefaultScheme = gois.DefaultCookieAuthenticationScheme
+			o.ExternalFailurePath = serverConfig.ExternalFailurePath()
 			return nil
 		})
 	})(r)

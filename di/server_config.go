@@ -41,6 +41,8 @@ type ServerConfig struct {
 	profileProvider                                 func() services.ProfileService
 	backChannelLogoutHttpClient                     *http.Client
 	backchannelAuthenticationNotificationHttpClient *http.Client
+
+	externalFailurePath string
 }
 
 func NewServerConfig() *ServerConfig {
@@ -288,4 +290,15 @@ func (c *ServerConfig) BackchannelAuthenticationNotificationHttpClient() *http.C
 		return nil
 	}
 	return c.backchannelAuthenticationNotificationHttpClient
+}
+
+func (c *ServerConfig) SetExternalFailurePath(path string) {
+	c.externalFailurePath = path
+}
+
+func (c *ServerConfig) ExternalFailurePath() string {
+	if c == nil {
+		return ""
+	}
+	return c.externalFailurePath
 }

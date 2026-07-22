@@ -319,8 +319,10 @@ func registerCore() {
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L78 (Add) - AddAuthentication(DefaultCookieAuthenticationScheme)
 	godi.AddSingletonFactory[optspkg.ConfigureOptions[*auth.Options]](&r, func(p godi.Provider) optspkg.ConfigureOptions[*auth.Options] {
+		serverConfig := godi.GetRequired[*ServerConfig](p)
 		return optspkg.NewConfigureNameOptions(optspkg.DefaultName, func(o *auth.Options) error {
 			o.DefaultScheme = gois.DefaultCookieAuthenticationScheme
+			o.ExternalFailurePath = serverConfig.ExternalFailurePath()
 			return nil
 		})
 	})
