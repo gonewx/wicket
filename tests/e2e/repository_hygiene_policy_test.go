@@ -133,7 +133,7 @@ func walkRepositoryTextFiles(t *testing.T, visit func(rel string, content string
 
 		if d.IsDir() {
 			switch rel {
-			case ".git", ".claude", ".agents", ".rnix", ".codegraph", ".cursor", "_bmad-output":
+			case ".git", ".claude", ".agents", ".qoder", ".rnix", ".codegraph", ".cursor", "_bmad-output":
 				return filepath.SkipDir
 			}
 			return nil
