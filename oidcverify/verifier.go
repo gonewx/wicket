@@ -5,6 +5,7 @@ package oidcverify
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/lestrrat-go/httprc/v3"
@@ -63,6 +64,13 @@ type verifier struct {
 }
 
 func NewVerifier(ctx context.Context, cfg ProviderConfig, clock services.SystemClock) (Verifier, error) {
+	if len(cfg.effectiveIssuers()) == 0 {
+		return nil, fmt.Errorf("oidcverify: at least one issuer must be configured")
+	}
+	if len(cfg.effectiveAudiences()) == 0 {
+		return nil, fmt.Errorf("oidcverify: at least one audience must be configured")
+	}
+
 	if cfg.ClockSkew == 0 {
 		cfg.ClockSkew = 5 * time.Minute
 	}
