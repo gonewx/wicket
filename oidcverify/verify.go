@@ -52,14 +52,22 @@ func (v *verifier) verify(ctx context.Context, idToken, nonce string) (*Verified
 
 	token, err := jwt.Parse([]byte(idToken),
 		jwt.WithKeySet(set, jws.WithInferAlgorithmFromKey(true)),
-		jwt.WithIssuer(v.config.Issuer),
-		jwt.WithAudience(v.config.Audience),
 		jwt.WithClock(v.clock),
 		jwt.WithAcceptableSkew(v.config.ClockSkew),
 		jwt.WithTruncation(time.Second),
 	)
 	if err != nil {
 		return nil, mapParseError(err)
+	}
+
+	iss, _ := token.Issuer()
+	if !containsStr(v.config.effectiveIssuers(), iss) {
+		return nil, fmt.Errorf("%w: got %q", ErrInvalidIssuer, iss)
+	}
+
+	aud, _ := token.Audience()
+	if !hasIntersection(aud, v.config.effectiveAudiences()) {
+		return nil, fmt.Errorf("%w: got %v", ErrInvalidAudience, aud)
 	}
 
 	if v.config.NonceRequired || nonce != "" {
@@ -145,4 +153,24 @@ func projectToken(token jwt.Token) (*VerifiedToken, error) {
 	}
 
 	return vt, nil
+}
+
+func containsStr(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func hasIntersection(a, b []string) bool {
+	for _, va := range a {
+		for _, vb := range b {
+			if va == vb {
+				return true
+			}
+		}
+	}
+	return false
 }

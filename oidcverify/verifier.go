@@ -28,10 +28,32 @@ type VerifiedToken struct {
 
 type ProviderConfig struct {
 	Issuer        string
+	Issuers       []string
 	JWKSURI       string
 	Audience      string
+	Audiences     []string
 	ClockSkew     time.Duration
 	NonceRequired bool
+}
+
+func (c ProviderConfig) effectiveIssuers() []string {
+	if len(c.Issuers) > 0 {
+		return c.Issuers
+	}
+	if c.Issuer != "" {
+		return []string{c.Issuer}
+	}
+	return nil
+}
+
+func (c ProviderConfig) effectiveAudiences() []string {
+	if len(c.Audiences) > 0 {
+		return c.Audiences
+	}
+	if c.Audience != "" {
+		return []string{c.Audience}
+	}
+	return nil
 }
 
 type verifier struct {

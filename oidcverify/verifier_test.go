@@ -466,3 +466,210 @@ func TestVerifyKidRefreshFallback(t *testing.T) {
 		t.Errorf("Subject = %q, want %q", result.Subject, testSubject)
 	}
 }
+
+func TestVerifyGoogleDualIssuer(t *testing.T) {
+	t.Parallel()
+
+	env := newTestEnv(t)
+	v := env.newVerifier(t, ProviderConfig{
+		Issuers:   []string{GoogleIssuerHTTPS, GoogleIssuerPlain},
+		Audiences: []string{testAudience},
+	})
+
+	tests := map[string]struct {
+		issuer  string
+		wantErr error
+	}{
+		"https issuer accepted": {
+			issuer: GoogleIssuerHTTPS,
+		},
+		"plain issuer accepted": {
+			issuer: GoogleIssuerPlain,
+		},
+		"unknown issuer rejected": {
+			issuer:  "https://evil.example.com",
+			wantErr: ErrInvalidIssuer,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			token := env.signToken(t, func(tok jwt.Token) {
+				tok.Set(jwt.IssuerKey, tc.issuer)
+			})
+
+			result, err := v.Verify(context.Background(), token)
+			if tc.wantErr != nil {
+				if err == nil {
+					t.Fatalf("expected error %v, got nil", tc.wantErr)
+				}
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected error wrapping %v, got: %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.Subject != testSubject {
+				t.Errorf("Subject = %q, want %q", result.Subject, testSubject)
+			}
+		})
+	}
+}
+
+func TestVerifyMultiAudience(t *testing.T) {
+	t.Parallel()
+
+	env := newTestEnv(t)
+	v := env.newVerifier(t, ProviderConfig{
+		Issuers:   []string{testIssuer},
+		Audiences: []string{"client-a", "client-b"},
+	})
+
+	tests := map[string]struct {
+		aud     []string
+		wantErr error
+	}{
+		"matching first audience": {
+			aud: []string{"client-a"},
+		},
+		"matching second audience": {
+			aud: []string{"client-b"},
+		},
+		"matching one of multiple token audiences": {
+			aud: []string{"client-c", "client-b"},
+		},
+		"no intersection rejected": {
+			aud:     []string{"client-c"},
+			wantErr: ErrInvalidAudience,
+		},
+		"multiple non-matching rejected": {
+			aud:     []string{"client-x", "client-y"},
+			wantErr: ErrInvalidAudience,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			token := env.signToken(t, func(tok jwt.Token) {
+				tok.Set(jwt.AudienceKey, tc.aud)
+			})
+
+			result, err := v.Verify(context.Background(), token)
+			if tc.wantErr != nil {
+				if err == nil {
+					t.Fatalf("expected error %v, got nil", tc.wantErr)
+				}
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected error wrapping %v, got: %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.Subject != testSubject {
+				t.Errorf("Subject = %q, want %q", result.Subject, testSubject)
+			}
+		})
+	}
+}
+
+func TestVerifyAppleEmailMissing(t *testing.T) {
+	t.Parallel()
+
+	env := newTestEnv(t)
+	v := env.newVerifier(t, ProviderConfig{})
+
+	token := env.signToken(t, func(tok jwt.Token) {
+		tok.Set("email", nil)
+		tok.Set("email_verified", nil)
+	})
+
+	result, err := v.Verify(context.Background(), token)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Email != "" {
+		t.Errorf("Email = %q, want empty string", result.Email)
+	}
+	if result.EmailVerified {
+		t.Error("EmailVerified = true, want false when email missing")
+	}
+}
+
+func TestVerifyAppleEmailPrivateRelay(t *testing.T) {
+	t.Parallel()
+
+	env := newTestEnv(t)
+	v := env.newVerifier(t, ProviderConfig{})
+
+	const relayEmail = "xyz123@privaterelay.appleid.com"
+	token := env.signToken(t, func(tok jwt.Token) {
+		tok.Set("email", relayEmail)
+		tok.Set("email_verified", true)
+	})
+
+	result, err := v.Verify(context.Background(), token)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Email != relayEmail {
+		t.Errorf("Email = %q, want %q", result.Email, relayEmail)
+	}
+	if !result.EmailVerified {
+		t.Error("EmailVerified = false, want true")
+	}
+}
+
+func TestAppleConfigPreset(t *testing.T) {
+	t.Parallel()
+
+	cfg := AppleConfig("com.example.app")
+
+	if len(cfg.Issuers) != 1 || cfg.Issuers[0] != AppleIssuer {
+		t.Errorf("Issuers = %v, want [%q]", cfg.Issuers, AppleIssuer)
+	}
+	if cfg.JWKSURI != AppleJWKSURI {
+		t.Errorf("JWKSURI = %q, want %q", cfg.JWKSURI, AppleJWKSURI)
+	}
+	if len(cfg.Audiences) != 1 || cfg.Audiences[0] != "com.example.app" {
+		t.Errorf("Audiences = %v, want [com.example.app]", cfg.Audiences)
+	}
+	if cfg.ClockSkew != 5*time.Minute {
+		t.Errorf("ClockSkew = %v, want 5m", cfg.ClockSkew)
+	}
+	if cfg.NonceRequired {
+		t.Error("NonceRequired = true, want false")
+	}
+}
+
+func TestGoogleConfigPreset(t *testing.T) {
+	t.Parallel()
+
+	cfg := GoogleConfig("web-client-id", "ios-client-id")
+
+	if len(cfg.Issuers) != 2 {
+		t.Fatalf("Issuers len = %d, want 2", len(cfg.Issuers))
+	}
+	if cfg.Issuers[0] != GoogleIssuerHTTPS || cfg.Issuers[1] != GoogleIssuerPlain {
+		t.Errorf("Issuers = %v, want [%q, %q]", cfg.Issuers, GoogleIssuerHTTPS, GoogleIssuerPlain)
+	}
+	if cfg.JWKSURI != GoogleJWKSURI {
+		t.Errorf("JWKSURI = %q, want %q", cfg.JWKSURI, GoogleJWKSURI)
+	}
+	if len(cfg.Audiences) != 2 || cfg.Audiences[0] != "web-client-id" || cfg.Audiences[1] != "ios-client-id" {
+		t.Errorf("Audiences = %v, want [web-client-id, ios-client-id]", cfg.Audiences)
+	}
+	if cfg.ClockSkew != 5*time.Minute {
+		t.Errorf("ClockSkew = %v, want 5m", cfg.ClockSkew)
+	}
+	if cfg.NonceRequired {
+		t.Error("NonceRequired = true, want false")
+	}
+}

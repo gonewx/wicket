@@ -161,7 +161,7 @@ func TestOIDCVerifyExternalIdPTokenFlowE2E(t *testing.T) {
 	v, err := oidcverify.NewVerifier(context.Background(), oidcverify.ProviderConfig{
 		Issuer:    oidcE2EIssuer,
 		JWKSURI:   idp.srv.URL,
-		Audience:  oidcE2EAudience,
+		Audiences: []string{oidcE2EAudience},
 		ClockSkew: 5 * time.Minute,
 	}, clock)
 	if err != nil {
@@ -202,9 +202,9 @@ func TestOIDCVerifyKeyRotationE2E(t *testing.T) {
 	idp := newOIDCE2EIdP(t)
 
 	v, err := oidcverify.NewVerifier(context.Background(), oidcverify.ProviderConfig{
-		Issuer:   oidcE2EIssuer,
-		JWKSURI:  idp.srv.URL,
-		Audience: oidcE2EAudience,
+		Issuer:    oidcE2EIssuer,
+		JWKSURI:   idp.srv.URL,
+		Audiences: []string{oidcE2EAudience},
 	}, clock)
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
@@ -243,7 +243,7 @@ func TestOIDCVerifyTokenLifecycleE2E(t *testing.T) {
 	v, err := oidcverify.NewVerifier(context.Background(), oidcverify.ProviderConfig{
 		Issuer:    oidcE2EIssuer,
 		JWKSURI:   idp.srv.URL,
-		Audience:  oidcE2EAudience,
+		Audiences: []string{oidcE2EAudience},
 		ClockSkew: 5 * time.Minute,
 	}, clock)
 	if err != nil {
@@ -284,7 +284,7 @@ func TestOIDCVerifyNonceFlowE2E(t *testing.T) {
 	v, err := oidcverify.NewVerifier(context.Background(), oidcverify.ProviderConfig{
 		Issuer:        oidcE2EIssuer,
 		JWKSURI:       idp.srv.URL,
-		Audience:      oidcE2EAudience,
+		Audiences:     []string{oidcE2EAudience},
 		NonceRequired: true,
 	}, clock)
 	if err != nil {
@@ -333,9 +333,9 @@ func TestOIDCVerifyAttackRejectionE2E(t *testing.T) {
 	idp := newOIDCE2EIdP(t)
 
 	v, err := oidcverify.NewVerifier(context.Background(), oidcverify.ProviderConfig{
-		Issuer:   oidcE2EIssuer,
-		JWKSURI:  idp.srv.URL,
-		Audience: oidcE2EAudience,
+		Issuer:    oidcE2EIssuer,
+		JWKSURI:   idp.srv.URL,
+		Audiences: []string{oidcE2EAudience},
 	}, clock)
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
@@ -391,9 +391,9 @@ func TestOIDCVerifyEmailVerifiedStringVariantE2E(t *testing.T) {
 	idp := newOIDCE2EIdP(t)
 
 	v, err := oidcverify.NewVerifier(context.Background(), oidcverify.ProviderConfig{
-		Issuer:   oidcE2EIssuer,
-		JWKSURI:  idp.srv.URL,
-		Audience: oidcE2EAudience,
+		Issuer:    oidcE2EIssuer,
+		JWKSURI:   idp.srv.URL,
+		Audiences: []string{oidcE2EAudience},
 	}, clock)
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
