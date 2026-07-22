@@ -4,6 +4,7 @@ package di
 import (
 	"reflect"
 
+	"context"
 	"crypto/rand"
 	"fmt"
 	"github.com/gonewx/godi"
@@ -28,6 +29,7 @@ import (
 	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/models/messages"
+	"github.com/gonewx/wicket/oidcverify"
 	"github.com/gonewx/wicket/responses"
 	impl3 "github.com/gonewx/wicket/responses/impl"
 	"github.com/gonewx/wicket/server"
@@ -88,6 +90,8 @@ type Root struct {
 	f_DeviceFlowStore                                        storage.DeviceFlowStore
 	f_BackchannelAuthenticationRequestStore                  storage.BackchannelAuthenticationRequestStore
 	f_Ptr_Manager                                            *keymgmt.Manager
+	f_Ptr_ProviderConfig                                     *oidcverify.ProviderConfig
+	f_Verifier                                               oidcverify.Verifier
 	f_MemoryDistributedCache                                 services.DistributedCache
 	f_AuthorizationCodeStore                                 storage.AuthorizationCodeStore
 	f_RefreshTokenStore                                      storage.RefreshTokenStore
@@ -285,6 +289,18 @@ func NewRoot() (*Root, error) {
 		}
 
 		return keymgmt.NewManager(cfg, store, provider, clock, entropy, godi.GetRequired[*slog.Logger](p))
+	})(r)
+	r.f_Ptr_ProviderConfig = (func(p godi.Provider) *oidcverify.ProviderConfig {
+		return &oidcverify.ProviderConfig{}
+	})(r)
+	r.f_Verifier = (func(p godi.Provider) oidcverify.Verifier {
+		cfg := godi.GetRequired[*oidcverify.ProviderConfig](p)
+		clock := godi.GetRequired[services.SystemClock](p)
+		v, err := oidcverify.NewVerifier(context.Background(), *cfg, clock)
+		if err != nil {
+			panic(err)
+		}
+		return v
 	})(r)
 	r.f_MemoryDistributedCache = memory2.NewMemoryDistributedCache()
 	r.f_AuthorizationCodeStore = impl4.NewAuthorizationCodeStore()
@@ -1194,6 +1210,10 @@ func (r *Root) BackchannelAuthenticationRequestStore() storage.BackchannelAuthen
 
 func (r *Root) Ptr_Manager() *keymgmt.Manager { return r.f_Ptr_Manager }
 
+func (r *Root) Ptr_ProviderConfig() *oidcverify.ProviderConfig { return r.f_Ptr_ProviderConfig }
+
+func (r *Root) Verifier() oidcverify.Verifier { return r.f_Verifier }
+
 func (r *Root) MemoryDistributedCache() services.DistributedCache { return r.f_MemoryDistributedCache }
 
 func (r *Root) AuthorizationCodeStore() storage.AuthorizationCodeStore {
@@ -1280,6 +1300,10 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_BackchannelAuthenticationRequestStore
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return r.f_Ptr_Manager
+	case reflect.TypeFor[*oidcverify.ProviderConfig]():
+		return r.f_Ptr_ProviderConfig
+	case reflect.TypeFor[oidcverify.Verifier]():
+		return r.f_Verifier
 	case reflect.TypeFor[services.DistributedCache]():
 		return r.f_MemoryDistributedCache
 	case reflect.TypeFor[storage.AuthorizationCodeStore]():
@@ -1688,6 +1712,10 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[*impl4.PersistentGrantSerializer]():
 		return true
+	case reflect.TypeFor[*oidcverify.ProviderConfig]():
+		return true
+	case reflect.TypeFor[oidcverify.Verifier]():
+		return true
 	case reflect.TypeFor[storage.MessageStore[messages.LogoutMessage]]():
 		return true
 	case reflect.TypeFor[storage.MessageStore[messages.ErrorMessage]]():
@@ -1917,6 +1945,10 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.f_BackchannelAuthenticationRequestStore}
 		case reflect.TypeFor[*keymgmt.Manager]():
 			return []any{r.f_Ptr_Manager}
+		case reflect.TypeFor[*oidcverify.ProviderConfig]():
+			return []any{r.f_Ptr_ProviderConfig}
+		case reflect.TypeFor[oidcverify.Verifier]():
+			return []any{r.f_Verifier}
 		case reflect.TypeFor[services.DistributedCache]():
 			return []any{r.f_MemoryDistributedCache}
 		case reflect.TypeFor[storage.AuthorizationCodeStore]():
@@ -2275,6 +2307,10 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_BackchannelAuthenticationRequestStore
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return s.root.f_Ptr_Manager
+	case reflect.TypeFor[*oidcverify.ProviderConfig]():
+		return s.root.f_Ptr_ProviderConfig
+	case reflect.TypeFor[oidcverify.Verifier]():
+		return s.root.f_Verifier
 	case reflect.TypeFor[services.DistributedCache]():
 		return s.root.f_MemoryDistributedCache
 	case reflect.TypeFor[storage.AuthorizationCodeStore]():
@@ -2564,6 +2600,10 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return true
 	case reflect.TypeFor[*keymgmt.Manager]():
+		return true
+	case reflect.TypeFor[*oidcverify.ProviderConfig]():
+		return true
+	case reflect.TypeFor[oidcverify.Verifier]():
 		return true
 	case reflect.TypeFor[services.DistributedCache]():
 		return true
@@ -2891,6 +2931,10 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.root.f_BackchannelAuthenticationRequestStore}
 		case reflect.TypeFor[*keymgmt.Manager]():
 			return []any{s.root.f_Ptr_Manager}
+		case reflect.TypeFor[*oidcverify.ProviderConfig]():
+			return []any{s.root.f_Ptr_ProviderConfig}
+		case reflect.TypeFor[oidcverify.Verifier]():
+			return []any{s.root.f_Verifier}
 		case reflect.TypeFor[services.DistributedCache]():
 			return []any{s.root.f_MemoryDistributedCache}
 		case reflect.TypeFor[storage.AuthorizationCodeStore]():
@@ -4060,6 +4104,10 @@ func (s *scope) BackchannelAuthenticationRequestStore() storage.BackchannelAuthe
 }
 
 func (s *scope) Ptr_Manager() *keymgmt.Manager { return s.root.f_Ptr_Manager }
+
+func (s *scope) Ptr_ProviderConfig() *oidcverify.ProviderConfig { return s.root.f_Ptr_ProviderConfig }
+
+func (s *scope) Verifier() oidcverify.Verifier { return s.root.f_Verifier }
 
 func (s *scope) MemoryDistributedCache() services.DistributedCache {
 	return s.root.f_MemoryDistributedCache

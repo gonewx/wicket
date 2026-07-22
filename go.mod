@@ -4,6 +4,7 @@ go 1.27rc1
 
 require (
 	github.com/google/uuid v1.3.0
+	github.com/lestrrat-go/httprc/v3 v3.0.5
 	github.com/lestrrat-go/jwx/v3 v3.1.1
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.16.0

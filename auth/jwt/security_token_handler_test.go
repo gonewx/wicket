@@ -233,10 +233,10 @@ func TestClockInjection(t *testing.T) {
 	fixedNow := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
 
 	tests := map[string]struct {
-		token          string
-		validateLife   bool
-		clockNow       time.Time
-		wantErr        bool
+		token        string
+		validateLife bool
+		clockNow     time.Time
+		wantErr      bool
 	}{
 		"clock set before expiry passes with lifetime enabled": {
 			token: issueToken(t, key, func(tok jwxjwt.Token) {
