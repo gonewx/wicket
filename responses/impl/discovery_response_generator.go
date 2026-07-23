@@ -83,7 +83,8 @@ func (g *DiscoveryResponseGenerator) constructMtlsEndpoint(baseUrl string, issue
 
 // CreateDiscoveryDocument Creates the discovery document.
 func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, issuerUri string) (map[string]any, error) {
-	baseUrl = utils.EnsureTrailingSlash(baseUrl)
+	baseUrl = utils.RemoveTrailingSlash(baseUrl)
+	joinUrl := func(path string) string { return baseUrl + "/" + strings.TrimLeft(path, "/") }
 
 	entries := make(map[string]any, 0)
 	entries[gois.DiscoveryIssuer] = issuerUri
@@ -96,46 +97,46 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 		}
 
 		if len(keys) > 0 {
-			entries[gois.DiscoveryJwksUri] = baseUrl + gois.ProtocolRoutePathsDiscoveryWebKeys
+			entries[gois.DiscoveryJwksUri] = joinUrl(gois.ProtocolRoutePathsDiscoveryWebKeys)
 		}
 	}
 
 	// endpoints
 	if g.options.Discovery.ShowEndpoints {
 		if g.options.Endpoints.EnableAuthorizeEndpoint {
-			entries[gois.DiscoveryAuthorizationEndpoint] = baseUrl + gois.ProtocolRoutePathsAuthorize
+			entries[gois.DiscoveryAuthorizationEndpoint] = joinUrl(gois.ProtocolRoutePathsAuthorize)
 		}
 
 		if g.options.Endpoints.EnableTokenEndpoint {
-			entries[gois.DiscoveryTokenEndpoint] = baseUrl + gois.ProtocolRoutePathsToken
+			entries[gois.DiscoveryTokenEndpoint] = joinUrl(gois.ProtocolRoutePathsToken)
 		}
 
 		if g.options.Endpoints.EnableUserInfoEndpoint {
-			entries[gois.DiscoveryUserInfoEndpoint] = baseUrl + gois.ProtocolRoutePathsUserInfo
+			entries[gois.DiscoveryUserInfoEndpoint] = joinUrl(gois.ProtocolRoutePathsUserInfo)
 		}
 
 		if g.options.Endpoints.EnableEndSessionEndpoint {
-			entries[gois.DiscoveryEndSessionEndpoint] = baseUrl + gois.ProtocolRoutePathsEndSession
+			entries[gois.DiscoveryEndSessionEndpoint] = joinUrl(gois.ProtocolRoutePathsEndSession)
 		}
 
 		if g.options.Endpoints.EnableCheckSessionEndpoint {
-			entries[gois.DiscoveryCheckSessionIframe] = baseUrl + gois.ProtocolRoutePathsCheckSession
+			entries[gois.DiscoveryCheckSessionIframe] = joinUrl(gois.ProtocolRoutePathsCheckSession)
 		}
 
 		if g.options.Endpoints.EnableTokenRevocationEndpoint {
-			entries[gois.DiscoveryRevocationEndpoint] = baseUrl + gois.ProtocolRoutePathsRevocation
+			entries[gois.DiscoveryRevocationEndpoint] = joinUrl(gois.ProtocolRoutePathsRevocation)
 		}
 
 		if g.options.Endpoints.EnableIntrospectionEndpoint {
-			entries[gois.DiscoveryIntrospectionEndpoint] = baseUrl + gois.ProtocolRoutePathsIntrospection
+			entries[gois.DiscoveryIntrospectionEndpoint] = joinUrl(gois.ProtocolRoutePathsIntrospection)
 		}
 
 		if g.options.Endpoints.EnableDeviceAuthorizationEndpoint {
-			entries[gois.DiscoveryDeviceAuthorizationEndpoint] = baseUrl + gois.ProtocolRoutePathsDeviceAuthorization
+			entries[gois.DiscoveryDeviceAuthorizationEndpoint] = joinUrl(gois.ProtocolRoutePathsDeviceAuthorization)
 		}
 
 		if g.options.Endpoints.EnableBackchannelAuthenticationEndpoint {
-			entries[gois.DiscoveryBackchannelAuthenticationEndpoint] = baseUrl + gois.ProtocolRoutePathsBackchannelAuthentication
+			entries[gois.DiscoveryBackchannelAuthenticationEndpoint] = joinUrl(gois.ProtocolRoutePathsBackchannelAuthentication)
 		}
 
 		if g.options.MutualTls.Enabled {
@@ -350,7 +351,7 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 
 				if customValueString, ok := value.(string); ok {
 					if strings.HasPrefix(customValueString, "~/") && g.options.Discovery.ExpandRelativePathsInCustomEntries {
-						entries[key] = baseUrl + strings.TrimPrefix(customValueString, "~/")
+						entries[key] = joinUrl(strings.TrimPrefix(customValueString, "~/"))
 						continue
 					}
 				}
