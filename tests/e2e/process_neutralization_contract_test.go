@@ -93,7 +93,7 @@ func TestNeutralConfigurationOptionSurfaceE2E(t *testing.T) {
 	for _, rel := range []string{
 		"config/options/backchannel_authentication_options.go",
 		"config/options/wicket_options.go",
-		"di/core.go",
+		"di/dsl_core.go",
 		"di/container_gen.go",
 	} {
 		content := readProjectFile(t, rel)

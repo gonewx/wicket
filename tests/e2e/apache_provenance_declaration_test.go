@@ -203,6 +203,14 @@ func currentApachePath(ledgerPath string) string {
 		return "test/integration/common/wicket_pipeline.go"
 	case "tools/identity_server_tools.go":
 		return "tools/token_tools.go"
+	case "di/core.go":
+		return "di/dsl_core.go"
+	case "di/crypto.go":
+		return "di/dsl_crypto.go"
+	case "di/additional.go":
+		return "di/dsl_additional.go"
+	case "di/message_cookie.go":
+		return "di/dsl_message_cookie.go"
 	default:
 		return ledgerPath
 	}
