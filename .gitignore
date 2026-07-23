@@ -8,3 +8,5 @@ go.work.sum
 .cursor/
 .codegraph/
 .qoder/
+.bmad-loop/
+.codex/
