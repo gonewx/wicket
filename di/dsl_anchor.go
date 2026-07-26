@@ -13,5 +13,6 @@ var (
 	_ = registerPluggableServicesAndValidators
 	_ = registerKeyManagement
 	_ = registerOIDCVerify
+	_ = registerWeChatVerify
 	_ = registerAdditional
 )

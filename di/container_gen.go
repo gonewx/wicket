@@ -42,6 +42,7 @@ import (
 	"github.com/gonewx/wicket/tools"
 	"github.com/gonewx/wicket/validators"
 	impl2 "github.com/gonewx/wicket/validators/impl"
+	"github.com/gonewx/wicket/wechatverify"
 	"log/slog"
 	"net/http"
 	"time"
@@ -96,6 +97,7 @@ type Root struct {
 	f_ReferenceTokenStore                                    storage.ReferenceTokenStore
 	f_UserConsentStore                                       storage.UserConsentStore
 	f_Store                                                  session.Store
+	f_Ptr_Config                                             *wechatverify.Config
 	f_DefaultHttpContextAccessor                             accessor.HttpContextAccessor
 	f_HandlerProvider                                        auth.HandlerProvider
 	f_UserSession                                            services.UserSession
@@ -300,6 +302,9 @@ func NewRoot() (*Root, error) {
 	r.f_UserConsentStore = impl4.NewUserConsentStore()
 	r.f_Store = (func(p godi.Provider) session.Store {
 		return session.NewMemoryStore(godi.GetRequired[services.SystemClock](p))
+	})(r)
+	r.f_Ptr_Config = (func(p godi.Provider) *wechatverify.Config {
+		return &wechatverify.Config{}
 	})(r)
 	r.f_DefaultHttpContextAccessor = accessor.NewDefaultHttpContextAccessor()
 	r.f_HandlerProvider = (func(p godi.Provider) auth.HandlerProvider {
@@ -1217,6 +1222,8 @@ func (r *Root) UserConsentStore() storage.UserConsentStore { return r.f_UserCons
 
 func (r *Root) Store() session.Store { return r.f_Store }
 
+func (r *Root) Ptr_Config() *wechatverify.Config { return r.f_Ptr_Config }
+
 func (r *Root) DefaultHttpContextAccessor() accessor.HttpContextAccessor {
 	return r.f_DefaultHttpContextAccessor
 }
@@ -1303,6 +1310,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_UserConsentStore
 	case reflect.TypeFor[session.Store]():
 		return r.f_Store
+	case reflect.TypeFor[*wechatverify.Config]():
+		return r.f_Ptr_Config
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return r.f_DefaultHttpContextAccessor
 	case reflect.TypeFor[auth.HandlerProvider]():
@@ -1811,6 +1820,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[services.ReturnUrlParser]():
 		return true
+	case reflect.TypeFor[*wechatverify.Config]():
+		return true
 	}
 	return false
 }
@@ -1944,6 +1955,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.f_UserConsentStore}
 		case reflect.TypeFor[session.Store]():
 			return []any{r.f_Store}
+		case reflect.TypeFor[*wechatverify.Config]():
+			return []any{r.f_Ptr_Config}
 		case reflect.TypeFor[accessor.HttpContextAccessor]():
 			return []any{r.f_DefaultHttpContextAccessor}
 		case reflect.TypeFor[auth.HandlerProvider]():
@@ -2304,6 +2317,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_UserConsentStore
 	case reflect.TypeFor[session.Store]():
 		return s.root.f_Store
+	case reflect.TypeFor[*wechatverify.Config]():
+		return s.root.f_Ptr_Config
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return s.f_DefaultHttpContextAccessor
 	case reflect.TypeFor[auth.HandlerProvider]():
@@ -2595,6 +2610,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[storage.UserConsentStore]():
 		return true
 	case reflect.TypeFor[session.Store]():
+		return true
+	case reflect.TypeFor[*wechatverify.Config]():
 		return true
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return true
@@ -2924,6 +2941,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.root.f_UserConsentStore}
 		case reflect.TypeFor[session.Store]():
 			return []any{s.root.f_Store}
+		case reflect.TypeFor[*wechatverify.Config]():
+			return []any{s.root.f_Ptr_Config}
 		case reflect.TypeFor[accessor.HttpContextAccessor]():
 			return []any{s.f_DefaultHttpContextAccessor}
 		case reflect.TypeFor[auth.HandlerProvider]():
@@ -4101,6 +4120,8 @@ func (s *scope) ReferenceTokenStore() storage.ReferenceTokenStore {
 func (s *scope) UserConsentStore() storage.UserConsentStore { return s.root.f_UserConsentStore }
 
 func (s *scope) Store() session.Store { return s.root.f_Store }
+
+func (s *scope) Ptr_Config() *wechatverify.Config { return s.root.f_Ptr_Config }
 
 func (s *scope) DefaultHttpContextAccessor() accessor.HttpContextAccessor {
 	return s.f_DefaultHttpContextAccessor

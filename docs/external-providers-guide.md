@@ -305,6 +305,100 @@ verifier, err := oidcverify.NewVerifier(ctx, cfg, clock)
 
 ---
 
+## 后端直调验证能力 — 微信（服务端交换）
+
+与上文的 Web 授权码流不同，本能力**不参与** scheme / cookie / challenge-callback 生命周期：它是业务后端直接调用的一个包，没有 handler、没有中间件、没有重定向。App 端拿到的授权 code 交由后端换取跨应用稳定的用户标识，appsecret 只保留在 wicket 消费方一侧，不必分发到每个业务系统。
+
+### 基本信息
+
+| 项 | 值 |
+|------|------|
+| 包路径 | `github.com/gonewx/wicket/wechatverify` |
+| 端点 | `GET https://api.weixin.qq.com/sns/oauth2/access_token`（`DefaultEndpoint`） |
+| 依赖 | 仅标准库 `net/http` + `encoding/json` |
+| 接口 | `Verifier.Verify(ctx, code) (*VerifiedIdentity, error)` |
+
+> 该端点属于**移动应用**微信登录。小程序的 `code2Session` 是另一套产品与响应形状，本能力不使用它。
+
+### 配置选项（`wechatverify.Config`）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `AppID` | `string` | 移动应用标识。**必填**，缺失时 `NewVerifier` 返回 `ErrUnavailable` |
+| `AppSecret` | `string` | 应用密钥。**必填**，同上 |
+| `Endpoint` | `string` | 覆盖默认端点；留空取 `DefaultEndpoint` |
+| `HTTPClient` | `*http.Client` | 覆盖内建客户端；留空时按 `Timeout` 构造 |
+| `Timeout` | `time.Duration` | 内建客户端超时（默认 10 秒），提供 `HTTPClient` 时忽略 |
+
+### 身份投影与降级标注
+
+```go
+type VerifiedIdentity struct {
+    Subject       string        // UnionID 优先，缺失时回落 OpenID
+    SubjectSource SubjectSource // "unionid" 或 "openid"
+    UnionID       string        // 原始值，可能为空
+    OpenID        string        // 原始值，成功时必非空
+    Scope         string        // 授权 scope，原样透传
+}
+```
+
+`UnionID` 仅在该应用已获得用户信息授权、且账号已绑定开放平台账号时返回，**缺失属正常场景而非错误**。此时 `Subject` 回落到 `OpenID`，`SubjectSource` 标注为 `SubjectFromOpenID`——这是一个**降级标识**：该标识只在本应用内稳定，跨应用不可用。消费方应据此决定是否接受该次登录、或引导用户完成绑定。
+
+### 错误类别
+
+四个 sentinel 用 `errors.Is` 判别；厂商原始返回码用 `errors.As` 取 `*VendorError` 详情。
+
+| Sentinel | 触发条件 |
+|------|------|
+| `ErrInvalidCredential` | code 已使用 / 无效 / 过期、应用密钥或标识不匹配、缺少 code，**以及任何无法识别的非零返回码** |
+| `ErrRetryable` | 传输失败、上游 5xx、服务繁忙、频率超限 |
+| `ErrMalformedResponse` | 响应体无法解码、返回码为 0 但缺少标识、非预期的 4xx 状态 |
+| `ErrUnavailable` | 未配置 `AppID` 或 `AppSecret` |
+
+无法识别的返回码归入 `ErrInvalidCredential` 是**刻意的收紧默认**：把一个读不懂的响应当成可重试条件，可能把一次拒绝重试成一次意外放行。
+
+### appsecret 不外泄
+
+密钥随请求 query 传输，因此包内所有对外文本都经过脱敏：错误信息、`Config.String()`、验证器的 `%v` 输出中密钥一律显示为 `[REDACTED]`。本包**不写任何日志**——消费方要记日志请在调用侧记，那里拿不到密钥。
+
+### 集成示例
+
+```go
+verifier, err := wechatverify.NewVerifier(wechatverify.Config{
+    AppID:     os.Getenv("WECHAT_APP_ID"),
+    AppSecret: os.Getenv("WECHAT_APP_SECRET"),
+})
+if err != nil {
+    // 未配置凭据：维持关闭姿态，对外返回 503
+    return nil, err
+}
+
+identity, err := verifier.Verify(ctx, code)
+switch {
+case err == nil:
+    if identity.SubjectSource == wechatverify.SubjectFromOpenID {
+        // 跨应用标识不可用，按业务策略处理
+    }
+    return lookupOrCreateUser(identity.Subject)
+case errors.Is(err, wechatverify.ErrInvalidCredential):
+    return nil, status401(err)
+case errors.Is(err, wechatverify.ErrRetryable):
+    return nil, status503(err)
+default:
+    return nil, status502(err)
+}
+```
+
+### DI 装配
+
+容器只注册 `*wechatverify.Config` 作为配置扩展点，**不注册 `Verifier` 单例**——空配置构造必然失败。消费方在自己的组合根用实配置调 `NewVerifier`。
+
+### 资质状态
+
+微信开放平台真实凭据尚未申请到位，当前验证覆盖到 stub 对拍与「未配置凭据即不可用」语义；真实链路联调另行安排。
+
+---
+
 ## 动态认证方案
 
 Wicket 支持运行时注册外部提供者，无需重启服务。
