@@ -13,8 +13,11 @@ package wechatverify
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -99,6 +102,63 @@ func (c Config) String() string {
 		c.AppID, secretDisplay(c.AppSecret), c.Endpoint)
 }
 
+// MarshalJSON renders the configuration with the secret removed. String covers
+// only the fmt verbs; a Config reaching a structured encoder — directly, or as
+// a field of something larger — would otherwise emit the secret in clear text.
+// Decoding is deliberately left untouched, so a configuration can still be read
+// from JSON; only the outbound direction is redacted.
+func (c Config) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		AppID     string `json:"AppID"`
+		AppSecret string `json:"AppSecret"`
+		Endpoint  string `json:"Endpoint"`
+		Timeout   string `json:"Timeout"`
+	}{
+		AppID:     c.AppID,
+		AppSecret: secretDisplay(c.AppSecret),
+		Endpoint:  c.Endpoint,
+		Timeout:   c.Timeout.String(),
+	})
+}
+
+// LogValue renders the configuration with the secret removed. A structured
+// logger reaches for this before it reflects over the fields, which is the
+// path a consumer takes when it logs its own configuration.
+func (c Config) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("AppID", c.AppID),
+		slog.String("AppSecret", secretDisplay(c.AppSecret)),
+		slog.String("Endpoint", c.Endpoint),
+	)
+}
+
+// validateEndpoint refuses an endpoint the exchange cannot be built from. The
+// query string is appended to this value, so an endpoint that already carries
+// one would bury the exchange parameters inside the last existing value rather
+// than adding them; and a scheme the HTTP client cannot serve would surface
+// only once a request was attempted. Both are configuration faults and are
+// reported as such at assembly time.
+//
+// Plain http is accepted: the exchange has to be pointed at a local test server
+// during development, and that server does not serve TLS.
+func validateEndpoint(endpoint string) error {
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("%w: endpoint is not a valid URL", ErrUnavailable)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("%w: endpoint scheme %q is not http or https",
+			ErrUnavailable, parsed.Scheme)
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("%w: endpoint has no host", ErrUnavailable)
+	}
+	if parsed.RawQuery != "" {
+		return fmt.Errorf("%w: endpoint must not carry a query string", ErrUnavailable)
+	}
+	return nil
+}
+
 // secretDisplay reports a secret's presence without revealing its value.
 func secretDisplay(secret string) string {
 	if secret == "" {
@@ -136,14 +196,26 @@ func NewVerifier(cfg Config) (Verifier, error) {
 	if endpoint == "" {
 		endpoint = DefaultEndpoint
 	}
+	if err := validateEndpoint(endpoint); err != nil {
+		return nil, err
+	}
 
 	client := cfg.HTTPClient
 	if client == nil {
 		timeout := cfg.Timeout
-		if timeout == 0 {
+		if timeout <= 0 {
 			timeout = defaultTimeout
 		}
-		client = &http.Client{Timeout: timeout}
+		client = &http.Client{
+			Timeout: timeout,
+			// The secret travels in the query string, and a followed
+			// redirect puts the previous URL in the Referer header of the
+			// request to the new host. Redirects are not part of this
+			// exchange, so the response is surfaced as-is instead.
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
 	}
 
 	return &verifier{

@@ -315,7 +315,7 @@ verifier, err := oidcverify.NewVerifier(ctx, cfg, clock)
 |------|------|
 | 包路径 | `github.com/gonewx/wicket/wechatverify` |
 | 端点 | `GET https://api.weixin.qq.com/sns/oauth2/access_token`（`DefaultEndpoint`） |
-| 依赖 | 仅标准库 `net/http` + `encoding/json` |
+| 依赖 | 零第三方依赖（仅 Go 标准库：`net/http`、`net/url`、`encoding/json`、`context`、`io`、`errors` 等） |
 | 接口 | `Verifier.Verify(ctx, code) (*VerifiedIdentity, error)` |
 
 > 该端点属于**移动应用**微信登录。小程序的 `code2Session` 是另一套产品与响应形状，本能力不使用它。
@@ -353,13 +353,23 @@ type VerifiedIdentity struct {
 | `ErrInvalidCredential` | code 已使用 / 无效 / 过期、应用密钥或标识不匹配、缺少 code，**以及任何无法识别的非零返回码** |
 | `ErrRetryable` | 传输失败、上游 5xx、服务繁忙、频率超限 |
 | `ErrMalformedResponse` | 响应体无法解码、返回码为 0 但缺少标识、非预期的 4xx 状态 |
-| `ErrUnavailable` | 未配置 `AppID` 或 `AppSecret` |
+| `ErrUnavailable` | 未配置 `AppID` 或 `AppSecret`；`Endpoint` 形态非法；请求无法构造 |
+
+`ErrRetryable` 另覆盖 HTTP 429 / 408——网关级限流与超时与厂商侧 45011 / -1 是同一类瞬时条件。
+
+`context` 取消与超时**不归入上述任何类别**，而是保留原 sentinel：`ctx` 被取消时错误满足 `errors.Is(err, context.Canceled)`（此时重试与调用方的意图相悖）；deadline 到期时同时满足 `context.DeadlineExceeded` 与 `ErrRetryable`。
 
 无法识别的返回码归入 `ErrInvalidCredential` 是**刻意的收紧默认**：把一个读不懂的响应当成可重试条件，可能把一次拒绝重试成一次意外放行。
 
 ### appsecret 不外泄
 
-密钥随请求 query 传输，因此包内所有对外文本都经过脱敏：错误信息、`Config.String()`、验证器的 `%v` 输出中密钥一律显示为 `[REDACTED]`。本包**不写任何日志**——消费方要记日志请在调用侧记，那里拿不到密钥。
+密钥随请求 query 传输，因此包内所有对外文本都经过脱敏：错误信息、`Config.String()`、验证器的 `%v` 输出中密钥一律显示为 `[REDACTED]`。脱敏同时匹配密钥的**原始形态与 query 编码形态**——传输失败返回的 `*url.Error` 内嵌的是编码后的 URL，只匹配原文会让它整条漏过。
+
+`Config` 另实现了 `json.Marshaler` 与 `slog.LogValuer`，因此 `json.Marshal(cfg)` 与结构化日志记录 `cfg` 输出的同样是 `[REDACTED]`；反序列化方向未做改动，配置仍可从 JSON 读入。
+
+本包**不写任何日志**。消费方在调用侧记日志时请注意：拿不到密钥的是**错误值**，而持有 `Config` 的是你自己——记录 `Config` 本身是安全的（已脱敏），但把 `AppSecret` 字段单独取出来打印不在本包的保护范围内。
+
+**厂商错误消息（`VendorError.Msg`）同样经过脱敏后才保留**——厂商预期不会回显密钥，但该文本会到达调用方，包内所有此类路径一律脱敏而非信任。
 
 ### 集成示例
 
@@ -392,6 +402,8 @@ default:
 ### DI 装配
 
 容器只注册 `*wechatverify.Config` 作为配置扩展点，**不注册 `Verifier` 单例**——空配置构造必然失败。消费方在自己的组合根用实配置调 `NewVerifier`。
+
+该扩展点是发给所有 scope 的**同一个共享指针**，且是**启动期扩展点**：请在容器装配阶段、任何 scope 开始服务之前写入。请求在途时写入会与每一个读取方竞争；此时把某个凭据置空，会让下一次构造转为 `ErrUnavailable`——能力被静默关闭，而链路上没有任何失败可供解释。
 
 ### 资质状态
 

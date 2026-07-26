@@ -4,14 +4,18 @@
 package wechatverify
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -35,6 +39,9 @@ const (
 
 	fixtureSuccessNoIdentifier = `{"access_token":"AT","expires_in":7200,"scope":"snsapi_userinfo"}`
 
+	fixtureSuccessUnionIDOnly = `{"access_token":"AT","expires_in":7200,` +
+		`"scope":"snsapi_userinfo","unionid":"UNIONID-3"}`
+
 	fixtureCodeAlreadyUsed = `{"errcode":40163,"errmsg":"code been used, hints: [ req_id: xyz ]"}`
 	fixtureCodeExpired     = `{"errcode":40029,"errmsg":"invalid code, hints: [ code expired ]"}`
 	fixtureCodeInvalid     = `{"errcode":40029,"errmsg":"invalid code"}`
@@ -48,10 +55,28 @@ const (
 )
 
 // recordedRequest captures what the stub actually received, so the request
-// shape can be asserted rather than assumed.
+// shape can be asserted rather than assumed. The handler runs on the server's
+// own goroutine, so the fields are guarded rather than left to the ordering the
+// HTTP round trip happens to provide.
 type recordedRequest struct {
+	mu    sync.Mutex
 	path  string
 	query url.Values
+}
+
+func (r *recordedRequest) record(req *http.Request) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.path = req.URL.Path
+	r.query = req.URL.Query()
+}
+
+func (r *recordedRequest) snapshot() (string, url.Values) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.path, r.query
 }
 
 func newStubServer(t *testing.T, status int, body string) (*httptest.Server, *recordedRequest) {
@@ -59,8 +84,7 @@ func newStubServer(t *testing.T, status int, body string) (*httptest.Server, *re
 
 	rec := &recordedRequest{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rec.path = r.URL.Path
-		rec.query = r.URL.Query()
+		rec.record(r)
 		// The provider serves JSON under a text/plain content type; the stub
 		// reproduces that so a content-type dependency would be caught here.
 		w.Header().Set("Content-Type", "text/plain")
@@ -195,6 +219,27 @@ func TestVerifyExchangeOutcomes(t *testing.T) {
 			body:    "forbidden",
 			wantErr: ErrMalformedResponse,
 		},
+		// A gateway-level rate limit is the same transient condition the
+		// vendor signals with errcode 45011, and is classified to match.
+		"gateway rate limit is retryable": {
+			status:  http.StatusTooManyRequests,
+			body:    "slow down",
+			wantErr: ErrRetryable,
+		},
+		"gateway request timeout is retryable": {
+			status:  http.StatusRequestTimeout,
+			body:    "took too long",
+			wantErr: ErrRetryable,
+		},
+		// The per-application identifier is present in every successful
+		// response; without it the shape is not understood, and an identity
+		// is not issued from it even when the cross-application identifier
+		// did arrive.
+		"success carrying only the cross-application identifier": {
+			status:  http.StatusOK,
+			body:    fixtureSuccessUnionIDOnly,
+			wantErr: ErrMalformedResponse,
+		},
 	}
 
 	for name, tc := range cases {
@@ -208,19 +253,20 @@ func TestVerifyExchangeOutcomes(t *testing.T) {
 
 			// The exchange must always hit the mobile-app endpoint with the
 			// full parameter set — this pins the endpoint choice down.
-			if rec.path != exchangePath {
-				t.Errorf("request path = %q, want %q", rec.path, exchangePath)
+			path, query := rec.snapshot()
+			if path != exchangePath {
+				t.Errorf("request path = %q, want %q", path, exchangePath)
 			}
-			if got := rec.query.Get("appid"); got != testAppID {
+			if got := query.Get("appid"); got != testAppID {
 				t.Errorf("appid parameter = %q, want %q", got, testAppID)
 			}
-			if got := rec.query.Get("secret"); got != testSecret {
+			if got := query.Get("secret"); got != testSecret {
 				t.Errorf("secret parameter = %q, want %q", got, testSecret)
 			}
-			if got := rec.query.Get("code"); got != testCode {
+			if got := query.Get("code"); got != testCode {
 				t.Errorf("code parameter = %q, want %q", got, testCode)
 			}
-			if got := rec.query.Get("grant_type"); got != "authorization_code" {
+			if got := query.Get("grant_type"); got != "authorization_code" {
 				t.Errorf("grant_type parameter = %q, want %q", got, "authorization_code")
 			}
 
@@ -316,8 +362,293 @@ func TestVerifyMalformedBodyIsTruncatedAndRedacted(t *testing.T) {
 	if strings.Contains(err.Error(), testSecret) {
 		t.Errorf("malformed-response error leaked the application secret: %v", err)
 	}
-	if len(err.Error()) > 2*maxErrorBodyBytes {
-		t.Errorf("malformed-response error is %d bytes, want the body truncated", len(err.Error()))
+	// The echoed body alone is 2*maxErrorBodyBytes; anything approaching that
+	// means the cut did not happen. The allowance over maxErrorBodyBytes
+	// covers this package's own message prefix and the truncation marker, and
+	// is deliberately tight enough that widening the cut fails here.
+	const allowance = 128
+	if len(err.Error()) > maxErrorBodyBytes+allowance {
+		t.Errorf("malformed-response error is %d bytes, want the body truncated to %d plus a short prefix",
+			len(err.Error()), maxErrorBodyBytes)
+	}
+}
+
+// TestVerifyRedactsSecretSplitByTruncation pins the order of redaction and
+// truncation. Redacting the already-cut text lets a secret straddling the cut
+// survive as a prefix, which narrows the search space for whoever reads the
+// log.
+func TestVerifyRedactsSecretSplitByTruncation(t *testing.T) {
+	t.Parallel()
+
+	// Place the secret so that the cut falls inside it.
+	padding := strings.Repeat("y", maxErrorBodyBytes-len(testSecret)/2)
+	echoed := padding + testSecret + strings.Repeat("z", maxErrorBodyBytes)
+	srv, _ := newStubServer(t, http.StatusOK, echoed)
+	v := newTestVerifier(t, srv.URL+exchangePath)
+
+	_, err := v.Verify(context.Background(), testCode)
+	if !errors.Is(err, ErrMalformedResponse) {
+		t.Fatalf("Verify error = %v, want category %v", err, ErrMalformedResponse)
+	}
+
+	// Any run of the secret's leading characters is a leak, not just the whole
+	// value. Half of it is already enough to be worth withholding.
+	if prefix := testSecret[:len(testSecret)/2]; strings.Contains(err.Error(), prefix) {
+		t.Errorf("error leaked a secret prefix across the truncation boundary: %v", err)
+	}
+}
+
+// TestVerifyRedactsQueryEncodedSecret covers the form the secret actually takes
+// in a transport error. The request URL is query-encoded, so a secret holding
+// any character the encoder escapes appears there in a form that does not match
+// the configured value.
+func TestVerifyRedactsQueryEncodedSecret(t *testing.T) {
+	t.Parallel()
+
+	const awkwardSecret = "ab+cd/ef=gh&ij kl"
+
+	srv, _ := newStubServer(t, http.StatusOK, fixtureSuccessWithUnionID)
+	endpoint := srv.URL + exchangePath
+	// Closing the server makes the exchange fail at the transport, which is
+	// the path whose *url.Error embeds the full URL.
+	srv.Close()
+
+	v, err := NewVerifier(Config{AppID: testAppID, AppSecret: awkwardSecret, Endpoint: endpoint})
+	if err != nil {
+		t.Fatalf("NewVerifier returned an unexpected error: %v", err)
+	}
+
+	_, err = v.Verify(context.Background(), testCode)
+	if !errors.Is(err, ErrRetryable) {
+		t.Fatalf("Verify error = %v, want category %v", err, ErrRetryable)
+	}
+	if strings.Contains(err.Error(), awkwardSecret) {
+		t.Errorf("transport error leaked the secret verbatim: %v", err)
+	}
+	if encoded := url.QueryEscape(awkwardSecret); strings.Contains(err.Error(), encoded) {
+		t.Errorf("transport error leaked the query-encoded secret: %v", err)
+	}
+	// A fragment is a leak too: the encoded form is escaped piecewise, so an
+	// unescaped run would survive a redaction that only matched the whole.
+	if strings.Contains(err.Error(), "ab%2Bcd") {
+		t.Errorf("transport error leaked an encoded secret fragment: %v", err)
+	}
+}
+
+// TestConfigNeverSerialisesTheSecret covers the encoders a consumer reaches for
+// when it records its own configuration. String only governs the fmt verbs.
+func TestConfigNeverSerialisesTheSecret(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{AppID: testAppID, AppSecret: testSecret, Endpoint: DefaultEndpoint}
+
+	encoded, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("json.Marshal returned an unexpected error: %v", err)
+	}
+	if strings.Contains(string(encoded), testSecret) {
+		t.Errorf("json.Marshal leaked the secret: %s", encoded)
+	}
+	if !strings.Contains(string(encoded), redactionPlaceholder) {
+		t.Errorf("json.Marshal dropped the secret silently, want it marked: %s", encoded)
+	}
+
+	// The same Config nested inside a larger value must stay redacted.
+	nested, err := json.Marshal(struct{ WeChat Config }{WeChat: cfg})
+	if err != nil {
+		t.Fatalf("json.Marshal of the nested value returned an unexpected error: %v", err)
+	}
+	if strings.Contains(string(nested), testSecret) {
+		t.Errorf("json.Marshal leaked the secret from a nested value: %s", nested)
+	}
+
+	var buf bytes.Buffer
+	slog.New(slog.NewJSONHandler(&buf, nil)).Info("configured", "cfg", cfg)
+	if strings.Contains(buf.String(), testSecret) {
+		t.Errorf("structured logging leaked the secret: %s", buf.String())
+	}
+
+	// Decoding is untouched, so a configuration can still be read from JSON.
+	var decoded Config
+	if err := json.Unmarshal([]byte(`{"AppID":"a","AppSecret":"b"}`), &decoded); err != nil {
+		t.Fatalf("json.Unmarshal returned an unexpected error: %v", err)
+	}
+	if decoded.AppSecret != "b" {
+		t.Errorf("decoded AppSecret = %q, want the value to survive decoding", decoded.AppSecret)
+	}
+}
+
+func TestVerifyRefusesEmptyCode(t *testing.T) {
+	t.Parallel()
+
+	srv, rec := newStubServer(t, http.StatusOK, fixtureSuccessWithUnionID)
+	v := newTestVerifier(t, srv.URL+exchangePath)
+
+	_, err := v.Verify(context.Background(), "")
+	if !errors.Is(err, ErrInvalidCredential) {
+		t.Fatalf("Verify error = %v, want category %v", err, ErrInvalidCredential)
+	}
+	// The point of the guard is that the secret never goes out for an exchange
+	// whose outcome is already known.
+	if path, _ := rec.snapshot(); path != "" {
+		t.Errorf("an empty code still reached the provider at %q", path)
+	}
+}
+
+func TestVerifyPreservesContextSentinels(t *testing.T) {
+	t.Parallel()
+
+	t.Run("cancelled", func(t *testing.T) {
+		t.Parallel()
+
+		srv, _ := newStubServer(t, http.StatusOK, fixtureSuccessWithUnionID)
+		v := newTestVerifier(t, srv.URL+exchangePath)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err := v.Verify(ctx, testCode)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Verify error = %v, want it to unwrap to context.Canceled", err)
+		}
+		// A withdrawn request must not be advertised as worth retrying.
+		if errors.Is(err, ErrRetryable) {
+			t.Errorf("a cancelled exchange was classified retryable: %v", err)
+		}
+		if strings.Contains(err.Error(), testSecret) {
+			t.Errorf("cancellation error leaked the application secret: %v", err)
+		}
+	})
+
+	t.Run("deadline exceeded", func(t *testing.T) {
+		t.Parallel()
+
+		// A server that never answers, so the deadline is what ends the call.
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		}))
+		t.Cleanup(srv.Close)
+		v := newTestVerifier(t, srv.URL+exchangePath)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		t.Cleanup(cancel)
+
+		_, err := v.Verify(ctx, testCode)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Verify error = %v, want it to unwrap to context.DeadlineExceeded", err)
+		}
+		// An expired deadline may well clear on a second attempt.
+		if !errors.Is(err, ErrRetryable) {
+			t.Errorf("an expired deadline was not classified retryable: %v", err)
+		}
+		if strings.Contains(err.Error(), testSecret) {
+			t.Errorf("deadline error leaked the application secret: %v", err)
+		}
+	})
+}
+
+func TestNewVerifierRefusesUnusableEndpoint(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"endpoint carrying a query string": "https://example.test/exchange?tenant=a",
+		"endpoint with a foreign scheme":   "file:///etc/passwd",
+		"endpoint with no scheme":          "example.test/exchange",
+		"endpoint with no host":            "https:///exchange",
+	}
+
+	for name, endpoint := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := NewVerifier(Config{
+				AppID:     testAppID,
+				AppSecret: testSecret,
+				Endpoint:  endpoint,
+			})
+			if !errors.Is(err, ErrUnavailable) {
+				t.Fatalf("NewVerifier error = %v, want category %v", err, ErrUnavailable)
+			}
+			if strings.Contains(err.Error(), testSecret) {
+				t.Errorf("construction error leaked the application secret: %v", err)
+			}
+		})
+	}
+
+	t.Run("plain http is accepted for a local test server", func(t *testing.T) {
+		t.Parallel()
+
+		if _, err := NewVerifier(Config{
+			AppID:     testAppID,
+			AppSecret: testSecret,
+			Endpoint:  "http://127.0.0.1:1/sns/oauth2/access_token",
+		}); err != nil {
+			t.Fatalf("NewVerifier rejected a plain-http endpoint: %v", err)
+		}
+	})
+}
+
+func TestNewVerifierNormalisesNonPositiveTimeout(t *testing.T) {
+	t.Parallel()
+
+	for name, timeout := range map[string]time.Duration{
+		"zero":     0,
+		"negative": -5 * time.Second,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			v, err := NewVerifier(Config{
+				AppID:     testAppID,
+				AppSecret: testSecret,
+				Timeout:   timeout,
+			})
+			if err != nil {
+				t.Fatalf("NewVerifier returned an unexpected error: %v", err)
+			}
+			// A negative timeout would expire every request the moment it
+			// started, turning every login into a retryable failure.
+			if got := v.(*verifier).client.Timeout; got != defaultTimeout {
+				t.Errorf("client timeout = %v, want %v", got, defaultTimeout)
+			}
+		})
+	}
+}
+
+// TestVerifyDoesNotFollowRedirects covers the header a followed redirect adds:
+// the previous URL, secret and all, travels to the new host as the Referer.
+func TestVerifyDoesNotFollowRedirects(t *testing.T) {
+	t.Parallel()
+
+	var referer string
+	var followed bool
+	var mu sync.Mutex
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		followed = true
+		referer = r.Header.Get("Referer")
+		mu.Unlock()
+		_, _ = io.WriteString(w, fixtureSuccessWithUnionID)
+	}))
+	t.Cleanup(target.Close)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+exchangePath, http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+
+	v := newTestVerifier(t, srv.URL+exchangePath)
+
+	_, err := v.Verify(context.Background(), testCode)
+	if !errors.Is(err, ErrMalformedResponse) {
+		t.Fatalf("Verify error = %v, want category %v", err, ErrMalformedResponse)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if followed {
+		t.Errorf("the redirect was followed; the target saw Referer %q", referer)
 	}
 }
 
@@ -344,6 +675,11 @@ func TestNewVerifierRefusesMissingCredentials(t *testing.T) {
 			}
 			if !errors.Is(err, ErrUnavailable) {
 				t.Fatalf("NewVerifier error = %v, want category %v", err, ErrUnavailable)
+			}
+			// Several of these configurations carry a real secret, so the
+			// construction failure is a path the secret could leave by.
+			if strings.Contains(err.Error(), testSecret) {
+				t.Errorf("construction error leaked the application secret: %v", err)
 			}
 		})
 	}

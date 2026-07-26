@@ -6,6 +6,7 @@ package wechatverify
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -52,7 +53,10 @@ const (
 type VendorError struct {
 	// Code is the provider's numeric return code.
 	Code int
-	// Msg is the provider's message text, verbatim.
+	// Msg is the provider's message text, redacted. The provider is not
+	// expected to echo the application secret back, but this text reaches
+	// callers and every such path in this package is redacted rather than
+	// trusted.
 	Msg string
 	// category is the sentinel this code maps to.
 	category error
@@ -89,9 +93,20 @@ const redactionPlaceholder = "[REDACTED]"
 // carries the secret as a query parameter, so any text derived from a
 // transport error, a response echo, or a struct dump must pass through here
 // before it leaves the package.
+//
+// The secret is stripped in both the form it was configured in and the form it
+// takes once query-encoded. Those two differ whenever the secret contains a
+// character the encoder escapes, and it is the encoded form that appears in a
+// transport error — matching only the configured form would let exactly the
+// text this function exists to remove pass through untouched.
 func redactSecret(s, secret string) string {
 	if secret == "" {
 		return s
 	}
-	return strings.ReplaceAll(s, secret, redactionPlaceholder)
+
+	out := strings.ReplaceAll(s, secret, redactionPlaceholder)
+	if encoded := url.QueryEscape(secret); encoded != secret {
+		out = strings.ReplaceAll(out, encoded, redactionPlaceholder)
+	}
+	return out
 }
