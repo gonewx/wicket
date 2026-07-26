@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -67,7 +68,9 @@ type PhoneAuthConfig struct {
 	// AccessKeyID identifies the account the exchange is billed and
 	// authorised against. Required. It travels in the request as part of the
 	// signature, which is why the error paths in this package redact it
-	// alongside the secret.
+	// alongside the secret: there it sits inside a replayable signed URL. On
+	// its own it is an account identifier rather than a secret, so the
+	// configuration renderings leave it visible for operational use.
 	AccessKeyID string
 
 	// AccessKeySecret is the signing key. Required. It is never transmitted:
@@ -119,6 +122,10 @@ func (c PhoneAuthConfig) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// GoString mirrors String, so the %#v verb — which consults GoString rather
+// than String — cannot leak the secret either.
+func (c PhoneAuthConfig) GoString() string { return c.String() }
+
 // LogValue renders the configuration with the secret removed. A structured
 // logger reaches for this before it reflects over the fields, which is the path
 // a consumer takes when it logs its own configuration.
@@ -154,18 +161,24 @@ func (v *verifier) String() string {
 		v.regionID, v.scheme, v.host)
 }
 
+// GoString mirrors String for the %#v verb.
+func (v *verifier) GoString() string { return v.String() }
+
 // NewVerifier builds a Verifier. Missing credentials are refused at
 // construction time rather than deferred to the first exchange, so a consumer
 // that cannot serve one-tap logins learns it at assembly time and can hold a
 // closed posture from the start.
 func NewVerifier(cfg PhoneAuthConfig) (Verifier, error) {
-	if cfg.AppKey == "" {
+	// A value of nothing but whitespace configures nothing; it is refused the
+	// same as an absent one, rather than carried along to fail as a signature
+	// error on the first exchange.
+	if strings.TrimSpace(cfg.AppKey) == "" {
 		return nil, fmt.Errorf("%w: application key is not configured", ErrUnavailable)
 	}
-	if cfg.AccessKeyID == "" {
+	if strings.TrimSpace(cfg.AccessKeyID) == "" {
 		return nil, fmt.Errorf("%w: access key id is not configured", ErrUnavailable)
 	}
-	if cfg.AccessKeySecret == "" {
+	if strings.TrimSpace(cfg.AccessKeySecret) == "" {
 		return nil, fmt.Errorf("%w: access key secret is not configured", ErrUnavailable)
 	}
 
@@ -202,9 +215,12 @@ func NewVerifier(cfg PhoneAuthConfig) (Verifier, error) {
 // splitEndpoint takes an endpoint apart into the scheme and the host the
 // request carries as separate values, refusing shapes the exchange cannot be
 // built from. A scheme the client cannot serve, or a missing host, would
-// otherwise surface only once a request was attempted; a query string would be
-// silently dropped, since the exchange builds its own. All three are
-// configuration faults and are reported as such at assembly time.
+// otherwise surface only once a request was attempted; a query string, a
+// path, a fragment or embedded credentials would be silently dropped, since
+// the exchange builds its own request line from the host alone — a proxy
+// configured as https://host/prefix would quietly be called at the root
+// instead. All of these are configuration faults and are reported as such at
+// assembly time.
 //
 // Plain http is accepted: the exchange has to be pointed at a local server
 // during development, and that server does not serve TLS. The host keeps its
@@ -221,15 +237,27 @@ func splitEndpoint(endpoint string) (scheme, host string, err error) {
 	if parsed.Host == "" {
 		return "", "", fmt.Errorf("%w: endpoint has no host", ErrUnavailable)
 	}
+	if parsed.User != nil {
+		return "", "", fmt.Errorf("%w: endpoint must not carry credentials", ErrUnavailable)
+	}
+	if parsed.Path != "" && parsed.Path != "/" {
+		return "", "", fmt.Errorf("%w: endpoint must not carry a path", ErrUnavailable)
+	}
 	if parsed.RawQuery != "" {
 		return "", "", fmt.Errorf("%w: endpoint must not carry a query string", ErrUnavailable)
+	}
+	if parsed.Fragment != "" {
+		return "", "", fmt.Errorf("%w: endpoint must not carry a fragment", ErrUnavailable)
 	}
 	return parsed.Scheme, parsed.Host, nil
 }
 
-// redact removes this verifier's credentials from text bound for a caller. The
-// secret never travels, but the key id does — it is part of the signed request
-// — so both are stripped.
-func (v *verifier) redact(s string) string {
-	return redactSecrets(s, v.accessKeySecret, v.accessKeyID)
+// redact removes this verifier's credentials — and any extra per-call values,
+// such as the token being verified — from text bound for a caller, then strips
+// the signing parameters' values. The secret never travels, but the key id and
+// the token do — both are part of the signed request URL a transport error
+// embeds — so all of them are stripped.
+func (v *verifier) redact(s string, extras ...string) string {
+	secrets := append([]string{v.accessKeySecret, v.accessKeyID}, extras...)
+	return redactSignedQueryValues(redactSecrets(s, secrets...))
 }

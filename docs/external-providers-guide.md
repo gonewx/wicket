@@ -481,14 +481,14 @@ type VerifiedPhone struct {
 
 | Sentinel | 触发条件 |
 |------|------|
-| `ErrInvalidCredential` | `isv.TOKEN_INVALID`、`isv.TOKEN_UNAUTHORIZED_USED`、`InvalidBizToken.Expired`、`InvalidBizToken.Check`、`GET_MOBILE_FAILED`，**以及任何无法识别的非 `OK` 返回码** |
+| `ErrInvalidCredential` | `isv.TOKEN_INVALID`、`isv.TOKEN_UNAUTHORIZED_USED`、`InvalidBizToken.Expired`、`InvalidBizToken.Check`、`GET_MOBILE_FAILED`，**以及任何无法识别的非 `OK` 返回码**（未识别码若随失败 HTTP 状态到达，先按状态兜底：5xx / 429 / 408 判 `ErrRetryable`，其余仍归本类） |
 | `ErrRetryable` | `isp.QPS_LIMIT`、`isv.BUSINESS_LIMIT_CONTROL`、`isp.SYSTEM_ERROR`、`isp.UNKNOWN`、HTTP 5xx / 429 / 408、传输失败、SDK 超时 |
 | `ErrMalformedResponse` | 响应体无法解码；返回码为 `OK` 但缺手机号 |
 | `ErrUnavailable` | 未配置 `AppKey` / `AccessKeyID` / `AccessKeySecret`；`Endpoint` 形态非法；请求无法构造；**以及本方配置类厂商码**：`isv.RAM_PERMISSION_DENY`、`isv.FORBIDDEN_ACTION`、`isv.PRODUCT_UNSUBSCRIBE`、`isv.VERIFY_SCHEME_NOT_EXIST`、`SignatureDoesNotMatch`、`IncompleteSignature` |
 
 **配置类厂商码为何归 `ErrUnavailable` 而非 `ErrInvalidCredential`**：这些码说的是「本方凭据、权限或开通状态有问题」，与「用户的 token 无效」是两回事。归入前者会让消费方对着一个完全正常的用户返回 401，把一次运维故障藏在用户身上；归入 `ErrUnavailable` 仍然 fail-closed（无人被放行），但指对了原因。此处与微信能力的分类口径不同，是因为本厂商有权威码表可精确区分。
 
-无法识别的返回码归入 `ErrInvalidCredential` 是**刻意的收紧默认**：把一个读不懂的响应当成可重试条件，可能把一次拒绝重试成一次意外放行。返回码采用**字符串全等**匹配，不做前缀归类——厂商的 `isv.` 前缀下同时存在凭据类与配置类两种语义，前缀归类必然把两者混为一谈。
+无法识别的返回码归入 `ErrInvalidCredential` 是**刻意的收紧默认**：把一个读不懂的响应当成可重试条件，可能把一次拒绝重试成一次意外放行。唯一的放宽是未识别码**随失败 HTTP 状态到达**时：5xx / 429 / 408 说的是「厂商侧故障」而非「读不懂的拒绝」，此时按状态判 `ErrRetryable`，其余状态仍收紧。返回码采用**字符串全等**匹配，不做前缀归类——厂商的 `isv.` 前缀下同时存在凭据类与配置类两种语义，前缀归类必然把两者混为一谈。
 
 `context` 取消与超时**不归入上述任何类别**：`ctx` 被取消时错误满足 `errors.Is(err, context.Canceled)` 且**不标可重试**（重试与调用方的意图相悖）；deadline 到期时同时满足 `context.DeadlineExceeded` 与 `ErrRetryable`。
 
@@ -496,11 +496,13 @@ type VerifiedPhone struct {
 
 ### AccessKeySecret 不外泄
 
-签名为 HMAC，**密钥不上网**；但签名后的请求 URL 中带有 `AccessKeyId` 与 `Signature`，而传输失败返回的错误内嵌完整 URL。因此包内所有对外文本都经过脱敏：**密钥与访问标识一并**替换为 `[REDACTED]`，且同时匹配原始形态与 query 编码形态。脱敏一律在截断**之前**执行——先截断会把机密切成不匹配的碎片，让残留前缀漏过。
+签名为 HMAC，**密钥不上网**；但签名后的请求 URL 中带有 `AccessKeyId`、**用户的 `AccessToken`** 与 `Signature`，而传输失败返回的错误内嵌完整 URL。因此包内所有对外文本都经过脱敏：**密钥、访问标识与当次 token 一并**替换为 `[REDACTED]`，且同时匹配原始形态、query 编码形态与签名回显的二次编码形态；`Signature` 与 `SignatureNonce` 的参数值逐请求变化、无法按字面匹配，按参数名剥除。脱敏一律在截断**之前**执行——先截断会把机密切成不匹配的碎片，让残留前缀漏过。
 
-`PhoneAuthConfig` 实现了 `String()`（值接收者）、`json.Marshaler` 与 `slog.LogValuer`，因此 `%v`/`%+v`、`json.Marshal(cfg)` 与结构化日志记录 `cfg` 输出的同样是 `[REDACTED]`；反序列化方向未做改动，配置仍可从 JSON 读入。
+`AccessKeyID` 的口径是刻意的不对称：错误文本里它伴随签名处于可重放的 URL 语境，故剥除；配置渲染里它只是账号标识（控制台可见），保留明文供运维识别。
 
-本包**不写任何日志**。消费方记录 `PhoneAuthConfig` 本身是安全的（已脱敏），但把 `AccessKeySecret` 字段单独取出来打印不在本包的保护范围内。
+`PhoneAuthConfig` 实现了 `String()`（值接收者）、`GoString()`、`json.Marshaler` 与 `slog.LogValuer`，因此 `%v`/`%+v`/`%#v`、`json.Marshal(cfg)` 与结构化日志记录 `cfg` 输出的同样是 `[REDACTED]`；反序列化方向未做改动，配置仍可从 JSON 读入。
+
+本包**不写任何日志**，并对每个 SDK client 关闭了链路追踪（SDK 在检测到进程内全局 tracer 时会以完整请求 URI 命名 span，那会绕过本包脱敏）。消费方记录 `PhoneAuthConfig` 本身是安全的（已脱敏），但把 `AccessKeySecret` 字段单独取出来打印不在本包的保护范围内；另注意 SDK 自带的 `DEBUG=sdk` 环境变量调试开关会把完整请求 URI 打到标准输出，生产环境不应设置。
 
 ### 并发与超时
 
@@ -538,7 +540,7 @@ default:
 ```go
 var vendorErr *phoneverify.VendorError
 if errors.As(err, &vendorErr) {
-    // vendorErr.Code / Message / RequestID / HTTPStatus 均已脱敏
+    // vendorErr.Code / Message / RequestID / HTTPStatus 均已脱敏并限长
 }
 ```
 

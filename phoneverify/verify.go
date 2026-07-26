@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	sdkerrors "github.com/aliyun/alibaba-cloud-sdk-go/sdk/errors"
@@ -57,13 +58,17 @@ func (t *contextTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // Verify exchanges an authentication token for the phone number behind it.
 func (v *verifier) Verify(ctx context.Context, token string) (*VerifiedPhone, error) {
-	// An empty token cannot succeed. Refusing it here spares the shared rate
-	// limit a request whose outcome is already known, and matches the closed
-	// posture NewVerifier takes towards missing credentials.
-	if token == "" {
-		if err := ctx.Err(); err != nil {
-			return nil, wrapContextError(err)
-		}
+	// A context that is already done settles the outcome before any work is
+	// spent on it — client construction and signing included, which would
+	// otherwise run to completion only to fail at the transport.
+	if err := ctx.Err(); err != nil {
+		return nil, wrapContextError(err)
+	}
+
+	// An empty or blank token cannot succeed. Refusing it here spares the
+	// shared rate limit a request whose outcome is already known, and matches
+	// the closed posture NewVerifier takes towards missing credentials.
+	if strings.TrimSpace(token) == "" {
 		return nil, fmt.Errorf("%w: authentication token is empty", ErrInvalidCredential)
 	}
 
@@ -85,6 +90,13 @@ func (v *verifier) Verify(ctx context.Context, token string) (*VerifiedPhone, er
 
 	client.SetTransport(&contextTransport{ctx: ctx, base: http.DefaultTransport})
 
+	// The client library names tracing spans after the full request URI —
+	// token and signature included — whenever a global tracer is registered
+	// anywhere in the process. That would hand exactly the text this package
+	// redacts to a telemetry pipeline, so tracing is switched off for this
+	// client.
+	client.SetCloseTrace(true)
+
 	req := dypnsapi.CreateGetMobileRequest()
 	// The scheme and host are set explicitly rather than derived from the
 	// region, both because the endpoint is a configuration override and
@@ -95,27 +107,43 @@ func (v *verifier) Verify(ctx context.Context, token string) (*VerifiedPhone, er
 	req.SetReadTimeout(v.timeout)
 	req.SetConnectTimeout(v.timeout)
 
-	resp, err := client.GetMobile(req)
+	resp, err := v.exchange(client, req)
 	if err != nil {
-		return nil, v.classifyCallError(ctx, err)
+		if errors.Is(err, ErrMalformedResponse) {
+			// Produced by the recover guard in exchange; already classified.
+			return nil, err
+		}
+		return nil, v.classifyCallError(ctx, token, err)
+	}
+
+	// A response that names no return code at all is not a rejection the
+	// provider expressed — it is a payload this package does not understand,
+	// such as an empty body under a success status, which the client library
+	// hands back as an untouched zero value.
+	if resp.Code == "" {
+		return nil, fmt.Errorf("%w: response carried no return code", ErrMalformedResponse)
 	}
 
 	// A business failure arrives under a success status with no error at all,
 	// carrying its reason in the return code. Branching on the error alone
-	// would accept every one of those as a verified phone number.
+	// would accept every one of those as a verified phone number. The code,
+	// message and request identifier are provider-controlled text: none of it
+	// is trusted to be free of echoes or fairly sized, so all three are
+	// redacted and bounded before they can reach a caller's log.
 	if resp.Code != codeSuccess {
 		return nil, &VendorError{
-			Code:       resp.Code,
-			Message:    truncate(v.redact(resp.Message), maxErrorTextBytes),
-			RequestID:  resp.RequestId,
+			Code:       truncate(v.redact(resp.Code, token), maxIdentifierTextBytes),
+			Message:    truncate(v.redact(resp.Message, token), maxErrorTextBytes),
+			RequestID:  truncate(v.redact(resp.RequestId, token), maxIdentifierTextBytes),
 			HTTPStatus: resp.GetHttpStatus(),
 			category:   classifyVendorCode(resp.Code),
 		}
 	}
 
-	// A success that carries no number is a response whose shape is not
-	// understood, and a verified phone number is not issued from one.
-	if resp.GetMobileResultDTO.Mobile == "" {
+	// A success that carries no number — or nothing but whitespace where one
+	// belongs — is a response whose shape is not understood, and a verified
+	// phone number is not issued from one.
+	if strings.TrimSpace(resp.GetMobileResultDTO.Mobile) == "" {
 		return nil, fmt.Errorf("%w: exchange succeeded without a phone number",
 			ErrMalformedResponse)
 	}
@@ -126,19 +154,29 @@ func (v *verifier) Verify(ctx context.Context, token string) (*VerifiedPhone, er
 	}, nil
 }
 
-// classifyCallError categorises a failed exchange.
-func (v *verifier) classifyCallError(ctx context.Context, err error) error {
-	// A context failure is reported before anything else, because its
-	// sentinel is what lets a caller tell its own abort apart from an
-	// upstream fault. The context is consulted rather than the returned
-	// error, because the client library may have rewritten a cancelled
-	// request's error into a timeout of its own.
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return wrapContextError(ctxErr)
-	}
+// exchange invokes the operation, converting a decoding panic into a
+// malformed-response failure. The client library parses a failure payload
+// with unchecked type assertions, so a response whose standard fields carry
+// unexpected JSON types — a numeric return code, say — would otherwise bring
+// the whole process down.
+func (v *verifier) exchange(client *dypnsapi.Client, req *dypnsapi.GetMobileRequest) (resp *dypnsapi.GetMobileResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: vendor library failed decoding the response: %s",
+				ErrMalformedResponse, truncate(v.redact(fmt.Sprint(r)), maxErrorTextBytes))
+		}
+	}()
+	return client.GetMobile(req)
+}
 
-	// A non-success status is reported as a server-side failure carrying the
-	// return code, message and status parsed out of the response.
+// classifyCallError categorises a failed exchange.
+func (v *verifier) classifyCallError(ctx context.Context, token string, err error) error {
+	// A definitive provider response outranks the context. Once this error
+	// shape exists, the exchange completed and produced an answer; a deadline
+	// that lapsed a moment later must not repaint that answer as retryable,
+	// or a caller would resend an already-burned token on the strength of it.
+	// A cancellation cannot be hiding in here either — an interrupted request
+	// never yields a parsed response.
 	var serverErr *sdkerrors.ServerError
 	if errors.As(err, &serverErr) {
 		category, recognised := lookupVendorCode(serverErr.ErrorCode())
@@ -146,12 +184,21 @@ func (v *verifier) classifyCallError(ctx context.Context, err error) error {
 			category = classifyHTTPStatus(serverErr.HttpStatus())
 		}
 		return &VendorError{
-			Code:       serverErr.ErrorCode(),
-			Message:    truncate(v.redact(serverErr.Message()), maxErrorTextBytes),
-			RequestID:  serverErr.RequestId(),
+			Code:       truncate(v.redact(serverErr.ErrorCode(), token), maxIdentifierTextBytes),
+			Message:    truncate(v.redact(serverErr.Message(), token), maxErrorTextBytes),
+			RequestID:  truncate(v.redact(serverErr.RequestId(), token), maxIdentifierTextBytes),
 			HTTPStatus: serverErr.HttpStatus(),
 			category:   category,
 		}
+	}
+
+	// With no definitive response in hand, a context failure is reported
+	// next, because its sentinel is what lets a caller tell its own abort
+	// apart from an upstream fault. The context is consulted rather than the
+	// returned error, because the client library may have rewritten a
+	// cancelled request's error into a timeout of its own.
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return wrapContextError(ctxErr)
 	}
 
 	// Failures the client library raises about the exchange itself rather
@@ -161,26 +208,31 @@ func (v *verifier) classifyCallError(ctx context.Context, err error) error {
 		switch clientErr.ErrorCode() {
 		case codeDecodeFailure:
 			return fmt.Errorf("%w: cannot decode the exchange response: %s",
-				ErrMalformedResponse, truncate(v.redact(clientErr.Error()), maxErrorTextBytes))
+				ErrMalformedResponse, truncate(v.redact(clientErr.Error(), token), maxErrorTextBytes))
 		case codeTimeout:
+			// The library only wraps a timeout in this code when its
+			// automatic retry is enabled, which this package never turns on;
+			// a plain timeout surfaces as a transport failure below and lands
+			// on the same category. The branch stays as a guard against the
+			// library growing new paths to this code underneath this package.
 			return fmt.Errorf("%w: exchange timed out: %s",
-				ErrRetryable, truncate(v.redact(clientErr.Error()), maxErrorTextBytes))
+				ErrRetryable, truncate(v.redact(clientErr.Error(), token), maxErrorTextBytes))
 		default:
 			// The remaining codes report a request the library refused to
 			// build or send — a missing parameter, an unusable credential,
 			// an endpoint it could not resolve. Those are faults on this
 			// side, and retrying them changes nothing.
 			return fmt.Errorf("%w: exchange could not be issued: %s",
-				ErrUnavailable, truncate(v.redact(clientErr.Error()), maxErrorTextBytes))
+				ErrUnavailable, truncate(v.redact(clientErr.Error(), token), maxErrorTextBytes))
 		}
 	}
 
 	// Any other failure is a transport failure, and the error it returns
-	// embeds the full request URL — key id and signature included. It is
-	// redacted and flattened into text here rather than wrapped, so no path
-	// can reach the original message.
+	// embeds the full request URL — key id, token and signature included. It
+	// is redacted and flattened into text here rather than wrapped, so no
+	// path can reach the original message.
 	return fmt.Errorf("%w: exchange request failed: %s",
-		ErrRetryable, truncate(v.redact(err.Error()), maxErrorTextBytes))
+		ErrRetryable, truncate(v.redact(err.Error(), token), maxErrorTextBytes))
 }
 
 // wrapContextError preserves a context failure's own sentinel. A deadline is

@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	sdkerrors "github.com/aliyun/alibaba-cloud-sdk-go/sdk/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,6 +31,15 @@ const (
 
 	fixtureSuccessWithoutMobile = `{"Code":"OK","Message":"OK","RequestId":"REQ-NO-MOBILE",` +
 		`"GetMobileResultDTO":{"Mobile":""}}`
+
+	fixtureSuccessBlankMobile = `{"Code":"OK","Message":"OK","RequestId":"REQ-BLANK-MOBILE",` +
+		`"GetMobileResultDTO":{"Mobile":"   "}}`
+
+	// A payload whose standard fields carry the wrong JSON types. The vendor
+	// library parses failure payloads with unchecked type assertions, so this
+	// shape probes the guard that keeps such a response from crashing the
+	// process.
+	fixtureNonStringFields = `{"Code":12345,"Message":true,"RequestId":67}`
 
 	fixtureTokenInvalid = `{"Code":"isv.TOKEN_INVALID","Message":"token is invalid",` +
 		`"RequestId":"REQ-TOKEN-INVALID"}`
@@ -80,7 +90,9 @@ const (
 	// form would pass such a test while leaking every realistic secret.
 	testSecret = "ab+cd/ef=gh&ij kl"
 
-	testToken = "test-authentication-token"
+	// The token carries escapable characters for the same reason: it travels
+	// in the query, so a transport error embeds it in encoded form.
+	testToken = "test+authentication/token=escaped&value"
 )
 
 // recorder captures what the stub server received. The handler runs on the
@@ -243,9 +255,24 @@ func TestVerifyExchangeOutcomes(t *testing.T) {
 			body:         fixtureSuccessWithoutMobile,
 			wantCategory: ErrMalformedResponse,
 		},
+		"success with a blank phone number is malformed": {
+			status:       http.StatusOK,
+			body:         fixtureSuccessBlankMobile,
+			wantCategory: ErrMalformedResponse,
+		},
 		"undecodable body is malformed": {
 			status:       http.StatusOK,
 			body:         fixtureMalformedBody,
+			wantCategory: ErrMalformedResponse,
+		},
+		"empty body under a success status is malformed": {
+			status:       http.StatusOK,
+			body:         "",
+			wantCategory: ErrMalformedResponse,
+		},
+		"wrongly typed fields under a failure status are malformed, not fatal": {
+			status:       http.StatusBadRequest,
+			body:         fixtureNonStringFields,
 			wantCategory: ErrMalformedResponse,
 		},
 		"rejected token under a failure status is refused": {
@@ -308,6 +335,8 @@ func TestVerifyExchangeOutcomes(t *testing.T) {
 			require.ErrorIs(t, err, tc.wantCategory)
 			require.NotContains(t, err.Error(), testSecret,
 				"the secret must not reach a caller through an error")
+			require.NotContains(t, err.Error(), testToken,
+				"the user's token must not reach a caller through an error either")
 
 			if tc.wantVendorCode != "" {
 				var vendorErr *VendorError
@@ -332,8 +361,10 @@ func TestVerifySendsTheExpectedRequest(t *testing.T) {
 	_, err = verifier.Verify(context.Background(), testToken)
 	require.NoError(t, err)
 
-	query, _, _, rawURL, calls := rec.snapshot()
+	query, method, _, rawURL, calls := rec.snapshot()
 	require.Equal(t, 1, calls, "one exchange means one request")
+	require.Equal(t, http.MethodPost, method,
+		"the operation posts, with every parameter in the query string")
 	require.Equal(t, "GetMobile", query.Get("Action"))
 	require.Equal(t, "2017-05-25", query.Get("Version"))
 	require.Equal(t, testToken, query.Get("AccessToken"))
@@ -365,19 +396,60 @@ func TestVerifyTreatsTransportFailureAsRetryable(t *testing.T) {
 	require.NotContains(t, err.Error(), url.QueryEscape(testSecret))
 	require.NotContains(t, err.Error(), testKeyID,
 		"the key id travels with the signed request and must be redacted too")
+	require.NotContains(t, err.Error(), testToken,
+		"the user's token travels in the query and must be redacted too")
+	require.NotContains(t, err.Error(), url.QueryEscape(testToken),
+		"the token appears in the URL in encoded form, and that form must be redacted too")
+	require.Contains(t, err.Error(), "AccessToken="+redactionPlaceholder,
+		"the redacted token should still be visibly present in the surviving URL")
+	require.Contains(t, err.Error(), "Signature="+redactionPlaceholder,
+		"the signature value replays the request within the timestamp window and must not survive")
+	require.Contains(t, err.Error(), "SignatureNonce="+redactionPlaceholder,
+		"the nonce is part of the same signing material and must not survive either")
 }
 
 func TestVerifyRefusesAnEmptyToken(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"empty token":           "",
+		"whitespace only token": " \t ",
+	}
+
+	for name, token := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			srv, rec := newStubServer(t, http.StatusOK, fixtureSuccess)
+			verifier, err := NewVerifier(testConfig(srv.URL))
+			require.NoError(t, err)
+
+			phone, err := verifier.Verify(context.Background(), token)
+			require.Error(t, err)
+			require.Nil(t, phone)
+			require.ErrorIs(t, err, ErrInvalidCredential)
+
+			_, _, _, _, calls := rec.snapshot()
+			require.Zero(t, calls, "an outcome already known must not cost a request")
+		})
+	}
+}
+
+func TestVerifyRefusesAPreCancelledContext(t *testing.T) {
 	t.Parallel()
 
 	srv, rec := newStubServer(t, http.StatusOK, fixtureSuccess)
 	verifier, err := NewVerifier(testConfig(srv.URL))
 	require.NoError(t, err)
 
-	phone, err := verifier.Verify(context.Background(), "")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	phone, err := verifier.Verify(ctx, testToken)
 	require.Error(t, err)
 	require.Nil(t, phone)
-	require.ErrorIs(t, err, ErrInvalidCredential)
+	require.ErrorIs(t, err, context.Canceled)
+	require.NotErrorIs(t, err, ErrRetryable)
 
 	_, _, _, _, calls := rec.snapshot()
 	require.Zero(t, calls, "an outcome already known must not cost a request")
@@ -403,7 +475,9 @@ func TestVerifyPreservesContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		// The stub holds the request open until the test releases it, so the
-		// exchange is guaranteed to still be in flight when this fires.
+		// exchange can never complete before this fires — whether it lands
+		// before the request is issued or while it is in flight, the call
+		// must come back reporting the cancellation.
 		cancel()
 	}()
 
@@ -492,6 +566,16 @@ func TestNewVerifierRefusesIncompleteCredentials(t *testing.T) {
 			AppKey:      testAppKey,
 			AccessKeyID: testKeyID,
 		},
+		"blank application key": {
+			AppKey:          "   ",
+			AccessKeyID:     testKeyID,
+			AccessKeySecret: testSecret,
+		},
+		"blank access key secret": {
+			AppKey:          testAppKey,
+			AccessKeyID:     testKeyID,
+			AccessKeySecret: " \t ",
+		},
 		"nothing configured at all": {},
 	}
 
@@ -518,6 +602,9 @@ func TestNewVerifierRefusesAnUnusableEndpoint(t *testing.T) {
 		"no scheme":              "dypnsapi.example.com",
 		"no host":                "https://",
 		"carries a query string": "https://dypnsapi.example.com?Action=GetMobile",
+		"carries a path":         "https://dypnsapi.example.com/api",
+		"carries a fragment":     "https://dypnsapi.example.com#section",
+		"carries credentials":    "https://user:pass@dypnsapi.example.com",
 		"not a URL at all":       "https://exa mple.com/\x7f",
 	}
 
@@ -624,6 +711,7 @@ func TestRenderingNeverRevealsTheSecret(t *testing.T) {
 	renderings := map[string]string{
 		"value with the default verb":   fmt.Sprintf("%v", cfg),
 		"value with the plus verb":      fmt.Sprintf("%+v", cfg),
+		"value with the go-syntax verb": fmt.Sprintf("%#v", cfg),
 		"pointer with the default verb": fmt.Sprintf("%v", &cfg),
 		"inside a slice":                fmt.Sprintf("%v", []PhoneAuthConfig{cfg}),
 		"inside a struct":               fmt.Sprintf("%+v", struct{ Phone PhoneAuthConfig }{cfg}),
@@ -631,6 +719,7 @@ func TestRenderingNeverRevealsTheSecret(t *testing.T) {
 		"encoded as nested JSON":        string(nested),
 		"emitted by a structured log":   logged.String(),
 		"the verifier itself":           fmt.Sprintf("%v", built),
+		"the verifier with go-syntax":   fmt.Sprintf("%#v", built),
 	}
 
 	for name, rendered := range renderings {
@@ -662,6 +751,13 @@ func TestRedactSecrets(t *testing.T) {
 			text:    "GET /?Signature=" + url.QueryEscape(testSecret),
 			secrets: []string{testSecret},
 			want:    "GET /?Signature=" + redactionPlaceholder,
+		},
+		"doubly encoded occurrence is removed": {
+			// A signing echo re-encodes the already-encoded query, so a
+			// credential with escapable characters arrives encoded twice.
+			text:    "string to sign was " + url.QueryEscape(url.QueryEscape(testSecret)),
+			secrets: []string{testSecret},
+			want:    "string to sign was " + redactionPlaceholder,
 		},
 		"every listed secret is removed": {
 			text:    "id=" + testKeyID + "&key=" + testSecret,
@@ -743,6 +839,14 @@ func TestTruncateKeepsRuneBoundaries(t *testing.T) {
 			limit: 4,
 			want:  "错...",
 		},
+		"an invalid byte early on does not collapse the cut": {
+			// Only a rune the cut itself split may be stepped back over.
+			// Invalid bytes deeper inside the text — binary in a response
+			// body, say — are removed without giving up the rest of the cut.
+			text:  "\xffabcdef",
+			limit: 4,
+			want:  "abc...",
+		},
 	}
 
 	for name, tc := range cases {
@@ -751,6 +855,58 @@ func TestTruncateKeepsRuneBoundaries(t *testing.T) {
 			require.Equal(t, tc.want, truncate(tc.text, tc.limit))
 		})
 	}
+}
+
+func TestRedactSignedQueryValues(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct{ text, want string }{
+		"url form values are stripped": {
+			text: "?AccessToken=t&Signature=abc%2F123%3D&SignatureNonce=n-1&Timestamp=2026",
+			want: "?AccessToken=t&Signature=" + redactionPlaceholder +
+				"&SignatureNonce=" + redactionPlaceholder + "&Timestamp=2026",
+		},
+		"signing echo values are stripped": {
+			// The echo encodes the whole query once more: escapes arrive as
+			// %25XX and the separators as %26 / %3D.
+			text: "POST&%2F&SignatureNonce%3Dabc%252Fn%26Timestamp%3D2026",
+			want: "POST&%2F&SignatureNonce%3D" + redactionPlaceholder + "%26Timestamp%3D2026",
+		},
+		"parameter names sharing the prefix stay readable": {
+			text: "SignatureMethod=HMAC-SHA1&SignatureVersion=1.0&SignatureType=",
+			want: "SignatureMethod=HMAC-SHA1&SignatureVersion=1.0&SignatureType=",
+		},
+		"text without signing parameters is untouched": {
+			text: "connection refused",
+			want: "connection refused",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, redactSignedQueryValues(tc.text))
+		})
+	}
+}
+
+func TestClassifyPrefersADefinitiveAnswerOverContextState(t *testing.T) {
+	t.Parallel()
+
+	v := &verifier{accessKeyID: testKeyID, accessKeySecret: testSecret}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := v.classifyCallError(ctx, testToken,
+		sdkerrors.NewServerError(http.StatusBadRequest, fixtureTokenInvalid, ""))
+
+	require.ErrorIs(t, err, ErrInvalidCredential,
+		"a rejection the provider already delivered must not be repainted by a later context event")
+	require.NotErrorIs(t, err, ErrRetryable)
+
+	var vendorErr *VendorError
+	require.ErrorAs(t, err, &vendorErr)
+	require.Equal(t, "isv.TOKEN_INVALID", vendorErr.Code)
 }
 
 func TestClassifyVendorCode(t *testing.T) {

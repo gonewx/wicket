@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 )
@@ -171,12 +172,18 @@ const redactionPlaceholder = "[REDACTED]"
 // echoed back in an error. That text is not this package's to size.
 const maxErrorTextBytes = 256
 
+// maxIdentifierTextBytes bounds the provider-controlled return code and
+// request identifier echoed in an error. Real values are short tokens;
+// anything longer is not worth carrying.
+const maxIdentifierTextBytes = 64
+
 // redactSecrets strips every occurrence of each secret from s.
 //
-// Each secret is stripped in both the form it was configured in and the form it
-// takes once query-encoded. Those two differ whenever the secret contains a
-// character the encoder escapes, and the encoded form is what appears in a
-// transport error — matching only the configured form would let exactly the
+// Each secret is stripped in the form it was configured in and in its encoded
+// forms. The once-encoded form is what a request URL carries and so what a
+// transport error embeds; the twice-encoded form is what a signing echo
+// carries, because the provider's string-to-sign encodes the already-encoded
+// query a second time. Matching only the configured form would let exactly the
 // text this function exists to remove pass through untouched.
 func redactSecrets(s string, secrets ...string) string {
 	out := s
@@ -185,11 +192,39 @@ func redactSecrets(s string, secrets ...string) string {
 			continue
 		}
 		out = strings.ReplaceAll(out, secret, redactionPlaceholder)
-		if encoded := url.QueryEscape(secret); encoded != secret {
+		form := secret
+		for range 2 {
+			encoded := url.QueryEscape(form)
+			if encoded == form {
+				break
+			}
 			out = strings.ReplaceAll(out, encoded, redactionPlaceholder)
+			form = encoded
 		}
 	}
 	return out
+}
+
+// The values of the signing parameters, in the two shapes error text carries
+// them. Unlike the configured credentials they change on every call, so they
+// cannot be matched literally and are stripped by parameter name instead. The
+// first shape is a URL's: percent escapes inside the value, a separator or
+// quote after it. The second is a signing echo's: the provider re-encodes the
+// whole query, so escapes arrive as %25XX and the separators as %26 and %3D.
+// Parameter names sharing the prefix (SignatureMethod, SignatureVersion,
+// SignatureType) carry no per-call material and are left readable.
+var (
+	signedQueryValueURL  = regexp.MustCompile(`(SignatureNonce|Signature)=[^&"'\s]*`)
+	signedQueryValueEcho = regexp.MustCompile(`(SignatureNonce|Signature)%3D(?:%25[0-9A-Fa-f]{2}|[^%&=\s"'])*`)
+)
+
+// redactSignedQueryValues strips the values of the signing parameters from s.
+// A signature is enough to replay the exact request it signed within the
+// provider's timestamp tolerance, so neither it nor its nonce is allowed
+// through in either shape.
+func redactSignedQueryValues(s string) string {
+	out := signedQueryValueURL.ReplaceAllString(s, "${1}="+redactionPlaceholder)
+	return signedQueryValueEcho.ReplaceAllString(out, "${1}%3D"+redactionPlaceholder)
 }
 
 // truncate caps s at n bytes, marking the cut so a reader can tell the text is
@@ -206,7 +241,17 @@ func truncate(s string, n int) string {
 	}
 
 	cut := s[:n]
-	for len(cut) > 0 && !utf8.ValidString(cut) {
+	// Only a trailing rune the cut split apart is stepped back over — at most
+	// three bytes, since a rune is four at the longest. A whole-string check
+	// here would walk back to the earliest invalid byte instead, and text that
+	// starts with one — binary in a response body, say — would collapse the
+	// entire diagnostic to the marker. Invalid bytes deeper inside the text
+	// are the text's own and are removed below without shrinking the cut.
+	for range 3 {
+		r, size := utf8.DecodeLastRuneInString(cut)
+		if r != utf8.RuneError || size > 1 {
+			break
+		}
 		cut = cut[:len(cut)-1]
 	}
 	return strings.ToValidUTF8(cut, "") + "..."
