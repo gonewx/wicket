@@ -14,5 +14,6 @@ var (
 	_ = registerKeyManagement
 	_ = registerOIDCVerify
 	_ = registerWeChatVerify
+	_ = registerPhoneAuthVerify
 	_ = registerAdditional
 )

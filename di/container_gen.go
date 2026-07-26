@@ -29,6 +29,7 @@ import (
 	"github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/models/messages"
 	"github.com/gonewx/wicket/oidcverify"
+	"github.com/gonewx/wicket/phoneverify"
 	"github.com/gonewx/wicket/responses"
 	impl3 "github.com/gonewx/wicket/responses/impl"
 	"github.com/gonewx/wicket/server"
@@ -91,6 +92,7 @@ type Root struct {
 	f_BackchannelAuthenticationRequestStore                  storage.BackchannelAuthenticationRequestStore
 	f_Ptr_Manager                                            *keymgmt.Manager
 	f_Ptr_ProviderConfig                                     *oidcverify.ProviderConfig
+	f_Ptr_PhoneAuthConfig                                    *phoneverify.PhoneAuthConfig
 	f_MemoryDistributedCache                                 services.DistributedCache
 	f_AuthorizationCodeStore                                 storage.AuthorizationCodeStore
 	f_RefreshTokenStore                                      storage.RefreshTokenStore
@@ -294,6 +296,9 @@ func NewRoot() (*Root, error) {
 	})(r)
 	r.f_Ptr_ProviderConfig = (func(p godi.Provider) *oidcverify.ProviderConfig {
 		return &oidcverify.ProviderConfig{}
+	})(r)
+	r.f_Ptr_PhoneAuthConfig = (func(p godi.Provider) *phoneverify.PhoneAuthConfig {
+		return &phoneverify.PhoneAuthConfig{}
 	})(r)
 	r.f_MemoryDistributedCache = memory2.NewMemoryDistributedCache()
 	r.f_AuthorizationCodeStore = impl4.NewAuthorizationCodeStore()
@@ -1208,6 +1213,8 @@ func (r *Root) Ptr_Manager() *keymgmt.Manager { return r.f_Ptr_Manager }
 
 func (r *Root) Ptr_ProviderConfig() *oidcverify.ProviderConfig { return r.f_Ptr_ProviderConfig }
 
+func (r *Root) Ptr_PhoneAuthConfig() *phoneverify.PhoneAuthConfig { return r.f_Ptr_PhoneAuthConfig }
+
 func (r *Root) MemoryDistributedCache() services.DistributedCache { return r.f_MemoryDistributedCache }
 
 func (r *Root) AuthorizationCodeStore() storage.AuthorizationCodeStore {
@@ -1298,6 +1305,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_Ptr_Manager
 	case reflect.TypeFor[*oidcverify.ProviderConfig]():
 		return r.f_Ptr_ProviderConfig
+	case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
+		return r.f_Ptr_PhoneAuthConfig
 	case reflect.TypeFor[services.DistributedCache]():
 		return r.f_MemoryDistributedCache
 	case reflect.TypeFor[storage.AuthorizationCodeStore]():
@@ -1710,6 +1719,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[*oidcverify.ProviderConfig]():
 		return true
+	case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
+		return true
 	case reflect.TypeFor[storage.MessageStore[messages.LogoutMessage]]():
 		return true
 	case reflect.TypeFor[storage.MessageStore[messages.ErrorMessage]]():
@@ -1943,6 +1954,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.f_Ptr_Manager}
 		case reflect.TypeFor[*oidcverify.ProviderConfig]():
 			return []any{r.f_Ptr_ProviderConfig}
+		case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
+			return []any{r.f_Ptr_PhoneAuthConfig}
 		case reflect.TypeFor[services.DistributedCache]():
 			return []any{r.f_MemoryDistributedCache}
 		case reflect.TypeFor[storage.AuthorizationCodeStore]():
@@ -2305,6 +2318,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_Ptr_Manager
 	case reflect.TypeFor[*oidcverify.ProviderConfig]():
 		return s.root.f_Ptr_ProviderConfig
+	case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
+		return s.root.f_Ptr_PhoneAuthConfig
 	case reflect.TypeFor[services.DistributedCache]():
 		return s.root.f_MemoryDistributedCache
 	case reflect.TypeFor[storage.AuthorizationCodeStore]():
@@ -2598,6 +2613,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return true
 	case reflect.TypeFor[*oidcverify.ProviderConfig]():
+		return true
+	case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 		return true
 	case reflect.TypeFor[services.DistributedCache]():
 		return true
@@ -2929,6 +2946,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.root.f_Ptr_Manager}
 		case reflect.TypeFor[*oidcverify.ProviderConfig]():
 			return []any{s.root.f_Ptr_ProviderConfig}
+		case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
+			return []any{s.root.f_Ptr_PhoneAuthConfig}
 		case reflect.TypeFor[services.DistributedCache]():
 			return []any{s.root.f_MemoryDistributedCache}
 		case reflect.TypeFor[storage.AuthorizationCodeStore]():
@@ -4102,6 +4121,10 @@ func (s *scope) BackchannelAuthenticationRequestStore() storage.BackchannelAuthe
 func (s *scope) Ptr_Manager() *keymgmt.Manager { return s.root.f_Ptr_Manager }
 
 func (s *scope) Ptr_ProviderConfig() *oidcverify.ProviderConfig { return s.root.f_Ptr_ProviderConfig }
+
+func (s *scope) Ptr_PhoneAuthConfig() *phoneverify.PhoneAuthConfig {
+	return s.root.f_Ptr_PhoneAuthConfig
+}
 
 func (s *scope) MemoryDistributedCache() services.DistributedCache {
 	return s.root.f_MemoryDistributedCache

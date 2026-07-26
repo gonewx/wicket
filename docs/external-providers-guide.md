@@ -303,6 +303,30 @@ verifier, err := oidcverify.NewVerifier(ctx, cfg, clock)
 
 验证器内部使用 `jwk.Cache`，每 15 分钟自动刷新 JWKS 密钥集。
 
+> 本地验签（`oidcverify`）与服务端交换（`wechatverify` / `phoneverify`）是两类不同机制，选用依据见下文[本地验签 vs 服务端交换](#本地验签-vs-服务端交换)。
+
+---
+
+## 本地验签 vs 服务端交换
+
+wicket 提供两类「后端直调验证能力」，机制不同，适用场景也不同。两者都不参与 Web 授权码流（无 handler、无 cookie、无重定向），都由业务后端直接调用。
+
+| 维度 | 本地验签（`oidcverify`） | 服务端交换（`wechatverify` / `phoneverify`） |
+|------|------|------|
+| 凭据形态 | 自包含且带签名的 ID Token | 不透明短时凭据（授权 code / 认证 token） |
+| 验证方式 | 用 JWKS 公钥在本地验签 + 校验 `iss`/`aud`/`exp` | 携本方凭据向厂商发一次请求换取结果 |
+| 每次验证是否出网 | 否（仅 JWKS 首取与定期刷新出网） | 是（每次验证一次往返） |
+| 厂商可用性影响 | 弱：JWKS 已缓存时厂商故障不阻断验证 | 强：厂商不可用即无法验证，须 fail-closed |
+| 延迟 | 微秒级（本地密码学运算） | 网络往返级 |
+| 本方需持有的机密 | 无（只需公钥） | 有（应用密钥 / 访问密钥），故有脱敏要求 |
+| 时钟依赖 | 有：须注入 `Clock` 校验 `exp`/`iat` | 无：时效由厂商侧判定 |
+| 频率限制 | 无 | 有：受厂商 QPS 与配额约束，`ErrRetryable` 是常规分支 |
+| 可离线重放校验 | 可（同一 token 可反复验证） | 不可（凭据一般一次性，重复交换即失败） |
+
+**选用依据**：凭据是签名 JWT（Apple / Google / 标准 OIDC 提供者）→ 用 `oidcverify`，无谓的出网只会把厂商故障变成自己的故障。凭据是厂商私有的不透明串（微信授权 code、一键登录 token）→ 只能走服务端交换，因为除厂商外无人能解读它。
+
+**两类共同的姿态**：验证失败一律 fail-closed；未配置凭据在**构造期**即失败（`ErrUnavailable`），而不是推迟到第一次验证。
+
 ---
 
 ## 后端直调验证能力 — 微信（服务端交换）
@@ -408,6 +432,127 @@ default:
 ### 资质状态
 
 微信开放平台真实凭据尚未申请到位，当前验证覆盖到 stub 对拍与「未配置凭据即不可用」语义；真实链路联调另行安排。
+
+> 若你的凭据是签名 ID Token 而非授权 code，应改用[本地验签](#自定义-oidc-提供者)；两类机制的对照见[本地验签 vs 服务端交换](#本地验签-vs-服务端交换)。
+
+---
+
+## 后端直调验证能力 — 一键登录（号码认证服务端交换）
+
+与微信能力同族：业务后端直调，无 handler、无中间件、无重定向。App 端经厂商移动 SDK 拿到号码认证 token，交由后端换取手机号；账号访问密钥与它驱动的请求签名集中在 wicket 一处，不必分发到每个业务系统。
+
+### 基本信息
+
+| 项 | 值 |
+|------|------|
+| 包路径 | `github.com/gonewx/wicket/phoneverify` |
+| 端点 | `https://dypnsapi.aliyuncs.com`（`DefaultEndpoint`） |
+| 操作 | `GetMobile`（`Version=2017-05-25`） |
+| 依赖 | `github.com/aliyun/alibaba-cloud-sdk-go`（仅 `services/dypnsapi` 与 `sdk/errors`） |
+| 接口 | `Verifier.Verify(ctx, token) (*VerifiedPhone, error)` |
+
+### 配置选项（`phoneverify.PhoneAuthConfig`）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `AppKey` | `string` | 控制台认证方案标识。**必填**，缺失时 `NewVerifier` 返回 `ErrUnavailable` |
+| `AccessKeyID` | `string` | 账号访问标识。**必填**，同上 |
+| `AccessKeySecret` | `string` | 签名密钥。**必填**，同上 |
+| `RegionID` | `string` | 签名所用地域；留空取 `DefaultRegionID`（`cn-hangzhou`） |
+| `Endpoint` | `string` | 完整 URL 形态的端点覆盖；留空取 `DefaultEndpoint` |
+| `Timeout` | `time.Duration` | 单次交换的传输层超时；≤ 0 时取默认 10 秒 |
+
+> `AppKey` **不随请求发出**——`GetMobile` 没有该参数，它标识的是移动端 SDK 那一侧的认证方案。此处仍要求必填，是为了让「身份配置不完整」的部署被整体拒绝，而不是等到恰好被校验的那一部分才失败。
+
+### 成功结果
+
+```go
+type VerifiedPhone struct {
+    Mobile    string // 验证通过的手机号，成功时必非空
+    RequestID string // 厂商请求标识，供对账与工单排查
+}
+```
+
+手机号**原样透传**，本包不做任何格式转换。
+
+### 错误类别
+
+四个 sentinel 用 `errors.Is` 判别；厂商原始返回码、消息、请求标识与 HTTP 状态用 `errors.As` 取 `*VendorError` 详情。
+
+| Sentinel | 触发条件 |
+|------|------|
+| `ErrInvalidCredential` | `isv.TOKEN_INVALID`、`isv.TOKEN_UNAUTHORIZED_USED`、`InvalidBizToken.Expired`、`InvalidBizToken.Check`、`GET_MOBILE_FAILED`，**以及任何无法识别的非 `OK` 返回码** |
+| `ErrRetryable` | `isp.QPS_LIMIT`、`isv.BUSINESS_LIMIT_CONTROL`、`isp.SYSTEM_ERROR`、`isp.UNKNOWN`、HTTP 5xx / 429 / 408、传输失败、SDK 超时 |
+| `ErrMalformedResponse` | 响应体无法解码；返回码为 `OK` 但缺手机号 |
+| `ErrUnavailable` | 未配置 `AppKey` / `AccessKeyID` / `AccessKeySecret`；`Endpoint` 形态非法；请求无法构造；**以及本方配置类厂商码**：`isv.RAM_PERMISSION_DENY`、`isv.FORBIDDEN_ACTION`、`isv.PRODUCT_UNSUBSCRIBE`、`isv.VERIFY_SCHEME_NOT_EXIST`、`SignatureDoesNotMatch`、`IncompleteSignature` |
+
+**配置类厂商码为何归 `ErrUnavailable` 而非 `ErrInvalidCredential`**：这些码说的是「本方凭据、权限或开通状态有问题」，与「用户的 token 无效」是两回事。归入前者会让消费方对着一个完全正常的用户返回 401，把一次运维故障藏在用户身上；归入 `ErrUnavailable` 仍然 fail-closed（无人被放行），但指对了原因。此处与微信能力的分类口径不同，是因为本厂商有权威码表可精确区分。
+
+无法识别的返回码归入 `ErrInvalidCredential` 是**刻意的收紧默认**：把一个读不懂的响应当成可重试条件，可能把一次拒绝重试成一次意外放行。返回码采用**字符串全等**匹配，不做前缀归类——厂商的 `isv.` 前缀下同时存在凭据类与配置类两种语义，前缀归类必然把两者混为一谈。
+
+`context` 取消与超时**不归入上述任何类别**：`ctx` 被取消时错误满足 `errors.Is(err, context.Canceled)` 且**不标可重试**（重试与调用方的意图相悖）；deadline 到期时同时满足 `context.DeadlineExceeded` 与 `ErrRetryable`。
+
+> **`err == nil` 不等于成功**：业务失败以 HTTP 200 + 非 `OK` 返回码送达。本包判定返回码后才投影结果；消费方无需自行判断，但若自行调用厂商 SDK，这是头号陷阱。
+
+### AccessKeySecret 不外泄
+
+签名为 HMAC，**密钥不上网**；但签名后的请求 URL 中带有 `AccessKeyId` 与 `Signature`，而传输失败返回的错误内嵌完整 URL。因此包内所有对外文本都经过脱敏：**密钥与访问标识一并**替换为 `[REDACTED]`，且同时匹配原始形态与 query 编码形态。脱敏一律在截断**之前**执行——先截断会把机密切成不匹配的碎片，让残留前缀漏过。
+
+`PhoneAuthConfig` 实现了 `String()`（值接收者）、`json.Marshaler` 与 `slog.LogValuer`，因此 `%v`/`%+v`、`json.Marshal(cfg)` 与结构化日志记录 `cfg` 输出的同样是 `[REDACTED]`；反序列化方向未做改动，配置仍可从 JSON 读入。
+
+本包**不写任何日志**。消费方记录 `PhoneAuthConfig` 本身是安全的（已脱敏），但把 `AccessKeySecret` 字段单独取出来打印不在本包的保护范围内。
+
+### 并发与超时
+
+`Verifier` 可被任意多个 goroutine 并发调用。厂商 SDK 的客户端在每次请求时改写自身的超时与传输层，因此本包**每次调用构造一次客户端**而不缓存共享——缓存共享客户端在 `-race` 下即报数据竞争。SDK 的 `GetMobile` 本身不接受 `context`，本包通过注入自定义传输层把调用方的 `ctx` 接进请求，使取消能真正中断在途请求。
+
+### 集成示例
+
+```go
+verifier, err := phoneverify.NewVerifier(phoneverify.PhoneAuthConfig{
+    AppKey:          os.Getenv("PHONE_AUTH_APP_KEY"),
+    AccessKeyID:     os.Getenv("PHONE_AUTH_ACCESS_KEY_ID"),
+    AccessKeySecret: os.Getenv("PHONE_AUTH_ACCESS_KEY_SECRET"),
+})
+if err != nil {
+    // 未配置凭据：维持关闭姿态，对外返回 503
+    return nil, err
+}
+
+phone, err := verifier.Verify(ctx, token)
+switch {
+case err == nil:
+    return lookupOrCreateUserByPhone(phone.Mobile)
+case errors.Is(err, phoneverify.ErrInvalidCredential):
+    return nil, status401(err)
+case errors.Is(err, phoneverify.ErrRetryable), errors.Is(err, phoneverify.ErrUnavailable):
+    // 两者都是「现在无法判定」，一律不放行
+    return nil, status503(err)
+default:
+    return nil, status502(err)
+}
+```
+
+取厂商详情用于排查与工单：
+
+```go
+var vendorErr *phoneverify.VendorError
+if errors.As(err, &vendorErr) {
+    // vendorErr.Code / Message / RequestID / HTTPStatus 均已脱敏
+}
+```
+
+### DI 装配
+
+容器只注册 `*phoneverify.PhoneAuthConfig` 作为配置扩展点（访问器 `Ptr_PhoneAuthConfig`），**不注册 `Verifier` 单例**——空配置构造必然失败。消费方在自己的组合根用实配置调 `NewVerifier`。
+
+该扩展点是发给所有 scope 的**同一个共享指针**，且是**启动期扩展点**：请在容器装配阶段、任何 scope 开始服务之前写入。请求在途时写入会与每一个读取方竞争；此时把某个凭据置空，会让下一次构造转为 `ErrUnavailable`——能力被静默关闭，而链路上没有任何失败可供解释。
+
+### 资质状态
+
+厂商真实凭据尚未申请到位，当前验证覆盖到 stub 对拍与「未配置凭据即不可用」语义；真实链路联调另行安排。另有一项待核实：官方文档示例中手机号呈掩码形态，真实返回是完整号码还是掩码尚未确认——本包对此不做任何形态转换，原样透传。
+
+> 两类机制的对照与选用依据见[本地验签 vs 服务端交换](#本地验签-vs-服务端交换)。
 
 ---
 
