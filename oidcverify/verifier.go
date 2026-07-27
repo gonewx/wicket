@@ -80,7 +80,13 @@ func NewVerifier(ctx context.Context, cfg ProviderConfig, clock services.SystemC
 		return nil, err
 	}
 
-	cache.Register(ctx, cfg.JWKSURI, jwk.WithMinInterval(15*time.Minute))
+	// WaitReady(false): Register must not do synchronous network I/O. The default
+	// (true) blocks until the first JWKS fetch succeeds, so with a deadline-less
+	// context an unreachable network would hang the caller's construction
+	// indefinitely. The initial fetch is deferred to the first Verify call.
+	if err := cache.Register(ctx, cfg.JWKSURI, jwk.WithMinInterval(15*time.Minute), jwk.WithWaitReady(false)); err != nil {
+		return nil, err
+	}
 
 	return &verifier{
 		cache:  cache,
