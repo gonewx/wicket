@@ -673,3 +673,74 @@ func TestGoogleConfigPreset(t *testing.T) {
 		t.Error("NonceRequired = true, want false")
 	}
 }
+
+func TestVerifyFirstCallFetchesDeferredJWKS(t *testing.T) {
+	t.Parallel()
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+
+	pub := &priv.PublicKey
+	key, err := jwk.Import(pub)
+	if err != nil {
+		t.Fatalf("import public key: %v", err)
+	}
+	if err := jwk.AssignKeyID(key); err != nil {
+		t.Fatalf("assign key ID: %v", err)
+	}
+	kid, _ := key.KeyID()
+
+	set := jwk.NewSet()
+	if err := set.AddKey(key); err != nil {
+		t.Fatalf("add key to set: %v", err)
+	}
+
+	// Hold the first JWKS response long enough that the fetch deferred by
+	// registration cannot have completed by the time Verify runs. Verify must
+	// fetch the key set itself rather than report the resource as not ready.
+	var once sync.Once
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() { time.Sleep(300 * time.Millisecond) })
+		w.Header().Set("Content-Type", "application/json")
+		buf, _ := json.Marshal(set)
+		w.Write(buf)
+	}))
+	t.Cleanup(srv.Close)
+
+	fixedNow := time.Date(2026, 7, 22, 12, 0, 0, 0, time.UTC)
+	clock := common.NewMockSystemClock()
+	clock.SetNow(fixedNow)
+
+	v, err := NewVerifier(context.Background(), ProviderConfig{
+		Issuer:   testIssuer,
+		JWKSURI:  srv.URL,
+		Audience: testAudience,
+	}, clock)
+	if err != nil {
+		t.Fatalf("NewVerifier: %v", err)
+	}
+
+	tok := jwt.New()
+	tok.Set(jwt.SubjectKey, testSubject)
+	tok.Set(jwt.IssuerKey, testIssuer)
+	tok.Set(jwt.AudienceKey, []string{testAudience})
+	tok.Set(jwt.ExpirationKey, fixedNow.Add(time.Hour))
+	tok.Set(jwt.IssuedAtKey, fixedNow)
+
+	privJwk, _ := jwk.Import(priv)
+	privJwk.Set(jwk.KeyIDKey, kid)
+	signed, err := jwt.Sign(tok, jwt.WithKey(jwa.RS256(), privJwk))
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+
+	result, err := v.Verify(context.Background(), string(signed))
+	if err != nil {
+		t.Fatalf("first Verify after construction: %v", err)
+	}
+	if result.Subject != testSubject {
+		t.Errorf("Subject = %q, want %q", result.Subject, testSubject)
+	}
+}

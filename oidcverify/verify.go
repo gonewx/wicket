@@ -84,7 +84,7 @@ func (v *verifier) verify(ctx context.Context, idToken, nonce string) (*Verified
 }
 
 func (v *verifier) resolveKeySet(ctx context.Context, kid string) (jwk.Set, error) {
-	set, err := v.cache.Lookup(ctx, v.config.JWKSURI)
+	set, err := v.loadKeySet(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrKeyNotFound, err)
 	}
@@ -107,6 +107,18 @@ func (v *verifier) resolveKeySet(ctx context.Context, kid string) (jwk.Set, erro
 		return set, nil
 	}
 	return nil, fmt.Errorf("%w: no kid in token and JWKS has multiple keys", ErrKeyNotFound)
+}
+
+// loadKeySet returns the cached JWKS, performing the initial fetch if it has
+// not happened yet. Registration defers that fetch (see NewVerifier), so the
+// first Lookup after construction finds an unpopulated resource and reports it
+// as not ready; a Refresh fetches it synchronously under the caller's context.
+func (v *verifier) loadKeySet(ctx context.Context) (jwk.Set, error) {
+	set, err := v.cache.Lookup(ctx, v.config.JWKSURI)
+	if err == nil {
+		return set, nil
+	}
+	return v.cache.Refresh(ctx, v.config.JWKSURI)
 }
 
 func mapParseError(err error) error {
