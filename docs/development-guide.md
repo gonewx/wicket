@@ -51,6 +51,22 @@ mise exec go@1.27rc1 -- go test ./...
 
 **漂移门禁：** `go generate` 后 `git status --porcelain` 必须为空。如果 `di/container_gen.go` 出现未提交修改，说明装配漂移，构建视为失败。
 
+## 持续集成
+
+GitHub Actions（`.github/workflows/ci.yml`）在每次 push 与 pull request 上自动承载门禁，作为合并阻塞条件。CI 为干净检出，与本地门禁等价：
+
+| 阶段 | 内容 |
+|------|------|
+| 工具链 | mise 安装 `mise.toml` pin 的版本（当前 `go = "1.27rc1"`），不使用运行器自带 Go |
+| 漂移门禁 | `go generate ./...` 后 `git status --porcelain` 必须为空 |
+| 构建 | `go build ./...` |
+| 全量测试 | `go test ./...` |
+| 血缘门禁 | `go test ./tests/e2e/...`（整包，含溯源、命名卫生与协议回归） |
+
+**证据仓兄弟布局：** `tests/e2e` 的溯源类测试要求私有证据仓检出为本仓的兄弟目录（名称约定见 `tests/e2e/source_provenance_ledger_test.go` 的 `evidenceRepositoryRoot`；需要完整 git 历史，非 shallow），找不到即失败、无降级。CI 经仓库 secret `WICKET_EVIDENCE_TOKEN`（只读）检出证据仓；secret 未就位时 CI 直接红，不得合并。
+
+**CI 与本地门禁的关系：** CI 为干净检出，不受本地工具态目录影响；本地主工作树可能含工具态伪影（例如 `.rnix/` 下的缓存文件），个别命名规范类测试的跳过目录集较窄，可能据此误伤。本地需要全量验证时，用 `git worktree add` 建干净 worktree、在兄弟位置放置证据仓后复跑上述命令。
+
 ## 开发工作流
 
 ### BMad Story 循环
