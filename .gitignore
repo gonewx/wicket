@@ -10,3 +10,4 @@ go.work.sum
 .qoder/
 .bmad-loop/
 .codex/
+.env
