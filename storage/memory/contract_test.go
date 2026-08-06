@@ -97,7 +97,7 @@ func TestDeviceFlowStoreRemoveExpired(t *testing.T) {
 	cutoff := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	store := NewMemoryDeviceFlowStore()
 	old := &models.DeviceCode{CreationTime: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), Lifetime: 600}
-	fresh := &models.DeviceCode{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400*4}
+	fresh := &models.DeviceCode{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400 * 4}
 	if err := store.StoreDeviceAuthorization(context.Background(), "dev-old", "usr-old", old); err != nil {
 		t.Fatal(err)
 	}

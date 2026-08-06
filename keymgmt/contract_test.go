@@ -40,10 +40,10 @@ func TestRecordStoreSentinelSemantics(t *testing.T) {
 
 	store := NewMemoryRecordStore()
 	record := &Record{
-		Handle:   "h1",
-		PublicID: "kid-1",
-		Purpose:  PurposeTokenSigning,
-		Phase:    PhaseActive,
+		Handle:    "h1",
+		PublicID:  "kid-1",
+		Purpose:   PurposeTokenSigning,
+		Phase:     PhaseActive,
 		CreatedAt: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
 	}
 	if err := store.Create(context.Background(), record); err != nil {

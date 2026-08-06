@@ -29,7 +29,7 @@ func TestAuthorizationCodeStoreRemoveExpired(t *testing.T) {
 	cutoff := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	store := NewAuthorizationCodeStore()
 	old := &models.AuthorizationCode{CreationTime: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), Lifetime: 300}
-	fresh := &models.AuthorizationCode{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400*4}
+	fresh := &models.AuthorizationCode{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400 * 4}
 	oldHandle, err := store.StoreAuthorizationCode(context.Background(), old)
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestRefreshTokenStoreRemoveExpiredAndSentinel(t *testing.T) {
 	}
 
 	old := &models.RefreshToken{CreationTime: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), Lifetime: 300}
-	fresh := &models.RefreshToken{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400*4}
+	fresh := &models.RefreshToken{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400 * 4}
 	oldHandle, err := store.StoreRefreshToken(context.Background(), old)
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestReferenceTokenStoreRemoveExpiredAndSentinel(t *testing.T) {
 	}
 
 	old := &models.Token{CreationTime: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), Lifetime: 300}
-	fresh := &models.Token{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400*4}
+	fresh := &models.Token{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400 * 4}
 	oldHandle, err := store.StoreReferenceToken(context.Background(), old)
 	if err != nil {
 		t.Fatal(err)
