@@ -288,6 +288,14 @@ func RunSessionStoreSuite(t *testing.T, newStore func() session.Store, opts ...O
 	// Lazy reclamation is an optimization of the suite's own memory store:
 	// a read of an expired record reports the sentinel and reclaims the
 	// record. External adapters may opt in or skip this behavior.
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		assertNoBackgroundGoroutines(t, newStore, func(store session.Store) {
+			_ = store.CreateSession(context.Background(), newSessionRecord("s1", "u1"))
+			_, _ = store.GetSession(context.Background(), "s1")
+			_, _ = store.DeleteExpired(context.Background(), fixedNow)
+			_ = store.DeleteSession(context.Background(), "s1")
+		})
+	})
 	cfg.mayCase(t, "LazyExpiryReclaimsOnRead", func(t *testing.T) {
 		t.Parallel()
 		store := newStore()

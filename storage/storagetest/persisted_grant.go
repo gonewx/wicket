@@ -220,6 +220,15 @@ func RunPersistedGrantStoreSuite(t *testing.T, newStore func() storage.Persisted
 			t.Fatalf("combined GetAll = %v, want only key-a", got)
 		}
 	})
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.PersistedGrantStore) {
+			grant := newPersistedGrant("key-1", "subject-1")
+			_ = store.Store(context.Background(), grant)
+			_, _ = store.Get(context.Background(), "key-1")
+			_, _ = store.RemoveExpired(context.Background(), fixedNow)
+			_ = store.Remove(context.Background(), "key-1")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

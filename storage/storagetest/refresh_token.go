@@ -196,6 +196,14 @@ func RunRefreshTokenStoreSuite(t *testing.T, newStore func() storage.RefreshToke
 			t.Fatalf("replay update error = %v, want ErrVersionConflict", err)
 		}
 	})
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.RefreshTokenStore) {
+			_ = store.StoreRefreshToken(context.Background(), "handle-1", newRefreshToken("client-a"))
+			_, _ = store.GetRefreshToken(context.Background(), "handle-1")
+			_, _ = store.RemoveExpired(context.Background(), fixedNow)
+			_ = store.RemoveRefreshToken(context.Background(), "handle-1")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

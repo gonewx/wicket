@@ -151,6 +151,14 @@ func RunBackchannelAuthenticationRequestStoreSuite(t *testing.T, newStore func()
 		_, err := store.FindBackchannelAuthenticationRequest(context.Background(), "req-1")
 		expectNotFound(t, err)
 	})
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.BackchannelAuthenticationRequestStore) {
+			_ = store.StoreBackchannelAuthenticationRequest(context.Background(), "req-1", newBackchannelRequest("client-a"))
+			_, _ = store.FindBackchannelAuthenticationRequest(context.Background(), "req-1")
+			_, _ = store.RemoveExpired(context.Background(), fixedNow)
+			_ = store.RemoveBackchannelAuthenticationRequest(context.Background(), "req-1")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

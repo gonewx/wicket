@@ -6,6 +6,7 @@ package storagetest
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -120,6 +121,50 @@ func assertCancellationWrite(t *testing.T, err error, observe func() error) {
 // package documentation.
 type conformanceCredential interface {
 	ConformsTo() string
+}
+
+// goroutineSettleSamples and goroutineSettleInterval fix the settle window
+// for the no-background-activity case: the minimum over 10 samples at 5ms
+// spacing. goroutineTolerance absorbs unrelated test-framework parallelism
+// that can legitimately appear while the case runs.
+const (
+	goroutineSettleSamples  = 10
+	goroutineSettleInterval = 5 * time.Millisecond
+	goroutineTolerance      = 2
+)
+
+// settleMinGoroutines samples the goroutine count over the settle window and
+// returns the minimum, so transient framework-parallel activity does not
+// inflate the baseline.
+func settleMinGoroutines() int {
+	min := int(^uint(0) >> 1)
+	for i := 0; i < goroutineSettleSamples; i++ {
+		if n := runtime.NumGoroutine(); n < min {
+			min = n
+		}
+		time.Sleep(goroutineSettleInterval)
+	}
+	return min
+}
+
+// runNoBackgroundGoroutinesCase asserts that running the representative store
+// operations on a fresh store spawns no background goroutines: the settle-min
+// count after the operations must not exceed the count before by more than
+// the tolerance. The case never runs t.Parallel() — the measurement must be
+// synchronous. Timer-only violations (a goroutine-less timer) are not
+// observable through this window and are out of scope for this case.
+//
+// Derived from: ARCHITECTURE-SPINE.md AD-12 (operational contract — store
+// adapters must not spawn background goroutines or timers).
+func runNoBackgroundGoroutinesCase[T any](t *testing.T, newStore func() T, ops func(T)) {
+	t.Helper()
+	before := settleMinGoroutines()
+	store := newStore()
+	ops(store)
+	after := settleMinGoroutines()
+	if after > before+goroutineTolerance {
+		t.Fatalf("goroutine count grew from %d to %d while running store operations (tolerance %d)", before, after, goroutineTolerance)
+	}
 }
 
 // maybeAssertConformsTo runs the optional credential check: when the adapter

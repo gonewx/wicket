@@ -134,6 +134,14 @@ func RunAuthorizationCodeStoreSuite(t *testing.T, newStore func() storage.Author
 		_, err := store.GetAuthorizationCode(context.Background(), "handle-1")
 		expectNotFound(t, err)
 	})
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.AuthorizationCodeStore) {
+			_ = store.StoreAuthorizationCode(context.Background(), "handle-1", newAuthorizationCode("client-a"))
+			_, _ = store.GetAuthorizationCode(context.Background(), "handle-1")
+			_, _ = store.RemoveExpired(context.Background(), fixedNow)
+			_ = store.RemoveAuthorizationCode(context.Background(), "handle-1")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

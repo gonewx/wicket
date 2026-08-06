@@ -156,6 +156,14 @@ func RunReferenceTokenStoreSuite(t *testing.T, newStore func() storage.Reference
 			t.Fatalf("other client token revoked: %v", err)
 		}
 	})
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.ReferenceTokenStore) {
+			_ = store.StoreReferenceToken(context.Background(), "handle-1", newReferenceToken("client-a"))
+			_, _ = store.GetReferenceToken(context.Background(), "handle-1")
+			_, _ = store.RemoveExpired(context.Background(), fixedNow)
+			_ = store.RemoveReferenceToken(context.Background(), "handle-1")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

@@ -195,6 +195,14 @@ func RunDeviceFlowStoreSuite(t *testing.T, newStore func() storage.DeviceFlowSto
 			t.Fatal("updated record not authorized")
 		}
 	})
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.DeviceFlowStore) {
+			_ = store.StoreDeviceAuthorization(context.Background(), "dev-1", "user-1", newDeviceCode("client-a"))
+			_, _ = store.FindByDeviceCode(context.Background(), "dev-1")
+			_, _ = store.RemoveExpired(context.Background(), fixedNow)
+			_ = store.RemoveByDeviceCode(context.Background(), "dev-1")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

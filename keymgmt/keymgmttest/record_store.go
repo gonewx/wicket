@@ -301,6 +301,13 @@ func RunRecordStoreSuite(t *testing.T, newStore func() keymgmt.RecordStore, opts
 	// Derived from: https://doi.org/10.6028/NIST.SP.800-57pt1r5
 	// Concurrent rotation: two writers on the same version must not both
 	// succeed; exactly one wins the optimistic-concurrency race.
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		assertNoBackgroundGoroutines(t, newStore, func(store keymgmt.RecordStore) {
+			_ = store.Create(context.Background(), newKeyRecord("h1", "kid-1"))
+			_, _ = store.Get(context.Background(), "h1")
+			_ = store.Delete(context.Background(), "h1")
+		})
+	})
 	cfg.mayCase(t, "ConcurrentUpdateSingleWinner", func(t *testing.T) {
 		t.Parallel()
 		store := newStore()

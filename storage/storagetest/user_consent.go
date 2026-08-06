@@ -152,6 +152,14 @@ func RunUserConsentStoreSuite(t *testing.T, newStore func() storage.UserConsentS
 			t.Fatalf("GetAllUserConsents(subject-1) clients = %v, want client-a and client-b", clients)
 		}
 	})
+	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.UserConsentStore) {
+			_ = store.StoreUserConsent(context.Background(), newConsent("subject-1", "client-a"))
+			_, _ = store.GetUserConsent(context.Background(), "subject-1", "client-a")
+			_, _ = store.RemoveExpired(context.Background(), fixedNow)
+			_ = store.RemoveUserConsent(context.Background(), "subject-1", "client-a")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 
