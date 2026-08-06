@@ -30,12 +30,12 @@ func TestAuthorizationCodeStoreRemoveExpired(t *testing.T) {
 	store := NewAuthorizationCodeStore()
 	old := &models.AuthorizationCode{CreationTime: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), Lifetime: 300}
 	fresh := &models.AuthorizationCode{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400 * 4}
-	oldHandle, err := store.StoreAuthorizationCode(context.Background(), old)
-	if err != nil {
+	oldHandle := "expired-code"
+	if err := store.StoreAuthorizationCode(context.Background(), oldHandle, old); err != nil {
 		t.Fatal(err)
 	}
-	freshHandle, err := store.StoreAuthorizationCode(context.Background(), fresh)
-	if err != nil {
+	freshHandle := "fresh-code"
+	if err := store.StoreAuthorizationCode(context.Background(), freshHandle, fresh); err != nil {
 		t.Fatal(err)
 	}
 
@@ -65,12 +65,12 @@ func TestRefreshTokenStoreRemoveExpiredAndSentinel(t *testing.T) {
 
 	old := &models.RefreshToken{CreationTime: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), Lifetime: 300}
 	fresh := &models.RefreshToken{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400 * 4}
-	oldHandle, err := store.StoreRefreshToken(context.Background(), old)
-	if err != nil {
+	oldHandle := "expired-token"
+	if err := store.StoreRefreshToken(context.Background(), oldHandle, old); err != nil {
 		t.Fatal(err)
 	}
-	freshHandle, err := store.StoreRefreshToken(context.Background(), fresh)
-	if err != nil {
+	freshHandle := "fresh-token"
+	if err := store.StoreRefreshToken(context.Background(), freshHandle, fresh); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,12 +100,12 @@ func TestReferenceTokenStoreRemoveExpiredAndSentinel(t *testing.T) {
 
 	old := &models.Token{CreationTime: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC), Lifetime: 300}
 	fresh := &models.Token{CreationTime: time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), Lifetime: 86400 * 4}
-	oldHandle, err := store.StoreReferenceToken(context.Background(), old)
-	if err != nil {
+	oldHandle := "expired-reference"
+	if err := store.StoreReferenceToken(context.Background(), oldHandle, old); err != nil {
 		t.Fatal(err)
 	}
-	freshHandle, err := store.StoreReferenceToken(context.Background(), fresh)
-	if err != nil {
+	freshHandle := "fresh-reference"
+	if err := store.StoreReferenceToken(context.Background(), freshHandle, fresh); err != nil {
 		t.Fatal(err)
 	}
 
@@ -165,12 +165,11 @@ func TestExpiredRecordsStillReadable(t *testing.T) {
 
 	store := NewAuthorizationCodeStore()
 	code := &models.AuthorizationCode{CreationTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Lifetime: 300}
-	handle, err := store.StoreAuthorizationCode(context.Background(), code)
-	if err != nil {
+	if err := store.StoreAuthorizationCode(context.Background(), "expired-readable", code); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := store.GetAuthorizationCode(context.Background(), handle)
+	got, err := store.GetAuthorizationCode(context.Background(), "expired-readable")
 	if err != nil {
 		t.Fatalf("Get expired record: %v", err)
 	}
