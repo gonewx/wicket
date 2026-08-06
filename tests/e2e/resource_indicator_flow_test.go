@@ -238,7 +238,7 @@ func newResourceIndicatorE2EFixture(t *testing.T) *resourceIndicatorE2EFixture {
 	resourceStore := newResourceIndicatorStore(t)
 	authorizationCodes := storage_impl.NewAuthorizationCodeStore()
 	refreshTokens := storage_impl.NewRefreshTokenStore()
-	refreshService := services_impl.NewRefreshTokenService(refreshTokens)
+	refreshService := services_impl.NewRefreshTokenService(refreshTokens, services_impl.NewHandleGenerationService())
 	resourceValidator := validators_impl.NewResourceValidator(resourceStore, validators_impl.NewScopeParser(), logger)
 	backchannelRequests := memory.NewMemoryBackchannelAuthenticationRequestStore()
 	recorder := &resourceIndicatorTokenRecorder{}
@@ -368,8 +368,8 @@ func (f *resourceIndicatorE2EFixture) storeAuthorizationCode(t *testing.T, reque
 	code.RequestedScopes = append([]string(nil), request.RequestedScopes...)
 	code.RequestedResourceGaps = append([]string(nil), request.RequestedResourceIndiators...)
 	code.Subject = request.Subject
-	handle, err := f.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
-	if err != nil {
+	handle := "resource-code"
+	if err := f.authorizationCodes.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 		t.Fatalf("store authorization code: %v", err)
 	}
 	return handle

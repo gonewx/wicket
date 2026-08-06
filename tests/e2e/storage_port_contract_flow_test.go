@@ -49,7 +49,7 @@ func newStoragePortContractFixture(t *testing.T) *storagePortContractFixture {
 	resourceStore := newStoragePortContractResourceStore(t)
 	authorizationCodes := storage_impl.NewAuthorizationCodeStore()
 	refreshTokens := storage_impl.NewRefreshTokenStore()
-	refreshService := services_impl.NewRefreshTokenService(refreshTokens)
+	refreshService := services_impl.NewRefreshTokenService(refreshTokens, services_impl.NewHandleGenerationService())
 	backchannelRequests := memory.NewMemoryBackchannelAuthenticationRequestStore()
 
 	return &storagePortContractFixture{
@@ -122,8 +122,8 @@ func (f *storagePortContractFixture) storeAuthorizationCode(t *testing.T, creati
 	code.RedirectUri = f.client.RedirectUris[0]
 	code.RequestedScopes = []string{"orders.read"}
 	code.Subject = claimspkg.ClaimsPrincipalAnonymous()
-	handle, err := f.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
-	if err != nil {
+	handle := "contract-code"
+	if err := f.authorizationCodes.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 		t.Fatalf("store authorization code: %v", err)
 	}
 	return handle
@@ -149,8 +149,8 @@ func (f *storagePortContractFixture) storeRefreshToken(t *testing.T, creationTim
 	token.Lifetime = lifetime
 	token.AuthorizedScopes = []string{"orders.read"}
 	token.Subject = claimspkg.ClaimsPrincipalAnonymous()
-	handle, err := f.refreshTokens.StoreRefreshToken(context.Background(), token)
-	if err != nil {
+	handle := "contract-refresh"
+	if err := f.refreshTokens.StoreRefreshToken(context.Background(), handle, token); err != nil {
 		t.Fatalf("store refresh token: %v", err)
 	}
 	return handle
@@ -225,7 +225,7 @@ func TestRefreshTokenValidationFlowE2E(t *testing.T) {
 	t.Run("service reports miss as not-found outcome", func(t *testing.T) {
 		t.Parallel()
 		fixture := newStoragePortContractFixture(t)
-		service := services_impl.NewRefreshTokenService(fixture.refreshTokens)
+		service := services_impl.NewRefreshTokenService(fixture.refreshTokens, services_impl.NewHandleGenerationService())
 		result := service.ValidateRefreshToken(context.Background(), "missing", fixture.client)
 		if result.Error == nil || !errors.Is(result.Error, storage.ErrNotFound) {
 			t.Fatalf("miss error = %v, want wrapped storage.ErrNotFound", result.Error)
@@ -236,7 +236,7 @@ func TestRefreshTokenValidationFlowE2E(t *testing.T) {
 		t.Parallel()
 		fixture := newStoragePortContractFixture(t)
 		handle := fixture.storeRefreshToken(t, fixture.clock.now.Add(-time.Minute), 300)
-		service := services_impl.NewRefreshTokenService(fixture.refreshTokens)
+		service := services_impl.NewRefreshTokenService(fixture.refreshTokens, services_impl.NewHandleGenerationService())
 		result := service.ValidateRefreshToken(context.Background(), handle, fixture.client)
 		if result.Error != nil {
 			t.Fatalf("validate error = %v, want success", result.Error)
@@ -317,8 +317,8 @@ func TestTokenRevocationIdempotencyE2E(t *testing.T) {
 	t.Run("present reference token is removed", func(t *testing.T) {
 		t.Parallel()
 		token := &storage_models.Token{CreationTime: time.Date(2026, 7, 8, 8, 0, 0, 0, time.UTC), Lifetime: 3600, ClientId: client.ClientId}
-		handle, err := referenceTokens.StoreReferenceToken(context.Background(), token)
-		if err != nil {
+		handle := "revoke-target"
+		if err := referenceTokens.StoreReferenceToken(context.Background(), handle, token); err != nil {
 			t.Fatalf("store reference token: %v", err)
 		}
 		response, err := generator.Handle(context.Background(), newResult(handle, gois.TokenTypeHintsAccessToken))
@@ -348,12 +348,12 @@ func TestRemoveExpiredReclaimsStoreFamiliesE2E(t *testing.T) {
 	tests := map[string]func(t *testing.T){
 		"authorization codes": func(t *testing.T) {
 			store := storage_impl.NewAuthorizationCodeStore()
-			oldHandle, err := store.StoreAuthorizationCode(context.Background(), &storage_models.AuthorizationCode{CreationTime: expired, Lifetime: 300})
-			if err != nil {
+			oldHandle := "expired-code"
+			if err := store.StoreAuthorizationCode(context.Background(), oldHandle, &storage_models.AuthorizationCode{CreationTime: expired, Lifetime: 300}); err != nil {
 				t.Fatal(err)
 			}
-			freshHandle, err := store.StoreAuthorizationCode(context.Background(), &storage_models.AuthorizationCode{CreationTime: future, Lifetime: 300})
-			if err != nil {
+			freshHandle := "fresh-code"
+			if err := store.StoreAuthorizationCode(context.Background(), freshHandle, &storage_models.AuthorizationCode{CreationTime: future, Lifetime: 300}); err != nil {
 				t.Fatal(err)
 			}
 			count, err := store.RemoveExpired(context.Background(), cutoff)
@@ -369,12 +369,12 @@ func TestRemoveExpiredReclaimsStoreFamiliesE2E(t *testing.T) {
 		},
 		"refresh tokens": func(t *testing.T) {
 			store := storage_impl.NewRefreshTokenStore()
-			oldHandle, err := store.StoreRefreshToken(context.Background(), &storage_models.RefreshToken{CreationTime: expired, Lifetime: 300})
-			if err != nil {
+			oldHandle := "expired-token"
+			if err := store.StoreRefreshToken(context.Background(), oldHandle, &storage_models.RefreshToken{CreationTime: expired, Lifetime: 300}); err != nil {
 				t.Fatal(err)
 			}
-			freshHandle, err := store.StoreRefreshToken(context.Background(), &storage_models.RefreshToken{CreationTime: future, Lifetime: 300})
-			if err != nil {
+			freshHandle := "fresh-token"
+			if err := store.StoreRefreshToken(context.Background(), freshHandle, &storage_models.RefreshToken{CreationTime: future, Lifetime: 300}); err != nil {
 				t.Fatal(err)
 			}
 			count, err := store.RemoveExpired(context.Background(), cutoff)
@@ -390,12 +390,12 @@ func TestRemoveExpiredReclaimsStoreFamiliesE2E(t *testing.T) {
 		},
 		"reference tokens": func(t *testing.T) {
 			store := storage_impl.NewReferenceTokenStore()
-			oldHandle, err := store.StoreReferenceToken(context.Background(), &storage_models.Token{CreationTime: expired, Lifetime: 300})
-			if err != nil {
+			oldHandle := "expired-reference"
+			if err := store.StoreReferenceToken(context.Background(), oldHandle, &storage_models.Token{CreationTime: expired, Lifetime: 300}); err != nil {
 				t.Fatal(err)
 			}
-			freshHandle, err := store.StoreReferenceToken(context.Background(), &storage_models.Token{CreationTime: future, Lifetime: 300})
-			if err != nil {
+			freshHandle := "fresh-reference"
+			if err := store.StoreReferenceToken(context.Background(), freshHandle, &storage_models.Token{CreationTime: future, Lifetime: 300}); err != nil {
 				t.Fatal(err)
 			}
 			count, err := store.RemoveExpired(context.Background(), cutoff)
