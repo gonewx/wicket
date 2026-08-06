@@ -87,12 +87,19 @@ func (c *Coordinator) ValidateSession(ctx context.Context, sessionID string) (bo
 
 	now := c.clock.Now()
 	if rec.IsExpired(now) {
-		_ = c.store.DeleteSession(ctx, sessionID)
+		if err := c.store.DeleteSession(ctx, sessionID); err != nil && !errors.Is(err, ErrSessionNotFound) {
+			return false, err
+		}
 		return false, nil
 	}
 
 	rec.Renewed = now
-	_ = c.store.UpdateSession(ctx, rec)
+	if err := c.store.UpdateSession(ctx, rec); err != nil {
+		if errors.Is(err, ErrSessionNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
 
 	return true, nil
 }
