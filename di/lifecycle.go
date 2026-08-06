@@ -5,7 +5,7 @@
 // store seams a host injects through ServerConfig, the lazy wrappers that
 // defer seam reads until first use, and the generated root container.
 //
-// Lifecycle contract
+// # Lifecycle contract
 //
 // Every lazy store wrapper implements io.Closer. Close releases a host
 // adapter that was already materialized through the wrapper: when the
