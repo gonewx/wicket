@@ -45,7 +45,7 @@ func TestRefreshTokenServiceUpdatesRequestedResourceAccessToken(t *testing.T) {
 	t.Parallel()
 
 	store := &resourceRefreshTokenStore{}
-	service := NewRefreshTokenService(store)
+	service := NewRefreshTokenService(store, NewHandleGenerationService())
 	refreshToken := models.NewRefreshToken()
 	refreshToken.SetAccessToken(&models.Token{ClientId: "default"}, "")
 	refreshToken.SetAccessToken(&models.Token{ClientId: "payments"}, "https://resources.example.com/payments")
@@ -81,15 +81,15 @@ type resourceRefreshTokenStore struct {
 	updated *models.RefreshToken
 }
 
-func (s *resourceRefreshTokenStore) StoreRefreshToken(ctx context.Context, token *models.RefreshToken) (string, error) {
-	return "handle", nil
+func (s *resourceRefreshTokenStore) StoreRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error {
+	return nil
 }
 
 func (s *resourceRefreshTokenStore) GetRefreshToken(ctx context.Context, handle string) (*models.RefreshToken, error) {
 	return nil, nil
 }
 
-func (s *resourceRefreshTokenStore) UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error {
+func (s *resourceRefreshTokenStore) UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken, expectedVersion int) error {
 	s.updated = token
 	return nil
 }

@@ -16,13 +16,13 @@ import (
 // sentinelRefreshStore reports every record as missing.
 type sentinelRefreshStore struct{}
 
-func (sentinelRefreshStore) StoreRefreshToken(context.Context, *models.RefreshToken) (string, error) {
-	return "", storage.ErrNotFound
+func (sentinelRefreshStore) StoreRefreshToken(context.Context, string, *models.RefreshToken) error {
+	return storage.ErrNotFound
 }
 func (sentinelRefreshStore) GetRefreshToken(context.Context, string) (*models.RefreshToken, error) {
 	return nil, storage.ErrNotFound
 }
-func (sentinelRefreshStore) UpdateRefreshToken(context.Context, string, *models.RefreshToken) error {
+func (sentinelRefreshStore) UpdateRefreshToken(context.Context, string, *models.RefreshToken, int) error {
 	return storage.ErrNotFound
 }
 func (sentinelRefreshStore) RemoveRefreshToken(context.Context, string) error {
@@ -37,13 +37,13 @@ func (sentinelRefreshStore) RemoveExpired(context.Context, time.Time) (int, erro
 // to the not-found outcome, everything else surfaces as the wrapped error.
 type failingRefreshStore struct{}
 
-func (failingRefreshStore) StoreRefreshToken(context.Context, *models.RefreshToken) (string, error) {
-	return "", errors.New("store unavailable")
+func (failingRefreshStore) StoreRefreshToken(context.Context, string, *models.RefreshToken) error {
+	return errors.New("store unavailable")
 }
 func (failingRefreshStore) GetRefreshToken(context.Context, string) (*models.RefreshToken, error) {
 	return nil, errors.New("store unavailable")
 }
-func (failingRefreshStore) UpdateRefreshToken(context.Context, string, *models.RefreshToken) error {
+func (failingRefreshStore) UpdateRefreshToken(context.Context, string, *models.RefreshToken, int) error {
 	return errors.New("store unavailable")
 }
 func (failingRefreshStore) RemoveRefreshToken(context.Context, string) error {
@@ -60,7 +60,7 @@ func TestRefreshTokenValidationDistinguishesMissFromFailure(t *testing.T) {
 
 	t.Run("miss maps to not-found outcome", func(t *testing.T) {
 		t.Parallel()
-		service := NewRefreshTokenService(&sentinelRefreshStore{})
+		service := NewRefreshTokenService(&sentinelRefreshStore{}, NewHandleGenerationService())
 		result := service.ValidateRefreshToken(context.Background(), "missing", client)
 		if result.Error == nil || !errors.Is(result.Error, storage.ErrNotFound) {
 			t.Fatalf("miss error = %v, want wrapped storage.ErrNotFound", result.Error)
@@ -69,7 +69,7 @@ func TestRefreshTokenValidationDistinguishesMissFromFailure(t *testing.T) {
 
 	t.Run("infrastructure failure surfaces as wrapped error", func(t *testing.T) {
 		t.Parallel()
-		service := NewRefreshTokenService(failingRefreshStore{})
+		service := NewRefreshTokenService(failingRefreshStore{}, NewHandleGenerationService())
 		result := service.ValidateRefreshToken(context.Background(), "handle", client)
 		if result.Error == nil || errors.Is(result.Error, storage.ErrNotFound) {
 			t.Fatalf("infrastructure error = %v, want non-not-found wrapped error", result.Error)
