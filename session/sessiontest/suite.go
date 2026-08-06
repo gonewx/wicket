@@ -85,16 +85,19 @@ func cancelledContext() context.Context {
 // goroutineSettleSamples and goroutineSettleInterval fix the settle window
 // for the no-background-activity case: the minimum over 10 samples at 5ms
 // spacing. goroutineTolerance absorbs unrelated test-framework parallelism
-// that can legitimately appear while the case runs.
+// that can legitimately appear while the case runs, and
+// goroutineStabilizeMaxWindows caps the baseline stabilization loop so a
+// never-quiet test binary still terminates.
 const (
-	goroutineSettleSamples  = 10
-	goroutineSettleInterval = 5 * time.Millisecond
-	goroutineTolerance      = 2
+	goroutineSettleSamples       = 10
+	goroutineSettleInterval      = 5 * time.Millisecond
+	goroutineTolerance           = 2
+	goroutineStabilizeMaxWindows = 25
 )
 
-// settleMinGoroutines samples the goroutine count over the settle window and
+// settleMinGoroutines samples the goroutine count over one settle window and
 // returns the minimum, so transient framework-parallel activity does not
-// inflate the baseline.
+// inflate the measurement.
 func settleMinGoroutines() int {
 	min := int(^uint(0) >> 1)
 	for i := 0; i < goroutineSettleSamples; i++ {
@@ -106,18 +109,42 @@ func settleMinGoroutines() int {
 	return min
 }
 
+// stableBaselineGoroutines waits for the goroutine count to reach the test
+// binary's steady state — two consecutive settle windows whose minima differ
+// by no more than the tolerance — and returns the minimum over that stable
+// pair. Under a parallel test binary the count ramps while sibling tests
+// start their subtests; a baseline taken mid-ramp would misread the ramp as
+// adapter activity, so the entry window must actually stabilize.
+func stableBaselineGoroutines() int {
+	prev := settleMinGoroutines()
+	for range goroutineStabilizeMaxWindows {
+		cur := settleMinGoroutines()
+		if diff := cur - prev; diff <= goroutineTolerance && diff >= -goroutineTolerance {
+			if cur < prev {
+				return cur
+			}
+			return prev
+		}
+		prev = cur
+	}
+	return prev
+}
+
 // assertNoBackgroundGoroutines asserts that running the representative store
 // operations on a fresh store spawns no background goroutines: the settle-min
-// count after the operations must not exceed the count before by more than
-// the tolerance. The case never runs t.Parallel() — the measurement must be
-// synchronous. Timer-only violations (a goroutine-less timer) are not
-// observable through this window and are out of scope for this case.
+// count over a single immediate window after the operations must not exceed
+// the stabilized baseline by more than the tolerance. The after-window is
+// deliberately not stabilized — short-lived violation goroutines must still
+// be alive while it samples. The case never runs t.Parallel() — the
+// measurement must be synchronous. Timer-only violations (a goroutine-less
+// timer) are not observable through this window and are out of scope for
+// this case.
 //
 // Derived from: ARCHITECTURE-SPINE.md AD-12 (operational contract — store
 // adapters must not spawn background goroutines or timers).
 func assertNoBackgroundGoroutines[T any](t *testing.T, newStore func() T, ops func(T)) {
 	t.Helper()
-	before := settleMinGoroutines()
+	before := stableBaselineGoroutines()
 	store := newStore()
 	ops(store)
 	after := settleMinGoroutines()
