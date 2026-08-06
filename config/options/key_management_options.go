@@ -13,9 +13,10 @@ import (
 // KeyManagementOptions configures automatic signing key management. It is off by
 // default; when enabled the manager maintains signing and validation material.
 // Duration zero values receive conservative defaults inside the manager. The
-// injected seams (storage, protector, clock, entropy) fall back to safe defaults
-// when left nil. Business packages do not read the environment; a host loads
-// configuration and injects it here.
+// injected seams (protector, clock, entropy) fall back to safe defaults when
+// left nil. The key record store is injected through the ServerConfig store
+// seam, not through this options type. Business packages do not read the
+// environment; a host loads configuration and injects it here.
 type KeyManagementOptions struct {
 	// Enabled turns on automatic key management.
 	Enabled bool
@@ -43,8 +44,6 @@ type KeyManagementOptions struct {
 	ClockSkew time.Duration
 	// AllowMultipleActive permits more than one active key per purpose.
 	AllowMultipleActive bool
-	// StorageProvider persists key records; nil uses an in-memory store.
-	StorageProvider keymgmt.RecordStore
 	// Protector protects private key material; nil uses the default provider.
 	Protector dp.DataProtectionProvider
 	// Clock is the injected time source; nil uses the default clock.

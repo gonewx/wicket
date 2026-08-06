@@ -86,16 +86,25 @@ func registerInMemory() {
 	// = NewServer 现硬编码等价。注册行自 3.3 done-early（di/pluggable_services.go）
 	// 移入本文件归位。
 	godi.AddSingletonFactory[storage.PersistedGrantStore](&r, func(p godi.Provider) storage.PersistedGrantStore {
-		return &lazyPersistedGrantStore{cfg: godi.GetRequired[*ServerConfig](p)}
+		return &lazyPersistedGrantStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
 	})
 
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/InMemory.cs#L167 AddInMemoryPersistedGrants
 	// (TryAddSingleton -> ServerConfig 覆盖钩子)：同上 lazy seam；默认
 	// NewMemoryDeviceFlowStore()。DeviceFlowCodeService 消费同步切换为容器解析。
 	godi.AddSingletonFactory[storage.DeviceFlowStore](&r, func(p godi.Provider) storage.DeviceFlowStore {
-		return &lazyDeviceFlowStore{cfg: godi.GetRequired[*ServerConfig](p)}
+		return &lazyDeviceFlowStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
 	})
 	godi.AddSingletonFactory[storage.BackchannelAuthenticationRequestStore](&r, func(p godi.Provider) storage.BackchannelAuthenticationRequestStore {
-		return &lazyBackchannelAuthenticationRequestStore{cfg: godi.GetRequired[*ServerConfig](p)}
+		return &lazyBackchannelAuthenticationRequestStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
 	})
 }

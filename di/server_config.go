@@ -4,12 +4,15 @@
 package di
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/auth"
+	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/services"
+	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
 	storage_models "github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/validators"
@@ -18,7 +21,8 @@ import (
 // ServerConfig stores host-provided runtime seams.
 // input: setter values or providers -> behavior: read current configured seam -> output: seam value.
 type ServerConfig struct {
-	frozen bool
+	frozen                bool
+	allowInMemoryFallback bool
 
 	logger *slog.Logger
 
@@ -33,6 +37,14 @@ type ServerConfig struct {
 	persistedGrantStoreProvider                   func() storage.PersistedGrantStore
 	deviceFlowStoreProvider                       func() storage.DeviceFlowStore
 	backchannelAuthenticationRequestStoreProvider func() storage.BackchannelAuthenticationRequestStore
+
+	authorizationCodeStoreProvider func() storage.AuthorizationCodeStore
+	refreshTokenStoreProvider      func() storage.RefreshTokenStore
+	referenceTokenStoreProvider    func() storage.ReferenceTokenStore
+	userConsentStoreProvider       func() storage.UserConsentStore
+	sessionStoreProvider           func() sessionpkg.Store
+	distributedCacheProvider       func() services.DistributedCache
+	recordStoreProvider            func() keymgmt.RecordStore
 
 	authenticationHandlerProviders map[string]func(godi.Provider) auth.Handler
 
@@ -49,8 +61,48 @@ func NewServerConfig() *ServerConfig {
 	return &ServerConfig{}
 }
 
+// storeSeam describes one store injection seam for the assembly-time
+// validation in Freeze. A seam is satisfied when the host injected a provider;
+// otherwise the host must have declared the in-memory fallback explicitly.
+type storeSeam struct {
+	name     string
+	injected func() bool
+}
+
+// storeSeams enumerates every store seam the composition root validates.
+func (c *ServerConfig) storeSeams() []storeSeam {
+	return []storeSeam{
+		{"authorization parameters message store", func() bool { return c.authorizationParametersMessageStoreProvider != nil }},
+		{"persisted grant store", func() bool { return c.persistedGrantStoreProvider != nil }},
+		{"device flow store", func() bool { return c.deviceFlowStoreProvider != nil }},
+		{"backchannel authentication request store", func() bool { return c.backchannelAuthenticationRequestStoreProvider != nil }},
+		{"authorization code store", func() bool { return c.authorizationCodeStoreProvider != nil }},
+		{"refresh token store", func() bool { return c.refreshTokenStoreProvider != nil }},
+		{"reference token store", func() bool { return c.referenceTokenStoreProvider != nil }},
+		{"user consent store", func() bool { return c.userConsentStoreProvider != nil }},
+		{"session store", func() bool { return c.sessionStoreProvider != nil }},
+		{"distributed cache", func() bool { return c.distributedCacheProvider != nil }},
+		{"key record store", func() bool { return c.recordStoreProvider != nil }},
+	}
+}
+
+// AllowInMemoryFallback declares that the host accepts the in-memory fallback
+// implementations for store seams it did not inject. Development hosts call it
+// before Freeze; production assembly must inject every store instead.
+func (c *ServerConfig) AllowInMemoryFallback() {
+	c.allowInMemoryFallback = true
+}
+
 func (c *ServerConfig) Freeze() {
 	c.frozen = true
+	if c.allowInMemoryFallback {
+		return
+	}
+	for _, seam := range c.storeSeams() {
+		if !seam.injected() {
+			panic(fmt.Sprintf("store seam %q not injected by host and in-memory fallback not declared", seam.name))
+		}
+	}
 }
 
 func (c *ServerConfig) Frozen() bool {
@@ -216,6 +268,111 @@ func (c *ServerConfig) BackchannelAuthenticationRequestStore() storage.Backchann
 		return nil
 	}
 	return c.backchannelAuthenticationRequestStoreProvider()
+}
+
+func (c *ServerConfig) SetAuthorizationCodeStoreProvider(provider func() storage.AuthorizationCodeStore) {
+	c.authorizationCodeStoreProvider = provider
+}
+
+func (c *ServerConfig) SetAuthorizationCodeStore(store storage.AuthorizationCodeStore) {
+	c.SetAuthorizationCodeStoreProvider(func() storage.AuthorizationCodeStore { return store })
+}
+
+func (c *ServerConfig) AuthorizationCodeStore() storage.AuthorizationCodeStore {
+	if c == nil || c.authorizationCodeStoreProvider == nil {
+		return nil
+	}
+	return c.authorizationCodeStoreProvider()
+}
+
+func (c *ServerConfig) SetRefreshTokenStoreProvider(provider func() storage.RefreshTokenStore) {
+	c.refreshTokenStoreProvider = provider
+}
+
+func (c *ServerConfig) SetRefreshTokenStore(store storage.RefreshTokenStore) {
+	c.SetRefreshTokenStoreProvider(func() storage.RefreshTokenStore { return store })
+}
+
+func (c *ServerConfig) RefreshTokenStore() storage.RefreshTokenStore {
+	if c == nil || c.refreshTokenStoreProvider == nil {
+		return nil
+	}
+	return c.refreshTokenStoreProvider()
+}
+
+func (c *ServerConfig) SetReferenceTokenStoreProvider(provider func() storage.ReferenceTokenStore) {
+	c.referenceTokenStoreProvider = provider
+}
+
+func (c *ServerConfig) SetReferenceTokenStore(store storage.ReferenceTokenStore) {
+	c.SetReferenceTokenStoreProvider(func() storage.ReferenceTokenStore { return store })
+}
+
+func (c *ServerConfig) ReferenceTokenStore() storage.ReferenceTokenStore {
+	if c == nil || c.referenceTokenStoreProvider == nil {
+		return nil
+	}
+	return c.referenceTokenStoreProvider()
+}
+
+func (c *ServerConfig) SetUserConsentStoreProvider(provider func() storage.UserConsentStore) {
+	c.userConsentStoreProvider = provider
+}
+
+func (c *ServerConfig) SetUserConsentStore(store storage.UserConsentStore) {
+	c.SetUserConsentStoreProvider(func() storage.UserConsentStore { return store })
+}
+
+func (c *ServerConfig) UserConsentStore() storage.UserConsentStore {
+	if c == nil || c.userConsentStoreProvider == nil {
+		return nil
+	}
+	return c.userConsentStoreProvider()
+}
+
+func (c *ServerConfig) SetSessionStoreProvider(provider func() sessionpkg.Store) {
+	c.sessionStoreProvider = provider
+}
+
+func (c *ServerConfig) SetSessionStore(store sessionpkg.Store) {
+	c.SetSessionStoreProvider(func() sessionpkg.Store { return store })
+}
+
+func (c *ServerConfig) SessionStore() sessionpkg.Store {
+	if c == nil || c.sessionStoreProvider == nil {
+		return nil
+	}
+	return c.sessionStoreProvider()
+}
+
+func (c *ServerConfig) SetDistributedCacheProvider(provider func() services.DistributedCache) {
+	c.distributedCacheProvider = provider
+}
+
+func (c *ServerConfig) SetDistributedCache(cache services.DistributedCache) {
+	c.SetDistributedCacheProvider(func() services.DistributedCache { return cache })
+}
+
+func (c *ServerConfig) DistributedCache() services.DistributedCache {
+	if c == nil || c.distributedCacheProvider == nil {
+		return nil
+	}
+	return c.distributedCacheProvider()
+}
+
+func (c *ServerConfig) SetRecordStoreProvider(provider func() keymgmt.RecordStore) {
+	c.recordStoreProvider = provider
+}
+
+func (c *ServerConfig) SetRecordStore(store keymgmt.RecordStore) {
+	c.SetRecordStoreProvider(func() keymgmt.RecordStore { return store })
+}
+
+func (c *ServerConfig) RecordStore() keymgmt.RecordStore {
+	if c == nil || c.recordStoreProvider == nil {
+		return nil
+	}
+	return c.recordStoreProvider()
 }
 
 func (c *ServerConfig) SetBackchannelAuthenticationUserValidator(validator validators.BackchannelAuthenticationUserValidator) {

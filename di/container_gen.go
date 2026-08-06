@@ -90,10 +90,11 @@ type Root struct {
 	f_PersistedGrantStore                                    storage.PersistedGrantStore
 	f_DeviceFlowStore                                        storage.DeviceFlowStore
 	f_BackchannelAuthenticationRequestStore                  storage.BackchannelAuthenticationRequestStore
+	f_RecordStore                                            keymgmt.RecordStore
 	f_Ptr_Manager                                            *keymgmt.Manager
 	f_Ptr_ProviderConfig                                     *oidcverify.ProviderConfig
 	f_Ptr_PhoneAuthConfig                                    *phoneverify.PhoneAuthConfig
-	f_MemoryDistributedCache                                 services.DistributedCache
+	f_DistributedCache                                       services.DistributedCache
 	f_AuthorizationCodeStore                                 storage.AuthorizationCodeStore
 	f_RefreshTokenStore                                      storage.RefreshTokenStore
 	f_ReferenceTokenStore                                    storage.ReferenceTokenStore
@@ -244,13 +245,28 @@ func NewRoot() (*Root, error) {
 		return godi.GetRequired[*options.WicketOptions](p).PersistentGrants
 	})(r)
 	r.f_PersistedGrantStore = (func(p godi.Provider) storage.PersistedGrantStore {
-		return &lazyPersistedGrantStore{cfg: godi.GetRequired[*ServerConfig](p)}
+		return &lazyPersistedGrantStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
 	})(r)
 	r.f_DeviceFlowStore = (func(p godi.Provider) storage.DeviceFlowStore {
-		return &lazyDeviceFlowStore{cfg: godi.GetRequired[*ServerConfig](p)}
+		return &lazyDeviceFlowStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
 	})(r)
 	r.f_BackchannelAuthenticationRequestStore = (func(p godi.Provider) storage.BackchannelAuthenticationRequestStore {
-		return &lazyBackchannelAuthenticationRequestStore{cfg: godi.GetRequired[*ServerConfig](p)}
+		return &lazyBackchannelAuthenticationRequestStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
+	})(r)
+	r.f_RecordStore = (func(p godi.Provider) keymgmt.RecordStore {
+		return &lazyRecordStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
 	})(r)
 	r.f_Ptr_Manager = (func(p godi.Provider) *keymgmt.Manager {
 		opts := godi.GetRequired[*options.KeyManagementOptions](p)
@@ -272,10 +288,7 @@ func NewRoot() (*Root, error) {
 			AllowMultipleActive: opts.AllowMultipleActive,
 		}
 
-		store := opts.StorageProvider
-		if store == nil {
-			store = keymgmt.NewMemoryRecordStore()
-		}
+		store := godi.GetRequired[keymgmt.RecordStore](p)
 
 		var provider dp.DataProtectionProvider = opts.Protector
 		if provider == nil {
@@ -300,13 +313,42 @@ func NewRoot() (*Root, error) {
 	r.f_Ptr_PhoneAuthConfig = (func(p godi.Provider) *phoneverify.PhoneAuthConfig {
 		return &phoneverify.PhoneAuthConfig{}
 	})(r)
-	r.f_MemoryDistributedCache = memory2.NewMemoryDistributedCache()
-	r.f_AuthorizationCodeStore = impl4.NewAuthorizationCodeStore()
-	r.f_RefreshTokenStore = impl4.NewRefreshTokenStore()
-	r.f_ReferenceTokenStore = impl4.NewReferenceTokenStore()
-	r.f_UserConsentStore = impl4.NewUserConsentStore()
+	r.f_DistributedCache = (func(p godi.Provider) services.DistributedCache {
+		return &lazyDistributedCache{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
+	})(r)
+	r.f_AuthorizationCodeStore = (func(p godi.Provider) storage.AuthorizationCodeStore {
+		return &lazyAuthorizationCodeStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
+	})(r)
+	r.f_RefreshTokenStore = (func(p godi.Provider) storage.RefreshTokenStore {
+		return &lazyRefreshTokenStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
+	})(r)
+	r.f_ReferenceTokenStore = (func(p godi.Provider) storage.ReferenceTokenStore {
+		return &lazyReferenceTokenStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
+	})(r)
+	r.f_UserConsentStore = (func(p godi.Provider) storage.UserConsentStore {
+		return &lazyUserConsentStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
+	})(r)
 	r.f_Store = (func(p godi.Provider) session.Store {
-		return session.NewMemoryStore(godi.GetRequired[services.SystemClock](p))
+		return &lazySessionStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+			clock:  godi.GetRequired[services.SystemClock](p),
+		}
 	})(r)
 	r.f_Ptr_Config = (func(p godi.Provider) *wechatverify.Config {
 		return &wechatverify.Config{}
@@ -837,7 +879,7 @@ func (r *Root) NewResourceValidator() validators.ResourceValidator {
 }
 
 func (r *Root) NewDistributedDeviceFlowThrottlingService() services.DeviceFlowThrottlingService {
-	return impl.NewDistributedDeviceFlowThrottlingService(r.f_MemoryDistributedCache, r.NewClientStore(), r.f_SystemClock, r.f_Ptr_WicketOptions)
+	return impl.NewDistributedDeviceFlowThrottlingService(r.f_DistributedCache, r.NewClientStore(), r.f_SystemClock, r.f_Ptr_WicketOptions)
 }
 
 func (r *Root) NewBackchannelAuthenticationThrottlingService() services.BackchannelAuthenticationThrottlingService {
@@ -1209,13 +1251,15 @@ func (r *Root) BackchannelAuthenticationRequestStore() storage.BackchannelAuthen
 	return r.f_BackchannelAuthenticationRequestStore
 }
 
+func (r *Root) RecordStore() keymgmt.RecordStore { return r.f_RecordStore }
+
 func (r *Root) Ptr_Manager() *keymgmt.Manager { return r.f_Ptr_Manager }
 
 func (r *Root) Ptr_ProviderConfig() *oidcverify.ProviderConfig { return r.f_Ptr_ProviderConfig }
 
 func (r *Root) Ptr_PhoneAuthConfig() *phoneverify.PhoneAuthConfig { return r.f_Ptr_PhoneAuthConfig }
 
-func (r *Root) MemoryDistributedCache() services.DistributedCache { return r.f_MemoryDistributedCache }
+func (r *Root) DistributedCache() services.DistributedCache { return r.f_DistributedCache }
 
 func (r *Root) AuthorizationCodeStore() storage.AuthorizationCodeStore {
 	return r.f_AuthorizationCodeStore
@@ -1301,6 +1345,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.f_DeviceFlowStore
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return r.f_BackchannelAuthenticationRequestStore
+	case reflect.TypeFor[keymgmt.RecordStore]():
+		return r.f_RecordStore
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return r.f_Ptr_Manager
 	case reflect.TypeFor[*oidcverify.ProviderConfig]():
@@ -1308,7 +1354,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 		return r.f_Ptr_PhoneAuthConfig
 	case reflect.TypeFor[services.DistributedCache]():
-		return r.f_MemoryDistributedCache
+		return r.f_DistributedCache
 	case reflect.TypeFor[storage.AuthorizationCodeStore]():
 		return r.f_AuthorizationCodeStore
 	case reflect.TypeFor[storage.RefreshTokenStore]():
@@ -1713,6 +1759,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return true
+	case reflect.TypeFor[keymgmt.RecordStore]():
+		return true
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return true
 	case reflect.TypeFor[*impl4.PersistentGrantSerializer]():
@@ -1950,6 +1998,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.f_DeviceFlowStore}
 		case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 			return []any{r.f_BackchannelAuthenticationRequestStore}
+		case reflect.TypeFor[keymgmt.RecordStore]():
+			return []any{r.f_RecordStore}
 		case reflect.TypeFor[*keymgmt.Manager]():
 			return []any{r.f_Ptr_Manager}
 		case reflect.TypeFor[*oidcverify.ProviderConfig]():
@@ -1957,7 +2007,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 			return []any{r.f_Ptr_PhoneAuthConfig}
 		case reflect.TypeFor[services.DistributedCache]():
-			return []any{r.f_MemoryDistributedCache}
+			return []any{r.f_DistributedCache}
 		case reflect.TypeFor[storage.AuthorizationCodeStore]():
 			return []any{r.f_AuthorizationCodeStore}
 		case reflect.TypeFor[storage.RefreshTokenStore]():
@@ -2314,6 +2364,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.root.f_DeviceFlowStore
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 		return s.root.f_BackchannelAuthenticationRequestStore
+	case reflect.TypeFor[keymgmt.RecordStore]():
+		return s.root.f_RecordStore
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return s.root.f_Ptr_Manager
 	case reflect.TypeFor[*oidcverify.ProviderConfig]():
@@ -2321,7 +2373,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 		return s.root.f_Ptr_PhoneAuthConfig
 	case reflect.TypeFor[services.DistributedCache]():
-		return s.root.f_MemoryDistributedCache
+		return s.root.f_DistributedCache
 	case reflect.TypeFor[storage.AuthorizationCodeStore]():
 		return s.root.f_AuthorizationCodeStore
 	case reflect.TypeFor[storage.RefreshTokenStore]():
@@ -2609,6 +2661,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[storage.DeviceFlowStore]():
 		return true
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
+		return true
+	case reflect.TypeFor[keymgmt.RecordStore]():
 		return true
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return true
@@ -2942,6 +2996,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.root.f_DeviceFlowStore}
 		case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
 			return []any{s.root.f_BackchannelAuthenticationRequestStore}
+		case reflect.TypeFor[keymgmt.RecordStore]():
+			return []any{s.root.f_RecordStore}
 		case reflect.TypeFor[*keymgmt.Manager]():
 			return []any{s.root.f_Ptr_Manager}
 		case reflect.TypeFor[*oidcverify.ProviderConfig]():
@@ -2949,7 +3005,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 			return []any{s.root.f_Ptr_PhoneAuthConfig}
 		case reflect.TypeFor[services.DistributedCache]():
-			return []any{s.root.f_MemoryDistributedCache}
+			return []any{s.root.f_DistributedCache}
 		case reflect.TypeFor[storage.AuthorizationCodeStore]():
 			return []any{s.root.f_AuthorizationCodeStore}
 		case reflect.TypeFor[storage.RefreshTokenStore]():
@@ -3742,7 +3798,7 @@ func (s *scope) NewResourceValidator() validators.ResourceValidator {
 }
 
 func (s *scope) NewDistributedDeviceFlowThrottlingService() services.DeviceFlowThrottlingService {
-	return impl.NewDistributedDeviceFlowThrottlingService(s.root.f_MemoryDistributedCache, s.NewClientStore(), s.root.f_SystemClock, s.root.f_Ptr_WicketOptions)
+	return impl.NewDistributedDeviceFlowThrottlingService(s.root.f_DistributedCache, s.NewClientStore(), s.root.f_SystemClock, s.root.f_Ptr_WicketOptions)
 }
 
 func (s *scope) NewBackchannelAuthenticationThrottlingService() services.BackchannelAuthenticationThrottlingService {
@@ -4118,6 +4174,8 @@ func (s *scope) BackchannelAuthenticationRequestStore() storage.BackchannelAuthe
 	return s.root.f_BackchannelAuthenticationRequestStore
 }
 
+func (s *scope) RecordStore() keymgmt.RecordStore { return s.root.f_RecordStore }
+
 func (s *scope) Ptr_Manager() *keymgmt.Manager { return s.root.f_Ptr_Manager }
 
 func (s *scope) Ptr_ProviderConfig() *oidcverify.ProviderConfig { return s.root.f_Ptr_ProviderConfig }
@@ -4126,9 +4184,7 @@ func (s *scope) Ptr_PhoneAuthConfig() *phoneverify.PhoneAuthConfig {
 	return s.root.f_Ptr_PhoneAuthConfig
 }
 
-func (s *scope) MemoryDistributedCache() services.DistributedCache {
-	return s.root.f_MemoryDistributedCache
-}
+func (s *scope) DistributedCache() services.DistributedCache { return s.root.f_DistributedCache }
 
 func (s *scope) AuthorizationCodeStore() storage.AuthorizationCodeStore {
 	return s.root.f_AuthorizationCodeStore

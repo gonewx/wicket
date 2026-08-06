@@ -21,12 +21,19 @@ import (
 
 // registerKeyManagement wires the automatic key manager. It is registered as a
 // singleton so its in-memory key state and cache persist across the transient
-// consumers that resolve it. Unlike the host store seams in registerCrypto, the
-// factory reads only singleton options and the data protection provider; it does
-// not read the ServerConfig store seam, so eager singleton assembly does not
-// freeze that seam prematurely.
+// consumers that resolve it. The key record store comes from the ServerConfig
+// seam through a lazy wrapper, so eager singleton assembly does not freeze the
+// host seam prematurely; a host that injects a store adapter via the seam gets
+// it, anything else falls back to the in-memory record store with a warning.
 func registerKeyManagement() {
 	var r godi.Registry
+
+	godi.AddSingletonFactory[keymgmt.RecordStore](&r, func(p godi.Provider) keymgmt.RecordStore {
+		return &lazyRecordStore{
+			cfg:    godi.GetRequired[*ServerConfig](p),
+			logger: godi.GetRequired[*slog.Logger](p),
+		}
+	})
 
 	godi.AddSingletonFactory[*keymgmt.Manager](&r, func(p godi.Provider) *keymgmt.Manager {
 		opts := godi.GetRequired[*config_options.KeyManagementOptions](p)
@@ -48,10 +55,7 @@ func registerKeyManagement() {
 			AllowMultipleActive: opts.AllowMultipleActive,
 		}
 
-		store := opts.StorageProvider
-		if store == nil {
-			store = keymgmt.NewMemoryRecordStore()
-		}
+		store := godi.GetRequired[keymgmt.RecordStore](p)
 
 		var provider dp.DataProtectionProvider = opts.Protector
 		if provider == nil {
