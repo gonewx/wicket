@@ -6,6 +6,7 @@
 package di_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gonewx/wicket/di"
@@ -38,7 +39,7 @@ func TestKeyManagementResolvesFromContainer(t *testing.T) {
 	}
 
 	// Disabled default with no host validation stores: an empty, non-error set.
-	keys, err := service.GetValidationKeys()
+	keys, err := service.GetValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("validation keys: %v", err)
 	}

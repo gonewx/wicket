@@ -6,6 +6,7 @@
 package di_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ func TestSessionServicesResolveFromContainer(t *testing.T) {
 		t.Fatal("session coordination service did not resolve")
 	}
 
-	valid, err := coord.ValidateSession(nil)
+	valid, err := coord.ValidateSession(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("ValidateSession error: %v", err)
 	}
@@ -72,11 +73,11 @@ func TestSessionStoreRoundTrip(t *testing.T) {
 		Renewed:   clock.Now(),
 		Expires:   clock.Now().Add(24 * time.Hour),
 	}
-	if err := store.CreateSession(rec); err != nil {
+	if err := store.CreateSession(context.Background(), rec); err != nil {
 		t.Fatalf("CreateSession: %v", err)
 	}
 
-	got, err := store.GetSession("integration-test-session")
+	got, err := store.GetSession(context.Background(), "integration-test-session")
 	if err != nil || got == nil {
 		t.Fatalf("GetSession: got=%v, err=%v", got, err)
 	}
@@ -84,7 +85,7 @@ func TestSessionStoreRoundTrip(t *testing.T) {
 		t.Fatalf("SubjectID = %q, want integration-test-user", got.SubjectID)
 	}
 
-	if err := store.DeleteSession("integration-test-session"); err != nil {
+	if err := store.DeleteSession(context.Background(), "integration-test-session"); err != nil {
 		t.Fatalf("DeleteSession: %v", err)
 	}
 }

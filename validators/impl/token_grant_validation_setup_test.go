@@ -7,11 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"io"
-	"log/slog"
-	"testing"
-	"time"
-
+	"errors"
 	"github.com/gonewx/wicket"
 	claimspkg "github.com/gonewx/wicket/claims"
 	config_options "github.com/gonewx/wicket/config/options"
@@ -24,6 +20,11 @@ import (
 	"github.com/gonewx/wicket/validators"
 	validators_mock "github.com/gonewx/wicket/validators/mock"
 	validators_models "github.com/gonewx/wicket/validators/models"
+	"io"
+	"log/slog"
+	"net/url"
+	"testing"
+	"time"
 )
 
 // grantValidationTestNow is the fixed reference instant injected into token
@@ -282,4 +283,64 @@ func newGrantTestRefreshToken(clientId string, now time.Time) *storage_models.Re
 	token.AuthorizedScopes = []string{"resource", gois.StandardScopesOfflineAccess}
 	token.SetAccessToken(&storage_models.Token{ClientId: clientId}, "")
 	return token
+}
+
+// failingAuthorizationCodeStore returns an infrastructure error distinct from
+// the not-found sentinel, so the merge-point split can be pinned: an infra
+// failure surfaces through the validator's error channel instead of being
+// disguised as invalid_grant.
+type failingAuthorizationCodeStore struct{}
+
+func (failingAuthorizationCodeStore) StoreAuthorizationCode(context.Context, *storage_models.AuthorizationCode) (string, error) {
+	return "", errors.New("store unavailable")
+}
+func (failingAuthorizationCodeStore) GetAuthorizationCode(context.Context, string) (*storage_models.AuthorizationCode, error) {
+	return nil, errors.New("store unavailable")
+}
+func (failingAuthorizationCodeStore) RemoveAuthorizationCode(context.Context, string) error {
+	return errors.New("store unavailable")
+}
+func (failingAuthorizationCodeStore) RemoveExpired(context.Context, time.Time) (int, error) {
+	return 0, errors.New("store unavailable")
+}
+
+// TestAuthorizationCodeInfrastructureFailureSurfacesAsError pins AC#3: only a
+// missing code maps to invalid_grant; a store failure must reach the caller as
+// an error, never as a protocol rejection.
+func TestAuthorizationCodeInfrastructureFailureSurfacesAsError(t *testing.T) {
+	t.Parallel()
+
+	client := storage_models.NewClient()
+	if err := client.SetAllowedGrantTypes(gois.GrantTypesCode); err != nil {
+		t.Fatalf("set grants: %v", err)
+	}
+	options := config_options.NewWicketOptions()
+	logger := discardTestLogger()
+	resourceStore, err := memory.NewMemoryResourcesStore(nil, nil, nil)
+	if err != nil {
+		t.Fatalf("resource store: %v", err)
+	}
+	validator := NewTokenRequestValidator(
+		options,
+		services_impl.NewIssuerNameService(options),
+		failingAuthorizationCodeStore{},
+		NewExtensionGrantValidator(nil, logger),
+		NewCustomTokenRequestValidator(),
+		NewResourceValidator(resourceStore, NewScopeParser(), logger),
+		resourceStore,
+		services_impl.NewRefreshTokenService(nil),
+		validators_mock.NewTestResourceOwnerPasswordValidator(nil, ""),
+		validators_mock.NewTestProfileService(true),
+		validators_mock.NewTestDeviceCodeValidator(false),
+		nil,
+		fixedTestClock{now: grantValidationTestNow},
+		logger,
+	)
+	result, err := validator.ValidateRequest(context.Background(), url.Values{
+		gois.TokenRequestGrantType: {gois.GrantTypeAuthorizationCode},
+		gois.TokenRequestCode:      {"some-code"},
+	}, &validators_models.ClientSecretValidationResult{Client: client})
+	if err == nil {
+		t.Fatalf("expected infrastructure error, got result %+v", result)
+	}
 }
