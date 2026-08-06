@@ -2,11 +2,13 @@
 package di
 
 import (
+	"io"
 	"reflect"
 
 	"crypto/rand"
 	"fmt"
 	"github.com/gonewx/godi"
+	"github.com/gonewx/godi/runtime"
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/accessor"
 	"github.com/gonewx/wicket/auth"
@@ -87,25 +89,27 @@ type Root struct {
 	f_ValidateOptions__cookies_AuthenticationOptions__2      options2.ValidateOptions[*cookies.AuthenticationOptions]
 	f_Ptr_WicketOptions                                      *options.WicketOptions
 	f_Ptr_PersistentGrantOptions                             *options.PersistentGrantOptions
-	f_PersistedGrantStore                                    storage.PersistedGrantStore
-	f_DeviceFlowStore                                        storage.DeviceFlowStore
-	f_BackchannelAuthenticationRequestStore                  storage.BackchannelAuthenticationRequestStore
-	f_RecordStore                                            keymgmt.RecordStore
+	f_lazyPersistedGrantStore                                storage.PersistedGrantStore
+	f_lazyDeviceFlowStore                                    storage.DeviceFlowStore
+	f_lazyBackchannelAuthenticationRequestStore              storage.BackchannelAuthenticationRequestStore
+	f_lazyRecordStore                                        keymgmt.RecordStore
 	f_Ptr_Manager                                            *keymgmt.Manager
 	f_Ptr_ProviderConfig                                     *oidcverify.ProviderConfig
 	f_Ptr_PhoneAuthConfig                                    *phoneverify.PhoneAuthConfig
-	f_DistributedCache                                       services.DistributedCache
-	f_AuthorizationCodeStore                                 storage.AuthorizationCodeStore
-	f_RefreshTokenStore                                      storage.RefreshTokenStore
-	f_ReferenceTokenStore                                    storage.ReferenceTokenStore
-	f_UserConsentStore                                       storage.UserConsentStore
-	f_Store                                                  session.Store
+	f_lazyDistributedCache                                   services.DistributedCache
+	f_lazyAuthorizationCodeStore                             storage.AuthorizationCodeStore
+	f_lazyRefreshTokenStore                                  storage.RefreshTokenStore
+	f_lazyReferenceTokenStore                                storage.ReferenceTokenStore
+	f_lazyUserConsentStore                                   storage.UserConsentStore
+	f_lazySessionStore                                       session.Store
 	f_Ptr_Config                                             *wechatverify.Config
 	f_DefaultHttpContextAccessor                             accessor.HttpContextAccessor
 	f_HandlerProvider                                        auth.HandlerProvider
 	f_UserSession                                            services.UserSession
 	f_Service                                                *core.Service
+	disp                                                     *runtime.Disposer
 	closed                                                   bool
+	closeErr                                                 error
 }
 
 var _ godi.Provider = (*Root)(nil)
@@ -113,6 +117,7 @@ var _ godi.Provider = (*Root)(nil)
 // NewRoot constructs and wires all singletons eagerly in dependency order (AD-1).
 func NewRoot() (*Root, error) {
 	r := &Root{}
+	r.disp = runtime.NewDisposer()
 	r.f_SystemClock = impl.NewSystemClock()
 	r.f_ServerConfig = NewServerConfig()
 	r.f_Ptr_Logger = (func(p godi.Provider) *slog.Logger {
@@ -244,30 +249,14 @@ func NewRoot() (*Root, error) {
 	r.f_Ptr_PersistentGrantOptions = (func(p godi.Provider) *options.PersistentGrantOptions {
 		return godi.GetRequired[*options.WicketOptions](p).PersistentGrants
 	})(r)
-	r.f_PersistedGrantStore = (func(p godi.Provider) storage.PersistedGrantStore {
-		return &lazyPersistedGrantStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
-	r.f_DeviceFlowStore = (func(p godi.Provider) storage.DeviceFlowStore {
-		return &lazyDeviceFlowStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
-	r.f_BackchannelAuthenticationRequestStore = (func(p godi.Provider) storage.BackchannelAuthenticationRequestStore {
-		return &lazyBackchannelAuthenticationRequestStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
-	r.f_RecordStore = (func(p godi.Provider) keymgmt.RecordStore {
-		return &lazyRecordStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
+	r.f_lazyPersistedGrantStore = NewlazyPersistedGrantStore(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyPersistedGrantStore.(io.Closer))
+	r.f_lazyDeviceFlowStore = NewlazyDeviceFlowStore(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyDeviceFlowStore.(io.Closer))
+	r.f_lazyBackchannelAuthenticationRequestStore = NewlazyBackchannelAuthenticationRequestStore(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyBackchannelAuthenticationRequestStore.(io.Closer))
+	r.f_lazyRecordStore = NewlazyRecordStore(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyRecordStore.(io.Closer))
 	r.f_Ptr_Manager = (func(p godi.Provider) *keymgmt.Manager {
 		opts := godi.GetRequired[*options.KeyManagementOptions](p)
 
@@ -313,43 +302,18 @@ func NewRoot() (*Root, error) {
 	r.f_Ptr_PhoneAuthConfig = (func(p godi.Provider) *phoneverify.PhoneAuthConfig {
 		return &phoneverify.PhoneAuthConfig{}
 	})(r)
-	r.f_DistributedCache = (func(p godi.Provider) services.DistributedCache {
-		return &lazyDistributedCache{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
-	r.f_AuthorizationCodeStore = (func(p godi.Provider) storage.AuthorizationCodeStore {
-		return &lazyAuthorizationCodeStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
-	r.f_RefreshTokenStore = (func(p godi.Provider) storage.RefreshTokenStore {
-		return &lazyRefreshTokenStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
-	r.f_ReferenceTokenStore = (func(p godi.Provider) storage.ReferenceTokenStore {
-		return &lazyReferenceTokenStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
-	r.f_UserConsentStore = (func(p godi.Provider) storage.UserConsentStore {
-		return &lazyUserConsentStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})(r)
-	r.f_Store = (func(p godi.Provider) session.Store {
-		return &lazySessionStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-			clock:  godi.GetRequired[services.SystemClock](p),
-		}
-	})(r)
+	r.f_lazyDistributedCache = NewlazyDistributedCache(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyDistributedCache.(io.Closer))
+	r.f_lazyAuthorizationCodeStore = NewlazyAuthorizationCodeStore(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyAuthorizationCodeStore.(io.Closer))
+	r.f_lazyRefreshTokenStore = NewlazyRefreshTokenStore(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyRefreshTokenStore.(io.Closer))
+	r.f_lazyReferenceTokenStore = NewlazyReferenceTokenStore(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyReferenceTokenStore.(io.Closer))
+	r.f_lazyUserConsentStore = NewlazyUserConsentStore(r.f_ServerConfig, r.f_Ptr_Logger)
+	r.disp.Track(r.f_lazyUserConsentStore.(io.Closer))
+	r.f_lazySessionStore = NewlazySessionStore(r.f_ServerConfig, r.f_Ptr_Logger, r.f_SystemClock)
+	r.disp.Track(r.f_lazySessionStore.(io.Closer))
 	r.f_Ptr_Config = (func(p godi.Provider) *wechatverify.Config {
 		return &wechatverify.Config{}
 	})(r)
@@ -654,7 +618,7 @@ func (r *Root) NewAuthorizeInteractionResponseGenerator() responses.AuthorizeInt
 }
 
 func (r *Root) NewAuthorizeResponseGenerator() responses.AuthorizeResponseGenerator {
-	return impl3.NewAuthorizeResponseGenerator(r.f_Ptr_WicketOptions, r.f_SystemClock, r.NewTokenService(), r.NewKeyMaterialService(), r.f_AuthorizationCodeStore, r.NewHandleGenerationService(), r.f_Ptr_Logger)
+	return impl3.NewAuthorizeResponseGenerator(r.f_Ptr_WicketOptions, r.f_SystemClock, r.NewTokenService(), r.NewKeyMaterialService(), r.f_lazyAuthorizationCodeStore, r.NewHandleGenerationService(), r.f_Ptr_Logger)
 }
 
 func (r *Root) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGenerator {
@@ -662,7 +626,7 @@ func (r *Root) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGenera
 }
 
 func (r *Root) NewTokenRevocationResponseGenerator() responses.TokenRevocationResponseGenerator {
-	return impl3.NewTokenRevocationResponseGenerator(r.f_ReferenceTokenStore, r.f_RefreshTokenStore, r.f_Ptr_Logger)
+	return impl3.NewTokenRevocationResponseGenerator(r.f_lazyReferenceTokenStore, r.f_lazyRefreshTokenStore, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewDeviceAuthorizationResponseGenerator() responses.DeviceAuthorizationResponseGenerator {
@@ -823,7 +787,7 @@ func (r *Root) NewScopeParser() validators.ScopeParser {
 }
 
 func (r *Root) NewPersistedGrantService() services.PersistedGrantService {
-	return impl.NewPersistedGrantService(r.f_PersistedGrantStore)
+	return impl.NewPersistedGrantService(r.f_lazyPersistedGrantStore)
 }
 
 func (r *Root) NewKeyMaterialService() services.KeyMaterialService {
@@ -850,7 +814,7 @@ func (r *Root) NewClaimsService() services.ClaimsService {
 }
 
 func (r *Root) NewRefreshTokenService() services.RefreshTokenService {
-	return impl.NewRefreshTokenService(r.f_RefreshTokenStore, r.NewHandleGenerationService())
+	return impl.NewRefreshTokenService(r.f_lazyRefreshTokenStore, r.NewHandleGenerationService())
 }
 
 func (r *Root) NewDeviceFlowCodeService() services.DeviceFlowCodeService {
@@ -879,7 +843,7 @@ func (r *Root) NewResourceValidator() validators.ResourceValidator {
 }
 
 func (r *Root) NewDistributedDeviceFlowThrottlingService() services.DeviceFlowThrottlingService {
-	return impl.NewDistributedDeviceFlowThrottlingService(r.f_DistributedCache, r.NewClientStore(), r.f_SystemClock, r.f_Ptr_WicketOptions)
+	return impl.NewDistributedDeviceFlowThrottlingService(r.f_lazyDistributedCache, r.NewClientStore(), r.f_SystemClock, r.f_Ptr_WicketOptions)
 }
 
 func (r *Root) NewBackchannelAuthenticationThrottlingService() services.BackchannelAuthenticationThrottlingService {
@@ -893,7 +857,7 @@ func (r *Root) NewBackchannelAuthenticationNotificationService() services.Backch
 }
 
 func (r *Root) NewBackchannelAuthenticationRequestIdValidator() validators.BackchannelAuthenticationRequestIdValidator {
-	return impl2.NewBackchannelAuthenticationRequestIdValidator(r.f_BackchannelAuthenticationRequestStore, r.NewBackchannelAuthenticationThrottlingService(), r.f_SystemClock)
+	return impl2.NewBackchannelAuthenticationRequestIdValidator(r.f_lazyBackchannelAuthenticationRequestStore, r.NewBackchannelAuthenticationThrottlingService(), r.f_SystemClock)
 }
 
 func (r *Root) NewBackchannelAuthenticationUserValidator() validators.BackchannelAuthenticationUserValidator {
@@ -906,7 +870,7 @@ func (r *Root) NewBackchannelAuthenticationUserValidator() validators.Backchanne
 }
 
 func (r *Root) NewBackchannelAuthenticationRequestValidator() validators.BackchannelAuthenticationRequestValidator {
-	return impl2.NewBackchannelAuthenticationRequestValidator(r.f_Ptr_WicketOptions, r.f_BackchannelAuthenticationRequestStore, r.NewResourceValidator(), r.NewBackchannelAuthenticationUserValidator(), r.NewBackchannelAuthenticationNotificationService(), r.f_SystemClock, r.f_Ptr_Logger)
+	return impl2.NewBackchannelAuthenticationRequestValidator(r.f_Ptr_WicketOptions, r.f_lazyBackchannelAuthenticationRequestStore, r.NewResourceValidator(), r.NewBackchannelAuthenticationUserValidator(), r.NewBackchannelAuthenticationNotificationService(), r.f_SystemClock, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewTokenService() services.TokenService {
@@ -997,7 +961,7 @@ func (r *Root) NewEndSessionRequestValidator() validators.EndSessionRequestValid
 }
 
 func (r *Root) NewTokenRequestValidator() validators.TokenRequestValidator {
-	return impl2.NewTokenRequestValidator(r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.f_AuthorizationCodeStore, r.NewPtr_ExtensionGrantValidator(), r.NewCustomTokenRequestValidator(), r.NewResourceValidator(), r.NewResourceStore(), r.NewRefreshTokenService(), r.NewResourceOwnerPasswordValidator(), r.NewProfileService(), r.NewDeviceCodeValidator(), r.NewBackchannelAuthenticationRequestIdValidator(), r.f_SystemClock, r.f_Ptr_Logger)
+	return impl2.NewTokenRequestValidator(r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.f_lazyAuthorizationCodeStore, r.NewPtr_ExtensionGrantValidator(), r.NewCustomTokenRequestValidator(), r.NewResourceValidator(), r.NewResourceStore(), r.NewRefreshTokenService(), r.NewResourceOwnerPasswordValidator(), r.NewProfileService(), r.NewDeviceCodeValidator(), r.NewBackchannelAuthenticationRequestIdValidator(), r.f_SystemClock, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
@@ -1005,7 +969,7 @@ func (r *Root) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
 }
 
 func (r *Root) NewTokenValidator() validators.TokenValidator {
-	return impl2.NewTokenValidator(r.f_Ptr_Logger, r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.f_ReferenceTokenStore, r.NewCustomTokenValidator(), r.NewClientStore(), r.NewProfileService(), r.NewKeyMaterialService(), r.NewSessionCoordinationService(), r.f_SystemClock)
+	return impl2.NewTokenValidator(r.f_Ptr_Logger, r.f_Ptr_WicketOptions, r.NewIssuerNameService(), r.f_lazyReferenceTokenStore, r.NewCustomTokenValidator(), r.NewClientStore(), r.NewProfileService(), r.NewKeyMaterialService(), r.NewSessionCoordinationService(), r.f_SystemClock)
 }
 
 func (r *Root) NewIntrospectionRequestValidator() validators.IntrospectionRequestValidator {
@@ -1243,15 +1207,17 @@ func (r *Root) Ptr_PersistentGrantOptions() *options.PersistentGrantOptions {
 	return r.f_Ptr_PersistentGrantOptions
 }
 
-func (r *Root) PersistedGrantStore() storage.PersistedGrantStore { return r.f_PersistedGrantStore }
-
-func (r *Root) DeviceFlowStore() storage.DeviceFlowStore { return r.f_DeviceFlowStore }
-
-func (r *Root) BackchannelAuthenticationRequestStore() storage.BackchannelAuthenticationRequestStore {
-	return r.f_BackchannelAuthenticationRequestStore
+func (r *Root) lazyPersistedGrantStore() storage.PersistedGrantStore {
+	return r.f_lazyPersistedGrantStore
 }
 
-func (r *Root) RecordStore() keymgmt.RecordStore { return r.f_RecordStore }
+func (r *Root) lazyDeviceFlowStore() storage.DeviceFlowStore { return r.f_lazyDeviceFlowStore }
+
+func (r *Root) lazyBackchannelAuthenticationRequestStore() storage.BackchannelAuthenticationRequestStore {
+	return r.f_lazyBackchannelAuthenticationRequestStore
+}
+
+func (r *Root) lazyRecordStore() keymgmt.RecordStore { return r.f_lazyRecordStore }
 
 func (r *Root) Ptr_Manager() *keymgmt.Manager { return r.f_Ptr_Manager }
 
@@ -1259,19 +1225,21 @@ func (r *Root) Ptr_ProviderConfig() *oidcverify.ProviderConfig { return r.f_Ptr_
 
 func (r *Root) Ptr_PhoneAuthConfig() *phoneverify.PhoneAuthConfig { return r.f_Ptr_PhoneAuthConfig }
 
-func (r *Root) DistributedCache() services.DistributedCache { return r.f_DistributedCache }
+func (r *Root) lazyDistributedCache() services.DistributedCache { return r.f_lazyDistributedCache }
 
-func (r *Root) AuthorizationCodeStore() storage.AuthorizationCodeStore {
-	return r.f_AuthorizationCodeStore
+func (r *Root) lazyAuthorizationCodeStore() storage.AuthorizationCodeStore {
+	return r.f_lazyAuthorizationCodeStore
 }
 
-func (r *Root) RefreshTokenStore() storage.RefreshTokenStore { return r.f_RefreshTokenStore }
+func (r *Root) lazyRefreshTokenStore() storage.RefreshTokenStore { return r.f_lazyRefreshTokenStore }
 
-func (r *Root) ReferenceTokenStore() storage.ReferenceTokenStore { return r.f_ReferenceTokenStore }
+func (r *Root) lazyReferenceTokenStore() storage.ReferenceTokenStore {
+	return r.f_lazyReferenceTokenStore
+}
 
-func (r *Root) UserConsentStore() storage.UserConsentStore { return r.f_UserConsentStore }
+func (r *Root) lazyUserConsentStore() storage.UserConsentStore { return r.f_lazyUserConsentStore }
 
-func (r *Root) Store() session.Store { return r.f_Store }
+func (r *Root) lazySessionStore() session.Store { return r.f_lazySessionStore }
 
 func (r *Root) Ptr_Config() *wechatverify.Config { return r.f_Ptr_Config }
 
@@ -1340,13 +1308,13 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*options.PersistentGrantOptions]():
 		return r.f_Ptr_PersistentGrantOptions
 	case reflect.TypeFor[storage.PersistedGrantStore]():
-		return r.f_PersistedGrantStore
+		return r.f_lazyPersistedGrantStore
 	case reflect.TypeFor[storage.DeviceFlowStore]():
-		return r.f_DeviceFlowStore
+		return r.f_lazyDeviceFlowStore
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
-		return r.f_BackchannelAuthenticationRequestStore
+		return r.f_lazyBackchannelAuthenticationRequestStore
 	case reflect.TypeFor[keymgmt.RecordStore]():
-		return r.f_RecordStore
+		return r.f_lazyRecordStore
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return r.f_Ptr_Manager
 	case reflect.TypeFor[*oidcverify.ProviderConfig]():
@@ -1354,17 +1322,17 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 		return r.f_Ptr_PhoneAuthConfig
 	case reflect.TypeFor[services.DistributedCache]():
-		return r.f_DistributedCache
+		return r.f_lazyDistributedCache
 	case reflect.TypeFor[storage.AuthorizationCodeStore]():
-		return r.f_AuthorizationCodeStore
+		return r.f_lazyAuthorizationCodeStore
 	case reflect.TypeFor[storage.RefreshTokenStore]():
-		return r.f_RefreshTokenStore
+		return r.f_lazyRefreshTokenStore
 	case reflect.TypeFor[storage.ReferenceTokenStore]():
-		return r.f_ReferenceTokenStore
+		return r.f_lazyReferenceTokenStore
 	case reflect.TypeFor[storage.UserConsentStore]():
-		return r.f_UserConsentStore
+		return r.f_lazyUserConsentStore
 	case reflect.TypeFor[session.Store]():
-		return r.f_Store
+		return r.f_lazySessionStore
 	case reflect.TypeFor[*wechatverify.Config]():
 		return r.f_Ptr_Config
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -1993,13 +1961,13 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*options.PersistentGrantOptions]():
 			return []any{r.f_Ptr_PersistentGrantOptions}
 		case reflect.TypeFor[storage.PersistedGrantStore]():
-			return []any{r.f_PersistedGrantStore}
+			return []any{r.f_lazyPersistedGrantStore}
 		case reflect.TypeFor[storage.DeviceFlowStore]():
-			return []any{r.f_DeviceFlowStore}
+			return []any{r.f_lazyDeviceFlowStore}
 		case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
-			return []any{r.f_BackchannelAuthenticationRequestStore}
+			return []any{r.f_lazyBackchannelAuthenticationRequestStore}
 		case reflect.TypeFor[keymgmt.RecordStore]():
-			return []any{r.f_RecordStore}
+			return []any{r.f_lazyRecordStore}
 		case reflect.TypeFor[*keymgmt.Manager]():
 			return []any{r.f_Ptr_Manager}
 		case reflect.TypeFor[*oidcverify.ProviderConfig]():
@@ -2007,17 +1975,17 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 			return []any{r.f_Ptr_PhoneAuthConfig}
 		case reflect.TypeFor[services.DistributedCache]():
-			return []any{r.f_DistributedCache}
+			return []any{r.f_lazyDistributedCache}
 		case reflect.TypeFor[storage.AuthorizationCodeStore]():
-			return []any{r.f_AuthorizationCodeStore}
+			return []any{r.f_lazyAuthorizationCodeStore}
 		case reflect.TypeFor[storage.RefreshTokenStore]():
-			return []any{r.f_RefreshTokenStore}
+			return []any{r.f_lazyRefreshTokenStore}
 		case reflect.TypeFor[storage.ReferenceTokenStore]():
-			return []any{r.f_ReferenceTokenStore}
+			return []any{r.f_lazyReferenceTokenStore}
 		case reflect.TypeFor[storage.UserConsentStore]():
-			return []any{r.f_UserConsentStore}
+			return []any{r.f_lazyUserConsentStore}
 		case reflect.TypeFor[session.Store]():
-			return []any{r.f_Store}
+			return []any{r.f_lazySessionStore}
 		case reflect.TypeFor[*wechatverify.Config]():
 			return []any{r.f_Ptr_Config}
 		case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -2269,6 +2237,7 @@ func (r *Root) CreateScope() godi.Scope {
 		panic(godi.ProviderClosedError())
 	}
 	s := &scope{root: r}
+	s.disp = runtime.NewDisposer()
 	s.f_DefaultHttpContextAccessor = accessor.NewDefaultHttpContextAccessor()
 	s.f_HandlerProvider = (func(p godi.Provider) auth.HandlerProvider {
 		return core.NewHandlerProvider(godi.GetRequired[auth.SchemeProvider](p), p)
@@ -2290,8 +2259,12 @@ func (r *Root) CreateScope() godi.Scope {
 }
 
 func (r *Root) Close() error {
+	if r.closed {
+		return r.closeErr
+	}
 	r.closed = true
-	return nil
+	r.closeErr = r.disp.CloseAll()
+	return r.closeErr
 }
 
 type scope struct {
@@ -2300,7 +2273,9 @@ type scope struct {
 	f_HandlerProvider            auth.HandlerProvider
 	f_UserSession                services.UserSession
 	f_Service                    *core.Service
+	disp                         *runtime.Disposer
 	closed                       bool
+	closeErr                     error
 }
 
 var _ godi.Scope = (*scope)(nil)
@@ -2359,13 +2334,13 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*options.PersistentGrantOptions]():
 		return s.root.f_Ptr_PersistentGrantOptions
 	case reflect.TypeFor[storage.PersistedGrantStore]():
-		return s.root.f_PersistedGrantStore
+		return s.root.f_lazyPersistedGrantStore
 	case reflect.TypeFor[storage.DeviceFlowStore]():
-		return s.root.f_DeviceFlowStore
+		return s.root.f_lazyDeviceFlowStore
 	case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
-		return s.root.f_BackchannelAuthenticationRequestStore
+		return s.root.f_lazyBackchannelAuthenticationRequestStore
 	case reflect.TypeFor[keymgmt.RecordStore]():
-		return s.root.f_RecordStore
+		return s.root.f_lazyRecordStore
 	case reflect.TypeFor[*keymgmt.Manager]():
 		return s.root.f_Ptr_Manager
 	case reflect.TypeFor[*oidcverify.ProviderConfig]():
@@ -2373,17 +2348,17 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 		return s.root.f_Ptr_PhoneAuthConfig
 	case reflect.TypeFor[services.DistributedCache]():
-		return s.root.f_DistributedCache
+		return s.root.f_lazyDistributedCache
 	case reflect.TypeFor[storage.AuthorizationCodeStore]():
-		return s.root.f_AuthorizationCodeStore
+		return s.root.f_lazyAuthorizationCodeStore
 	case reflect.TypeFor[storage.RefreshTokenStore]():
-		return s.root.f_RefreshTokenStore
+		return s.root.f_lazyRefreshTokenStore
 	case reflect.TypeFor[storage.ReferenceTokenStore]():
-		return s.root.f_ReferenceTokenStore
+		return s.root.f_lazyReferenceTokenStore
 	case reflect.TypeFor[storage.UserConsentStore]():
-		return s.root.f_UserConsentStore
+		return s.root.f_lazyUserConsentStore
 	case reflect.TypeFor[session.Store]():
-		return s.root.f_Store
+		return s.root.f_lazySessionStore
 	case reflect.TypeFor[*wechatverify.Config]():
 		return s.root.f_Ptr_Config
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -2991,13 +2966,13 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*options.PersistentGrantOptions]():
 			return []any{s.root.f_Ptr_PersistentGrantOptions}
 		case reflect.TypeFor[storage.PersistedGrantStore]():
-			return []any{s.root.f_PersistedGrantStore}
+			return []any{s.root.f_lazyPersistedGrantStore}
 		case reflect.TypeFor[storage.DeviceFlowStore]():
-			return []any{s.root.f_DeviceFlowStore}
+			return []any{s.root.f_lazyDeviceFlowStore}
 		case reflect.TypeFor[storage.BackchannelAuthenticationRequestStore]():
-			return []any{s.root.f_BackchannelAuthenticationRequestStore}
+			return []any{s.root.f_lazyBackchannelAuthenticationRequestStore}
 		case reflect.TypeFor[keymgmt.RecordStore]():
-			return []any{s.root.f_RecordStore}
+			return []any{s.root.f_lazyRecordStore}
 		case reflect.TypeFor[*keymgmt.Manager]():
 			return []any{s.root.f_Ptr_Manager}
 		case reflect.TypeFor[*oidcverify.ProviderConfig]():
@@ -3005,17 +2980,17 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*phoneverify.PhoneAuthConfig]():
 			return []any{s.root.f_Ptr_PhoneAuthConfig}
 		case reflect.TypeFor[services.DistributedCache]():
-			return []any{s.root.f_DistributedCache}
+			return []any{s.root.f_lazyDistributedCache}
 		case reflect.TypeFor[storage.AuthorizationCodeStore]():
-			return []any{s.root.f_AuthorizationCodeStore}
+			return []any{s.root.f_lazyAuthorizationCodeStore}
 		case reflect.TypeFor[storage.RefreshTokenStore]():
-			return []any{s.root.f_RefreshTokenStore}
+			return []any{s.root.f_lazyRefreshTokenStore}
 		case reflect.TypeFor[storage.ReferenceTokenStore]():
-			return []any{s.root.f_ReferenceTokenStore}
+			return []any{s.root.f_lazyReferenceTokenStore}
 		case reflect.TypeFor[storage.UserConsentStore]():
-			return []any{s.root.f_UserConsentStore}
+			return []any{s.root.f_lazyUserConsentStore}
 		case reflect.TypeFor[session.Store]():
-			return []any{s.root.f_Store}
+			return []any{s.root.f_lazySessionStore}
 		case reflect.TypeFor[*wechatverify.Config]():
 			return []any{s.root.f_Ptr_Config}
 		case reflect.TypeFor[accessor.HttpContextAccessor]():
@@ -3267,6 +3242,7 @@ func (s *scope) CreateScope() godi.Scope {
 		panic(godi.ProviderClosedError())
 	}
 	ns := &scope{root: s.root}
+	ns.disp = runtime.NewDisposer()
 	ns.f_DefaultHttpContextAccessor = accessor.NewDefaultHttpContextAccessor()
 	ns.f_HandlerProvider = (func(p godi.Provider) auth.HandlerProvider {
 		return core.NewHandlerProvider(godi.GetRequired[auth.SchemeProvider](p), p)
@@ -3288,8 +3264,12 @@ func (s *scope) CreateScope() godi.Scope {
 }
 
 func (s *scope) Close() error {
+	if s.closed {
+		return s.closeErr
+	}
 	s.closed = true
-	return nil
+	s.closeErr = s.disp.CloseAll()
+	return s.closeErr
 }
 
 func (s *scope) NewAuthorizationParametersMessageStore() storage.AuthorizationParametersMessageStore {
@@ -3573,7 +3553,7 @@ func (s *scope) NewAuthorizeInteractionResponseGenerator() responses.AuthorizeIn
 }
 
 func (s *scope) NewAuthorizeResponseGenerator() responses.AuthorizeResponseGenerator {
-	return impl3.NewAuthorizeResponseGenerator(s.root.f_Ptr_WicketOptions, s.root.f_SystemClock, s.NewTokenService(), s.NewKeyMaterialService(), s.root.f_AuthorizationCodeStore, s.NewHandleGenerationService(), s.root.f_Ptr_Logger)
+	return impl3.NewAuthorizeResponseGenerator(s.root.f_Ptr_WicketOptions, s.root.f_SystemClock, s.NewTokenService(), s.NewKeyMaterialService(), s.root.f_lazyAuthorizationCodeStore, s.NewHandleGenerationService(), s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGenerator {
@@ -3581,7 +3561,7 @@ func (s *scope) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGener
 }
 
 func (s *scope) NewTokenRevocationResponseGenerator() responses.TokenRevocationResponseGenerator {
-	return impl3.NewTokenRevocationResponseGenerator(s.root.f_ReferenceTokenStore, s.root.f_RefreshTokenStore, s.root.f_Ptr_Logger)
+	return impl3.NewTokenRevocationResponseGenerator(s.root.f_lazyReferenceTokenStore, s.root.f_lazyRefreshTokenStore, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewDeviceAuthorizationResponseGenerator() responses.DeviceAuthorizationResponseGenerator {
@@ -3742,7 +3722,7 @@ func (s *scope) NewScopeParser() validators.ScopeParser {
 }
 
 func (s *scope) NewPersistedGrantService() services.PersistedGrantService {
-	return impl.NewPersistedGrantService(s.root.f_PersistedGrantStore)
+	return impl.NewPersistedGrantService(s.root.f_lazyPersistedGrantStore)
 }
 
 func (s *scope) NewKeyMaterialService() services.KeyMaterialService {
@@ -3769,7 +3749,7 @@ func (s *scope) NewClaimsService() services.ClaimsService {
 }
 
 func (s *scope) NewRefreshTokenService() services.RefreshTokenService {
-	return impl.NewRefreshTokenService(s.root.f_RefreshTokenStore, s.NewHandleGenerationService())
+	return impl.NewRefreshTokenService(s.root.f_lazyRefreshTokenStore, s.NewHandleGenerationService())
 }
 
 func (s *scope) NewDeviceFlowCodeService() services.DeviceFlowCodeService {
@@ -3798,7 +3778,7 @@ func (s *scope) NewResourceValidator() validators.ResourceValidator {
 }
 
 func (s *scope) NewDistributedDeviceFlowThrottlingService() services.DeviceFlowThrottlingService {
-	return impl.NewDistributedDeviceFlowThrottlingService(s.root.f_DistributedCache, s.NewClientStore(), s.root.f_SystemClock, s.root.f_Ptr_WicketOptions)
+	return impl.NewDistributedDeviceFlowThrottlingService(s.root.f_lazyDistributedCache, s.NewClientStore(), s.root.f_SystemClock, s.root.f_Ptr_WicketOptions)
 }
 
 func (s *scope) NewBackchannelAuthenticationThrottlingService() services.BackchannelAuthenticationThrottlingService {
@@ -3812,7 +3792,7 @@ func (s *scope) NewBackchannelAuthenticationNotificationService() services.Backc
 }
 
 func (s *scope) NewBackchannelAuthenticationRequestIdValidator() validators.BackchannelAuthenticationRequestIdValidator {
-	return impl2.NewBackchannelAuthenticationRequestIdValidator(s.root.f_BackchannelAuthenticationRequestStore, s.NewBackchannelAuthenticationThrottlingService(), s.root.f_SystemClock)
+	return impl2.NewBackchannelAuthenticationRequestIdValidator(s.root.f_lazyBackchannelAuthenticationRequestStore, s.NewBackchannelAuthenticationThrottlingService(), s.root.f_SystemClock)
 }
 
 func (s *scope) NewBackchannelAuthenticationUserValidator() validators.BackchannelAuthenticationUserValidator {
@@ -3825,7 +3805,7 @@ func (s *scope) NewBackchannelAuthenticationUserValidator() validators.Backchann
 }
 
 func (s *scope) NewBackchannelAuthenticationRequestValidator() validators.BackchannelAuthenticationRequestValidator {
-	return impl2.NewBackchannelAuthenticationRequestValidator(s.root.f_Ptr_WicketOptions, s.root.f_BackchannelAuthenticationRequestStore, s.NewResourceValidator(), s.NewBackchannelAuthenticationUserValidator(), s.NewBackchannelAuthenticationNotificationService(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
+	return impl2.NewBackchannelAuthenticationRequestValidator(s.root.f_Ptr_WicketOptions, s.root.f_lazyBackchannelAuthenticationRequestStore, s.NewResourceValidator(), s.NewBackchannelAuthenticationUserValidator(), s.NewBackchannelAuthenticationNotificationService(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewTokenService() services.TokenService {
@@ -3916,7 +3896,7 @@ func (s *scope) NewEndSessionRequestValidator() validators.EndSessionRequestVali
 }
 
 func (s *scope) NewTokenRequestValidator() validators.TokenRequestValidator {
-	return impl2.NewTokenRequestValidator(s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.root.f_AuthorizationCodeStore, s.NewPtr_ExtensionGrantValidator(), s.NewCustomTokenRequestValidator(), s.NewResourceValidator(), s.NewResourceStore(), s.NewRefreshTokenService(), s.NewResourceOwnerPasswordValidator(), s.NewProfileService(), s.NewDeviceCodeValidator(), s.NewBackchannelAuthenticationRequestIdValidator(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
+	return impl2.NewTokenRequestValidator(s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.root.f_lazyAuthorizationCodeStore, s.NewPtr_ExtensionGrantValidator(), s.NewCustomTokenRequestValidator(), s.NewResourceValidator(), s.NewResourceStore(), s.NewRefreshTokenService(), s.NewResourceOwnerPasswordValidator(), s.NewProfileService(), s.NewDeviceCodeValidator(), s.NewBackchannelAuthenticationRequestIdValidator(), s.root.f_SystemClock, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
@@ -3924,7 +3904,7 @@ func (s *scope) NewStrictRedirectUriValidator() validators.RedirectUriValidator 
 }
 
 func (s *scope) NewTokenValidator() validators.TokenValidator {
-	return impl2.NewTokenValidator(s.root.f_Ptr_Logger, s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.root.f_ReferenceTokenStore, s.NewCustomTokenValidator(), s.NewClientStore(), s.NewProfileService(), s.NewKeyMaterialService(), s.NewSessionCoordinationService(), s.root.f_SystemClock)
+	return impl2.NewTokenValidator(s.root.f_Ptr_Logger, s.root.f_Ptr_WicketOptions, s.NewIssuerNameService(), s.root.f_lazyReferenceTokenStore, s.NewCustomTokenValidator(), s.NewClientStore(), s.NewProfileService(), s.NewKeyMaterialService(), s.NewSessionCoordinationService(), s.root.f_SystemClock)
 }
 
 func (s *scope) NewIntrospectionRequestValidator() validators.IntrospectionRequestValidator {
@@ -4164,17 +4144,17 @@ func (s *scope) Ptr_PersistentGrantOptions() *options.PersistentGrantOptions {
 	return s.root.f_Ptr_PersistentGrantOptions
 }
 
-func (s *scope) PersistedGrantStore() storage.PersistedGrantStore {
-	return s.root.f_PersistedGrantStore
+func (s *scope) lazyPersistedGrantStore() storage.PersistedGrantStore {
+	return s.root.f_lazyPersistedGrantStore
 }
 
-func (s *scope) DeviceFlowStore() storage.DeviceFlowStore { return s.root.f_DeviceFlowStore }
+func (s *scope) lazyDeviceFlowStore() storage.DeviceFlowStore { return s.root.f_lazyDeviceFlowStore }
 
-func (s *scope) BackchannelAuthenticationRequestStore() storage.BackchannelAuthenticationRequestStore {
-	return s.root.f_BackchannelAuthenticationRequestStore
+func (s *scope) lazyBackchannelAuthenticationRequestStore() storage.BackchannelAuthenticationRequestStore {
+	return s.root.f_lazyBackchannelAuthenticationRequestStore
 }
 
-func (s *scope) RecordStore() keymgmt.RecordStore { return s.root.f_RecordStore }
+func (s *scope) lazyRecordStore() keymgmt.RecordStore { return s.root.f_lazyRecordStore }
 
 func (s *scope) Ptr_Manager() *keymgmt.Manager { return s.root.f_Ptr_Manager }
 
@@ -4184,21 +4164,25 @@ func (s *scope) Ptr_PhoneAuthConfig() *phoneverify.PhoneAuthConfig {
 	return s.root.f_Ptr_PhoneAuthConfig
 }
 
-func (s *scope) DistributedCache() services.DistributedCache { return s.root.f_DistributedCache }
-
-func (s *scope) AuthorizationCodeStore() storage.AuthorizationCodeStore {
-	return s.root.f_AuthorizationCodeStore
+func (s *scope) lazyDistributedCache() services.DistributedCache {
+	return s.root.f_lazyDistributedCache
 }
 
-func (s *scope) RefreshTokenStore() storage.RefreshTokenStore { return s.root.f_RefreshTokenStore }
-
-func (s *scope) ReferenceTokenStore() storage.ReferenceTokenStore {
-	return s.root.f_ReferenceTokenStore
+func (s *scope) lazyAuthorizationCodeStore() storage.AuthorizationCodeStore {
+	return s.root.f_lazyAuthorizationCodeStore
 }
 
-func (s *scope) UserConsentStore() storage.UserConsentStore { return s.root.f_UserConsentStore }
+func (s *scope) lazyRefreshTokenStore() storage.RefreshTokenStore {
+	return s.root.f_lazyRefreshTokenStore
+}
 
-func (s *scope) Store() session.Store { return s.root.f_Store }
+func (s *scope) lazyReferenceTokenStore() storage.ReferenceTokenStore {
+	return s.root.f_lazyReferenceTokenStore
+}
+
+func (s *scope) lazyUserConsentStore() storage.UserConsentStore { return s.root.f_lazyUserConsentStore }
+
+func (s *scope) lazySessionStore() session.Store { return s.root.f_lazySessionStore }
 
 func (s *scope) Ptr_Config() *wechatverify.Config { return s.root.f_Ptr_Config }
 

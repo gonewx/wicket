@@ -64,6 +64,12 @@ func NewServerConfig() *ServerConfig {
 // storeSeam describes one store injection seam for the assembly-time
 // validation in Freeze. A seam is satisfied when the host injected a provider;
 // otherwise the host must have declared the in-memory fallback explicitly.
+//
+// The authorization parameters message store seam is special: it is read
+// directly by the ReturnUrlParser factory (no container wrapper, di/
+// lifecycle.go covers the other ten seams), so its lifecycle belongs to the
+// host — the host that injected the store owns closing it, and the container
+// never releases it.
 type storeSeam struct {
 	name     string
 	injected func() bool

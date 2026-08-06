@@ -28,12 +28,7 @@ import (
 func registerKeyManagement() {
 	var r godi.Registry
 
-	godi.AddSingletonFactory[keymgmt.RecordStore](&r, func(p godi.Provider) keymgmt.RecordStore {
-		return &lazyRecordStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})
+	godi.AddSingleton[keymgmt.RecordStore, lazyRecordStore](&r)
 
 	godi.AddSingletonFactory[*keymgmt.Manager](&r, func(p godi.Provider) *keymgmt.Manager {
 		opts := godi.GetRequired[*config_options.KeyManagementOptions](p)

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gonewx/godi"
+
 	"github.com/gonewx/wicket/di"
 	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/services"
@@ -47,7 +49,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"authorization code store": {
 			inject: func(c *di.ServerConfig, v any) { c.SetAuthorizationCodeStore(v.(storage.AuthorizationCodeStore)) },
 			resolve: func(r *di.Root) any {
-				return r.AuthorizationCodeStore()
+				return godi.GetRequired[storage.AuthorizationCodeStore](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(storage.AuthorizationCodeStore).StoreAuthorizationCode(ctx, "code-1", &storage_models.AuthorizationCode{})
@@ -61,7 +63,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"refresh token store": {
 			inject: func(c *di.ServerConfig, v any) { c.SetRefreshTokenStore(v.(storage.RefreshTokenStore)) },
 			resolve: func(r *di.Root) any {
-				return r.RefreshTokenStore()
+				return godi.GetRequired[storage.RefreshTokenStore](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(storage.RefreshTokenStore).StoreRefreshToken(ctx, "rt-1", &storage_models.RefreshToken{})
@@ -75,7 +77,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"reference token store": {
 			inject: func(c *di.ServerConfig, v any) { c.SetReferenceTokenStore(v.(storage.ReferenceTokenStore)) },
 			resolve: func(r *di.Root) any {
-				return r.ReferenceTokenStore()
+				return godi.GetRequired[storage.ReferenceTokenStore](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(storage.ReferenceTokenStore).StoreReferenceToken(ctx, "ref-1", &storage_models.Token{})
@@ -89,7 +91,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"user consent store": {
 			inject: func(c *di.ServerConfig, v any) { c.SetUserConsentStore(v.(storage.UserConsentStore)) },
 			resolve: func(r *di.Root) any {
-				return r.UserConsentStore()
+				return godi.GetRequired[storage.UserConsentStore](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(storage.UserConsentStore).StoreUserConsent(ctx, &storage_models.Consent{SubjectId: "subj", ClientId: "client"})
@@ -103,7 +105,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"session store": {
 			inject: func(c *di.ServerConfig, v any) { c.SetSessionStore(v.(sessionpkg.Store)) },
 			resolve: func(r *di.Root) any {
-				return r.Store()
+				return godi.GetRequired[sessionpkg.Store](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(sessionpkg.Store).CreateSession(ctx, &sessionpkg.Record{SessionID: "sess-1", SubjectID: "subj"})
@@ -117,7 +119,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"distributed cache": {
 			inject: func(c *di.ServerConfig, v any) { c.SetDistributedCache(v.(services.DistributedCache)) },
 			resolve: func(r *di.Root) any {
-				return r.DistributedCache()
+				return godi.GetRequired[services.DistributedCache](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(services.DistributedCache).Set("cache-1", []byte("v"), nil)
@@ -137,7 +139,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"key record store": {
 			inject: func(c *di.ServerConfig, v any) { c.SetRecordStore(v.(keymgmt.RecordStore)) },
 			resolve: func(r *di.Root) any {
-				return r.RecordStore()
+				return godi.GetRequired[keymgmt.RecordStore](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(keymgmt.RecordStore).Create(ctx, &keymgmt.Record{Handle: "key-1"})
@@ -151,7 +153,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"persisted grant store": {
 			inject: func(c *di.ServerConfig, v any) { c.SetPersistedGrantStore(v.(storage.PersistedGrantStore)) },
 			resolve: func(r *di.Root) any {
-				return r.PersistedGrantStore()
+				return godi.GetRequired[storage.PersistedGrantStore](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(storage.PersistedGrantStore).Store(ctx, &storage_models.PersistedGrant{Key: "grant-1"})
@@ -165,7 +167,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 		"device flow store": {
 			inject: func(c *di.ServerConfig, v any) { c.SetDeviceFlowStore(v.(storage.DeviceFlowStore)) },
 			resolve: func(r *di.Root) any {
-				return r.DeviceFlowStore()
+				return godi.GetRequired[storage.DeviceFlowStore](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(storage.DeviceFlowStore).StoreDeviceAuthorization(ctx, "dev-1", "user-1", &storage_models.DeviceCode{})
@@ -181,7 +183,7 @@ func TestStoreSeamAdoptedByContainer(t *testing.T) {
 				c.SetBackchannelAuthenticationRequestStore(v.(storage.BackchannelAuthenticationRequestStore))
 			},
 			resolve: func(r *di.Root) any {
-				return r.BackchannelAuthenticationRequestStore()
+				return godi.GetRequired[storage.BackchannelAuthenticationRequestStore](r)
 			},
 			write: func(s any, ctx context.Context) error {
 				return s.(storage.BackchannelAuthenticationRequestStore).StoreBackchannelAuthenticationRequest(ctx, "ciba-1", &storage_models.BackchannelAuthenticationRequest{})
@@ -242,7 +244,7 @@ func TestStoreSeamFallbackWarnedThroughContainer(t *testing.T) {
 	root.ServerConfig().AllowInMemoryFallback()
 	root.ServerConfig().Freeze() // must not panic with the fallback declared
 
-	store := root.AuthorizationCodeStore()
+	store := godi.GetRequired[storage.AuthorizationCodeStore](root)
 	if err := store.StoreAuthorizationCode(context.Background(), "code-1", &storage_models.AuthorizationCode{}); err != nil {
 		t.Fatalf("write through fallback store: %v", err)
 	}

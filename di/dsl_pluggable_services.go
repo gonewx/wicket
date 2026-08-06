@@ -44,12 +44,7 @@ func registerPluggableServicesAndValidators() {
 	// di/inmemory.go（InMemory.cs 归属文件）：ClientStore/ResourceStore 修正为
 	// Transient（含 ValidatingClientStore 链），PersistedGrantStore lazy Singleton 归位。
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L227 (AddDistributedMemoryCache)
-	godi.AddSingletonFactory[services.DistributedCache](&r, func(p godi.Provider) services.DistributedCache {
-		return &lazyDistributedCache{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})
+	godi.AddSingleton[services.DistributedCache, lazyDistributedCache](&r)
 
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L220 (TryAdd -> unique Go registration; no IHttpClientFactory equivalent)
 	godi.AddTransientFactory[services.JwtRequestUriHttpClient](&r, func(p godi.Provider) services.JwtRequestUriHttpClient {
@@ -78,39 +73,19 @@ func registerPluggableServicesAndValidators() {
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L200 (TryAddTransient)
 	// The in-process store keeps its grant state in an instance map, so it must
 	// live as long as the container or every issued handle is lost immediately.
-	godi.AddSingletonFactory[storage.AuthorizationCodeStore](&r, func(p godi.Provider) storage.AuthorizationCodeStore {
-		return &lazyAuthorizationCodeStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})
+	godi.AddSingleton[storage.AuthorizationCodeStore, lazyAuthorizationCodeStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L201 (TryAddTransient)
 	// The in-process store keeps its grant state in an instance map, so it must
 	// live as long as the container or every issued handle is lost immediately.
-	godi.AddSingletonFactory[storage.RefreshTokenStore](&r, func(p godi.Provider) storage.RefreshTokenStore {
-		return &lazyRefreshTokenStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})
+	godi.AddSingleton[storage.RefreshTokenStore, lazyRefreshTokenStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L202 (TryAddTransient)
 	// The in-process store keeps its grant state in an instance map, so it must
 	// live as long as the container or every issued handle is lost immediately.
-	godi.AddSingletonFactory[storage.ReferenceTokenStore](&r, func(p godi.Provider) storage.ReferenceTokenStore {
-		return &lazyReferenceTokenStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})
+	godi.AddSingleton[storage.ReferenceTokenStore, lazyReferenceTokenStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L203 (TryAddTransient)
 	// The in-process store keeps its grant state in an instance map, so it must
 	// live as long as the container or every issued handle is lost immediately.
-	godi.AddSingletonFactory[storage.UserConsentStore](&r, func(p godi.Provider) storage.UserConsentStore {
-		return &lazyUserConsentStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-		}
-	})
+	godi.AddSingleton[storage.UserConsentStore, lazyUserConsentStore](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L183 (TryAddTransient)
 	godi.AddTransient[services.PersistedGrantService, services_impl.PersistedGrantService](&r)
 	godi.AddTransient[services.KeyMaterialService, services_impl.KeyMaterialService](&r)
@@ -187,13 +162,7 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[storage.MessageStore[models_contexts.LogoutNotificationContext]](p),
 		)
 	})
-	godi.AddSingletonFactory[sessionpkg.Store](&r, func(p godi.Provider) sessionpkg.Store {
-		return &lazySessionStore{
-			cfg:    godi.GetRequired[*ServerConfig](p),
-			logger: godi.GetRequired[*slog.Logger](p),
-			clock:  godi.GetRequired[services.SystemClock](p),
-		}
-	})
+	godi.AddSingleton[sessionpkg.Store, lazySessionStore](&r)
 	godi.AddTransientFactory[services.SessionCoordinationService](&r, func(p godi.Provider) services.SessionCoordinationService {
 		opts := godi.GetRequired[*config_options.WicketOptions](p)
 		enabled := false

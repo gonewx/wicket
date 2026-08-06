@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/di"
 	"github.com/gonewx/wicket/session"
 )
@@ -27,7 +28,7 @@ func TestSessionServicesResolveFromContainer(t *testing.T) {
 		}
 	})
 
-	store := root.Store()
+	store := godi.GetRequired[session.Store](root)
 	if store == nil {
 		t.Fatal("session store did not resolve")
 	}
@@ -59,7 +60,7 @@ func TestSessionStoreRoundTrip(t *testing.T) {
 		}
 	})
 
-	store := root.Store()
+	store := godi.GetRequired[session.Store](root)
 	if store == nil {
 		t.Fatal("session store did not resolve")
 	}

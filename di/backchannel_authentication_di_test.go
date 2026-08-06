@@ -6,7 +6,9 @@ package di_test
 import (
 	"testing"
 
+	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/di"
+	"github.com/gonewx/wicket/storage"
 )
 
 func TestBackchannelAuthenticationServicesResolveFromContainer(t *testing.T) {
@@ -34,7 +36,7 @@ func TestBackchannelAuthenticationServicesResolveFromContainer(t *testing.T) {
 	if root.NewResourceValidator() == nil {
 		t.Fatal("ResourceValidator did not resolve")
 	}
-	if root.BackchannelAuthenticationRequestStore() == nil {
+	if godi.GetRequired[storage.BackchannelAuthenticationRequestStore](root) == nil {
 		t.Fatal("BackchannelAuthenticationRequestStore did not resolve")
 	}
 }
