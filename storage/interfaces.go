@@ -42,6 +42,18 @@ import (
 // sentinel for "record absent", distinct from any infrastructure error.
 var ErrNotFound = errors.New("storage: record not found")
 
+// ErrDuplicateHandle reports that an insert-only write collided with an
+// existing handle. Insert-only stores never overwrite; a collision means the
+// caller's generated handle is not unique, which the caller must treat as an
+// infrastructure defect, not a protocol event.
+var ErrDuplicateHandle = errors.New("storage: duplicate handle")
+
+// ErrVersionConflict reports that an optimistic-concurrency update carried an
+// expected version that does not match the stored version. The caller must
+// reload the record and decide whether to retry or fail; a store never
+// resolves the conflict itself.
+var ErrVersionConflict = errors.New("storage: version conflict")
+
 // MessageStore persists an opaque message value by generated handle. Message
 // data is either self-contained in a protected payload or held by the client,
 // so the store keeps no server-side lifecycle and carries no reclamation
@@ -80,6 +92,10 @@ type ResourceStore interface {
 
 // PersistedGrantStore stores grants keyed by persisted grant key and filters.
 type PersistedGrantStore interface {
+	// Store writes a grant under its Key. The write is an upsert: storing a
+	// grant whose Key already exists replaces the stored record, because the
+	// key is a caller-chosen natural key whose data evolves over the grant's
+	// lifecycle.
 	Store(ctx context.Context, grant *models.PersistedGrant) error
 	Get(ctx context.Context, key string) (*models.PersistedGrant, error)
 	GetAll(ctx context.Context, filter *PersistedGrantFilter) ([]*models.PersistedGrant, error)
@@ -93,9 +109,17 @@ type PersistedGrantStore interface {
 
 // DeviceFlowStore stores device-flow records by device and user codes.
 type DeviceFlowStore interface {
+	// StoreDeviceAuthorization writes a record under the caller-supplied
+	// device and user codes. The write is insert-only: either code already
+	// being present fails with ErrDuplicateHandle and the stored records are
+	// left unchanged.
 	StoreDeviceAuthorization(ctx context.Context, deviceCode string, userCode string, data *models.DeviceCode) error
 	FindByUserCode(ctx context.Context, userCode string) (*models.DeviceCode, error)
 	FindByDeviceCode(ctx context.Context, deviceCode string) (*models.DeviceCode, error)
+	// UpdateByUserCode replaces the record for a state migration (for example
+	// marking the flow consumed). It is not version-guarded: the one-shot
+	// semantics of the flow are enforced by state fields and removal, not by
+	// an optimistic-concurrency marker.
 	UpdateByUserCode(ctx context.Context, userCode string, data *models.DeviceCode) error
 	RemoveByDeviceCode(ctx context.Context, deviceCode string) error
 	// RemoveExpired removes device-flow records whose creation time plus
@@ -106,8 +130,16 @@ type DeviceFlowStore interface {
 
 // BackchannelAuthenticationRequestStore stores CIBA request state by opaque auth_req_id.
 type BackchannelAuthenticationRequestStore interface {
+	// StoreBackchannelAuthenticationRequest writes a record under the
+	// caller-supplied request id. The write is insert-only: a request id that
+	// already exists fails with ErrDuplicateHandle and the stored record is
+	// left unchanged.
 	StoreBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *models.BackchannelAuthenticationRequest) error
 	FindBackchannelAuthenticationRequest(ctx context.Context, requestID string) (*models.BackchannelAuthenticationRequest, error)
+	// UpdateBackchannelAuthenticationRequest replaces the record for a state
+	// migration (for example marking the request consumed). It is not
+	// version-guarded: the one-shot semantics of the flow are enforced by
+	// state fields and removal, not by an optimistic-concurrency marker.
 	UpdateBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *models.BackchannelAuthenticationRequest) error
 	RemoveBackchannelAuthenticationRequest(ctx context.Context, requestID string) error
 	// RemoveExpired removes CIBA requests whose ExpirationTime precedes cutoff,
@@ -116,9 +148,14 @@ type BackchannelAuthenticationRequestStore interface {
 	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
-// AuthorizationCodeStore stores authorization codes by generated handle.
+// AuthorizationCodeStore stores authorization codes by caller-supplied handle.
 type AuthorizationCodeStore interface {
-	StoreAuthorizationCode(ctx context.Context, code *models.AuthorizationCode) (string, error)
+	// StoreAuthorizationCode writes a code under the caller-supplied handle.
+	// The write is insert-only: a handle that already exists fails with
+	// ErrDuplicateHandle and the stored record is left unchanged.
+	StoreAuthorizationCode(ctx context.Context, handle string, code *models.AuthorizationCode) error
+	// GetAuthorizationCode returns an independent copy of the stored code.
+	// The caller may mutate the returned value without affecting the store.
 	GetAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error)
 	RemoveAuthorizationCode(ctx context.Context, handle string) error
 	// RemoveExpired removes codes whose creation time plus lifetime precedes
@@ -127,11 +164,24 @@ type AuthorizationCodeStore interface {
 	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
-// RefreshTokenStore stores refresh tokens by generated handle.
+// RefreshTokenStore stores refresh tokens by caller-supplied handle.
 type RefreshTokenStore interface {
-	StoreRefreshToken(ctx context.Context, token *models.RefreshToken) (string, error)
+	// StoreRefreshToken writes a token under the caller-supplied handle.
+	// The write is insert-only: a handle that already exists fails with
+	// ErrDuplicateHandle and the stored record is left unchanged. The stored
+	// copy carries version 1, and the caller's token.Version is written back
+	// with the same value.
+	StoreRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error
+	// GetRefreshToken returns an independent copy of the stored token.
+	// The caller may mutate the returned value without affecting the store.
 	GetRefreshToken(ctx context.Context, handle string) (*models.RefreshToken, error)
-	UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error
+	// UpdateRefreshToken replaces the stored token under an optimistic
+	// concurrency check: the update succeeds only when the stored version
+	// equals expectedVersion, and the new stored copy carries version
+	// expectedVersion+1, written back to the caller's token.Version. A
+	// mismatch fails with ErrVersionConflict and the stored record is left
+	// unchanged.
+	UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken, expectedVersion int) error
 	RemoveRefreshToken(ctx context.Context, handle string) error
 	// RemoveExpired removes tokens whose creation time plus lifetime precedes
 	// cutoff, returning how many were removed. It reclaims space only; expiry
@@ -139,9 +189,14 @@ type RefreshTokenStore interface {
 	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
-// ReferenceTokenStore stores reference access tokens by generated handle.
+// ReferenceTokenStore stores reference access tokens by caller-supplied handle.
 type ReferenceTokenStore interface {
-	StoreReferenceToken(ctx context.Context, token *models.Token) (string, error)
+	// StoreReferenceToken writes a token under the caller-supplied handle.
+	// The write is insert-only: a handle that already exists fails with
+	// ErrDuplicateHandle and the stored record is left unchanged.
+	StoreReferenceToken(ctx context.Context, handle string, token *models.Token) error
+	// GetReferenceToken returns an independent copy of the stored token.
+	// The caller may mutate the returned value without affecting the store.
 	GetReferenceToken(ctx context.Context, handle string) (*models.Token, error)
 	RemoveReferenceToken(ctx context.Context, handle string) error
 	RemoveReferenceTokens(ctx context.Context, subjectId, clientId string) error
@@ -153,6 +208,11 @@ type ReferenceTokenStore interface {
 
 // UserConsentStore stores user consent grants.
 type UserConsentStore interface {
+	// StoreUserConsent writes a consent under the caller-supplied
+	// subject+client natural key. The write is an upsert: storing a consent
+	// for a subject/client pair that already exists replaces the stored
+	// record, because repeated authorization decisions naturally overwrite
+	// the earlier decision.
 	StoreUserConsent(ctx context.Context, consent *models.Consent) error
 	GetUserConsent(ctx context.Context, subjectId, clientId string) (*models.Consent, error)
 	GetAllUserConsents(ctx context.Context, subjectId string) ([]*models.Consent, error)

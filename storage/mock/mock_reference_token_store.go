@@ -18,8 +18,8 @@ func NewMockReferenceTokenStore() *MockReferenceTokenStore {
 	return &MockReferenceTokenStore{}
 }
 
-func (m *MockReferenceTokenStore) StoreReferenceToken(ctx context.Context, token *models.Token) (string, error) {
-	return "", fmt.Errorf("Not implemented")
+func (m *MockReferenceTokenStore) StoreReferenceToken(ctx context.Context, handle string, token *models.Token) error {
+	return fmt.Errorf("Not implemented")
 }
 
 func (m *MockReferenceTokenStore) GetReferenceToken(ctx context.Context, handle string) (*models.Token, error) {

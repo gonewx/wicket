@@ -22,6 +22,9 @@ func NewMemoryPersistedGrantStore() *MemoryPersistedGrantStore {
 	return &MemoryPersistedGrantStore{grants: map[string]*models.PersistedGrant{}}
 }
 
+// Store writes a grant under its Key. The write is an upsert: storing a grant
+// whose Key already exists replaces the stored record, matching the interface
+// contract for the caller-chosen natural key.
 func (s *MemoryPersistedGrantStore) Store(ctx context.Context, grant *models.PersistedGrant) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -122,9 +125,18 @@ func NewMemoryDeviceFlowStore() *MemoryDeviceFlowStore {
 	}
 }
 
+// StoreDeviceAuthorization writes a record under the caller-supplied device
+// and user codes. The write is insert-only: either code already being present
+// fails with ErrDuplicateHandle, matching the interface contract.
 func (s *MemoryDeviceFlowStore) StoreDeviceAuthorization(ctx context.Context, deviceCode string, userCode string, data *models.DeviceCode) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, ok := s.byDeviceCode[deviceCode]; ok {
+		return storage.ErrDuplicateHandle
+	}
+	if _, ok := s.byUserCode[userCode]; ok {
+		return storage.ErrDuplicateHandle
+	}
 	s.byUserCode[userCode] = data
 	s.byDeviceCode[deviceCode] = data
 	s.userByDevice[deviceCode] = userCode
@@ -193,9 +205,16 @@ func NewMemoryBackchannelAuthenticationRequestStore() *MemoryBackchannelAuthenti
 	return &MemoryBackchannelAuthenticationRequestStore{requests: map[string]*models.BackchannelAuthenticationRequest{}}
 }
 
+// StoreBackchannelAuthenticationRequest writes a record under the
+// caller-supplied request id. The write is insert-only: a request id that
+// already exists fails with ErrDuplicateHandle, matching the interface
+// contract.
 func (s *MemoryBackchannelAuthenticationRequestStore) StoreBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *models.BackchannelAuthenticationRequest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, ok := s.requests[requestID]; ok {
+		return storage.ErrDuplicateHandle
+	}
 	s.requests[requestID] = data
 	return nil
 }

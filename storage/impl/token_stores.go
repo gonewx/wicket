@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/storage/models"
-	"github.com/gonewx/wicket/utils"
 )
 
 type AuthorizationCodeStore struct {
@@ -22,12 +22,14 @@ func NewAuthorizationCodeStore() *AuthorizationCodeStore {
 	return &AuthorizationCodeStore{items: map[string]*models.AuthorizationCode{}}
 }
 
-func (s *AuthorizationCodeStore) StoreAuthorizationCode(ctx context.Context, code *models.AuthorizationCode) (string, error) {
+func (s *AuthorizationCodeStore) StoreAuthorizationCode(ctx context.Context, handle string, code *models.AuthorizationCode) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	id := newHandle()
-	s.items[id] = code
-	return id, nil
+	if _, ok := s.items[handle]; ok {
+		return storage.ErrDuplicateHandle
+	}
+	s.items[handle] = copyAuthorizationCode(code)
+	return nil
 }
 
 func (s *AuthorizationCodeStore) GetAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error) {
@@ -37,7 +39,7 @@ func (s *AuthorizationCodeStore) GetAuthorizationCode(ctx context.Context, handl
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
-	return code, nil
+	return copyAuthorizationCode(code), nil
 }
 
 func (s *AuthorizationCodeStore) RemoveAuthorizationCode(ctx context.Context, handle string) error {
@@ -69,12 +71,17 @@ func NewRefreshTokenStore() *RefreshTokenStore {
 	return &RefreshTokenStore{items: map[string]*models.RefreshToken{}}
 }
 
-func (s *RefreshTokenStore) StoreRefreshToken(ctx context.Context, token *models.RefreshToken) (string, error) {
+func (s *RefreshTokenStore) StoreRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	id := newHandle()
-	s.items[id] = token
-	return id, nil
+	if _, ok := s.items[handle]; ok {
+		return storage.ErrDuplicateHandle
+	}
+	stored := copyRefreshToken(token)
+	stored.Version = 1
+	s.items[handle] = stored
+	token.Version = 1
+	return nil
 }
 
 func (s *RefreshTokenStore) GetRefreshToken(ctx context.Context, handle string) (*models.RefreshToken, error) {
@@ -84,13 +91,23 @@ func (s *RefreshTokenStore) GetRefreshToken(ctx context.Context, handle string) 
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
-	return token, nil
+	return copyRefreshToken(token), nil
 }
 
-func (s *RefreshTokenStore) UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error {
+func (s *RefreshTokenStore) UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken, expectedVersion int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.items[handle] = token
+	current, ok := s.items[handle]
+	if !ok {
+		return storage.ErrNotFound
+	}
+	if current.Version != expectedVersion {
+		return storage.ErrVersionConflict
+	}
+	stored := copyRefreshToken(token)
+	stored.Version = current.Version + 1
+	s.items[handle] = stored
+	token.Version = stored.Version
 	return nil
 }
 
@@ -123,12 +140,14 @@ func NewReferenceTokenStore() *ReferenceTokenStore {
 	return &ReferenceTokenStore{items: map[string]*models.Token{}}
 }
 
-func (s *ReferenceTokenStore) StoreReferenceToken(ctx context.Context, token *models.Token) (string, error) {
+func (s *ReferenceTokenStore) StoreReferenceToken(ctx context.Context, handle string, token *models.Token) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	id := newHandle()
-	s.items[id] = token
-	return id, nil
+	if _, ok := s.items[handle]; ok {
+		return storage.ErrDuplicateHandle
+	}
+	s.items[handle] = copyToken(token)
+	return nil
 }
 
 func (s *ReferenceTokenStore) GetReferenceToken(ctx context.Context, handle string) (*models.Token, error) {
@@ -138,7 +157,7 @@ func (s *ReferenceTokenStore) GetReferenceToken(ctx context.Context, handle stri
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
-	return token, nil
+	return copyToken(token), nil
 }
 
 func (s *ReferenceTokenStore) RemoveReferenceToken(ctx context.Context, handle string) error {
@@ -181,6 +200,9 @@ func NewUserConsentStore() *UserConsentStore {
 	return &UserConsentStore{items: map[string]*models.Consent{}}
 }
 
+// StoreUserConsent writes a consent under the subject+client natural key. The
+// write is an upsert: a later decision for the same pair replaces the earlier
+// record, matching the interface contract.
 func (s *UserConsentStore) StoreUserConsent(ctx context.Context, consent *models.Consent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -230,10 +252,59 @@ func (s *UserConsentStore) RemoveExpired(ctx context.Context, cutoff time.Time) 
 	return count, nil
 }
 
-func newHandle() string {
-	id, err := utils.CreateUniqueId(32, utils.Hex)
-	if err != nil {
-		return ""
+// copyStrings returns an independent copy of values that preserves nil-ness:
+// a nil input yields nil, and an empty non-nil slice stays non-nil. Callers
+// distinguish the two states, so the copy must not collapse them.
+func copyStrings(values []string) []string {
+	if values == nil {
+		return nil
 	}
-	return id
+	out := make([]string, len(values))
+	copy(out, values)
+	return out
+}
+
+// copyAuthorizationCode returns an independent copy of the record: value
+// fields are copied and slice fields get fresh backing arrays. The subject
+// principal is shared by convention (it is treated as immutable).
+func copyAuthorizationCode(code *models.AuthorizationCode) *models.AuthorizationCode {
+	if code == nil {
+		return nil
+	}
+	out := *code
+	out.RequestedScopes = copyStrings(code.RequestedScopes)
+	out.RequestedResourceGaps = copyStrings(code.RequestedResourceGaps)
+	return &out
+}
+
+// copyRefreshToken returns an independent copy of the record: value fields
+// are copied, the access-token map is copied entry by entry, and slice fields
+// get fresh backing arrays. The subject principal is shared by convention (it
+// is treated as immutable).
+func copyRefreshToken(token *models.RefreshToken) *models.RefreshToken {
+	if token == nil {
+		return nil
+	}
+	out := *token
+	out.AccessToken = *copyToken(&token.AccessToken)
+	out.AccessTokens = make(map[string]*models.Token, len(token.AccessTokens))
+	for gap, accessToken := range token.AccessTokens {
+		out.AccessTokens[gap] = copyToken(accessToken)
+	}
+	out.AuthorizedScopes = copyStrings(token.AuthorizedScopes)
+	out.AuthorizedResourceGaps = copyStrings(token.AuthorizedResourceGaps)
+	return &out
+}
+
+// copyToken returns an independent copy of the token: value fields are copied
+// and slice fields get fresh backing arrays.
+func copyToken(token *models.Token) *models.Token {
+	if token == nil {
+		return nil
+	}
+	out := *token
+	out.AllowedSigningAlgorithms = copyStrings(token.AllowedSigningAlgorithms)
+	out.Audiences = copyStrings(token.Audiences)
+	out.Claims = append([]*claims.Claim(nil), token.Claims...)
+	return &out
 }
