@@ -128,9 +128,9 @@ type PersistedGrantService interface {
 }
 
 // HandleGenerationService creates opaque handles.
-// input: none -> behavior: generate random handle -> output: handle string.
+// input: none -> behavior: generate random handle -> output: handle string or error.
 type HandleGenerationService interface {
-	Generate() string
+	Generate() (string, error)
 }
 
 // UserCodeGenerator creates device-flow user codes.

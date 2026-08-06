@@ -325,7 +325,12 @@ func (s *UserSession) RemoveSessionIdCookie() error {
 
 func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	s.user = principal
-	s.session = newHandle()
+	sessionId, err := utils.CreateUniqueId(32, utils.Hex)
+	if err != nil {
+		s.user = nil
+		return "", fmt.Errorf("create session: generate session id: %w", err)
+	}
+	s.session = sessionId
 
 	if s.enabled && s.store != nil {
 		if s.clock == nil {
@@ -618,11 +623,12 @@ func (s *TokenService) CreateSecurityToken(ctx context.Context, token *storage_m
 }
 
 type RefreshTokenService struct {
-	store storage.RefreshTokenStore
+	store   storage.RefreshTokenStore
+	handles services.HandleGenerationService
 }
 
-func NewRefreshTokenService(store storage.RefreshTokenStore) *RefreshTokenService {
-	return &RefreshTokenService{store: store}
+func NewRefreshTokenService(store storage.RefreshTokenStore, handles services.HandleGenerationService) *RefreshTokenService {
+	return &RefreshTokenService{store: store, handles: handles}
 }
 
 func (s *RefreshTokenService) CreateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenCreationRequest) (string, error) {
@@ -633,14 +639,25 @@ func (s *RefreshTokenService) CreateRefreshToken(ctx context.Context, request *r
 	token.AuthorizedScopes = request.AuthorizedScopes
 	token.AuthorizedResourceGaps = request.AuthorizedResourceGaps
 	token.SetAccessToken(request.AccessToken, request.RequestedResourceGap)
-	return s.store.StoreRefreshToken(ctx, token)
+	handle, err := s.handles.Generate()
+	if err != nil {
+		return "", fmt.Errorf("create refresh token: generate handle: %w", err)
+	}
+	if err := s.store.StoreRefreshToken(ctx, handle, token); err != nil {
+		return "", err
+	}
+	return handle, nil
 }
 
 func (s *RefreshTokenService) UpdateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenUpdateRequest) (string, error) {
+	expected := 0
+	if request.RefreshToken != nil {
+		expected = request.RefreshToken.Version
+	}
 	if request.RefreshToken != nil && request.AccessToken != nil {
 		request.RefreshToken.SetAccessToken(request.AccessToken, request.RequestedResourceGap)
 	}
-	return request.Handle, s.store.UpdateRefreshToken(ctx, request.Handle, request.RefreshToken)
+	return request.Handle, s.store.UpdateRefreshToken(ctx, request.Handle, request.RefreshToken, expected)
 }
 
 func (s *RefreshTokenService) ValidateRefreshToken(ctx context.Context, handle string, client *storage_models.Client) *validators_models.TokenValidationResult {
@@ -675,7 +692,7 @@ func (s *PersistedGrantService) RemoveAllGrantsAsync(ctx context.Context, subjec
 type HandleGenerationService struct{}
 
 func NewHandleGenerationService() HandleGenerationService { return HandleGenerationService{} }
-func (HandleGenerationService) Generate() string          { return newHandle() }
+func (HandleGenerationService) Generate() (string, error) { return utils.CreateUniqueId(32, utils.Hex) }
 
 type UserCodeService struct {
 	generators []services.UserCodeGenerator
@@ -702,7 +719,10 @@ func NewDeviceFlowCodeService(store storage.DeviceFlowStore, handles services.Ha
 }
 
 func (s *DeviceFlowCodeService) StoreDeviceAuthorization(ctx context.Context, userCode string, data *storage_models.DeviceCode) (string, error) {
-	deviceCode := s.handles.Generate()
+	deviceCode, err := s.handles.Generate()
+	if err != nil {
+		return "", fmt.Errorf("store device authorization: generate device code: %w", err)
+	}
 	return deviceCode, s.store.StoreDeviceAuthorization(ctx, deviceCode, userCode, data)
 }
 func (s *DeviceFlowCodeService) FindByUserCode(ctx context.Context, userCode string) (*storage_models.DeviceCode, error) {
@@ -861,12 +881,4 @@ func NewBackchannelLogoutService(notifications services.LogoutNotificationServic
 
 func (s *BackchannelLogoutService) SendLogoutNotificationsAsync(ctx *contexts.LogoutNotificationContext) error {
 	return nil
-}
-
-func newHandle() string {
-	id, err := utils.CreateUniqueId(32, utils.Hex)
-	if err != nil {
-		return ""
-	}
-	return id
 }
