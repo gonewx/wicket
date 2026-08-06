@@ -62,6 +62,9 @@ func ConfigureServices(logger *slog.Logger) *httptest.Server {
 	cfg.SetApiScopes(apiScopes)
 	cfg.SetResourceOwnerValidator(resourceOwnerValidator)
 	cfg.SetProfileProvider(profileProvider)
+	// Developer host: stores not injected by this test setup use the declared
+	// in-memory fallback instead of failing assembly.
+	cfg.AllowInMemoryFallback()
 	cfg.Freeze()
 
 	wicketMiddleware := srv.UseWicket()

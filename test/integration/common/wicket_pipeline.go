@@ -426,6 +426,9 @@ func (p *WicketPipeline) configureServices() {
 	); err != nil {
 		panic(err)
 	}
+	// Developer host: stores not injected by this test pipeline use the declared
+	// in-memory fallback instead of failing assembly.
+	cfg.AllowInMemoryFallback()
 	cfg.Freeze()
 
 }
