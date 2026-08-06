@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -399,7 +400,7 @@ func TestAuthorizeProtocolValidationInvalid(t *testing.T) {
 			validator, err := createAuthorizeRequestValidator()
 			r.NoError(err)
 
-			resp := validator.Validate(tc.parameters(), nil)
+			resp := validator.Validate(context.Background(), tc.parameters(), nil)
 			tc.expected(r, resp)
 
 		})

@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -39,21 +40,21 @@ type authorizeBaseHandler struct {
 
 // validate runs protocol validation of the request parameters against the
 // current subject.
-func (h *authorizeBaseHandler) validate(values url.Values) *validators_models.AuthorizeRequestValidationResult {
-	return h.validator.Validate(values, h.session.GetUser())
+func (h *authorizeBaseHandler) validate(ctx context.Context, values url.Values) *validators_models.AuthorizeRequestValidationResult {
+	return h.validator.Validate(ctx, values, h.session.GetUser())
 }
 
 // dispatch maps a validated request plus any consent answer onto the result that
 // expresses the request's next step. Error paths (validation or interaction)
 // take precedence over interaction redirects, which take precedence over issuing
 // the final authorization response.
-func (h *authorizeBaseHandler) dispatch(validation *validators_models.AuthorizeRequestValidationResult, consent *messages.ConsentResponse) (endpointResult, error) {
+func (h *authorizeBaseHandler) dispatch(ctx context.Context, validation *validators_models.AuthorizeRequestValidationResult, consent *messages.ConsentResponse) (endpointResult, error) {
 	if validation.Error != nil {
 		return h.errorResult(validation.ValidatedRequest, validation.Error, validation.Description), nil
 	}
 
 	request := validation.ValidatedRequest
-	interaction := h.interaction.Handle(request, consent)
+	interaction := h.interaction.Handle(ctx, request, consent)
 	switch {
 	case interaction.IsError():
 		return h.errorResult(request, interaction.Error, interaction.ErrorDescription), nil
@@ -65,7 +66,7 @@ func (h *authorizeBaseHandler) dispatch(validation *validators_models.AuthorizeR
 		return results.NewCustomRedirectResult(request, interaction.RedirectUrl), nil
 	}
 
-	response, err := h.generator.Create(request)
+	response, err := h.generator.Create(ctx, request)
 	if err != nil {
 		// A generator failure is surfaced to the client through the authorize
 		// result: safe errors return to the client, everything else renders the

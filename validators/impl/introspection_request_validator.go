@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -28,7 +29,7 @@ func NewIntrospectionRequestValidator(tokenValidator validators.TokenValidator, 
 }
 
 // Validates the request.
-func (v *IntrospectionRequestValidator) Validate(parameters url.Values, api *storage_models.ApiResource) (*models.IntrospectionRequestValidationResult, error) {
+func (v *IntrospectionRequestValidator) Validate(ctx context.Context, parameters url.Values, api *storage_models.ApiResource) (*models.IntrospectionRequestValidationResult, error) {
 	v.logger.Debug("Introspection request validation started.")
 
 	// retrieve required token
@@ -45,7 +46,10 @@ func (v *IntrospectionRequestValidator) Validate(parameters url.Values, api *sto
 	}
 
 	// validate token
-	tokenValidationResult := v.tokenValidator.ValidateAccessToken(token, "")
+	tokenValidationResult, err := v.tokenValidator.ValidateAccessToken(ctx, token, "")
+	if err != nil {
+		return nil, err
+	}
 
 	// invalid or unknown token
 	if tokenValidationResult.Error != nil {

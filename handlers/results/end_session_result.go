@@ -89,7 +89,7 @@ func (esr *EndSessionResult) Execute(w http.ResponseWriter, r *http.Request) err
 		logoutMessage := messages.NewLogoutMessage(validatedRequest)
 		if logoutMessage.ContainsPayload() {
 			msg := messages.NewMessageWithCreated(logoutMessage, esr.clock.Now().Unix())
-			id, err = esr.logoutMessageStore.Write(msg)
+			id, err = esr.logoutMessageStore.Write(r.Context(), msg)
 		}
 	}
 

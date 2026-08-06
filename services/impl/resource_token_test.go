@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func TestTokenServiceUsesSelectedApiResourcesAsAudience(t *testing.T) {
 	apiResource.Name = "https://resources.example.com/orders"
 	apiScope := models.NewApiScope()
 	apiScope.Name = "orders.read"
-	token, err := (&TokenService{clock: resourceTokenClock{}}).CreateAccessToken(&responses_models.TokenCreationRequest{
+	token, err := (&TokenService{clock: resourceTokenClock{}}).CreateAccessToken(context.Background(), &responses_models.TokenCreationRequest{
 		ValidatedResources: validators_models.NewResourceValidationResultWithResources(models.NewResources(
 			models.WithResourcesApiResources([]*models.ApiResource{apiResource}),
 			models.WithResourcesApiScopes([]*models.ApiScope{apiScope}),
@@ -50,7 +51,7 @@ func TestRefreshTokenServiceUpdatesRequestedResourceAccessToken(t *testing.T) {
 	refreshToken.SetAccessToken(&models.Token{ClientId: "payments"}, "https://resources.example.com/payments")
 	ordersToken := &models.Token{ClientId: "orders"}
 
-	handle, err := service.UpdateRefreshToken(&responses_models.RefreshTokenUpdateRequest{
+	handle, err := service.UpdateRefreshToken(context.Background(), &responses_models.RefreshTokenUpdateRequest{
 		Handle:               "handle",
 		RefreshToken:         refreshToken,
 		AccessToken:          ordersToken,
@@ -80,19 +81,23 @@ type resourceRefreshTokenStore struct {
 	updated *models.RefreshToken
 }
 
-func (s *resourceRefreshTokenStore) StoreRefreshToken(token *models.RefreshToken) (string, error) {
+func (s *resourceRefreshTokenStore) StoreRefreshToken(ctx context.Context, token *models.RefreshToken) (string, error) {
 	return "handle", nil
 }
 
-func (s *resourceRefreshTokenStore) GetRefreshToken(string) (*models.RefreshToken, error) {
+func (s *resourceRefreshTokenStore) GetRefreshToken(ctx context.Context, handle string) (*models.RefreshToken, error) {
 	return nil, nil
 }
 
-func (s *resourceRefreshTokenStore) UpdateRefreshToken(_ string, token *models.RefreshToken) error {
+func (s *resourceRefreshTokenStore) UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error {
 	s.updated = token
 	return nil
 }
 
-func (s *resourceRefreshTokenStore) RemoveRefreshToken(string) error {
+func (s *resourceRefreshTokenStore) RemoveRefreshToken(ctx context.Context, handle string) error {
 	return nil
+}
+
+func (s *resourceRefreshTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	return 0, nil
 }

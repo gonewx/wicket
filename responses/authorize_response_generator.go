@@ -5,11 +5,13 @@
 package responses
 
 import (
+	"context"
+
 	responses_models "github.com/gonewx/wicket/responses/models"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
 // AuthorizeResponseGenerator Interface for the authorize response generator
 type AuthorizeResponseGenerator interface {
-	Create(req *validators_models.ValidatedAuthorizeRequest) (*responses_models.AuthorizeResponse, error)
+	Create(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) (*responses_models.AuthorizeResponse, error)
 }

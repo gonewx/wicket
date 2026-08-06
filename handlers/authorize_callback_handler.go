@@ -72,18 +72,18 @@ func (h *AuthorizeCallbackHandler) result(r *http.Request) (endpointResult, erro
 	values := h.recoverParameters(r)
 	key := consentRequestKey(h.base.session.GetUser(), values)
 
-	message, err := h.consent.Read(key)
+	message, err := h.consent.Read(r.Context(), key)
 	if err != nil {
 		return nil, fmt.Errorf("read consent message: %w", err)
 	}
 
-	validation := h.base.validate(values)
+	validation := h.base.validate(r.Context(), values)
 
 	if message != nil && message.Data == nil {
 		// The consent message exists but carries no answer: the callback cannot
 		// complete, so it fails to the error page and the empty message is
 		// discarded.
-		_ = h.consent.Delete(key)
+		_ = h.consent.Delete(r.Context(), key)
 		return h.base.errorResult(validation.ValidatedRequest, gois.AuthorizeErrorsInvalidRequest, ""), nil
 	}
 
@@ -92,13 +92,13 @@ func (h *AuthorizeCallbackHandler) result(r *http.Request) (endpointResult, erro
 		answer = message.Data
 	}
 
-	result, err := h.base.dispatch(validation, answer)
+	result, err := h.base.dispatch(r.Context(), validation, answer)
 	if err != nil {
 		return nil, err
 	}
 	if message != nil {
 		// The consent answer is one-time; once applied it is removed.
-		_ = h.consent.Delete(key)
+		_ = h.consent.Delete(r.Context(), key)
 	}
 	return result, nil
 }
@@ -113,7 +113,7 @@ func (h *AuthorizeCallbackHandler) recoverParameters(r *http.Request) url.Values
 	values := r.URL.Query()
 	if h.parameters != nil {
 		if storeId := values.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName); storeId != "" {
-			if message, err := h.parameters.Read(storeId); err == nil && message != nil && message.Data != nil {
+			if message, err := h.parameters.Read(r.Context(), storeId); err == nil && message != nil && message.Data != nil {
 				values = message.Data
 			}
 		}

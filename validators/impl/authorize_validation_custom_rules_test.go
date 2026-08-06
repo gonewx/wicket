@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/url"
@@ -93,7 +94,7 @@ func TestAuthorizeCustomRuleValidation(t *testing.T) {
 			values.Set(gois.AuthorizeRequestRedirectUri, "https://server/cb")
 			values.Set(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
 
-			result := validator.Validate(values, nil)
+			result := validator.Validate(context.Background(), values, nil)
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}

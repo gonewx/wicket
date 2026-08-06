@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gonewx/wicket"
@@ -36,7 +37,7 @@ func TestValid_Single_Secret(t *testing.T) {
 	ti := newHashedSharedSecretValidatorTests()
 
 	clientId := "single_secret_hashed_no_expiration"
-	client, err := extensions.FindEnabledClientById(ti.clients, clientId)
+	client, err := extensions.FindEnabledClientById(context.Background(), ti.clients, clientId)
 	a.NoError(err)
 
 	secret := &models.ParsedSecret{
@@ -57,7 +58,7 @@ func TestInvalid_Credential_Type(t *testing.T) {
 	ti := newHashedSharedSecretValidatorTests()
 
 	clientId := "single_secret_hashed_no_expiration"
-	client, err := extensions.FindEnabledClientById(ti.clients, clientId)
+	client, err := extensions.FindEnabledClientById(context.Background(), ti.clients, clientId)
 	a.NoError(err)
 
 	secret := &models.ParsedSecret{
@@ -78,7 +79,7 @@ func TestValid_Multiple_Secrets(t *testing.T) {
 	ti := newHashedSharedSecretValidatorTests()
 
 	clientId := "multiple_secrets_hashed"
-	client, err := extensions.FindEnabledClientById(ti.clients, clientId)
+	client, err := extensions.FindEnabledClientById(context.Background(), ti.clients, clientId)
 	a.NoError(err)
 
 	secret := &models.ParsedSecret{
@@ -113,7 +114,7 @@ func TestInvalid_Single_Secret(t *testing.T) {
 	ti := newHashedSharedSecretValidatorTests()
 
 	clientId := "single_secret_hashed_no_expiration"
-	client, err := extensions.FindEnabledClientById(ti.clients, clientId)
+	client, err := extensions.FindEnabledClientById(context.Background(), ti.clients, clientId)
 	a.NoError(err)
 
 	secret := &models.ParsedSecret{
@@ -134,7 +135,7 @@ func TestInvalid_Multiple_Secrets(t *testing.T) {
 	ti := newHashedSharedSecretValidatorTests()
 
 	clientId := "multiple_secrets_hashed"
-	client, err := extensions.FindEnabledClientById(ti.clients, clientId)
+	client, err := extensions.FindEnabledClientById(context.Background(), ti.clients, clientId)
 	a.NoError(err)
 
 	secret := &models.ParsedSecret{
@@ -155,7 +156,7 @@ func TestClient_with_no_Secret_Should_Fail(t *testing.T) {
 	ti := newHashedSharedSecretValidatorTests()
 
 	clientId := "no_secret_client"
-	client, err := extensions.FindEnabledClientById(ti.clients, clientId)
+	client, err := extensions.FindEnabledClientById(context.Background(), ti.clients, clientId)
 	a.NoError(err)
 
 	secret := &models.ParsedSecret{
@@ -175,7 +176,7 @@ func TestClient_with_null_Secret_Should_Fail(t *testing.T) {
 	ti := newHashedSharedSecretValidatorTests()
 
 	clientId := "null_secret_client"
-	client, err := extensions.FindEnabledClientById(ti.clients, clientId)
+	client, err := extensions.FindEnabledClientById(context.Background(), ti.clients, clientId)
 	a.NoError(err)
 
 	secret := &models.ParsedSecret{

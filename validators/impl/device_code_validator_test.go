@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -49,7 +50,7 @@ func TestDeviceCode_Missing(t *testing.T) {
 
 	tests := newDeviceCodeValidatorTests()
 
-	client, err := tests.clients.FindClientById("device_flow")
+	client, err := tests.clients.FindClientById(context.Background(), "device_flow")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
@@ -59,16 +60,16 @@ func TestDeviceCode_Missing(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(client, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: "",
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.Error(ctx.Result.Error)
-	r.ErrorIs(ctx.Result.Error, gois.TokenErrorsInvalidGrant)
+	r.Error(validation.Result.Error)
+	r.ErrorIs(validation.Result.Error, gois.TokenErrorsInvalidGrant)
 }
 
 func TestDeviceCode_From_Different_Client(t *testing.T) {
@@ -76,12 +77,12 @@ func TestDeviceCode_From_Different_Client(t *testing.T) {
 
 	tests := newDeviceCodeValidatorTests()
 
-	badActor, err := tests.clients.FindClientById("codeclient")
+	badActor, err := tests.clients.FindClientById(context.Background(), "codeclient")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
 
-	handle, err := service.StoreDeviceAuthorization(uuid.New().String(), tests.deviceCode)
+	handle, err := service.StoreDeviceAuthorization(context.Background(), uuid.New().String(), tests.deviceCode)
 	r.NoError(err)
 
 	validator := createDeviceCodeValidator(service, nil, nil, nil)
@@ -89,16 +90,16 @@ func TestDeviceCode_From_Different_Client(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(badActor, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: handle,
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.Error(ctx.Result.Error)
-	r.ErrorIs(ctx.Result.Error, gois.TokenErrorsInvalidGrant)
+	r.Error(validation.Result.Error)
+	r.ErrorIs(validation.Result.Error, gois.TokenErrorsInvalidGrant)
 }
 
 func TestExpired_DeviceCode(t *testing.T) {
@@ -109,12 +110,12 @@ func TestExpired_DeviceCode(t *testing.T) {
 	tests.deviceCode.CreationTime = deviceCodeTestNow.Add(-10 * 24 * time.Hour)
 	tests.deviceCode.Lifetime = 300
 
-	client, err := tests.clients.FindClientById("device_flow")
+	client, err := tests.clients.FindClientById(context.Background(), "device_flow")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
 
-	handle, err := service.StoreDeviceAuthorization(uuid.New().String(), tests.deviceCode)
+	handle, err := service.StoreDeviceAuthorization(context.Background(), uuid.New().String(), tests.deviceCode)
 	r.NoError(err)
 
 	validator := createDeviceCodeValidator(service, nil, nil, nil)
@@ -122,16 +123,16 @@ func TestExpired_DeviceCode(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(client, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: handle,
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.Error(ctx.Result.Error)
-	r.ErrorIs(ctx.Result.Error, gois.TokenErrorsExpiredToken)
+	r.Error(validation.Result.Error)
+	r.ErrorIs(validation.Result.Error, gois.TokenErrorsExpiredToken)
 }
 
 func TestAccess_Denied(t *testing.T) {
@@ -141,12 +142,12 @@ func TestAccess_Denied(t *testing.T) {
 
 	tests.deviceCode.AuthorizedScopes = []string{}
 
-	client, err := tests.clients.FindClientById("device_flow")
+	client, err := tests.clients.FindClientById(context.Background(), "device_flow")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
 
-	handle, err := service.StoreDeviceAuthorization(uuid.New().String(), tests.deviceCode)
+	handle, err := service.StoreDeviceAuthorization(context.Background(), uuid.New().String(), tests.deviceCode)
 	r.NoError(err)
 
 	validator := createDeviceCodeValidator(service, nil, nil, nil)
@@ -154,16 +155,16 @@ func TestAccess_Denied(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(client, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: handle,
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.Error(ctx.Result.Error)
-	r.ErrorIs(ctx.Result.Error, gois.TokenErrorsAccessDenied)
+	r.Error(validation.Result.Error)
+	r.ErrorIs(validation.Result.Error, gois.TokenErrorsAccessDenied)
 }
 
 func TestDeviceCode_Not_Yet_Authorized(t *testing.T) {
@@ -173,12 +174,12 @@ func TestDeviceCode_Not_Yet_Authorized(t *testing.T) {
 
 	tests.deviceCode.IsAuthorized = false
 
-	client, err := tests.clients.FindClientById("device_flow")
+	client, err := tests.clients.FindClientById(context.Background(), "device_flow")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
 
-	handle, err := service.StoreDeviceAuthorization(uuid.New().String(), tests.deviceCode)
+	handle, err := service.StoreDeviceAuthorization(context.Background(), uuid.New().String(), tests.deviceCode)
 	r.NoError(err)
 
 	validator := createDeviceCodeValidator(service, nil, nil, nil)
@@ -186,16 +187,16 @@ func TestDeviceCode_Not_Yet_Authorized(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(client, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: handle,
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.Error(ctx.Result.Error)
-	r.ErrorIs(ctx.Result.Error, gois.TokenErrorsAuthorizationPending)
+	r.Error(validation.Result.Error)
+	r.ErrorIs(validation.Result.Error, gois.TokenErrorsAuthorizationPending)
 }
 
 func TestDeviceCode_Missing_Subject(t *testing.T) {
@@ -205,12 +206,12 @@ func TestDeviceCode_Missing_Subject(t *testing.T) {
 
 	tests.deviceCode.Subject = nil
 
-	client, err := tests.clients.FindClientById("device_flow")
+	client, err := tests.clients.FindClientById(context.Background(), "device_flow")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
 
-	handle, err := service.StoreDeviceAuthorization(uuid.New().String(), tests.deviceCode)
+	handle, err := service.StoreDeviceAuthorization(context.Background(), uuid.New().String(), tests.deviceCode)
 	r.NoError(err)
 
 	validator := createDeviceCodeValidator(service, nil, nil, nil)
@@ -218,16 +219,16 @@ func TestDeviceCode_Missing_Subject(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(client, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: handle,
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.Error(ctx.Result.Error)
-	r.ErrorIs(ctx.Result.Error, gois.TokenErrorsAuthorizationPending)
+	r.Error(validation.Result.Error)
+	r.ErrorIs(validation.Result.Error, gois.TokenErrorsAuthorizationPending)
 }
 
 func TestUser_Disabled(t *testing.T) {
@@ -235,12 +236,12 @@ func TestUser_Disabled(t *testing.T) {
 
 	tests := newDeviceCodeValidatorTests()
 
-	client, err := tests.clients.FindClientById("device_flow")
+	client, err := tests.clients.FindClientById(context.Background(), "device_flow")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
 
-	handle, err := service.StoreDeviceAuthorization(uuid.New().String(), tests.deviceCode)
+	handle, err := service.StoreDeviceAuthorization(context.Background(), uuid.New().String(), tests.deviceCode)
 	r.NoError(err)
 
 	validator := createDeviceCodeValidator(service, validators_mock.NewTestProfileService(false), nil, nil)
@@ -248,16 +249,16 @@ func TestUser_Disabled(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(client, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: handle,
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.Error(ctx.Result.Error)
-	r.ErrorIs(ctx.Result.Error, gois.TokenErrorsInvalidGrant)
+	r.Error(validation.Result.Error)
+	r.ErrorIs(validation.Result.Error, gois.TokenErrorsInvalidGrant)
 }
 
 func TestDeviceCode_Polling_Too_Fast(t *testing.T) {
@@ -265,12 +266,12 @@ func TestDeviceCode_Polling_Too_Fast(t *testing.T) {
 
 	tests := newDeviceCodeValidatorTests()
 
-	client, err := tests.clients.FindClientById("device_flow")
+	client, err := tests.clients.FindClientById(context.Background(), "device_flow")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
 
-	handle, err := service.StoreDeviceAuthorization(uuid.New().String(), tests.deviceCode)
+	handle, err := service.StoreDeviceAuthorization(context.Background(), uuid.New().String(), tests.deviceCode)
 	r.NoError(err)
 
 	validator := createDeviceCodeValidator(service, nil, validators_mock.NewTestDeviceFlowThrottlingService(true), nil)
@@ -278,16 +279,16 @@ func TestDeviceCode_Polling_Too_Fast(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(client, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: handle,
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.Error(ctx.Result.Error)
-	r.ErrorIs(ctx.Result.Error, gois.TokenErrorsSlowDown)
+	r.Error(validation.Result.Error)
+	r.ErrorIs(validation.Result.Error, gois.TokenErrorsSlowDown)
 }
 
 func TestValid_DeviceCode(t *testing.T) {
@@ -295,12 +296,12 @@ func TestValid_DeviceCode(t *testing.T) {
 
 	tests := newDeviceCodeValidatorTests()
 
-	client, err := tests.clients.FindClientById("device_flow")
+	client, err := tests.clients.FindClientById(context.Background(), "device_flow")
 	r.NoError(err)
 
 	service := createDeviceCodeService()
 
-	handle, err := service.StoreDeviceAuthorization(uuid.New().String(), tests.deviceCode)
+	handle, err := service.StoreDeviceAuthorization(context.Background(), uuid.New().String(), tests.deviceCode)
 	r.NoError(err)
 
 	validator := createDeviceCodeValidator(service, nil, nil, nil)
@@ -308,13 +309,13 @@ func TestValid_DeviceCode(t *testing.T) {
 	request := validators_models.NewValidatedTokenRequest()
 	request.SetClient(client, nil, "")
 
-	ctx := &validators_models.DeviceCodeValidationContext{
+	validation := &validators_models.DeviceCodeValidationContext{
 		DeviceCode: handle,
 		Request:    request,
 	}
 
-	err = validator.Validate(ctx)
+	err = validator.Validate(context.Background(), validation)
 	r.NoError(err)
 
-	r.NoError(ctx.Result.Error)
+	r.NoError(validation.Result.Error)
 }

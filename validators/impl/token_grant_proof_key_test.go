@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"testing"
@@ -120,7 +121,7 @@ func TestTokenRequestValidationProofKey(t *testing.T) {
 				parameters.Set(gois.TokenRequestCodeVerifier, tt.codeVerifier)
 			}
 
-			result := f.validator.ValidateRequest(parameters, grantTestSecretResult(t, tt.clientId))
+			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
 			if tt.wantErr == nil {
 				if result.Error != nil {
 					t.Fatalf("unexpected error: %v (description %q)", result.Error, result.Description)

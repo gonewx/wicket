@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -81,21 +82,21 @@ func TestUserSessionDisabledTwoState(t *testing.T) {
 
 	us := newSessionUserSession(t, false, store, acc, clock)
 
-	sid, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{})
+	sid, err := us.CreateSessionId(context.Background(), principalWithSubject("alice"), &auth.Properties{})
 	if err != nil {
 		t.Fatalf("CreateSessionId: %v", err)
 	}
 	if sid == "" {
 		t.Fatal("expected non-empty session id")
 	}
-	if got, _ := store.GetSession(sid); got != nil {
+	if got, _ := store.GetSession(context.Background(), sid); got != nil {
 		t.Fatal("disabled UserSession must not write to the store")
 	}
 	if len(rec.Result().Cookies()) != 0 {
 		t.Fatal("disabled UserSession must not set a session cookie")
 	}
 
-	if err := us.EnsureSessionIdCookie(); err != nil {
+	if err := us.EnsureSessionIdCookie(context.Background()); err != nil {
 		t.Fatalf("EnsureSessionIdCookie: %v", err)
 	}
 }
@@ -121,7 +122,7 @@ func TestUserSessionEnabledNilClockFailsClosed(t *testing.T) {
 	}
 	us := NewUserSession(acc, nil, opts, nil, nil, nil, nil, store)
 
-	_, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{})
+	_, err := us.CreateSessionId(context.Background(), principalWithSubject("alice"), &auth.Properties{})
 	if err == nil {
 		t.Fatal("expected CreateSessionId to fail closed with a nil clock, got nil error")
 	}
@@ -143,7 +144,7 @@ func TestUserSessionEnabledEnsureWithoutCookieIsNoOp(t *testing.T) {
 
 	us := newSessionUserSession(t, true, store, acc, clock)
 
-	if err := us.EnsureSessionIdCookie(); err != nil {
+	if err := us.EnsureSessionIdCookie(context.Background()); err != nil {
 		t.Fatalf("EnsureSessionIdCookie: %v", err)
 	}
 	if len(rec.Result().Cookies()) != 0 {
@@ -186,7 +187,7 @@ func TestUserSessionGetUserReflectsCreation(t *testing.T) {
 				t.Fatal("GetUser must be nil before a session is created")
 			}
 
-			if _, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{}); err != nil {
+			if _, err := us.CreateSessionId(context.Background(), principalWithSubject("alice"), &auth.Properties{}); err != nil {
 				t.Fatalf("CreateSessionId: %v", err)
 			}
 
@@ -309,7 +310,7 @@ func TestUserSessionGetUserRecoversFromTicket(t *testing.T) {
 				}
 				us := NewUserSession(acc, handlers, opts, clock, nil, nil, recoverySchemes(t), store)
 
-				if _, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{}); err != nil {
+				if _, err := us.CreateSessionId(context.Background(), principalWithSubject("alice"), &auth.Properties{}); err != nil {
 					t.Fatalf("CreateSessionId: %v", err)
 				}
 
@@ -335,12 +336,12 @@ func TestUserSessionEnabledCreatePersistsAndSetsCookie(t *testing.T) {
 
 	us := newSessionUserSession(t, true, store, acc, clock)
 
-	sid, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{})
+	sid, err := us.CreateSessionId(context.Background(), principalWithSubject("alice"), &auth.Properties{})
 	if err != nil {
 		t.Fatalf("CreateSessionId: %v", err)
 	}
 
-	stored, err := store.GetSession(sid)
+	stored, err := store.GetSession(context.Background(), sid)
 	if err != nil || stored == nil {
 		t.Fatalf("session not persisted: got=%v err=%v", stored, err)
 	}
@@ -395,7 +396,7 @@ func TestUserSessionEnabledEnsureLoadsFromCookie(t *testing.T) {
 		Expires:   clock.Now().Add(24 * time.Hour),
 		ClientIDs: []string{"client-a"},
 	}
-	if err := store.CreateSession(seed); err != nil {
+	if err := store.CreateSession(context.Background(), seed); err != nil {
 		t.Fatal(err)
 	}
 
@@ -405,7 +406,7 @@ func TestUserSessionEnabledEnsureLoadsFromCookie(t *testing.T) {
 
 	us := newSessionUserSession(t, true, store, acc, clock)
 
-	if err := us.EnsureSessionIdCookie(); err != nil {
+	if err := us.EnsureSessionIdCookie(context.Background()); err != nil {
 		t.Fatalf("EnsureSessionIdCookie: %v", err)
 	}
 	if us.GetSessionId() != "seed-session" {
@@ -436,7 +437,7 @@ func TestUserSessionEnabledEnsureClearsStaleCookie(t *testing.T) {
 
 	us := newSessionUserSession(t, true, store, acc, clock)
 
-	if err := us.EnsureSessionIdCookie(); err != nil {
+	if err := us.EnsureSessionIdCookie(context.Background()); err != nil {
 		t.Fatalf("EnsureSessionIdCookie: %v", err)
 	}
 	if us.GetSessionId() != "" {
@@ -466,15 +467,15 @@ func TestUserSessionEnabledAddClientPersists(t *testing.T) {
 
 	us := newSessionUserSession(t, true, store, acc, clock)
 
-	sid, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{})
+	sid, err := us.CreateSessionId(context.Background(), principalWithSubject("alice"), &auth.Properties{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := us.AddClientId("client-x"); err != nil {
+	if err := us.AddClientId(context.Background(), "client-x"); err != nil {
 		t.Fatalf("AddClientId: %v", err)
 	}
 
-	stored, _ := store.GetSession(sid)
+	stored, _ := store.GetSession(context.Background(), sid)
 	if stored == nil {
 		t.Fatal("session missing")
 	}
@@ -502,7 +503,7 @@ func TestUserSessionRemoveClearsCookieNotRecord(t *testing.T) {
 	acc := &recordingAccessor{req: httptest.NewRequest(http.MethodGet, "/", nil), rw: rec}
 
 	us := newSessionUserSession(t, true, store, acc, clock)
-	sid, err := us.CreateSessionId(principalWithSubject("alice"), &auth.Properties{})
+	sid, err := us.CreateSessionId(context.Background(), principalWithSubject("alice"), &auth.Properties{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +514,7 @@ func TestUserSessionRemoveClearsCookieNotRecord(t *testing.T) {
 	if us.GetSessionId() != "" {
 		t.Fatal("internal session id should be cleared")
 	}
-	if got, _ := store.GetSession(sid); got == nil {
+	if got, _ := store.GetSession(context.Background(), sid); got == nil {
 		t.Fatal("server-side record must survive cookie removal")
 	}
 }
@@ -531,7 +532,7 @@ func TestSessionCoordinationAdapterValidatePath(t *testing.T) {
 		t.Parallel()
 		store := sessionpkg.NewMemoryStore(clock)
 		adapter := NewSessionCoordinationAdapter(sessionpkg.NewCoordinator(store, clock, false))
-		valid, err := adapter.ValidateSession(&services.SessionValidationRequest{
+		valid, err := adapter.ValidateSession(context.Background(), &services.SessionValidationRequest{
 			Type:      services.SessionValidationTypeAccessToken,
 			SubjectId: "alice",
 			SessionId: "anything",
@@ -544,7 +545,7 @@ func TestSessionCoordinationAdapterValidatePath(t *testing.T) {
 	t.Run("enabled valid session", func(t *testing.T) {
 		t.Parallel()
 		store := sessionpkg.NewMemoryStore(clock)
-		if err := store.CreateSession(&sessionpkg.Record{
+		if err := store.CreateSession(context.Background(), &sessionpkg.Record{
 			SessionID: "sid-1",
 			SubjectID: "alice",
 			Created:   clock.Now(),
@@ -554,7 +555,7 @@ func TestSessionCoordinationAdapterValidatePath(t *testing.T) {
 			t.Fatal(err)
 		}
 		adapter := NewSessionCoordinationAdapter(sessionpkg.NewCoordinator(store, clock, true))
-		valid, err := adapter.ValidateSession(&services.SessionValidationRequest{
+		valid, err := adapter.ValidateSession(context.Background(), &services.SessionValidationRequest{
 			Type:      services.SessionValidationTypeAccessToken,
 			SubjectId: "alice",
 			SessionId: "sid-1",
@@ -568,7 +569,7 @@ func TestSessionCoordinationAdapterValidatePath(t *testing.T) {
 		t.Parallel()
 		store := sessionpkg.NewMemoryStore(clock)
 		adapter := NewSessionCoordinationAdapter(sessionpkg.NewCoordinator(store, clock, true))
-		valid, err := adapter.ValidateSession(&services.SessionValidationRequest{
+		valid, err := adapter.ValidateSession(context.Background(), &services.SessionValidationRequest{
 			Type:      services.SessionValidationTypeAccessToken,
 			SubjectId: "alice",
 			SessionId: "unknown",

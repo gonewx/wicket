@@ -4,6 +4,7 @@
 package results
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -40,9 +41,13 @@ func (emptyScope) Close() error                             { return nil }
 // can be exercised and its propagation asserted.
 type errWriteStore struct{ err error }
 
-func (s errWriteStore) Write(*messages.Message[url.Values]) (string, error) { return "", s.err }
-func (errWriteStore) Read(string) (*messages.Message[url.Values], error)    { return nil, nil }
-func (errWriteStore) Delete(string) error                                   { return nil }
+func (s errWriteStore) Write(ctx context.Context, message *messages.Message[url.Values]) (string, error) {
+	return "", s.err
+}
+func (errWriteStore) Read(ctx context.Context, id string) (*messages.Message[url.Values], error) {
+	return nil, nil
+}
+func (errWriteStore) Delete(ctx context.Context, id string) error { return nil }
 
 // authorizeRawValues is a representative set of front-channel authorize
 // parameters used to prove they survive the round trip into the return URL.

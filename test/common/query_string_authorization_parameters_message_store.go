@@ -5,6 +5,7 @@
 package common
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/gonewx/wicket/models/messages"
@@ -17,12 +18,12 @@ func NewQueryStringAuthorizationParametersMessageStore() *QueryStringAuthorizati
 	return &QueryStringAuthorizationParametersMessageStore{}
 }
 
-func (s *QueryStringAuthorizationParametersMessageStore) Write(message *messages.Message[url.Values]) (string, error) {
+func (s *QueryStringAuthorizationParametersMessageStore) Write(ctx context.Context, message *messages.Message[url.Values]) (string, error) {
 	queryString := message.Data.Encode()
 	return queryString, nil
 }
 
-func (s *QueryStringAuthorizationParametersMessageStore) Read(id string) (*messages.Message[url.Values], error) {
+func (s *QueryStringAuthorizationParametersMessageStore) Read(ctx context.Context, id string) (*messages.Message[url.Values], error) {
 	parsedUrl, err := url.ParseQuery(id)
 	if err != nil {
 		return nil, err
@@ -33,6 +34,6 @@ func (s *QueryStringAuthorizationParametersMessageStore) Read(id string) (*messa
 	return msg, nil
 }
 
-func (s *QueryStringAuthorizationParametersMessageStore) Delete(id string) error {
+func (s *QueryStringAuthorizationParametersMessageStore) Delete(ctx context.Context, id string) error {
 	return nil
 }

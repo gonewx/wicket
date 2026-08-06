@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -20,7 +21,7 @@ type fakeDiscoveryResponseGenerator struct {
 	err      error
 }
 
-func (g *fakeDiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, issuerUri string) (map[string]any, error) {
+func (g *fakeDiscoveryResponseGenerator) CreateDiscoveryDocument(ctx context.Context, baseUrl string, issuerUri string) (map[string]any, error) {
 	if g.err != nil {
 		return nil, g.err
 	}
@@ -31,7 +32,7 @@ func (g *fakeDiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string,
 	return document, nil
 }
 
-func (g *fakeDiscoveryResponseGenerator) CreateJwkDocument() ([]*models.JsonWebKey, error) {
+func (g *fakeDiscoveryResponseGenerator) CreateJwkDocument(ctx context.Context) ([]*models.JsonWebKey, error) {
 	return g.keys, g.err
 }
 

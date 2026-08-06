@@ -58,6 +58,7 @@ func (crr *CustomRedirectResult) Execute(w http.ResponseWriter, r *http.Request)
 	crr.init(r.Context())
 
 	target, err := redirectUrl(
+		r.Context(),
 		crr.request,
 		crr.urls,
 		crr.authorizationParametersMessageStore,

@@ -4,6 +4,8 @@
 package memory
 
 import (
+	"context"
+
 	core_models "github.com/gonewx/wicket/models"
 	"github.com/gonewx/wicket/tokens"
 )
@@ -18,7 +20,7 @@ func NewMemorySigningCredentialStore(credential *tokens.SigningCredentials) *Mem
 	return &MemorySigningCredentialStore{credential: credential}
 }
 
-func (s *MemorySigningCredentialStore) GetSigningCredentials() (*tokens.SigningCredentials, error) {
+func (s *MemorySigningCredentialStore) GetSigningCredentials(ctx context.Context) (*tokens.SigningCredentials, error) {
 	return s.credential, nil
 }
 
@@ -32,6 +34,6 @@ func NewMemoryValidationKeysStore(keys []*core_models.SecurityKeyInfo) *MemoryVa
 	return &MemoryValidationKeysStore{keys: keys}
 }
 
-func (s *MemoryValidationKeysStore) GetValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
+func (s *MemoryValidationKeysStore) GetValidationKeys(ctx context.Context) ([]*core_models.SecurityKeyInfo, error) {
 	return append([]*core_models.SecurityKeyInfo(nil), s.keys...), nil
 }

@@ -4,6 +4,7 @@
 package keymgmt
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -225,10 +226,10 @@ func (m *Manager) effectiveLead() time.Duration {
 // SigningCandidates returns the active, in-window signing candidates. Storage
 // disruption falls back to the last known good candidates so signing stays
 // available, which takes priority over fail-closed.
-func (m *Manager) SigningCandidates() ([]SigningCandidate, error) {
+func (m *Manager) SigningCandidates(ctx context.Context) ([]SigningCandidate, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	snap, err := m.currentSnapshot()
+	snap, err := m.currentSnapshot(ctx)
 	if err != nil {
 		if len(m.lastGood) > 0 {
 			return cloneCandidates(m.lastGood), nil
@@ -252,10 +253,10 @@ func (m *Manager) SigningCandidates() ([]SigningCandidate, error) {
 // snapshot within the TTL; after the TTL a storage read failure fails closed.
 // An active key whose public material cannot be serialized fails the whole set
 // rather than silently dropping the kid that is currently signing.
-func (m *Manager) ValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
+func (m *Manager) ValidationKeys(ctx context.Context) ([]*core_models.SecurityKeyInfo, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	snap, err := m.currentSnapshot()
+	snap, err := m.currentSnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -269,10 +270,10 @@ func (m *Manager) ValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
 // keys without gating on Enabled or running rotation. It supports a host
 // draining auto-managed keys into its own validation stores when disabling the
 // manager, so already-issued tokens keep resolving through JWKS.
-func (m *Manager) ExportValidationMaterial() ([]*core_models.SecurityKeyInfo, error) {
+func (m *Manager) ExportValidationMaterial(ctx context.Context) ([]*core_models.SecurityKeyInfo, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	records, err := m.store.List()
+	records, err := m.store.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +282,7 @@ func (m *Manager) ExportValidationMaterial() ([]*core_models.SecurityKeyInfo, er
 
 // currentSnapshot returns a fresh snapshot, reconciling the lifecycle when the
 // cache is cold or expired. Callers hold m.mu.
-func (m *Manager) currentSnapshot() (*snapshot, error) {
+func (m *Manager) currentSnapshot(ctx context.Context) (*snapshot, error) {
 	if err := m.validateConfig(); err != nil {
 		return nil, err
 	}
@@ -292,10 +293,10 @@ func (m *Manager) currentSnapshot() (*snapshot, error) {
 	if m.snapshot != nil && now.Before(m.cacheExpiry) {
 		return m.snapshot, nil
 	}
-	if err := m.reconcile(now); err != nil {
+	if err := m.reconcile(ctx, now); err != nil {
 		return nil, err
 	}
-	records, err := m.store.List()
+	records, err := m.store.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -316,13 +317,13 @@ func (m *Manager) currentSnapshot() (*snapshot, error) {
 // reconcile drives the lifecycle to convergence by applying one committed
 // transition per iteration. Each transition is optimistic-concurrency guarded,
 // so concurrent instances converge without producing duplicate keys.
-func (m *Manager) reconcile(now time.Time) error {
+func (m *Manager) reconcile(ctx context.Context, now time.Time) error {
 	for i := 0; i < maxReconcileSteps; i++ {
-		records, err := m.store.List()
+		records, err := m.store.List(ctx)
 		if err != nil {
 			return err
 		}
-		mutated, err := m.reconcileStep(now, records)
+		mutated, err := m.reconcileStep(ctx, now, records)
 		if err != nil {
 			if errors.Is(err, ErrVersionConflict) || errors.Is(err, ErrDuplicateKey) || errors.Is(err, ErrRecordNotFound) {
 				// Another instance advanced or removed the record; re-read and
@@ -344,20 +345,20 @@ func (m *Manager) reconcile(now time.Time) error {
 
 // reconcileStep finds the single highest-priority actionable transition, commits
 // it, and reports whether it mutated state.
-func (m *Manager) reconcileStep(now time.Time, records []*Record) (bool, error) {
+func (m *Manager) reconcileStep(ctx context.Context, now time.Time, records []*Record) (bool, error) {
 	// 1. Retire retained keys past their retention window plus clock skew, so
 	// the publish window (+skew in withinPublishWindow) is fully honoured.
 	for _, r := range records {
 		if r.Phase == PhaseRetained && !r.RetainUntil.IsZero() && !now.Before(r.RetainUntil.Add(m.cfg.ClockSkew)) {
 			next := copyRecord(r)
 			next.Phase = PhaseRetired
-			return true, m.store.Update(next, r.Version)
+			return true, m.store.Update(ctx, next, r.Version)
 		}
 	}
 	// 2. Move expired active keys into retention.
 	for _, r := range records {
 		if r.Phase == PhaseActive && !r.NotAfter.IsZero() && !now.Before(r.NotAfter) {
-			return true, m.retain(r, now)
+			return true, m.retain(ctx, r, now)
 		}
 	}
 	// 3. Activate a candidate whose warm-up and window are satisfied.
@@ -365,19 +366,19 @@ func (m *Manager) reconcileStep(now time.Time, records []*Record) (bool, error) 
 		if r.Phase == PhaseCandidate && m.candidateReady(r, now) {
 			next := copyRecord(r)
 			next.Phase = PhaseActive
-			return true, m.store.Update(next, r.Version)
+			return true, m.store.Update(ctx, next, r.Version)
 		}
 	}
 	// 4. Demote surplus active keys when multiple active is not allowed.
 	if !m.cfg.AllowMultipleActive {
 		if surplus := m.surplusActive(records); surplus != nil {
-			return true, m.retain(surplus, now)
+			return true, m.retain(ctx, surplus, now)
 		}
 	}
 	// 5. Bootstrap the first active key directly when none can sign.
-	if !m.hasActiveSignable(records, now) {
+	if !m.hasActiveSignable(ctx, records, now) {
 		if m.cfg.AutoCreate {
-			return true, m.createKey(now, PhaseActive)
+			return true, m.createKey(ctx, now, PhaseActive)
 		}
 		return false, nil
 	}
@@ -385,16 +386,16 @@ func (m *Manager) reconcileStep(now time.Time, records []*Record) (bool, error) 
 	// never signed, so no issued token depends on its kid: it retires directly
 	// instead of passing through retention, keeping its audit metadata.
 	for _, r := range records {
-		if r.Phase == PhaseCandidate && m.orphanCandidate(r, now) {
+		if r.Phase == PhaseCandidate && m.orphanCandidate(ctx, r, now) {
 			m.warn("isolating stale candidate superseded by a fresher active key", "kid", r.PublicID)
 			next := copyRecord(r)
 			next.Phase = PhaseRetired
-			return true, m.store.Update(next, r.Version)
+			return true, m.store.Update(ctx, next, r.Version)
 		}
 	}
 	// 7. Warm up the next rotation candidate ahead of active expiry.
 	if m.shouldRotate(records, now) {
-		return true, m.createKey(now, PhaseCandidate)
+		return true, m.createKey(ctx, now, PhaseCandidate)
 	}
 	return false, nil
 }
@@ -410,18 +411,18 @@ func (m *Manager) candidateReady(r *Record, now time.Time) bool {
 
 // orphanCandidate reports whether a candidate is stale and can no longer be
 // activated because a fresh active key already exists.
-func (m *Manager) orphanCandidate(r *Record, now time.Time) bool {
+func (m *Manager) orphanCandidate(ctx context.Context, r *Record, now time.Time) bool {
 	if now.Before(r.CreatedAt.Add(2 * m.effectiveLead())) {
 		return false
 	}
 	// Only isolate a stale candidate once a fresher active key already covers
 	// signing, so the orphan is not needed.
-	return m.hasFreshActive(r, now)
+	return m.hasFreshActive(ctx, r, now)
 }
 
 // hasFreshActive reports whether some active key newer than the candidate exists.
-func (m *Manager) hasFreshActive(candidate *Record, now time.Time) bool {
-	records, err := m.store.List()
+func (m *Manager) hasFreshActive(ctx context.Context, candidate *Record, now time.Time) bool {
+	records, err := m.store.List(ctx)
 	if err != nil {
 		return false
 	}
@@ -454,7 +455,7 @@ func (m *Manager) surplusActive(records []*Record) *Record {
 
 // retain transitions a key into the retained phase and computes its retirement
 // deadline when unset.
-func (m *Manager) retain(r *Record, now time.Time) error {
+func (m *Manager) retain(ctx context.Context, r *Record, now time.Time) error {
 	next := copyRecord(r)
 	next.Phase = PhaseRetained
 	if next.RetainUntil.IsZero() {
@@ -464,15 +465,15 @@ func (m *Manager) retain(r *Record, now time.Time) error {
 		}
 		next.RetainUntil = base.Add(m.cfg.RetentionDuration)
 	}
-	return m.store.Update(next, r.Version)
+	return m.store.Update(ctx, next, r.Version)
 }
 
 // hasActiveSignable reports whether any active key can currently sign. When
 // records is nil the store is read.
-func (m *Manager) hasActiveSignable(records []*Record, now time.Time) bool {
+func (m *Manager) hasActiveSignable(ctx context.Context, records []*Record, now time.Time) bool {
 	if records == nil {
 		var err error
-		records, err = m.store.List()
+		records, err = m.store.List(ctx)
 		if err != nil {
 			return false
 		}
@@ -521,7 +522,7 @@ func (m *Manager) acceptableCandidate(r *Record, now time.Time, allowedSet map[s
 }
 
 // createKey generates, protects and persists a new key in the given phase.
-func (m *Manager) createKey(now time.Time, phase Phase) error {
+func (m *Manager) createKey(ctx context.Context, now time.Time, phase Phase) error {
 	if !m.protector.available() {
 		return ErrProtectorUnavailable
 	}
@@ -558,7 +559,7 @@ func (m *Manager) createKey(now time.Time, phase Phase) error {
 	if err := validateWindow(record); err != nil {
 		return err
 	}
-	return m.store.Create(record)
+	return m.store.Create(ctx, record)
 }
 
 // recoverable reports whether a record's private material can be unprotected and

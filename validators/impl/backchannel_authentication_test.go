@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/url"
@@ -73,7 +74,7 @@ func TestBackchannelAuthenticationRequestValidatorTable(t *testing.T) {
 				tt.client(client)
 			}
 
-			result := validator.Validate(tt.values, client)
+			result := validator.Validate(context.Background(), tt.values, client)
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}
@@ -91,7 +92,7 @@ func TestBackchannelAuthenticationRequestValidatorTable(t *testing.T) {
 					t.Fatalf("auth_req_id contains invalid rune %q", r)
 				}
 			}
-			stored, err := store.FindBackchannelAuthenticationRequest(result.Request.RequestId)
+			stored, err := store.FindBackchannelAuthenticationRequest(context.Background(), result.Request.RequestId)
 			if err != nil {
 				t.Fatalf("find stored request: %v", err)
 			}
@@ -163,7 +164,7 @@ func TestBackchannelAuthenticationRequestIdValidatorTable(t *testing.T) {
 			options := config_options.NewWicketOptions()
 			clock := &cibaTestClock{now: now}
 			store := memory.NewMemoryBackchannelAuthenticationRequestStore()
-			if err := store.StoreBackchannelAuthenticationRequest(tt.request.RequestId, tt.request); err != nil {
+			if err := store.StoreBackchannelAuthenticationRequest(context.Background(), tt.request.RequestId, tt.request); err != nil {
 				t.Fatalf("store request: %v", err)
 			}
 			validator := NewBackchannelAuthenticationRequestIdValidator(
@@ -173,15 +174,15 @@ func TestBackchannelAuthenticationRequestIdValidatorTable(t *testing.T) {
 			)
 			request := validators_models.NewValidatedTokenRequest()
 			request.SetClient(newCIBAClient(t), nil, "")
-			ctx := &validators_models.BackchannelAuthenticationRequestIdValidationContext{
+			validation := &validators_models.BackchannelAuthenticationRequestIdValidationContext{
 				RequestId: tt.request.RequestId,
 				Request:   request,
 			}
-			if err := validator.Validate(ctx); err != nil {
+			if err := validator.Validate(context.Background(), validation); err != nil {
 				t.Fatalf("validate request id: %v", err)
 			}
-			if !errors.Is(ctx.Result.Error, tt.wantErr) {
-				t.Fatalf("error = %v, want %v", ctx.Result.Error, tt.wantErr)
+			if !errors.Is(validation.Result.Error, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", validation.Result.Error, tt.wantErr)
 			}
 			if tt.wantInterval > 0 && tt.request.PollInterval != tt.wantInterval {
 				t.Fatalf("poll interval = %d, want %d", tt.request.PollInterval, tt.wantInterval)

@@ -40,7 +40,7 @@ func (h *EndSessionCallbackHandler) Process(w http.ResponseWriter, r *http.Reque
 		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
 	}
 
-	validationResult, err := h.requestValidator.ValidateCallback(r.URL.Query())
+	validationResult, err := h.requestValidator.ValidateCallback(r.Context(), r.URL.Query())
 	if err != nil {
 		return fmt.Errorf("validate end-session callback: %w", err)
 	}

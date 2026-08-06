@@ -4,13 +4,17 @@
 
 package responses
 
-import "github.com/gonewx/wicket/models"
+import (
+	"context"
+
+	"github.com/gonewx/wicket/models"
+)
 
 // DiscoveryResponseGenerator Interface for discovery endpoint response generator
 type DiscoveryResponseGenerator interface {
 	// Creates the discovery document.
-	CreateDiscoveryDocument(baseUrl string, issuerUri string) (map[string]any, error)
+	CreateDiscoveryDocument(ctx context.Context, baseUrl string, issuerUri string) (map[string]any, error)
 
 	// Creates the JWK document.
-	CreateJwkDocument() ([]*models.JsonWebKey, error)
+	CreateJwkDocument(ctx context.Context) ([]*models.JsonWebKey, error)
 }

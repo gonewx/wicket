@@ -35,8 +35,8 @@ func NewValidatingClientStore[T storage.ClientStore](
 }
 
 // FindClientById Finds a client by id (and runs the validation logic)
-func (s *ValidatingClientStore[T]) FindClientById(id string) (*storage_models.Client, error) {
-	client, err := s.inner.FindClientById(id)
+func (s *ValidatingClientStore[T]) FindClientById(ctx context.Context, id string) (*storage_models.Client, error) {
+	client, err := s.inner.FindClientById(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -45,19 +45,19 @@ func (s *ValidatingClientStore[T]) FindClientById(id string) (*storage_models.Cl
 		return nil, nil
 	}
 
-	if s.logger.Enabled(context.Background(), slog.LevelDebug) {
+	if s.logger.Enabled(ctx, slog.LevelDebug) {
 		s.logger.Debug("Calling into client configuration validator", slog.String("validatorType", fmt.Sprintf("%T", s.validator)))
 	}
 
-	ctx := validators_contexts.NewClientConfigurationValidationContext(client)
-	s.validator.Validate(ctx)
+	validationCtx := validators_contexts.NewClientConfigurationValidationContext(client)
+	s.validator.Validate(validationCtx)
 
-	if ctx.IsValid {
+	if validationCtx.IsValid {
 		s.logger.Debug("client configuration validation for client {clientId} succeeded.", slog.String("clientId", client.ClientId))
 		return client, nil
 	}
 
-	s.logger.Error("Invalid client configuration for client.", slog.String("clientId", client.ClientId), slog.String("errorMessage", ctx.ErrorMessage))
+	s.logger.Error("Invalid client configuration for client.", slog.String("clientId", client.ClientId), slog.String("errorMessage", validationCtx.ErrorMessage))
 
 	return nil, fmt.Errorf("Invalid client configuration for client")
 }

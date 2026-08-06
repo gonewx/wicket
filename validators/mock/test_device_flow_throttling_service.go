@@ -4,7 +4,11 @@
 
 package mock
 
-import storage_models "github.com/gonewx/wicket/storage/models"
+import (
+	"context"
+
+	storage_models "github.com/gonewx/wicket/storage/models"
+)
 
 type TestDeviceFlowThrottlingService struct {
 	shouldSlownDown bool
@@ -18,6 +22,6 @@ func NewTestDeviceFlowThrottlingService(shouldSlownDown bool) *TestDeviceFlowThr
 	}
 }
 
-func (s *TestDeviceFlowThrottlingService) ShouldSlowDown(deviceCode string, details *storage_models.DeviceCode) (bool, error) {
+func (s *TestDeviceFlowThrottlingService) ShouldSlowDown(ctx context.Context, deviceCode string, details *storage_models.DeviceCode) (bool, error) {
 	return s.shouldSlownDown, nil
 }

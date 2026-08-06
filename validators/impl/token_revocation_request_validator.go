@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -28,7 +29,7 @@ func NewTokenRevocationRequestValidator(logger *slog.Logger) *TokenRevocationReq
 }
 
 // Validates the request.
-func (v *TokenRevocationRequestValidator) ValidateRequest(parameters url.Values, client *storage_models.Client) (*models.TokenRevocationRequestValidationResult, error) {
+func (v *TokenRevocationRequestValidator) ValidateRequest(ctx context.Context, parameters url.Values, client *storage_models.Client) (*models.TokenRevocationRequestValidationResult, error) {
 	v.logger.Debug("ValidateRequest called")
 
 	if len(parameters) == 0 {

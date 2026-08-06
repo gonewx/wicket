@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 
 	"github.com/gonewx/wicket"
@@ -99,47 +100,51 @@ func NewBackchannelAuthenticationRequestIdValidator(store storage.BackchannelAut
 	return &BackchannelAuthenticationRequestIdValidator{store: store, throttler: throttler, clock: clock}
 }
 
-func (v *BackchannelAuthenticationRequestIdValidator) Validate(ctx *validators_models.BackchannelAuthenticationRequestIdValidationContext) error {
-	if ctx == nil || ctx.Request == nil {
+func (v *BackchannelAuthenticationRequestIdValidator) Validate(ctx context.Context, validation *validators_models.BackchannelAuthenticationRequestIdValidationContext) error {
+	if validation == nil || validation.Request == nil {
 		return errors.New("validation context is required")
 	}
-	if ctx.RequestId == "" {
-		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsInvalidRequest, "")
+	if validation.RequestId == "" {
+		validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(validation.Request, gois.TokenErrorsInvalidRequest, "")
 		return nil
 	}
-	request, err := v.store.FindBackchannelAuthenticationRequest(ctx.RequestId)
+	request, err := v.store.FindBackchannelAuthenticationRequest(ctx, validation.RequestId)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(validation.Request, gois.TokenErrorsInvalidGrant, "")
+			return nil
+		}
 		return err
 	}
-	if request == nil || request.ClientId != ctx.Request.Client.ClientId {
-		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsInvalidGrant, "")
+	if request == nil || request.ClientId != validation.Request.Client.ClientId {
+		validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(validation.Request, gois.TokenErrorsInvalidGrant, "")
 		return nil
 	}
 	if !request.ExpirationTime.IsZero() && request.ExpirationTime.Before(v.clock.Now()) {
-		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsExpiredToken, "")
+		validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(validation.Request, gois.TokenErrorsExpiredToken, "")
 		return nil
 	}
 	switch request.Status {
 	case storage_models.BackchannelAuthenticationRequestStatusApproved:
-		ctx.Request.BackchannelAuthenticationRequest = request
-		ctx.Request.Subject = request.Subject
-		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationSuccess(ctx.Request)
+		validation.Request.BackchannelAuthenticationRequest = request
+		validation.Request.Subject = request.Subject
+		validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationSuccess(validation.Request)
 	case storage_models.BackchannelAuthenticationRequestStatusDenied:
-		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsAccessDenied, "")
+		validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(validation.Request, gois.TokenErrorsAccessDenied, "")
 	case storage_models.BackchannelAuthenticationRequestStatusConsumed:
-		ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsInvalidGrant, "")
+		validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(validation.Request, gois.TokenErrorsInvalidGrant, "")
 	default:
-		slowDown, err := v.throttler.ShouldSlowDown(ctx.RequestId, request)
+		slowDown, err := v.throttler.ShouldSlowDown(validation.RequestId, request)
 		if err != nil {
 			return err
 		}
-		if err := v.store.UpdateBackchannelAuthenticationRequest(ctx.RequestId, request); err != nil {
+		if err := v.store.UpdateBackchannelAuthenticationRequest(ctx, validation.RequestId, request); err != nil {
 			return err
 		}
 		if slowDown {
-			ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsSlowDown, "")
+			validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(validation.Request, gois.TokenErrorsSlowDown, "")
 		} else {
-			ctx.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(ctx.Request, gois.TokenErrorsAuthorizationPending, "")
+			validation.Result = validators_models.NewBackchannelAuthenticationRequestIdValidationError(validation.Request, gois.TokenErrorsAuthorizationPending, "")
 		}
 	}
 	return nil
@@ -151,18 +156,18 @@ func NewBackchannelAuthenticationUserValidator() BackchannelAuthenticationUserVa
 	return BackchannelAuthenticationUserValidator{}
 }
 
-func (BackchannelAuthenticationUserValidator) Validate(ctx *validators_models.BackchannelAuthenticationUserValidationContext) error {
-	if ctx == nil || (ctx.LoginHint == "" && ctx.IdTokenHint == "" && ctx.LoginHintToken == "") {
+func (BackchannelAuthenticationUserValidator) Validate(ctx context.Context, validation *validators_models.BackchannelAuthenticationUserValidationContext) error {
+	if validation == nil || (validation.LoginHint == "" && validation.IdTokenHint == "" && validation.LoginHintToken == "") {
 		return gois.TokenErrorsInvalidRequest
 	}
-	subjectID := ctx.LoginHint
+	subjectID := validation.LoginHint
 	if subjectID == "" {
-		subjectID = ctx.LoginHintToken
+		subjectID = validation.LoginHintToken
 	}
 	if subjectID == "" {
-		subjectID = ctx.IdTokenHint
+		subjectID = validation.IdTokenHint
 	}
-	ctx.Subject = claims.NewClaimsPrincipal(
+	validation.Subject = claims.NewClaimsPrincipal(
 		claims.WithClaimsPrincipalIdentity(
 			claims.NewClaimsIdentity(
 				claims.WithAuthenticationType(gois.WicketAuthenticationType),

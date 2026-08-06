@@ -5,6 +5,7 @@
 package mock
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/gonewx/wicket/storage/models"
@@ -17,18 +18,18 @@ func NewMockReferenceTokenStore() *MockReferenceTokenStore {
 	return &MockReferenceTokenStore{}
 }
 
-func (m *MockReferenceTokenStore) StoreReferenceToken(token *models.Token) (string, error) {
+func (m *MockReferenceTokenStore) StoreReferenceToken(ctx context.Context, token *models.Token) (string, error) {
 	return "", fmt.Errorf("Not implemented")
 }
 
-func (m *MockReferenceTokenStore) GetReferenceToken(handle string) (*models.Token, error) {
+func (m *MockReferenceTokenStore) GetReferenceToken(ctx context.Context, handle string) (*models.Token, error) {
 	return nil, fmt.Errorf("Not implemented")
 }
 
-func (m *MockReferenceTokenStore) RemoveReferenceToken(handle string) error {
+func (m *MockReferenceTokenStore) RemoveReferenceToken(ctx context.Context, handle string) error {
 	return fmt.Errorf("Not implemented")
 }
 
-func (m *MockReferenceTokenStore) RemoveReferenceTokens(subjectId, clientId string) error {
+func (m *MockReferenceTokenStore) RemoveReferenceTokens(ctx context.Context, subjectId, clientId string) error {
 	return fmt.Errorf("Not implemented")
 }

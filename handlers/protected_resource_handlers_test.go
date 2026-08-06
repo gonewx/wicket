@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +33,7 @@ type fakeIntrospectionRequestValidator struct {
 	err    error
 }
 
-func (v *fakeIntrospectionRequestValidator) Validate(url.Values, *storage_models.ApiResource) (*validators_models.IntrospectionRequestValidationResult, error) {
+func (v *fakeIntrospectionRequestValidator) Validate(ctx context.Context, values url.Values, api *storage_models.ApiResource) (*validators_models.IntrospectionRequestValidationResult, error) {
 	return v.result, v.err
 }
 
@@ -40,7 +41,7 @@ type fakeIntrospectionResponseGenerator struct {
 	entries map[string]any
 }
 
-func (g *fakeIntrospectionResponseGenerator) Handle(*validators_models.IntrospectionRequestValidationResult) map[string]any {
+func (g *fakeIntrospectionResponseGenerator) Handle(ctx context.Context, result *validators_models.IntrospectionRequestValidationResult) map[string]any {
 	return g.entries
 }
 
@@ -48,8 +49,8 @@ type fakeUserInfoRequestValidator struct {
 	result *validators_models.UserInfoRequestValidationResult
 }
 
-func (v *fakeUserInfoRequestValidator) ValidateRequest(string) *validators_models.UserInfoRequestValidationResult {
-	return v.result
+func (v *fakeUserInfoRequestValidator) ValidateRequest(ctx context.Context, accessToken string) (*validators_models.UserInfoRequestValidationResult, error) {
+	return v.result, nil
 }
 
 type fakeUserInfoResponseGenerator struct {
@@ -57,7 +58,7 @@ type fakeUserInfoResponseGenerator struct {
 	err    error
 }
 
-func (g *fakeUserInfoResponseGenerator) Handle(*validators_models.UserInfoRequestValidationResult) (map[string]any, error) {
+func (g *fakeUserInfoResponseGenerator) Handle(ctx context.Context, result *validators_models.UserInfoRequestValidationResult) (map[string]any, error) {
 	return g.claims, g.err
 }
 

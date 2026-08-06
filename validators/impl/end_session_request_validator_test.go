@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -77,11 +78,11 @@ func TestEndSessionRequestValidatoranonymous_user_when_options_require_authentic
 	instance.options.Authentication.RequireAuthenticatedUserForSignOutMessage = true
 
 	parameters := url.Values{}
-	result, err := instance.subject.Validate(parameters, claims.NewClaimsPrincipal())
+	result, err := instance.subject.Validate(context.Background(), parameters, claims.NewClaimsPrincipal())
 	a.NoError(err)
 	a.Error(result.Error)
 
-	result, err = instance.subject.Validate(parameters, claims.NewClaimsPrincipal(
+	result, err = instance.subject.Validate(context.Background(), parameters, claims.NewClaimsPrincipal(
 		claims.WithClaimsPrincipalIdentity(claims.NewClaimsIdentity()),
 	))
 	a.NoError(err)
@@ -113,7 +114,7 @@ func TestEndSessionRequestValidatorvalid_params_should_return_success(t *testing
 	parameters.Add("client_id", "client1")
 	parameters.Add("state", "foo")
 
-	result, err := instance.subject.Validate(parameters, instance.user)
+	result, err := instance.subject.Validate(context.Background(), parameters, instance.user)
 	a.NoError(err)
 	a.NoError(result.Error)
 
@@ -143,7 +144,7 @@ func TestEndSessionRequestValidatorno_post_logout_redirect_uri_should_not_use_si
 	parameters := url.Values{}
 	parameters.Add("id_token_hint", "id_token")
 
-	result, err := instance.subject.Validate(parameters, instance.user)
+	result, err := instance.subject.Validate(context.Background(), parameters, instance.user)
 	a.NoError(err)
 	a.NoError(result.Error)
 
@@ -173,7 +174,7 @@ func TestEndSessionRequestValidatorno_post_logout_redirect_uri_should_not_use_mu
 	parameters := url.Values{}
 	parameters.Add("id_token_hint", "id_token")
 
-	result, err := instance.subject.Validate(parameters, instance.user)
+	result, err := instance.subject.Validate(context.Background(), parameters, instance.user)
 	a.NoError(err)
 	a.NoError(result.Error)
 
@@ -205,7 +206,7 @@ func TestEndSessionRequestValidatorpost_logout_uri_fails_validation_should_not_h
 	parameters.Add("client_id", "client1")
 	parameters.Add("state", "foo")
 
-	result, err := instance.subject.Validate(parameters, instance.user)
+	result, err := instance.subject.Validate(context.Background(), parameters, instance.user)
 	a.NoError(err)
 	a.NoError(result.Error)
 
@@ -240,7 +241,7 @@ func TestEndSessionRequestValidatorsubject_mismatch_should_return_error(t *testi
 	parameters.Add("client_id", "client1")
 	parameters.Add("state", "foo")
 
-	result, err := instance.subject.Validate(parameters, instance.user)
+	result, err := instance.subject.Validate(context.Background(), parameters, instance.user)
 	a.NoError(err)
 	a.Error(result.Error)
 }
@@ -252,7 +253,7 @@ func TestEndSessionRequestValidatorsuccessful_request_should_return_inputs(t *te
 
 	parameters := url.Values{}
 
-	result, err := instance.subject.Validate(parameters, instance.user)
+	result, err := instance.subject.Validate(context.Background(), parameters, instance.user)
 	a.NoError(err)
 	a.NoError(result.Error)
 	a.Equal(parameters, result.ValidatedRequest.Raw)

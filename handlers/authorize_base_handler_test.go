@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gonewx/wicket"
@@ -103,7 +104,7 @@ func TestAuthorizeBaseHandlerDispatchPrecedence(t *testing.T) {
 			t.Parallel()
 
 			base := newBaseHandler(tt.validation(), tt.interaction, tt.response, tt.generator)
-			result, err := base.dispatch(tt.validation(), nil)
+			result, err := base.dispatch(context.Background(), tt.validation(), nil)
 			if err != nil {
 				t.Fatalf("dispatch returned process error %v, want nil (protocol errors travel via result)", err)
 			}

@@ -5,6 +5,8 @@
 package responses
 
 import (
+	"context"
+
 	responses_models "github.com/gonewx/wicket/responses/models"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -12,5 +14,5 @@ import (
 // TokenRevocationResponseGenerator Interface for the revocation response generator
 type TokenRevocationResponseGenerator interface {
 	// Processes the response.
-	Handle(validationResult *validators_models.TokenRevocationRequestValidationResult) (*responses_models.TokenRevocationResponse, error)
+	Handle(ctx context.Context, validationResult *validators_models.TokenRevocationRequestValidationResult) (*responses_models.TokenRevocationResponse, error)
 }

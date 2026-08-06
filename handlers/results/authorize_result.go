@@ -158,7 +158,7 @@ func (ar *AuthorizeResult) ToQueryValues(options *config_options.WicketOptions) 
 func (ar *AuthorizeResult) ProcessResponse(w http.ResponseWriter, r *http.Request) error {
 	if ar.Response.Error == nil && ar.Response.Request != nil {
 		// success response -- track client authorization for sign-out
-		if err := ar.userSession.AddClientId(ar.Response.Request.ClientId); err != nil {
+		if err := ar.userSession.AddClientId(r.Context(), ar.Response.Request.ClientId); err != nil {
 			ar.Response.Error = err
 			return ar.RedirectToErrorPage(w, r)
 		}
@@ -222,7 +222,7 @@ func (ar *AuthorizeResult) RedirectToErrorPage(w http.ResponseWriter, r *http.Re
 	}
 
 	message := messages.NewMessageWithCreated(errorModel, time.Now().Unix())
-	id, err := ar.errorMessageStore.Write(message)
+	id, err := ar.errorMessageStore.Write(r.Context(), message)
 	if err != nil {
 		return err
 	}

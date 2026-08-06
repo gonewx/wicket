@@ -5,6 +5,7 @@
 package validators
 
 import (
+	"context"
 	"net/url"
 
 	storage_models "github.com/gonewx/wicket/storage/models"
@@ -14,5 +15,5 @@ import (
 // IntrospectionRequestValidator Interface for the introspection request validator
 type IntrospectionRequestValidator interface {
 	// Validates the request.
-	Validate(parameters url.Values, api *storage_models.ApiResource) (*models.IntrospectionRequestValidationResult, error)
+	Validate(ctx context.Context, parameters url.Values, api *storage_models.ApiResource) (*models.IntrospectionRequestValidationResult, error)
 }

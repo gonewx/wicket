@@ -57,7 +57,7 @@ func (h *AuthorizeHandler) result(r *http.Request) (endpointResult, error) {
 	if !ok {
 		return results.NewStatusCodeResult(http.StatusUnsupportedMediaType), nil
 	}
-	return h.base.dispatch(h.base.validate(values), nil)
+	return h.base.dispatch(r.Context(), h.base.validate(r.Context(), values), nil)
 }
 
 // gatherAuthorizeParameters reads parameters from the query string for GET and

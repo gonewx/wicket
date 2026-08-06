@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ type capturingTokenCreation struct {
 	captured *storage_models.Token
 }
 
-func (c *capturingTokenCreation) CreateToken(token *storage_models.Token) (string, error) {
+func (c *capturingTokenCreation) CreateToken(ctx context.Context, token *storage_models.Token) (string, error) {
 	c.captured = token
 	return "serialized", nil
 }
@@ -76,7 +77,7 @@ func TestCreateAccessTokenAudiences(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
 
-			token, err := svc.CreateAccessToken(accessTokenRequest(tc.resourceNames, ""))
+			token, err := svc.CreateAccessToken(context.Background(), accessTokenRequest(tc.resourceNames, ""))
 
 			require.NoError(t, err)
 			require.ElementsMatch(t, tc.wantAudiences, token.Audiences)
@@ -98,7 +99,7 @@ func TestCreateAccessTokenSessionBinding(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
 
-			token, err := svc.CreateAccessToken(accessTokenRequest(nil, tc.sessionId))
+			token, err := svc.CreateAccessToken(context.Background(), accessTokenRequest(nil, tc.sessionId))
 
 			require.NoError(t, err)
 			sidClaims := claimsOfType(token.Claims, gois.JwtClaimTypesSessionId)
@@ -131,7 +132,7 @@ func TestCreateAccessTokenSessionIdSingleClaim(t *testing.T) {
 	request := accessTokenRequest(nil, "session-123")
 	request.Subject = claimspkg.NewClaimsPrincipal(claimspkg.WithClaimsPrincipalIdentity(identity))
 
-	token, err := svc.CreateAccessToken(request)
+	token, err := svc.CreateAccessToken(context.Background(), request)
 
 	require.NoError(t, err)
 	sidClaims := claimsOfType(token.Claims, gois.JwtClaimTypesSessionId)
@@ -171,7 +172,7 @@ func TestCreateSecurityTokenJwtIdAssembly(t *testing.T) {
 				))
 			}
 
-			_, err := svc.CreateSecurityToken(token)
+			_, err := svc.CreateSecurityToken(context.Background(), token)
 			require.NoError(t, err)
 
 			jwtIdClaims := claimsOfType(capture.captured.Claims, gois.JwtClaimTypesJwtId)
@@ -208,12 +209,12 @@ func TestCreateTokenIssuerAndLifetimeAssembly(t *testing.T) {
 
 	svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
 
-	accessToken, err := svc.CreateAccessToken(request)
+	accessToken, err := svc.CreateAccessToken(context.Background(), request)
 	require.NoError(t, err)
 	require.Equal(t, "https://issuer.wicket.test", accessToken.Issuer)
 	require.Equal(t, 3600, accessToken.Lifetime)
 
-	identityToken, err := svc.CreateIdentityToken(request)
+	identityToken, err := svc.CreateIdentityToken(context.Background(), request)
 	require.NoError(t, err)
 	require.Equal(t, "https://issuer.wicket.test", identityToken.Issuer)
 	require.Equal(t, 300, identityToken.Lifetime)

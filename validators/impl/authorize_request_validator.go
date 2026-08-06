@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -71,7 +72,7 @@ func responseTypeEqualityComparer() *ResponseTypeEqualityComparer {
 	return &ResponseTypeEqualityComparer{}
 }
 
-func (v *AuthorizeRequestValidator) Validate(values url.Values,
+func (v *AuthorizeRequestValidator) Validate(ctx context.Context, values url.Values,
 	subject *claimspkg.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult {
 	v.logger.Debug("Start authorize request protocol validation")
 
@@ -89,7 +90,7 @@ func (v *AuthorizeRequestValidator) Validate(values url.Values,
 
 	var err error
 	// client_id must always be present on the request
-	result := v.loadClient(request)
+	result := v.loadClient(ctx, request)
 	if result.Error != nil {
 		return result
 	}
@@ -113,7 +114,7 @@ func (v *AuthorizeRequestValidator) Validate(values url.Values,
 	}
 
 	// scope, scope restrictions and plausability, and resource gaps
-	result = v.validateScopeAndResource(request)
+	result = v.validateScopeAndResource(ctx, request)
 	if result.Error != nil {
 		return result
 	}
@@ -136,7 +137,7 @@ func (v *AuthorizeRequestValidator) Validate(values url.Values,
 	return valid(request)
 }
 
-func (v *AuthorizeRequestValidator) loadClient(request *validators_models.ValidatedAuthorizeRequest) *validators_models.AuthorizeRequestValidationResult {
+func (v *AuthorizeRequestValidator) loadClient(ctx context.Context, request *validators_models.ValidatedAuthorizeRequest) *validators_models.AuthorizeRequestValidationResult {
 	clientId := request.Raw.Get(gois.AuthorizeRequestClientId)
 
 	// client_id must be present
@@ -149,7 +150,7 @@ func (v *AuthorizeRequestValidator) loadClient(request *validators_models.Valida
 	request.ClientId = clientId
 
 	// check for valid client
-	client, err := extensions.FindEnabledClientById(v.clients, clientId)
+	client, err := extensions.FindEnabledClientById(ctx, v.clients, clientId)
 	if err != nil || client == nil {
 		v.logger.Error("Unknown client or not enabled", slog.String("clientId", clientId), slog.Any("request", request))
 		return invalid(request, gois.AuthorizeErrorsUnauthorizedClient, "Unknown client or client not enabled")
@@ -449,7 +450,7 @@ func (v *AuthorizeRequestValidator) validatePkceParameters(request *validators_m
 
 	return valid(request)
 }
-func (v *AuthorizeRequestValidator) validateScopeAndResource(request *validators_models.ValidatedAuthorizeRequest) *validators_models.AuthorizeRequestValidationResult {
+func (v *AuthorizeRequestValidator) validateScopeAndResource(ctx context.Context, request *validators_models.ValidatedAuthorizeRequest) *validators_models.AuthorizeRequestValidationResult {
 	// scope must be present
 	scope := request.Raw.Get(gois.AuthorizeRequestScope)
 	if strings.TrimSpace(scope) == "" {
@@ -495,7 +496,7 @@ func (v *AuthorizeRequestValidator) validateScopeAndResource(request *validators
 	request.RequestedResourceIndiators = resourceIndicators
 
 	// check if scopes are valid/supported and check for resource scopes
-	validatedResources, err := v.resourceValidator.ValidateRequestedResources(&validators_models.ResourceValidationRequest{
+	validatedResources, err := v.resourceValidator.ValidateRequestedResources(ctx, &validators_models.ResourceValidationRequest{
 		Client:                         request.Client,
 		Scopes:                         request.RequestedScopes,
 		ResourceGaps:                   resourceIndicators,

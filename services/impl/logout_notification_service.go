@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 	urlpkg "net/url"
 	"strings"
@@ -34,10 +35,10 @@ func NewLogoutNotificationService(clientStore storage.ClientStore, issuerNameSer
 }
 
 // GetFrontChannelLogoutNotificationsUrls Builds the URLs needed for front-channel logout notification.
-func (s *LogoutNotificationService) GetFrontChannelLogoutNotificationsUrls(ctx *contexts.LogoutNotificationContext) ([]string, error) {
+func (s *LogoutNotificationService) GetFrontChannelLogoutNotificationsUrls(ctx context.Context, notification *contexts.LogoutNotificationContext) ([]string, error) {
 	frontChannelUrls := make([]string, 0)
-	for _, clientId := range ctx.ClientIds {
-		client, err := extensions.FindEnabledClientById(s.clientStore, clientId)
+	for _, clientId := range notification.ClientIds {
+		client, err := extensions.FindEnabledClientById(ctx, s.clientStore, clientId)
 
 		if err != nil || client == nil {
 			continue
@@ -58,7 +59,7 @@ func (s *LogoutNotificationService) GetFrontChannelLogoutNotificationsUrls(ctx *
 		// add session id if required
 		if client.ProtocolType == gois.ProtocolTypesOpenIdConnect {
 			if client.FrontChannelLogoutSessionRequired {
-				q.Set(gois.EndSessionRequestSid, ctx.SessionId)
+				q.Set(gois.EndSessionRequestSid, notification.SessionId)
 				q.Set(gois.EndSessionRequestIssuer, s.issuerNameService.GetCurrent())
 				url.RawQuery = q.Encode()
 			}
@@ -83,10 +84,10 @@ func (s *LogoutNotificationService) GetFrontChannelLogoutNotificationsUrls(ctx *
 }
 
 // GetBackchannelLogoutNotifications Builds the http back-channel logout request data for the collection of clients.
-func (s *LogoutNotificationService) GetBackchannelLogoutNotifications(ctx *contexts.LogoutNotificationContext) ([]*services.BackchannelLogoutRequest, error) {
+func (s *LogoutNotificationService) GetBackchannelLogoutNotifications(ctx context.Context, notification *contexts.LogoutNotificationContext) ([]*services.BackchannelLogoutRequest, error) {
 	backChannelLogouts := make([]*services.BackchannelLogoutRequest, 0)
-	for _, clientId := range ctx.ClientIds {
-		client, err := extensions.FindEnabledClientById(s.clientStore, clientId)
+	for _, clientId := range notification.ClientIds {
+		client, err := extensions.FindEnabledClientById(ctx, s.clientStore, clientId)
 
 		if err != nil || client == nil {
 			continue
@@ -99,10 +100,10 @@ func (s *LogoutNotificationService) GetBackchannelLogoutNotifications(ctx *conte
 		back := &services.BackchannelLogoutRequest{
 			ClientId:          clientId,
 			LogoutUri:         client.BackChannelLogoutUri,
-			SubjectId:         ctx.SubjectId,
-			SessionId:         ctx.SessionId,
+			SubjectId:         notification.SubjectId,
+			SessionId:         notification.SessionId,
 			SessionIdRequired: client.BackChannelLogoutSessionRequired,
-			Issuer:            ctx.Issuer,
+			Issuer:            notification.Issuer,
 		}
 
 		backChannelLogouts = append(backChannelLogouts, back)

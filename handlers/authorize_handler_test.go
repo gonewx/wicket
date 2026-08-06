@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,17 +27,17 @@ type fakeUserSession struct {
 	user *claims.ClaimsPrincipal
 }
 
-func (s *fakeUserSession) EnsureSessionIdCookie() error { return nil }
-func (s *fakeUserSession) RemoveSessionIdCookie() error { return nil }
-func (s *fakeUserSession) CreateSessionId(*claims.ClaimsPrincipal, *auth.Properties) (string, error) {
+func (s *fakeUserSession) EnsureSessionIdCookie(ctx context.Context) error { return nil }
+func (s *fakeUserSession) RemoveSessionIdCookie() error                    { return nil }
+func (s *fakeUserSession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	return "", nil
 }
-func (s *fakeUserSession) GetSessionId() string             { return "" }
-func (s *fakeUserSession) GetClientList() ([]string, error) { return nil, nil }
-func (s *fakeUserSession) GetUser() *claims.ClaimsPrincipal { return s.user }
-func (s *fakeUserSession) AddClientId(string) error         { return nil }
-func (s *fakeUserSession) Item(string) (any, bool)          { return nil, false }
-func (s *fakeUserSession) SetItem(string, any)              {}
+func (s *fakeUserSession) GetSessionId() string                                   { return "" }
+func (s *fakeUserSession) GetClientList() ([]string, error)                       { return nil, nil }
+func (s *fakeUserSession) GetUser() *claims.ClaimsPrincipal                       { return s.user }
+func (s *fakeUserSession) AddClientId(ctx context.Context, clientId string) error { return nil }
+func (s *fakeUserSession) Item(string) (any, bool)                                { return nil, false }
+func (s *fakeUserSession) SetItem(string, any)                                    {}
 
 // fakeAuthorizeRequestValidator returns a preset validation result regardless of
 // the incoming parameters.
@@ -44,7 +45,7 @@ type fakeAuthorizeRequestValidator struct {
 	result *validators_models.AuthorizeRequestValidationResult
 }
 
-func (v *fakeAuthorizeRequestValidator) Validate(url.Values, *claims.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult {
+func (v *fakeAuthorizeRequestValidator) Validate(ctx context.Context, values url.Values, subject *claims.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult {
 	return v.result
 }
 
@@ -53,13 +54,13 @@ type fakeInteractionGenerator struct {
 	response *responses_models.InteractionResponse
 }
 
-func (g *fakeInteractionGenerator) Handle(*validators_models.ValidatedAuthorizeRequest, *messages.ConsentResponse) *responses_models.InteractionResponse {
+func (g *fakeInteractionGenerator) Handle(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
 	return g.response
 }
-func (g *fakeInteractionGenerator) HandleLogin(*validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse {
+func (g *fakeInteractionGenerator) HandleLogin(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse {
 	return nil
 }
-func (g *fakeInteractionGenerator) HandleConsent(*validators_models.ValidatedAuthorizeRequest, *messages.ConsentResponse) *responses_models.InteractionResponse {
+func (g *fakeInteractionGenerator) HandleConsent(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
 	return nil
 }
 
@@ -69,7 +70,7 @@ type fakeAuthorizeResponseGenerator struct {
 	err      error
 }
 
-func (g *fakeAuthorizeResponseGenerator) Create(*validators_models.ValidatedAuthorizeRequest) (*responses_models.AuthorizeResponse, error) {
+func (g *fakeAuthorizeResponseGenerator) Create(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) (*responses_models.AuthorizeResponse, error) {
 	return g.response, g.err
 }
 

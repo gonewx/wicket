@@ -283,7 +283,7 @@ func (s *UserSession) readSessionCookie() string {
 // state when server-side sessions are enabled. If the cookie references a
 // session that is missing or expired, the cookie is cleared and internal state
 // stays empty (graceful degradation, not an error).
-func (s *UserSession) EnsureSessionIdCookie() error {
+func (s *UserSession) EnsureSessionIdCookie(ctx context.Context) error {
 	if !s.enabled || s.store == nil {
 		return nil
 	}
@@ -296,8 +296,12 @@ func (s *UserSession) EnsureSessionIdCookie() error {
 		return nil
 	}
 
-	rec, err := s.store.GetSession(sessionID)
+	rec, err := s.store.GetSession(ctx, sessionID)
 	if err != nil {
+		if errors.Is(err, sessionpkg.ErrSessionNotFound) {
+			s.clearSessionCookie()
+			return nil
+		}
 		return fmt.Errorf("load session: %w", err)
 	}
 	if rec == nil {
@@ -319,7 +323,7 @@ func (s *UserSession) RemoveSessionIdCookie() error {
 	return nil
 }
 
-func (s *UserSession) CreateSessionId(principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
+func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	s.user = principal
 	s.session = newHandle()
 
@@ -337,7 +341,7 @@ func (s *UserSession) CreateSessionId(principal *claims.ClaimsPrincipal, propert
 			Renewed:   now,
 			Expires:   now.Add(s.lifetime),
 		}
-		if err := s.store.CreateSession(rec); err != nil {
+		if err := s.store.CreateSession(ctx, rec); err != nil {
 			s.session = ""
 			s.user = nil
 			return "", fmt.Errorf("create session: %w", err)
@@ -387,13 +391,13 @@ func (s *UserSession) GetUser() *claims.ClaimsPrincipal {
 	return result.Principal
 }
 
-func (s *UserSession) AddClientId(clientId string) error {
+func (s *UserSession) AddClientId(ctx context.Context, clientId string) error {
 	if !utils.Contains(s.clients, clientId) {
 		s.clients = append(s.clients, clientId)
 	}
 
 	if s.enabled && s.store != nil && s.session != "" {
-		if err := s.store.AddClientID(s.session, clientId); err != nil && s.logger != nil {
+		if err := s.store.AddClientID(ctx, s.session, clientId); err != nil && s.logger != nil {
 			s.logger.Warn("failed to persist client id to session store",
 				slog.String("sessionId", s.session),
 				slog.String("clientId", clientId),
@@ -469,7 +473,7 @@ func NewTokenService(
 	return &TokenService{claims: claims, reference: reference, tokenCreation: tokenCreation, clock: clock, keys: keys, options: options, logger: logger, request: request}
 }
 
-func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
+func (s *TokenService) CreateAccessToken(ctx context.Context, request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
 	tokenClaims := []*claims.Claim(nil)
 	if request.Subject != nil {
 		tokenClaims = request.Subject.Claims()
@@ -525,7 +529,7 @@ func (s *TokenService) CreateAccessToken(request *responses_models.TokenCreation
 	return token, nil
 }
 
-func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
+func (s *TokenService) CreateIdentityToken(ctx context.Context, request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
 	tokenClaims := []*claims.Claim(nil)
 	if request.Subject != nil {
 		tokenClaims = request.Subject.Claims()
@@ -542,7 +546,7 @@ func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreati
 	appendClaim(gois.JwtClaimTypesNonce, request.Nonce)
 	appendClaim(gois.JwtClaimTypesStateHash, request.StateHash)
 	if request.AccessTokenToHash != "" || request.AuthorizationCodeToHash != "" {
-		algorithm, err := s.identitySigningAlgorithm(request)
+		algorithm, err := s.identitySigningAlgorithm(ctx, request)
 		if err != nil {
 			return nil, err
 		}
@@ -578,12 +582,12 @@ func (s *TokenService) CreateIdentityToken(request *responses_models.TokenCreati
 
 // identitySigningAlgorithm resolves the algorithm the identity token will be
 // signed with, which fixes the hash size of the derived at_hash/c_hash claims.
-func (s *TokenService) identitySigningAlgorithm(request *responses_models.TokenCreationRequest) (string, error) {
+func (s *TokenService) identitySigningAlgorithm(ctx context.Context, request *responses_models.TokenCreationRequest) (string, error) {
 	var allowed []string
 	if request.ValidatedRequest != nil && request.ValidatedRequest.Client != nil {
 		allowed = request.ValidatedRequest.Client.AllowedIdentityTokenSigningAlgorithms
 	}
-	credential, err := s.keys.GetSigningCredentials(allowed)
+	credential, err := s.keys.GetSigningCredentials(ctx, allowed)
 	if err != nil {
 		return "", fmt.Errorf("create identity token: resolve signing credential: %w", err)
 	}
@@ -593,7 +597,7 @@ func (s *TokenService) identitySigningAlgorithm(request *responses_models.TokenC
 	return credential.Algorithm, nil
 }
 
-func (s *TokenService) CreateSecurityToken(token *storage_models.Token) (string, error) {
+func (s *TokenService) CreateSecurityToken(ctx context.Context, token *storage_models.Token) (string, error) {
 	// Only access tokens carry a jwt id, and only when the client opted in. Any
 	// value carried in from an earlier assembly is dropped and replaced with a
 	// freshly generated one so the id is never reused.
@@ -610,7 +614,7 @@ func (s *TokenService) CreateSecurityToken(token *storage_models.Token) (string,
 			),
 		)
 	}
-	return s.tokenCreation.CreateToken(token)
+	return s.tokenCreation.CreateToken(ctx, token)
 }
 
 type RefreshTokenService struct {
@@ -621,7 +625,7 @@ func NewRefreshTokenService(store storage.RefreshTokenStore) *RefreshTokenServic
 	return &RefreshTokenService{store: store}
 }
 
-func (s *RefreshTokenService) CreateRefreshToken(request *responses_models.RefreshTokenCreationRequest) (string, error) {
+func (s *RefreshTokenService) CreateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenCreationRequest) (string, error) {
 	token := storage_models.NewRefreshToken()
 	token.Subject = request.Subject
 	token.ClientId = request.Client.ClientId
@@ -629,21 +633,25 @@ func (s *RefreshTokenService) CreateRefreshToken(request *responses_models.Refre
 	token.AuthorizedScopes = request.AuthorizedScopes
 	token.AuthorizedResourceGaps = request.AuthorizedResourceGaps
 	token.SetAccessToken(request.AccessToken, request.RequestedResourceGap)
-	return s.store.StoreRefreshToken(token)
+	return s.store.StoreRefreshToken(ctx, token)
 }
 
-func (s *RefreshTokenService) UpdateRefreshToken(request *responses_models.RefreshTokenUpdateRequest) (string, error) {
+func (s *RefreshTokenService) UpdateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenUpdateRequest) (string, error) {
 	if request.RefreshToken != nil && request.AccessToken != nil {
 		request.RefreshToken.SetAccessToken(request.AccessToken, request.RequestedResourceGap)
 	}
-	return request.Handle, s.store.UpdateRefreshToken(request.Handle, request.RefreshToken)
+	return request.Handle, s.store.UpdateRefreshToken(ctx, request.Handle, request.RefreshToken)
 }
 
-func (s *RefreshTokenService) ValidateRefreshToken(handle string, client *storage_models.Client) *validators_models.TokenValidationResult {
-	token, err := s.store.GetRefreshToken(handle)
+func (s *RefreshTokenService) ValidateRefreshToken(ctx context.Context, handle string, client *storage_models.Client) *validators_models.TokenValidationResult {
+	token, err := s.store.GetRefreshToken(ctx, handle)
 	result := validators_models.NewTokenValidationResult()
-	if err != nil || token == nil {
-		result.Error = fmt.Errorf("refresh token not found")
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			result.Error = fmt.Errorf("refresh token not found: %w", storage.ErrNotFound)
+			return result
+		}
+		result.Error = fmt.Errorf("validate refresh token: %w", err)
 		return result
 	}
 	result.RefreshToken = token
@@ -660,8 +668,8 @@ func NewPersistedGrantService(store storage.PersistedGrantStore) *PersistedGrant
 	return &PersistedGrantService{store: store}
 }
 
-func (s *PersistedGrantService) RemoveAllGrantsAsync(subjectId, clientId, sessionId string) error {
-	return s.store.RemoveAll(&storage.PersistedGrantFilter{SubjectId: subjectId, ClientId: clientId, SessionId: sessionId})
+func (s *PersistedGrantService) RemoveAllGrantsAsync(ctx context.Context, subjectId, clientId, sessionId string) error {
+	return s.store.RemoveAll(ctx, &storage.PersistedGrantFilter{SubjectId: subjectId, ClientId: clientId, SessionId: sessionId})
 }
 
 type HandleGenerationService struct{}
@@ -693,21 +701,21 @@ func NewDeviceFlowCodeService(store storage.DeviceFlowStore, handles services.Ha
 	return &DeviceFlowCodeService{store: store, handles: handles}
 }
 
-func (s *DeviceFlowCodeService) StoreDeviceAuthorization(userCode string, data *storage_models.DeviceCode) (string, error) {
+func (s *DeviceFlowCodeService) StoreDeviceAuthorization(ctx context.Context, userCode string, data *storage_models.DeviceCode) (string, error) {
 	deviceCode := s.handles.Generate()
-	return deviceCode, s.store.StoreDeviceAuthorization(deviceCode, userCode, data)
+	return deviceCode, s.store.StoreDeviceAuthorization(ctx, deviceCode, userCode, data)
 }
-func (s *DeviceFlowCodeService) FindByUserCode(userCode string) (*storage_models.DeviceCode, error) {
-	return s.store.FindByUserCode(userCode)
+func (s *DeviceFlowCodeService) FindByUserCode(ctx context.Context, userCode string) (*storage_models.DeviceCode, error) {
+	return s.store.FindByUserCode(ctx, userCode)
 }
-func (s *DeviceFlowCodeService) FindByDeviceCode(deviceCode string) (*storage_models.DeviceCode, error) {
-	return s.store.FindByDeviceCode(deviceCode)
+func (s *DeviceFlowCodeService) FindByDeviceCode(ctx context.Context, deviceCode string) (*storage_models.DeviceCode, error) {
+	return s.store.FindByDeviceCode(ctx, deviceCode)
 }
-func (s *DeviceFlowCodeService) UpdateByUserCode(userCode string, data *storage_models.DeviceCode) error {
-	return s.store.UpdateByUserCode(userCode, data)
+func (s *DeviceFlowCodeService) UpdateByUserCode(ctx context.Context, userCode string, data *storage_models.DeviceCode) error {
+	return s.store.UpdateByUserCode(ctx, userCode, data)
 }
-func (s *DeviceFlowCodeService) RemoveByDeviceCode(deviceCode string) error {
-	return s.store.RemoveByDeviceCode(deviceCode)
+func (s *DeviceFlowCodeService) RemoveByDeviceCode(ctx context.Context, deviceCode string) error {
+	return s.store.RemoveByDeviceCode(ctx, deviceCode)
 }
 
 type ConsentService struct{}
@@ -762,21 +770,21 @@ func NewInteractionService(clock services.SystemClock, logout storage.MessageSto
 	}
 }
 
-func (s *InteractionService) GetAuthorizationContext(returnUrl string) (*messages.AuthorizationRequest, error) {
+func (s *InteractionService) GetAuthorizationContext(ctx context.Context, returnUrl string) (*messages.AuthorizationRequest, error) {
 	if s.parser == nil {
 		return nil, nil
 	}
-	return s.parser.Parse(returnUrl)
+	return s.parser.Parse(ctx, returnUrl)
 }
-func (s *InteractionService) GetLogoutContext(logoutId string) (*messages.LogoutRequest, error) {
+func (s *InteractionService) GetLogoutContext(ctx context.Context, logoutId string) (*messages.LogoutRequest, error) {
 	if s.logout == nil || logoutId == "" {
 		return messages.NewLogoutRequest("", nil), nil
 	}
-	message, err := s.logout.Read(logoutId)
+	message, err := s.logout.Read(ctx, logoutId)
 	if err != nil || message == nil {
 		return messages.NewLogoutRequest("", nil), err
 	}
-	iframeUrl, err := s.signOutIframeUrl(message.Data)
+	iframeUrl, err := s.signOutIframeUrl(ctx, message.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -787,7 +795,7 @@ func (s *InteractionService) GetLogoutContext(logoutId string) (*messages.Logout
 // authenticated sign-out and returns the callback iframe address carrying its
 // handle. A logout without a session or without client participation has no
 // front-channel work, so no iframe is offered.
-func (s *InteractionService) signOutIframeUrl(logout *messages.LogoutMessage) (string, error) {
+func (s *InteractionService) signOutIframeUrl(ctx context.Context, logout *messages.LogoutMessage) (string, error) {
 	if logout == nil || s.notifications == nil || s.urls == nil {
 		return "", nil
 	}
@@ -800,7 +808,7 @@ func (s *InteractionService) signOutIframeUrl(logout *messages.LogoutMessage) (s
 		SessionId: logout.SessionId,
 		ClientIds: logout.ClientIds,
 	}
-	handle, err := s.notifications.Write(messages.NewMessageWithCreated(&context, s.clock.Now().Unix()))
+	handle, err := s.notifications.Write(ctx, messages.NewMessageWithCreated(&context, s.clock.Now().Unix()))
 	if err != nil {
 		return "", fmt.Errorf("write end-session notification: %w", err)
 	}
@@ -808,11 +816,11 @@ func (s *InteractionService) signOutIframeUrl(logout *messages.LogoutMessage) (s
 	callback := strings.TrimRight(s.urls.BaseUrl(), "/") + utils.EnsureLeadingSlash(gois.ProtocolRoutePathsEndSessionCallback)
 	return utils.AddQuery(callback, gois.UIConstantsDefaultRoutePathParamsEndSessionCallback, handle), nil
 }
-func (s *InteractionService) GetErrorContext(errorId string) (*messages.ErrorMessage, error) {
+func (s *InteractionService) GetErrorContext(ctx context.Context, errorId string) (*messages.ErrorMessage, error) {
 	if s.errors == nil || errorId == "" {
 		return messages.NewErrorMessage(), nil
 	}
-	message, err := s.errors.Read(errorId)
+	message, err := s.errors.Read(ctx, errorId)
 	if err != nil || message == nil || message.Data == nil {
 		return messages.NewErrorMessage(), err
 	}
@@ -822,7 +830,7 @@ func (s *InteractionService) GetErrorContext(errorId string) (*messages.ErrorMes
 // GrantConsent records the consent answer under the key the authorize callback
 // derives from the subject and the original request parameters, so the callback
 // can pick the answer up and complete the flow.
-func (s *InteractionService) GrantConsent(request *messages.AuthorizationRequest, response *messages.ConsentResponse, subject string) error {
+func (s *InteractionService) GrantConsent(ctx context.Context, request *messages.AuthorizationRequest, response *messages.ConsentResponse, subject string) error {
 	if s.consentStore == nil || request == nil {
 		return s.consent.GrantConsent(request, response, subject)
 	}
@@ -835,10 +843,10 @@ func (s *InteractionService) GrantConsent(request *messages.AuthorizationRequest
 	if s.clock != nil {
 		message.Created = s.clock.Now().Unix()
 	}
-	return s.consentStore.Write(key, message)
+	return s.consentStore.Write(ctx, key, message)
 }
 
-func (s *InteractionService) DenyAuthorization(request *messages.AuthorizationRequest, subject string) error {
+func (s *InteractionService) DenyAuthorization(ctx context.Context, request *messages.AuthorizationRequest, subject string) error {
 	return s.consent.DenyAuthorization(request, subject)
 }
 

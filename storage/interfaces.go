@@ -1,10 +1,36 @@
 // Copyright 2026 Decker.
 // Licensed under the Apache License, Version 2.0.
 
+// Package storage defines the persistence ports the server consumes. The port
+// family serves a single issuer: one server instance owns one set of stores,
+// and no port method carries a tenant or issuer dimension. A deployment that
+// needs multiple issuers runs one server instance (and one storage set) per
+// issuer. Introducing a multi-issuer dimension in the storage layer would be a
+// public interface change.
+//
+// Every port method takes a context as its first parameter. The caller's
+// cancellation and deadline propagate to the adapter; an adapter must not
+// fabricate its own context.Background() or override the caller's timeout.
+// Read methods report a missing record with a sentinel error (ErrNotFound for
+// this package's port family) and never with a nil record and nil error, so a
+// host can distinguish "record absent" from "infrastructure failure". List
+// methods return an empty slice, not the sentinel.
+//
+// Stores never judge expiry: a read returns the record whether or not it is
+// expired, and adapters must not filter on their own clock (for example by
+// appending an expires_at comparison to a query). Expiry is judged on the core
+// side. Data with a lifecycle exposes a caller-driven one-shot reclamation
+// method, RemoveExpired, which returns how many records were removed; it
+// reclaims space only and carries no correctness responsibility. Ports whose
+// data has no server-side lifecycle (message stores, configuration data, key
+// records) carry no reclamation method.
 package storage
 
 import (
+	"context"
+	"errors"
 	"net/url"
+	"time"
 
 	core_models "github.com/gonewx/wicket/models"
 	"github.com/gonewx/wicket/models/messages"
@@ -12,109 +38,141 @@ import (
 	"github.com/gonewx/wicket/tokens"
 )
 
-// MessageStore persists an opaque message value by generated handle.
-// input: message/handle -> behavior: store or retrieve -> output: handle, message, or error.
+// ErrNotFound reports that a single-record read missed. It is the port family's
+// sentinel for "record absent", distinct from any infrastructure error.
+var ErrNotFound = errors.New("storage: record not found")
+
+// MessageStore persists an opaque message value by generated handle. Message
+// data is either self-contained in a protected payload or held by the client,
+// so the store keeps no server-side lifecycle and carries no reclamation
+// method.
 type MessageStore[T any] interface {
-	Write(*messages.Message[*T]) (string, error)
-	Read(string) (*messages.Message[*T], error)
+	Write(ctx context.Context, message *messages.Message[*T]) (string, error)
+	Read(ctx context.Context, handle string) (*messages.Message[*T], error)
 }
 
-// AuthorizationParametersMessageStore persists authorize parameters across redirects.
-// input: URL values/handle -> behavior: store, read, or delete -> output: handle, values, or error.
+// AuthorizationParametersMessageStore persists authorize parameters across
+// redirects. Message data is either self-contained in a protected payload or
+// held by the client, so the store keeps no server-side lifecycle and carries
+// no reclamation method.
 type AuthorizationParametersMessageStore interface {
-	Write(*messages.Message[url.Values]) (string, error)
-	Read(string) (*messages.Message[url.Values], error)
-	Delete(string) error
+	Write(ctx context.Context, message *messages.Message[url.Values]) (string, error)
+	Read(ctx context.Context, handle string) (*messages.Message[url.Values], error)
+	Delete(ctx context.Context, handle string) error
 }
 
-// ClientStore loads clients by identifier.
-// input: client id -> behavior: find matching enabled or disabled client -> output: client or error.
+// ClientStore loads clients by identifier. Client records are configuration
+// data without a lifecycle, so the store carries no reclamation method.
 type ClientStore interface {
-	FindClientById(string) (*models.Client, error)
+	FindClientById(ctx context.Context, clientId string) (*models.Client, error)
 }
 
 // ResourceStore loads API and identity resources by current caller criteria.
-// input: names/scopes -> behavior: find matching resources -> output: resources or error.
+// Resource records are configuration data without a lifecycle, so the store
+// carries no reclamation method.
 type ResourceStore interface {
-	GetAllEnabledResources() (*models.Resources, error)
-	FindResourcesByScope([]string) (*models.Resources, error)
-	FindApiResourcesByName([]string) ([]*models.ApiResource, error)
-	FindApiScopesByName([]string) ([]*models.ApiScope, error)
-	FindIdentityResourcesByScope([]string) ([]*models.IdentityResource, error)
+	GetAllEnabledResources(ctx context.Context) (*models.Resources, error)
+	FindResourcesByScope(ctx context.Context, scopes []string) (*models.Resources, error)
+	FindApiResourcesByName(ctx context.Context, names []string) ([]*models.ApiResource, error)
+	FindApiScopesByName(ctx context.Context, names []string) ([]*models.ApiScope, error)
+	FindIdentityResourcesByScope(ctx context.Context, scopes []string) ([]*models.IdentityResource, error)
 }
 
 // PersistedGrantStore stores grants keyed by persisted grant key and filters.
-// input: grant/filter -> behavior: store, query, or remove -> output: grants or error.
 type PersistedGrantStore interface {
-	Store(*models.PersistedGrant) error
-	Get(string) (*models.PersistedGrant, error)
-	GetAll(*PersistedGrantFilter) ([]*models.PersistedGrant, error)
-	Remove(string) error
-	RemoveAll(*PersistedGrantFilter) error
+	Store(ctx context.Context, grant *models.PersistedGrant) error
+	Get(ctx context.Context, key string) (*models.PersistedGrant, error)
+	GetAll(ctx context.Context, filter *PersistedGrantFilter) ([]*models.PersistedGrant, error)
+	Remove(ctx context.Context, key string) error
+	RemoveAll(ctx context.Context, filter *PersistedGrantFilter) error
+	// RemoveExpired removes grants whose Expiration is set and precedes cutoff,
+	// returning how many were removed. It reclaims space only; expiry judgement
+	// remains on the core side.
+	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 // DeviceFlowStore stores device-flow records by device and user codes.
-// input: codes/data -> behavior: store, find, update, or remove -> output: data or error.
 type DeviceFlowStore interface {
-	StoreDeviceAuthorization(string, string, *models.DeviceCode) error
-	FindByUserCode(string) (*models.DeviceCode, error)
-	FindByDeviceCode(string) (*models.DeviceCode, error)
-	UpdateByUserCode(string, *models.DeviceCode) error
-	RemoveByDeviceCode(string) error
+	StoreDeviceAuthorization(ctx context.Context, deviceCode string, userCode string, data *models.DeviceCode) error
+	FindByUserCode(ctx context.Context, userCode string) (*models.DeviceCode, error)
+	FindByDeviceCode(ctx context.Context, deviceCode string) (*models.DeviceCode, error)
+	UpdateByUserCode(ctx context.Context, userCode string, data *models.DeviceCode) error
+	RemoveByDeviceCode(ctx context.Context, deviceCode string) error
+	// RemoveExpired removes device-flow records whose creation time plus
+	// lifetime precedes cutoff, returning how many were removed. It reclaims
+	// space only; expiry judgement remains on the core side.
+	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 // BackchannelAuthenticationRequestStore stores CIBA request state by opaque auth_req_id.
-// input: request id/data -> behavior: store, find, update, consume -> output: data or error.
 type BackchannelAuthenticationRequestStore interface {
-	StoreBackchannelAuthenticationRequest(string, *models.BackchannelAuthenticationRequest) error
-	FindBackchannelAuthenticationRequest(string) (*models.BackchannelAuthenticationRequest, error)
-	UpdateBackchannelAuthenticationRequest(string, *models.BackchannelAuthenticationRequest) error
-	RemoveBackchannelAuthenticationRequest(string) error
+	StoreBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *models.BackchannelAuthenticationRequest) error
+	FindBackchannelAuthenticationRequest(ctx context.Context, requestID string) (*models.BackchannelAuthenticationRequest, error)
+	UpdateBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *models.BackchannelAuthenticationRequest) error
+	RemoveBackchannelAuthenticationRequest(ctx context.Context, requestID string) error
+	// RemoveExpired removes CIBA requests whose ExpirationTime precedes cutoff,
+	// returning how many were removed. It reclaims space only; expiry judgement
+	// remains on the core side.
+	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 // AuthorizationCodeStore stores authorization codes by generated handle.
-// input: code/handle -> behavior: store, find, or remove -> output: handle, code, or error.
 type AuthorizationCodeStore interface {
-	StoreAuthorizationCode(*models.AuthorizationCode) (string, error)
-	GetAuthorizationCode(string) (*models.AuthorizationCode, error)
-	RemoveAuthorizationCode(string) error
+	StoreAuthorizationCode(ctx context.Context, code *models.AuthorizationCode) (string, error)
+	GetAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error)
+	RemoveAuthorizationCode(ctx context.Context, handle string) error
+	// RemoveExpired removes codes whose creation time plus lifetime precedes
+	// cutoff, returning how many were removed. It reclaims space only; expiry
+	// judgement remains on the core side.
+	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 // RefreshTokenStore stores refresh tokens by generated handle.
-// input: token/handle -> behavior: store, find, update, or remove -> output: handle, token, or error.
 type RefreshTokenStore interface {
-	StoreRefreshToken(*models.RefreshToken) (string, error)
-	GetRefreshToken(string) (*models.RefreshToken, error)
-	UpdateRefreshToken(string, *models.RefreshToken) error
-	RemoveRefreshToken(string) error
+	StoreRefreshToken(ctx context.Context, token *models.RefreshToken) (string, error)
+	GetRefreshToken(ctx context.Context, handle string) (*models.RefreshToken, error)
+	UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error
+	RemoveRefreshToken(ctx context.Context, handle string) error
+	// RemoveExpired removes tokens whose creation time plus lifetime precedes
+	// cutoff, returning how many were removed. It reclaims space only; expiry
+	// judgement remains on the core side.
+	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 // ReferenceTokenStore stores reference access tokens by generated handle.
-// input: token/handle -> behavior: store, find, or remove -> output: handle, token, or error.
 type ReferenceTokenStore interface {
-	StoreReferenceToken(*models.Token) (string, error)
-	GetReferenceToken(string) (*models.Token, error)
-	RemoveReferenceToken(string) error
-	RemoveReferenceTokens(subjectId, clientId string) error
+	StoreReferenceToken(ctx context.Context, token *models.Token) (string, error)
+	GetReferenceToken(ctx context.Context, handle string) (*models.Token, error)
+	RemoveReferenceToken(ctx context.Context, handle string) error
+	RemoveReferenceTokens(ctx context.Context, subjectId, clientId string) error
+	// RemoveExpired removes tokens whose creation time plus lifetime precedes
+	// cutoff, returning how many were removed. It reclaims space only; expiry
+	// judgement remains on the core side.
+	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 // UserConsentStore stores user consent grants.
-// input: consent identity -> behavior: store, find, list, or remove -> output: consent(s) or error.
 type UserConsentStore interface {
-	StoreUserConsent(*models.Consent) error
-	GetUserConsent(subjectId, clientId string) (*models.Consent, error)
-	GetAllUserConsents(subjectId string) ([]*models.Consent, error)
-	RemoveUserConsent(subjectId, clientId string) error
+	StoreUserConsent(ctx context.Context, consent *models.Consent) error
+	GetUserConsent(ctx context.Context, subjectId, clientId string) (*models.Consent, error)
+	GetAllUserConsents(ctx context.Context, subjectId string) ([]*models.Consent, error)
+	RemoveUserConsent(ctx context.Context, subjectId, clientId string) error
+	// RemoveExpired removes consents whose Expiration is set and precedes
+	// cutoff, returning how many were removed. It reclaims space only; expiry
+	// judgement remains on the core side.
+	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 // SigningCredentialStore exposes signing credentials to token services.
-// input: none -> behavior: return configured credential -> output: credential or error.
+// Credentials are configuration data without a lifecycle, so the store carries
+// no reclamation method.
 type SigningCredentialStore interface {
-	GetSigningCredentials() (*tokens.SigningCredentials, error)
+	GetSigningCredentials(ctx context.Context) (*tokens.SigningCredentials, error)
 }
 
-// ValidationKeysStore exposes validation keys to token validators.
-// input: none -> behavior: return configured validation keys -> output: key list or error.
+// ValidationKeysStore exposes validation keys to token validators. Keys are
+// configuration data without a lifecycle, so the store carries no reclamation
+// method.
 type ValidationKeysStore interface {
-	GetValidationKeys() ([]*core_models.SecurityKeyInfo, error)
+	GetValidationKeys(ctx context.Context) ([]*core_models.SecurityKeyInfo, error)
 }

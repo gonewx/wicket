@@ -32,7 +32,7 @@ func (h *BackchannelAuthenticationHandler) Process(w http.ResponseWriter, r *htt
 		}
 		return results.NewBadRequestResult(err, "").Execute(w, r)
 	}
-	result := h.requestValidator.Validate(r.Form, clientResult.Client)
+	result := h.requestValidator.Validate(r.Context(), r.Form, clientResult.Client)
 	if result.Error != nil {
 		return results.NewBadRequestResult(result.Error, result.Description).Execute(w, r)
 	}

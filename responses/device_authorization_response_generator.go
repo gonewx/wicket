@@ -5,6 +5,8 @@
 package responses
 
 import (
+	"context"
+
 	responses_models "github.com/gonewx/wicket/responses/models"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -12,5 +14,5 @@ import (
 // DeviceAuthorizationResponseGenerator Interface the device authorization response generator
 type DeviceAuthorizationResponseGenerator interface {
 	// Processes the response.
-	Handle(validationResult *validators_models.DeviceAuthorizationRequestValidationResult, baseUrl string) (*responses_models.DeviceAuthorizationResponse, error)
+	Handle(ctx context.Context, validationResult *validators_models.DeviceAuthorizationRequestValidationResult, baseUrl string) (*responses_models.DeviceAuthorizationResponse, error)
 }

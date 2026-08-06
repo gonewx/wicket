@@ -4,17 +4,21 @@
 
 package storage
 
-import "github.com/gonewx/wicket/models/messages"
+import (
+	"context"
+
+	"github.com/gonewx/wicket/models/messages"
+)
 
 // ConsentMessageStore Interface for a message store
 type ConsentMessageStore interface {
 	// Writes the consent response message.
 	// return An identifier for the message
-	Write(id string, message *messages.Message[*messages.ConsentResponse]) error
+	Write(ctx context.Context, id string, message *messages.Message[*messages.ConsentResponse]) error
 
 	// Reads the message.
-	Read(id string) (*messages.Message[*messages.ConsentResponse], error)
+	Read(ctx context.Context, id string) (*messages.Message[*messages.ConsentResponse], error)
 
 	// Deletes the consent response message.
-	Delete(id string) error
+	Delete(ctx context.Context, id string) error
 }

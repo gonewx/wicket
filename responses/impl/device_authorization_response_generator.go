@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -43,7 +44,7 @@ func NewDeviceAuthorizationResponseGenerator(
 }
 
 // Processes the response.
-func (g *DeviceAuthorizationResponseGenerator) Handle(validationResult *validators_models.DeviceAuthorizationRequestValidationResult, baseUrl string) (*responses_models.DeviceAuthorizationResponse, error) {
+func (g *DeviceAuthorizationResponseGenerator) Handle(ctx context.Context, validationResult *validators_models.DeviceAuthorizationRequestValidationResult, baseUrl string) (*responses_models.DeviceAuthorizationResponse, error) {
 	if validationResult == nil {
 		return nil, fmt.Errorf("validationResult is nil")
 	}
@@ -71,7 +72,7 @@ func (g *DeviceAuthorizationResponseGenerator) Handle(validationResult *validato
 	for {
 		userCode := userCodeGenerator.Generate()
 
-		deviceCode, err := g.deviceFlowCodeService.FindByUserCode(userCode)
+		deviceCode, err := g.deviceFlowCodeService.FindByUserCode(ctx, userCode)
 		if err != nil || deviceCode == nil {
 			response.UserCode = userCode
 			break
@@ -106,7 +107,7 @@ func (g *DeviceAuthorizationResponseGenerator) Handle(validationResult *validato
 
 	// store device request (device code & user code)
 	var err error
-	response.DeviceCode, err = g.deviceFlowCodeService.StoreDeviceAuthorization(response.UserCode, &storage_models.DeviceCode{
+	response.DeviceCode, err = g.deviceFlowCodeService.StoreDeviceAuthorization(ctx, response.UserCode, &storage_models.DeviceCode{
 		Description:     validationResult.ValidatedRequest.Client.Description,
 		ClientId:        validationResult.ValidatedRequest.Client.ClientId,
 		IsOpenId:        validationResult.ValidatedRequest.IsOpenIdRequest,

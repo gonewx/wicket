@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -58,7 +59,7 @@ func TestEmpty_Parameters(t *testing.T) {
 
 	parameters := url.Values{}
 
-	_, err := ti.validator.ValidateRequest(parameters, ti.client)
+	_, err := ti.validator.ValidateRequest(context.Background(), parameters, ti.client)
 
 	a.Error(err)
 	a.Equal("no parameters passed", err.Error())
@@ -72,7 +73,7 @@ func TestMissing_Token_Valid_Hint(t *testing.T) {
 	parameters := url.Values{}
 	parameters.Add("token_type_hint", "access_token")
 
-	result, err := ti.validator.ValidateRequest(parameters, ti.client)
+	result, err := ti.validator.ValidateRequest(context.Background(), parameters, ti.client)
 
 	a.NoError(err)
 	a.Error(result.Error)
@@ -88,7 +89,7 @@ func TestValid_Token_And_AccessTokenHint(t *testing.T) {
 	parameters.Add("token", "foo")
 	parameters.Add("token_type_hint", "access_token")
 
-	result, err := ti.validator.ValidateRequest(parameters, ti.client)
+	result, err := ti.validator.ValidateRequest(context.Background(), parameters, ti.client)
 
 	a.NoError(err)
 	a.NoError(result.Error)
@@ -105,7 +106,7 @@ func TestValid_Token_and_RefreshTokenHint(t *testing.T) {
 	parameters.Add("token", "foo")
 	parameters.Add("token_type_hint", "refresh_token")
 
-	result, err := ti.validator.ValidateRequest(parameters, ti.client)
+	result, err := ti.validator.ValidateRequest(context.Background(), parameters, ti.client)
 
 	a.NoError(err)
 	a.NoError(result.Error)
@@ -121,7 +122,7 @@ func TestValid_Token_And_Missing_Hint(t *testing.T) {
 	parameters := url.Values{}
 	parameters.Add("token", "foo")
 
-	result, err := ti.validator.ValidateRequest(parameters, ti.client)
+	result, err := ti.validator.ValidateRequest(context.Background(), parameters, ti.client)
 
 	a.NoError(err)
 	a.NoError(result.Error)
@@ -138,7 +139,7 @@ func TestValid_Token_And_Invalid_Hint(t *testing.T) {
 	parameters.Add("token", "foo")
 	parameters.Add("token_type_hint", "invalid")
 
-	result, err := ti.validator.ValidateRequest(parameters, ti.client)
+	result, err := ti.validator.ValidateRequest(context.Background(), parameters, ti.client)
 
 	a.NoError(err)
 	a.Error(result.Error)

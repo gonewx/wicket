@@ -4,14 +4,20 @@
 
 package validators
 
-import "github.com/gonewx/wicket/validators/models"
+import (
+	"context"
+
+	"github.com/gonewx/wicket/validators/models"
+)
 
 // / TokenValidator Interface for the token validator
 type TokenValidator interface {
 	/// Validates an access token.
-	ValidateAccessToken(token string, expectedScope string) *models.TokenValidationResult
+	/// error reports an infrastructure failure; protocol outcomes live in the result.
+	ValidateAccessToken(ctx context.Context, token string, expectedScope string) (*models.TokenValidationResult, error)
 
 	/// Validates an identity token.
 	/// validateLifetime if set to <c>true</c> the lifetime gets validated. Otherwise not.
-	ValidateIdentityToken(token string, clientId string, validateLifetime bool) *models.TokenValidationResult
+	/// error reports an infrastructure failure; protocol outcomes live in the result.
+	ValidateIdentityToken(ctx context.Context, token string, clientId string, validateLifetime bool) (*models.TokenValidationResult, error)
 }

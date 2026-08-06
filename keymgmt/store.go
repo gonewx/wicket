@@ -3,7 +3,10 @@
 
 package keymgmt
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 // MemoryRecordStore is an in-memory RecordStore with an optimistic-concurrency
 // marker. It is the default persistence when a host supplies no storage
@@ -18,7 +21,7 @@ func NewMemoryRecordStore() *MemoryRecordStore {
 	return &MemoryRecordStore{records: map[string]*Record{}}
 }
 
-func (s *MemoryRecordStore) List() ([]*Record, error) {
+func (s *MemoryRecordStore) List(ctx context.Context) ([]*Record, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := make([]*Record, 0, len(s.records))
@@ -28,7 +31,7 @@ func (s *MemoryRecordStore) List() ([]*Record, error) {
 	return out, nil
 }
 
-func (s *MemoryRecordStore) Get(handle string) (*Record, error) {
+func (s *MemoryRecordStore) Get(ctx context.Context, handle string) (*Record, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	r, ok := s.records[handle]
@@ -38,7 +41,7 @@ func (s *MemoryRecordStore) Get(handle string) (*Record, error) {
 	return copyRecord(r), nil
 }
 
-func (s *MemoryRecordStore) Create(record *Record) error {
+func (s *MemoryRecordStore) Create(ctx context.Context, record *Record) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.records[record.Handle]; ok {
@@ -54,7 +57,7 @@ func (s *MemoryRecordStore) Create(record *Record) error {
 	return nil
 }
 
-func (s *MemoryRecordStore) Update(record *Record, expectedVersion uint64) error {
+func (s *MemoryRecordStore) Update(ctx context.Context, record *Record, expectedVersion uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	current, ok := s.records[record.Handle]
@@ -71,7 +74,7 @@ func (s *MemoryRecordStore) Update(record *Record, expectedVersion uint64) error
 	return nil
 }
 
-func (s *MemoryRecordStore) Delete(handle string) error {
+func (s *MemoryRecordStore) Delete(ctx context.Context, handle string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.records[handle]; !ok {

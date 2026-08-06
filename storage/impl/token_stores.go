@@ -4,8 +4,11 @@
 package impl
 
 import (
+	"context"
 	"sync"
+	"time"
 
+	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/utils"
 )
@@ -19,7 +22,7 @@ func NewAuthorizationCodeStore() *AuthorizationCodeStore {
 	return &AuthorizationCodeStore{items: map[string]*models.AuthorizationCode{}}
 }
 
-func (s *AuthorizationCodeStore) StoreAuthorizationCode(code *models.AuthorizationCode) (string, error) {
+func (s *AuthorizationCodeStore) StoreAuthorizationCode(ctx context.Context, code *models.AuthorizationCode) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := newHandle()
@@ -27,17 +30,34 @@ func (s *AuthorizationCodeStore) StoreAuthorizationCode(code *models.Authorizati
 	return id, nil
 }
 
-func (s *AuthorizationCodeStore) GetAuthorizationCode(handle string) (*models.AuthorizationCode, error) {
+func (s *AuthorizationCodeStore) GetAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.items[handle], nil
+	code, ok := s.items[handle]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return code, nil
 }
 
-func (s *AuthorizationCodeStore) RemoveAuthorizationCode(handle string) error {
+func (s *AuthorizationCodeStore) RemoveAuthorizationCode(ctx context.Context, handle string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, handle)
 	return nil
+}
+
+func (s *AuthorizationCodeStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for handle, code := range s.items {
+		if code.CreationTime.Add(time.Duration(code.Lifetime) * time.Second).Before(cutoff) {
+			delete(s.items, handle)
+			count++
+		}
+	}
+	return count, nil
 }
 
 type RefreshTokenStore struct {
@@ -49,7 +69,7 @@ func NewRefreshTokenStore() *RefreshTokenStore {
 	return &RefreshTokenStore{items: map[string]*models.RefreshToken{}}
 }
 
-func (s *RefreshTokenStore) StoreRefreshToken(token *models.RefreshToken) (string, error) {
+func (s *RefreshTokenStore) StoreRefreshToken(ctx context.Context, token *models.RefreshToken) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := newHandle()
@@ -57,24 +77,41 @@ func (s *RefreshTokenStore) StoreRefreshToken(token *models.RefreshToken) (strin
 	return id, nil
 }
 
-func (s *RefreshTokenStore) GetRefreshToken(handle string) (*models.RefreshToken, error) {
+func (s *RefreshTokenStore) GetRefreshToken(ctx context.Context, handle string) (*models.RefreshToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.items[handle], nil
+	token, ok := s.items[handle]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return token, nil
 }
 
-func (s *RefreshTokenStore) UpdateRefreshToken(handle string, token *models.RefreshToken) error {
+func (s *RefreshTokenStore) UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.items[handle] = token
 	return nil
 }
 
-func (s *RefreshTokenStore) RemoveRefreshToken(handle string) error {
+func (s *RefreshTokenStore) RemoveRefreshToken(ctx context.Context, handle string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, handle)
 	return nil
+}
+
+func (s *RefreshTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for handle, token := range s.items {
+		if token.CreationTime.Add(time.Duration(token.Lifetime) * time.Second).Before(cutoff) {
+			delete(s.items, handle)
+			count++
+		}
+	}
+	return count, nil
 }
 
 type ReferenceTokenStore struct {
@@ -86,7 +123,7 @@ func NewReferenceTokenStore() *ReferenceTokenStore {
 	return &ReferenceTokenStore{items: map[string]*models.Token{}}
 }
 
-func (s *ReferenceTokenStore) StoreReferenceToken(token *models.Token) (string, error) {
+func (s *ReferenceTokenStore) StoreReferenceToken(ctx context.Context, token *models.Token) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := newHandle()
@@ -94,20 +131,24 @@ func (s *ReferenceTokenStore) StoreReferenceToken(token *models.Token) (string, 
 	return id, nil
 }
 
-func (s *ReferenceTokenStore) GetReferenceToken(handle string) (*models.Token, error) {
+func (s *ReferenceTokenStore) GetReferenceToken(ctx context.Context, handle string) (*models.Token, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.items[handle], nil
+	token, ok := s.items[handle]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return token, nil
 }
 
-func (s *ReferenceTokenStore) RemoveReferenceToken(handle string) error {
+func (s *ReferenceTokenStore) RemoveReferenceToken(ctx context.Context, handle string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, handle)
 	return nil
 }
 
-func (s *ReferenceTokenStore) RemoveReferenceTokens(subjectId, clientId string) error {
+func (s *ReferenceTokenStore) RemoveReferenceTokens(ctx context.Context, subjectId, clientId string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for key, token := range s.items {
@@ -116,6 +157,19 @@ func (s *ReferenceTokenStore) RemoveReferenceTokens(subjectId, clientId string) 
 		}
 	}
 	return nil
+}
+
+func (s *ReferenceTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for handle, token := range s.items {
+		if token.CreationTime.Add(time.Duration(token.Lifetime) * time.Second).Before(cutoff) {
+			delete(s.items, handle)
+			count++
+		}
+	}
+	return count, nil
 }
 
 type UserConsentStore struct {
@@ -127,20 +181,24 @@ func NewUserConsentStore() *UserConsentStore {
 	return &UserConsentStore{items: map[string]*models.Consent{}}
 }
 
-func (s *UserConsentStore) StoreUserConsent(consent *models.Consent) error {
+func (s *UserConsentStore) StoreUserConsent(ctx context.Context, consent *models.Consent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.items[consent.SubjectId+"\x00"+consent.ClientId] = consent
 	return nil
 }
 
-func (s *UserConsentStore) GetUserConsent(subjectId, clientId string) (*models.Consent, error) {
+func (s *UserConsentStore) GetUserConsent(ctx context.Context, subjectId, clientId string) (*models.Consent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.items[subjectId+"\x00"+clientId], nil
+	consent, ok := s.items[subjectId+"\x00"+clientId]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return consent, nil
 }
 
-func (s *UserConsentStore) GetAllUserConsents(subjectId string) ([]*models.Consent, error) {
+func (s *UserConsentStore) GetAllUserConsents(ctx context.Context, subjectId string) ([]*models.Consent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := make([]*models.Consent, 0)
@@ -152,11 +210,24 @@ func (s *UserConsentStore) GetAllUserConsents(subjectId string) ([]*models.Conse
 	return out, nil
 }
 
-func (s *UserConsentStore) RemoveUserConsent(subjectId, clientId string) error {
+func (s *UserConsentStore) RemoveUserConsent(ctx context.Context, subjectId, clientId string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, subjectId+"\x00"+clientId)
 	return nil
+}
+
+func (s *UserConsentStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for key, consent := range s.items {
+		if consent.Expiration != nil && consent.Expiration.Before(cutoff) {
+			delete(s.items, key)
+			count++
+		}
+	}
+	return count, nil
 }
 
 func newHandle() string {

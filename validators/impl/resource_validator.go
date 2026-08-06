@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 
@@ -24,7 +25,7 @@ func NewResourceValidator(store storage.ResourceStore, parser validators.ScopePa
 	return &ResourceValidator{store: store, parser: parser}
 }
 
-func (v *ResourceValidator) ValidateRequestedResources(request *validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error) {
+func (v *ResourceValidator) ValidateRequestedResources(ctx context.Context, request *validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error) {
 	result := validators_models.NewResourceValidationResult()
 	if request == nil {
 		return result, nil
@@ -61,7 +62,7 @@ func (v *ResourceValidator) ValidateRequestedResources(request *validators_model
 	scopeNames := parsedScopeNames(result.ParsedScopes)
 	resources := storage_models.NewResources()
 	if v.store != nil {
-		found, err := v.store.FindResourcesByScope(scopeNames)
+		found, err := v.store.FindResourcesByScope(ctx, scopeNames)
 		if err != nil {
 			return nil, err
 		}
@@ -110,7 +111,7 @@ func (v *ResourceValidator) ValidateRequestedResources(request *validators_model
 
 	requestedApiResources := map[string]*storage_models.ApiResource{}
 	if len(validResourceGaps) > 0 && v.store != nil {
-		found, err := v.store.FindApiResourcesByName(validResourceGaps)
+		found, err := v.store.FindApiResourcesByName(ctx, validResourceGaps)
 		if err != nil {
 			return nil, err
 		}

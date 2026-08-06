@@ -4,6 +4,8 @@
 package impl
 
 import (
+	"context"
+
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/session"
 )
@@ -16,7 +18,7 @@ func NewSessionCoordinationAdapter(coordinator *session.Coordinator) *SessionCoo
 	return &SessionCoordinationAdapter{coordinator: coordinator}
 }
 
-func (a *SessionCoordinationAdapter) ValidateSession(req *services.SessionValidationRequest) (bool, error) {
+func (a *SessionCoordinationAdapter) ValidateSession(ctx context.Context, req *services.SessionValidationRequest) (bool, error) {
 	if a.coordinator == nil {
 		return true, nil
 	}
@@ -24,5 +26,5 @@ func (a *SessionCoordinationAdapter) ValidateSession(req *services.SessionValida
 	if req != nil {
 		sessionID = req.SessionId
 	}
-	return a.coordinator.ValidateSession(sessionID)
+	return a.coordinator.ValidateSession(ctx, sessionID)
 }

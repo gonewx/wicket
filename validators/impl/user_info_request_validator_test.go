@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gonewx/wicket"
@@ -34,7 +35,7 @@ func TestToken_without_sub_should_fail(t *testing.T) {
 	ti := newUserInfoRequestValidatorTest()
 
 	tokenResult := validators_models.NewTokenValidationResult()
-	tokenResult.Client, _ = extensions.FindEnabledClientById(ti.clients, "codeclient")
+	tokenResult.Client, _ = extensions.FindEnabledClientById(context.Background(), ti.clients, "codeclient")
 	tokenResult.Claims = make([]*claims.Claim, 0)
 
 	validator := NewUserInfoRequestValidator(
@@ -43,7 +44,7 @@ func TestToken_without_sub_should_fail(t *testing.T) {
 		test_common.NewTestLogger(),
 	)
 
-	result := validator.ValidateRequest("token")
+	result, _ := validator.ValidateRequest(context.Background(), "token")
 
 	a.Error(result.Error)
 	a.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
@@ -55,7 +56,7 @@ func TestActive_user_should_succeed(t *testing.T) {
 	ti := newUserInfoRequestValidatorTest()
 
 	tokenResult := validators_models.NewTokenValidationResult()
-	tokenResult.Client, _ = extensions.FindEnabledClientById(ti.clients, "codeclient")
+	tokenResult.Client, _ = extensions.FindEnabledClientById(context.Background(), ti.clients, "codeclient")
 	tokenResult.Claims = []*claims.Claim{
 		claims.NewClaim(
 			claims.WithClaimType("sub"),
@@ -69,7 +70,7 @@ func TestActive_user_should_succeed(t *testing.T) {
 		test_common.NewTestLogger(),
 	)
 
-	result := validator.ValidateRequest("token")
+	result, _ := validator.ValidateRequest(context.Background(), "token")
 
 	a.NoError(result.Error)
 }
@@ -80,7 +81,7 @@ func TestUserInfoRequestValidatorInactive_user_should_fail(t *testing.T) {
 	ti := newUserInfoRequestValidatorTest()
 
 	tokenResult := validators_models.NewTokenValidationResult()
-	tokenResult.Client, _ = extensions.FindEnabledClientById(ti.clients, "codeclient")
+	tokenResult.Client, _ = extensions.FindEnabledClientById(context.Background(), ti.clients, "codeclient")
 	tokenResult.Claims = []*claims.Claim{
 		claims.NewClaim(
 			claims.WithClaimType("sub"),
@@ -94,7 +95,7 @@ func TestUserInfoRequestValidatorInactive_user_should_fail(t *testing.T) {
 		test_common.NewTestLogger(),
 	)
 
-	result := validator.ValidateRequest("token")
+	result, _ := validator.ValidateRequest(context.Background(), "token")
 
 	a.Error(result.Error)
 	a.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)

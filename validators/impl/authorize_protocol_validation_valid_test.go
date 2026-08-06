@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -225,7 +226,7 @@ func TestAuthorizeProtocolValidationValid(t *testing.T) {
 			validator, err := createAuthorizeRequestValidator()
 			r.NoError(err)
 
-			result := validator.Validate(tc.parameters(), nil)
+			result := validator.Validate(context.Background(), tc.parameters(), nil)
 			tc.expected(r, result)
 
 		})
@@ -248,7 +249,7 @@ func TestAuthorizeProtocolValidationValidSuppressedPromt(t *testing.T) {
 		validator, err := createAuthorizeRequestValidator()
 		r.NoError(err)
 
-		result := validator.Validate(values, nil)
+		result := validator.Validate(context.Background(), values, nil)
 		r.NoError(result.Error)
 
 		r.ElementsMatch(result.ValidatedRequest.PromptModes, []string{gois.PromptModesConsent, gois.PromptModesLogin})
@@ -263,7 +264,7 @@ func TestAuthorizeProtocolValidationValidSuppressedPromt(t *testing.T) {
 		validator, err := createAuthorizeRequestValidator()
 		r.NoError(err)
 
-		result := validator.Validate(values, nil)
+		result := validator.Validate(context.Background(), values, nil)
 
 		r.NoError(result.Error)
 		r.ElementsMatch(result.ValidatedRequest.PromptModes, []string{gois.PromptModesConsent})
@@ -280,7 +281,7 @@ func TestAuthorizeProtocolValidationValidSuppressedPromt(t *testing.T) {
 		validator, err := createAuthorizeRequestValidator()
 		r.NoError(err)
 
-		result := validator.Validate(values, nil)
+		result := validator.Validate(context.Background(), values, nil)
 
 		r.NoError(result.Error)
 		r.Empty(result.ValidatedRequest.PromptModes)

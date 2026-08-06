@@ -5,6 +5,7 @@
 package validators
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/gonewx/wicket/claims"
@@ -12,5 +13,5 @@ import (
 )
 
 type AuthorizeRequestValidator interface {
-	Validate(values url.Values, subject *claims.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult
+	Validate(ctx context.Context, values url.Values, subject *claims.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult
 }

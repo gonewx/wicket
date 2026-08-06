@@ -4,6 +4,7 @@
 package e2e_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -43,7 +44,7 @@ type resourceIndicatorTokenRecorder struct {
 	tokens []*storage_models.Token
 }
 
-func (r *resourceIndicatorTokenRecorder) CreateToken(token *storage_models.Token) (string, error) {
+func (r *resourceIndicatorTokenRecorder) CreateToken(ctx context.Context, token *storage_models.Token) (string, error) {
 	r.tokens = append(r.tokens, token)
 	return fmt.Sprintf("token-%d", len(r.tokens)), nil
 }
@@ -74,7 +75,7 @@ func TestResourceIndicatorAuthorizationCodeRefreshFlowE2E(t *testing.T) {
 		t.Fatalf("authorization code token error = %v", tokenResult.Error)
 	}
 
-	tokenResponse, err := fixture.tokenGenerator.Handle(tokenResult)
+	tokenResponse, err := fixture.tokenGenerator.Handle(context.Background(), tokenResult)
 	if err != nil {
 		t.Fatalf("authorization code token response: %v", err)
 	}
@@ -84,7 +85,7 @@ func TestResourceIndicatorAuthorizationCodeRefreshFlowE2E(t *testing.T) {
 		t.Fatal("missing refresh token")
 	}
 
-	refreshToken, err := fixture.refreshTokens.GetRefreshToken(tokenResponse.RefreshToken)
+	refreshToken, err := fixture.refreshTokens.GetRefreshToken(context.Background(), tokenResponse.RefreshToken)
 	if err != nil {
 		t.Fatalf("get refresh token: %v", err)
 	}
@@ -103,7 +104,7 @@ func TestResourceIndicatorAuthorizationCodeRefreshFlowE2E(t *testing.T) {
 	if refreshResult.Error != nil {
 		t.Fatalf("refresh token error = %v", refreshResult.Error)
 	}
-	refreshResponse, err := fixture.tokenGenerator.Handle(refreshResult)
+	refreshResponse, err := fixture.tokenGenerator.Handle(context.Background(), refreshResult)
 	if err != nil {
 		t.Fatalf("refresh token response: %v", err)
 	}
@@ -113,7 +114,7 @@ func TestResourceIndicatorAuthorizationCodeRefreshFlowE2E(t *testing.T) {
 	assertSameStrings(t, strings.Fields(refreshResponse.Scope), []string{"payments.read", gois.StandardScopesOfflineAccess})
 	assertLastAccessTokenAudience(t, fixture.recorder, []string{resourceIndicatorPayments})
 
-	updatedRefreshToken, err := fixture.refreshTokens.GetRefreshToken(refreshResponse.RefreshToken)
+	updatedRefreshToken, err := fixture.refreshTokens.GetRefreshToken(context.Background(), refreshResponse.RefreshToken)
 	if err != nil {
 		t.Fatalf("get updated refresh token: %v", err)
 	}
@@ -166,7 +167,7 @@ func TestResourceIndicatorInvalidTargetsE2E(t *testing.T) {
 			if tokenResult.Error != nil {
 				t.Fatalf("authorization code token error = %v", tokenResult.Error)
 			}
-			tokenResponse, err := fixture.tokenGenerator.Handle(tokenResult)
+			tokenResponse, err := fixture.tokenGenerator.Handle(context.Background(), tokenResult)
 			if err != nil {
 				t.Fatalf("authorization code token response: %v", err)
 			}
@@ -177,20 +178,26 @@ func TestResourceIndicatorInvalidTargetsE2E(t *testing.T) {
 		},
 		"token endpoint rejects multiple resource parameters": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
-			result := fixture.tokenValidator.ValidateRequest(url.Values{
+			result, err := fixture.tokenValidator.ValidateRequest(context.Background(), url.Values{
 				gois.TokenRequestGrantType: {gois.GrantTypeAuthorizationCode},
 				gois.TokenRequestResource:  {resourceIndicatorOrders, resourceIndicatorPayments},
 			}, &validators_models.ClientSecretValidationResult{Client: fixture.client})
+			if err != nil {
+				t.Fatalf("validate token request: %v", err)
+			}
 			if !errors.Is(result.Error, gois.TokenErrorsInvalidTarget) {
 				t.Fatalf("token error = %v, want %v", result.Error, gois.TokenErrorsInvalidTarget)
 			}
 		},
 		"token endpoint rejects empty resource": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
-			result := fixture.tokenValidator.ValidateRequest(url.Values{
+			result, err := fixture.tokenValidator.ValidateRequest(context.Background(), url.Values{
 				gois.TokenRequestGrantType: {gois.GrantTypeAuthorizationCode},
 				gois.TokenRequestResource:  {""},
 			}, &validators_models.ClientSecretValidationResult{Client: fixture.client})
+			if err != nil {
+				t.Fatalf("validate token request: %v", err)
+			}
 			if !errors.Is(result.Error, gois.TokenErrorsInvalidTarget) {
 				t.Fatalf("token error = %v, want %v", result.Error, gois.TokenErrorsInvalidTarget)
 			}
@@ -347,7 +354,7 @@ func (f *resourceIndicatorE2EFixture) validateAuthorize(t *testing.T, responseTy
 	for _, resource := range resources {
 		values.Add(gois.AuthorizeRequestResource, resource)
 	}
-	return f.authorizeValidator.Validate(values, claimspkg.ClaimsPrincipalAnonymous())
+	return f.authorizeValidator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous())
 }
 
 func (f *resourceIndicatorE2EFixture) storeAuthorizationCode(t *testing.T, request *validators_models.ValidatedAuthorizeRequest) string {
@@ -361,7 +368,7 @@ func (f *resourceIndicatorE2EFixture) storeAuthorizationCode(t *testing.T, reque
 	code.RequestedScopes = append([]string(nil), request.RequestedScopes...)
 	code.RequestedResourceGaps = append([]string(nil), request.RequestedResourceIndiators...)
 	code.Subject = request.Subject
-	handle, err := f.authorizationCodes.StoreAuthorizationCode(code)
+	handle, err := f.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
 	if err != nil {
 		t.Fatalf("store authorization code: %v", err)
 	}
@@ -379,7 +386,11 @@ func (f *resourceIndicatorE2EFixture) validateAuthorizationCodeToken(t *testing.
 	if resource != "" {
 		values.Set(gois.TokenRequestResource, resource)
 	}
-	return f.tokenValidator.ValidateRequest(values, &validators_models.ClientSecretValidationResult{Client: f.client})
+	result, err := f.tokenValidator.ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: f.client})
+	if err != nil {
+		return nil
+	}
+	return result
 }
 
 func (f *resourceIndicatorE2EFixture) validateRefreshToken(t *testing.T, refreshHandle string, resource string) *validators_models.TokenRequestValidationResult {
@@ -392,7 +403,11 @@ func (f *resourceIndicatorE2EFixture) validateRefreshToken(t *testing.T, refresh
 	if resource != "" {
 		values.Set(gois.TokenRequestResource, resource)
 	}
-	return f.tokenValidator.ValidateRequest(values, &validators_models.ClientSecretValidationResult{Client: f.client})
+	result, err := f.tokenValidator.ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: f.client})
+	if err != nil {
+		return nil
+	}
+	return result
 }
 
 func assertLastAccessTokenAudience(t *testing.T, recorder *resourceIndicatorTokenRecorder, want []string) {

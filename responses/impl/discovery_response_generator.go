@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -82,7 +83,7 @@ func (g *DiscoveryResponseGenerator) constructMtlsEndpoint(baseUrl string, issue
 }
 
 // CreateDiscoveryDocument Creates the discovery document.
-func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, issuerUri string) (map[string]any, error) {
+func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(ctx context.Context, baseUrl string, issuerUri string) (map[string]any, error) {
 	baseUrl = utils.RemoveTrailingSlash(baseUrl)
 	joinUrl := func(path string) string { return baseUrl + "/" + strings.TrimLeft(path, "/") }
 
@@ -91,7 +92,7 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 
 	// jwks
 	if g.options.Discovery.ShowKeySet {
-		keys, err := g.keys.GetValidationKeys()
+		keys, err := g.keys.GetValidationKeys(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +175,7 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 	if g.options.Discovery.ShowIdentityScopes ||
 		g.options.Discovery.ShowApiScopes ||
 		g.options.Discovery.ShowClaims {
-		resources, err := g.resourceStore.GetAllEnabledResources()
+		resources, err := g.resourceStore.GetAllEnabledResources(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -290,7 +291,7 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 		entries[gois.DiscoveryTokenEndpointAuthenticationMethodsSupported] = types
 	}
 
-	signingCredentials, err := g.keys.GetAllSigningCredentials()
+	signingCredentials, err := g.keys.GetAllSigningCredentials(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -364,10 +365,10 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(baseUrl string, iss
 }
 
 // Creates the JWK document.
-func (g *DiscoveryResponseGenerator) CreateJwkDocument() ([]*models.JsonWebKey, error) {
+func (g *DiscoveryResponseGenerator) CreateJwkDocument(ctx context.Context) ([]*models.JsonWebKey, error) {
 
 	webKeys := make([]*models.JsonWebKey, 0)
-	validationKeys, err := g.keys.GetValidationKeys()
+	validationKeys, err := g.keys.GetValidationKeys(ctx)
 	if err != nil {
 		return nil, err
 	}

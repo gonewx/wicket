@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func TestHandleConsentRejectsNilRequest(t *testing.T) {
 
 	g := consentGenerator(common.NewMockConsentService())
 
-	resp := g.HandleConsent(nil, messages.NewConsentResponse())
+	resp := g.HandleConsent(context.Background(), nil, messages.NewConsentResponse())
 
 	if !resp.IsError() {
 		t.Fatalf("expected an error result for a nil request, got %+v", resp)
@@ -53,7 +54,7 @@ func TestHandleConsentRejectsLoginClassPrompt(t *testing.T) {
 			req.PromptModes = []string{prompt}
 			g := consentGenerator(consent)
 
-			resp := g.HandleConsent(req, nil)
+			resp := g.HandleConsent(context.Background(), req, nil)
 
 			if !resp.IsError() {
 				t.Fatalf("expected an error result for a %q prompt, got %+v", prompt, resp)
@@ -92,7 +93,7 @@ func TestHandleConsentShowsPageWhenUnanswered(t *testing.T) {
 			req.PromptModes = tc.prompt
 			g := consentGenerator(consent)
 
-			resp := g.HandleConsent(req, nil)
+			resp := g.HandleConsent(context.Background(), req, nil)
 
 			if resp.IsError() {
 				t.Fatalf("did not expect an error, got %v", resp.Error)
@@ -122,7 +123,7 @@ func TestHandleConsentAllowsWhenNotRequired(t *testing.T) {
 	req := consentRequest(t)
 	g := consentGenerator(consent)
 
-	resp := g.HandleConsent(req, nil)
+	resp := g.HandleConsent(context.Background(), req, nil)
 
 	if resp.IsError() {
 		t.Fatalf("did not expect an error, got %v", resp.Error)
@@ -150,7 +151,7 @@ func TestHandleConsentRequiredUnderPromptNone(t *testing.T) {
 	req.PromptModes = []string{gois.PromptModesNone}
 	g := consentGenerator(consent)
 
-	resp := g.HandleConsent(req, nil)
+	resp := g.HandleConsent(context.Background(), req, nil)
 
 	if !errors.Is(resp.Error, gois.AuthorizeErrorsConsentRequired) {
 		t.Fatalf("Error = %v, want consent_required", resp.Error)
@@ -189,7 +190,7 @@ func TestHandleConsentDeniesUnsatisfactoryGrant(t *testing.T) {
 			req := consentRequest(t)
 			g := consentGenerator(consent)
 
-			resp := g.HandleConsent(req, tc.consent)
+			resp := g.HandleConsent(context.Background(), req, tc.consent)
 
 			if !errors.Is(resp.Error, gois.AuthorizeErrorsAccessDenied) {
 				t.Fatalf("Error = %v, want access_denied", resp.Error)
@@ -222,7 +223,7 @@ func TestHandleConsentFiltersGrantedSubset(t *testing.T) {
 		RememberConsent:       false,
 	}
 
-	resp := g.HandleConsent(req, answer)
+	resp := g.HandleConsent(context.Background(), req, answer)
 
 	if resp.IsError() {
 		t.Fatalf("did not expect an error, got %v", resp.Error)
@@ -283,7 +284,7 @@ func TestHandleConsentPersistenceGatedByClient(t *testing.T) {
 				RememberConsent:       tc.remember,
 			}
 
-			g.HandleConsent(req, answer)
+			g.HandleConsent(context.Background(), req, answer)
 
 			if consent.ConsentSubject != req.Subject {
 				t.Fatalf("persisted subject = %p, want %p", consent.ConsentSubject, req.Subject)
@@ -346,7 +347,7 @@ func TestHandleConsentReturnsPageSuppliedError(t *testing.T) {
 			answer.Error = &e
 			answer.ErrorDescription = "some description"
 
-			resp := g.HandleConsent(req, answer)
+			resp := g.HandleConsent(context.Background(), req, answer)
 
 			if !errors.Is(resp.Error, tc.want) {
 				t.Fatalf("Error = %v, want %v", resp.Error, tc.want)

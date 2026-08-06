@@ -5,6 +5,8 @@
 package common
 
 import (
+	"context"
+
 	"github.com/gonewx/wicket/utils"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -23,7 +25,7 @@ func (v *MockResourceValidator) ParseRequestedScopes(scopeValues []string) []*va
 	})
 }
 
-func (v *MockResourceValidator) ValidateRequestedResources(request *validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error) {
+func (v *MockResourceValidator) ValidateRequestedResources(ctx context.Context, request *validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error) {
 	if v.Result == nil {
 		v.Result = validators_models.NewResourceValidationResult()
 	}

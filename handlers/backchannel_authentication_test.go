@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +28,7 @@ type cibaHandlerRequestValidator struct {
 	result *validators_models.BackchannelAuthenticationRequestValidationResult
 }
 
-func (v cibaHandlerRequestValidator) Validate(url.Values, *storage_models.Client) *validators_models.BackchannelAuthenticationRequestValidationResult {
+func (v cibaHandlerRequestValidator) Validate(ctx context.Context, parameters url.Values, client *storage_models.Client) *validators_models.BackchannelAuthenticationRequestValidationResult {
 	return v.result
 }
 

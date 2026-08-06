@@ -5,6 +5,7 @@
 package validators
 
 import (
+	"context"
 	"net/url"
 
 	storage_models "github.com/gonewx/wicket/storage/models"
@@ -14,5 +15,5 @@ import (
 // TokenRevocationRequestValidator Interface for the token revocation request validator
 type TokenRevocationRequestValidator interface {
 	// Validates the request.
-	ValidateRequest(parameters url.Values, client *storage_models.Client) (*models.TokenRevocationRequestValidationResult, error)
+	ValidateRequest(ctx context.Context, parameters url.Values, client *storage_models.Client) (*models.TokenRevocationRequestValidationResult, error)
 }

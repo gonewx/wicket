@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/url"
@@ -75,7 +76,7 @@ func TestAuthorizeRequestValidatorResourceIndicatorTable(t *testing.T) {
 				values.Add(gois.AuthorizeRequestResource, resource)
 			}
 
-			result := validator.Validate(values, claimspkg.ClaimsPrincipalAnonymous())
+			result := validator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous())
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}
@@ -113,7 +114,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.RedirectUri = "https://client.example.com/callback"
 				code.RequestedScopes = []string{"orders.read"}
 				code.RequestedResourceGaps = []string{resourceOrders}
-				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(code)
+				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
 				if err != nil {
 					t.Fatalf("store code: %v", err)
 				}
@@ -137,7 +138,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.RedirectUri = "https://client.example.com/callback"
 				code.RequestedScopes = []string{"orders.read", "common.read", gois.StandardScopesOfflineAccess}
 				code.RequestedResourceGaps = []string{resourceOrders}
-				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(code)
+				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
 				if err != nil {
 					t.Fatalf("store code: %v", err)
 				}
@@ -159,7 +160,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.RedirectUri = "https://client.example.com/callback"
 				code.RequestedScopes = []string{"orders.read"}
 				code.RequestedResourceGaps = []string{resourceOrders}
-				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(code)
+				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
 				if err != nil {
 					t.Fatalf("store code: %v", err)
 				}
@@ -180,7 +181,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.Lifetime = 300
 				code.RedirectUri = "https://client.example.com/callback"
 				code.RequestedScopes = []string{"orders.read"}
-				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(code)
+				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
 				if err != nil {
 					t.Fatalf("store code: %v", err)
 				}
@@ -228,7 +229,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				refresh := storage_models.NewRefreshToken()
 				refresh.AuthorizedScopes = []string{"orders.read", "payments.read"}
 				refresh.AuthorizedResourceGaps = []string{resourceOrders, resourcePayments}
-				handle, err := ctx.refreshTokens.StoreRefreshToken(refresh)
+				handle, err := ctx.refreshTokens.StoreRefreshToken(context.Background(), refresh)
 				if err != nil {
 					t.Fatalf("store refresh token: %v", err)
 				}
@@ -248,7 +249,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				refresh := storage_models.NewRefreshToken()
 				refresh.AuthorizedScopes = []string{"orders.read"}
 				refresh.AuthorizedResourceGaps = []string{}
-				handle, err := ctx.refreshTokens.StoreRefreshToken(refresh)
+				handle, err := ctx.refreshTokens.StoreRefreshToken(context.Background(), refresh)
 				if err != nil {
 					t.Fatalf("store refresh token: %v", err)
 				}
@@ -270,7 +271,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 					RequestedScopes:       []string{"orders.read"},
 					RequestedResourceGaps: []string{resourceOrders},
 				}
-				if err := ctx.backchannelRequests.StoreBackchannelAuthenticationRequest(state.RequestId, state); err != nil {
+				if err := ctx.backchannelRequests.StoreBackchannelAuthenticationRequest(context.Background(), state.RequestId, state); err != nil {
 					t.Fatalf("store CIBA request: %v", err)
 				}
 				return url.Values{
@@ -293,7 +294,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 						"orders.read",
 					},
 				}
-				if err := ctx.backchannelRequests.StoreBackchannelAuthenticationRequest(state.RequestId, state); err != nil {
+				if err := ctx.backchannelRequests.StoreBackchannelAuthenticationRequest(context.Background(), state.RequestId, state); err != nil {
 					t.Fatalf("store CIBA request: %v", err)
 				}
 				return url.Values{
@@ -312,7 +313,10 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 
 			ctx := newResourceTokenValidatorContext(t)
 			parameters := tt.setup(t, ctx)
-			result := ctx.validator.ValidateRequest(parameters, &validators_models.ClientSecretValidationResult{Client: ctx.client})
+			result, err := ctx.validator.ValidateRequest(context.Background(), parameters, &validators_models.ClientSecretValidationResult{Client: ctx.client})
+			if err != nil {
+				t.Fatalf("validate token request: %v", err)
+			}
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}
@@ -358,7 +362,7 @@ func TestBackchannelAuthenticationRequestValidatorStoresRequestedResources(t *te
 		t.Fatalf("set grant types: %v", err)
 	}
 
-	result := validator.Validate(url.Values{
+	result := validator.Validate(context.Background(), url.Values{
 		gois.BackchannelAuthenticationRequestScope:     {"orders.read"},
 		gois.BackchannelAuthenticationRequestResource:  {resourceOrders},
 		gois.BackchannelAuthenticationRequestLoginHint: {"alice"},
@@ -391,7 +395,7 @@ func TestBackchannelAuthenticationRequestValidatorRejectsEmptyResource(t *testin
 		t.Fatalf("set grant types: %v", err)
 	}
 
-	result := validator.Validate(url.Values{
+	result := validator.Validate(context.Background(), url.Values{
 		gois.BackchannelAuthenticationRequestScope:     {"orders.read"},
 		gois.BackchannelAuthenticationRequestResource:  {""},
 		gois.BackchannelAuthenticationRequestLoginHint: {"alice"},

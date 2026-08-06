@@ -5,6 +5,7 @@
 package validators
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/gonewx/wicket/claims"
@@ -14,8 +15,8 @@ import (
 // EndSessionRequestValidator  Validates end session requests.
 type EndSessionRequestValidator interface {
 	// Validates end session endpoint requests.
-	Validate(parameters url.Values, subject *claims.ClaimsPrincipal) (*validators_models.EndSessionValidationResult, error)
+	Validate(ctx context.Context, parameters url.Values, subject *claims.ClaimsPrincipal) (*validators_models.EndSessionValidationResult, error)
 
 	//  Validates requests from logout page iframe to trigger single signout.
-	ValidateCallback(parameters url.Values) (*validators_models.EndSessionCallbackValidationResult, error)
+	ValidateCallback(ctx context.Context, parameters url.Values) (*validators_models.EndSessionCallbackValidationResult, error)
 }

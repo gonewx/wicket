@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"testing"
@@ -16,7 +17,7 @@ import (
 
 type missingClientStore struct{}
 
-func (missingClientStore) FindClientById(id string) (*storage_models.Client, error) {
+func (missingClientStore) FindClientById(ctx context.Context, id string) (*storage_models.Client, error) {
 	return nil, nil
 }
 
@@ -36,7 +37,7 @@ func TestValidatingClientStoreReturnsNilWhenClientMissing(t *testing.T) {
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 
-	client, err := store.FindClientById("missing")
+	client, err := store.FindClientById(context.Background(), "missing")
 
 	require.NoError(t, err)
 	require.Nil(t, client)

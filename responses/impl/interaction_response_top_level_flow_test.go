@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -89,7 +90,7 @@ func TestHandlePromptNoneTurnsLoginIntoError(t *testing.T) {
 			tc.setup(req)
 			g := buildGenerator(fixedClock(now), common.NewMockConsentService(), common.NewMockProfileService())
 
-			resp := g.Handle(req, nil)
+			resp := g.Handle(context.Background(), req, nil)
 
 			if !errors.Is(resp.Error, gois.AuthorizeErrorsLoginRequired) {
 				t.Fatalf("Error = %v, want login_required", resp.Error)

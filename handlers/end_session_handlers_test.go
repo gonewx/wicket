@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,11 +20,11 @@ type fakeEndSessionRequestValidator struct {
 	callbackResult *validators_models.EndSessionCallbackValidationResult
 }
 
-func (v *fakeEndSessionRequestValidator) Validate(url.Values, *claims.ClaimsPrincipal) (*validators_models.EndSessionValidationResult, error) {
+func (v *fakeEndSessionRequestValidator) Validate(ctx context.Context, values url.Values, subject *claims.ClaimsPrincipal) (*validators_models.EndSessionValidationResult, error) {
 	return v.result, nil
 }
 
-func (v *fakeEndSessionRequestValidator) ValidateCallback(url.Values) (*validators_models.EndSessionCallbackValidationResult, error) {
+func (v *fakeEndSessionRequestValidator) ValidateCallback(ctx context.Context, values url.Values) (*validators_models.EndSessionCallbackValidationResult, error) {
 	return v.callbackResult, nil
 }
 

@@ -4,12 +4,16 @@
 
 package services
 
-import "github.com/gonewx/wicket/models/messages"
+import (
+	"context"
+
+	"github.com/gonewx/wicket/models/messages"
+)
 
 // ReturnUrlParser Interface for the return URL parser
 type ReturnUrlParser interface {
 	// Parses a return URL.
-	Parse(returnUrl string) (*messages.AuthorizationRequest, error)
+	Parse(ctx context.Context, returnUrl string) (*messages.AuthorizationRequest, error)
 	// Determines whether the return URL is valid.
 	IsValidReturnUrl(returnUrl string) bool
 }

@@ -4,6 +4,7 @@
 package authorize
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/url"
@@ -152,7 +153,7 @@ func validateAuthorize(t *testing.T, responseType string, resources []string) *v
 	for _, resource := range resources {
 		values.Add(gois.AuthorizeRequestResource, resource)
 	}
-	return validator.Validate(values, claimspkg.ClaimsPrincipalAnonymous())
+	return validator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous())
 }
 
 func validateCodeExchange(t *testing.T, authorizeResources []string, tokenResource string) *validators_models.TokenRequestValidationResult {
@@ -169,7 +170,7 @@ func validateCodeExchange(t *testing.T, authorizeResources []string, tokenResour
 	code.RedirectUri = client.RedirectUris[0]
 	code.RequestedScopes = []string{"orders.read"}
 	code.RequestedResourceGaps = authorizeResources
-	handle, err := codeStore.StoreAuthorizationCode(code)
+	handle, err := codeStore.StoreAuthorizationCode(context.Background(), code)
 	if err != nil {
 		t.Fatalf("store code: %v", err)
 	}
@@ -181,7 +182,11 @@ func validateCodeExchange(t *testing.T, authorizeResources []string, tokenResour
 	if tokenResource != "" {
 		values.Set(gois.TokenRequestResource, tokenResource)
 	}
-	return tokenValidator(t, client, codeStore, refreshStore, clock).ValidateRequest(values, &validators_models.ClientSecretValidationResult{Client: client})
+	result, err := tokenValidator(t, client, codeStore, refreshStore, clock).ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: client})
+	if err != nil {
+		t.Fatalf("validate token request: %v", err)
+	}
+	return result
 }
 
 func validateRefreshExchange(t *testing.T, authorizedResources []string, tokenResource string) *validators_models.TokenRequestValidationResult {
@@ -194,7 +199,7 @@ func validateRefreshExchange(t *testing.T, authorizedResources []string, tokenRe
 	refresh := storage_models.NewRefreshToken()
 	refresh.AuthorizedScopes = []string{"orders.read", "payments.read"}
 	refresh.AuthorizedResourceGaps = authorizedResources
-	handle, err := refreshStore.StoreRefreshToken(refresh)
+	handle, err := refreshStore.StoreRefreshToken(context.Background(), refresh)
 	if err != nil {
 		t.Fatalf("store refresh token: %v", err)
 	}
@@ -205,7 +210,11 @@ func validateRefreshExchange(t *testing.T, authorizedResources []string, tokenRe
 	if tokenResource != "" {
 		values.Set(gois.TokenRequestResource, tokenResource)
 	}
-	return tokenValidator(t, client, codeStore, refreshStore, clock).ValidateRequest(values, &validators_models.ClientSecretValidationResult{Client: client})
+	result, err := tokenValidator(t, client, codeStore, refreshStore, clock).ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: client})
+	if err != nil {
+		t.Fatalf("validate token request: %v", err)
+	}
+	return result
 }
 
 func tokenValidator(

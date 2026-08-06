@@ -4,6 +4,7 @@
 package services
 
 import (
+	"context"
 	"time"
 
 	"github.com/gonewx/wicket/auth"
@@ -65,13 +66,13 @@ type CorsPolicyService interface {
 // UserSession tracks the current user session.
 // input: principal/properties/client id -> behavior: create/read session state -> output: session data or error.
 type UserSession interface {
-	EnsureSessionIdCookie() error
+	EnsureSessionIdCookie(ctx context.Context) error
 	RemoveSessionIdCookie() error
-	CreateSessionId(*claims.ClaimsPrincipal, *auth.Properties) (string, error)
+	CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error)
 	GetSessionId() string
 	GetClientList() ([]string, error)
 	GetUser() *claims.ClaimsPrincipal
-	AddClientId(string) error
+	AddClientId(ctx context.Context, clientId string) error
 	Item(string) (any, bool)
 	SetItem(string, any)
 }
@@ -93,37 +94,37 @@ type ClaimsService interface {
 // KeyMaterialService exposes signing and validation key material.
 // input: allowed algorithms -> behavior: choose configured key material -> output: credentials/keys or error.
 type KeyMaterialService interface {
-	GetSigningCredentials([]string) (*tokens.SigningCredentials, error)
-	GetAllSigningCredentials() ([]*tokens.SigningCredentials, error)
-	GetValidationKeys() ([]*core_models.SecurityKeyInfo, error)
+	GetSigningCredentials(ctx context.Context, allowed []string) (*tokens.SigningCredentials, error)
+	GetAllSigningCredentials(ctx context.Context) ([]*tokens.SigningCredentials, error)
+	GetValidationKeys(ctx context.Context) ([]*core_models.SecurityKeyInfo, error)
 }
 
 // TokenCreationService serializes a token.
 // input: token model -> behavior: create serialized security token -> output: token string or error.
 type TokenCreationService interface {
-	CreateToken(*models.Token) (string, error)
+	CreateToken(ctx context.Context, token *models.Token) (string, error)
 }
 
 // TokenService creates protocol token models and serializes them.
 // input: token creation request/model -> behavior: create or serialize token -> output: token model/string or error.
 type TokenService interface {
-	CreateAccessToken(*responses_models.TokenCreationRequest) (*models.Token, error)
-	CreateIdentityToken(*responses_models.TokenCreationRequest) (*models.Token, error)
-	CreateSecurityToken(*models.Token) (string, error)
+	CreateAccessToken(ctx context.Context, request *responses_models.TokenCreationRequest) (*models.Token, error)
+	CreateIdentityToken(ctx context.Context, request *responses_models.TokenCreationRequest) (*models.Token, error)
+	CreateSecurityToken(ctx context.Context, token *models.Token) (string, error)
 }
 
 // RefreshTokenService manages refresh token handles.
 // input: refresh token request/handle -> behavior: create, validate, or update -> output: handle/result or error.
 type RefreshTokenService interface {
-	CreateRefreshToken(*responses_models.RefreshTokenCreationRequest) (string, error)
-	UpdateRefreshToken(*responses_models.RefreshTokenUpdateRequest) (string, error)
-	ValidateRefreshToken(string, *models.Client) *validators_models.TokenValidationResult
+	CreateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenCreationRequest) (string, error)
+	UpdateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenUpdateRequest) (string, error)
+	ValidateRefreshToken(ctx context.Context, handle string, client *models.Client) *validators_models.TokenValidationResult
 }
 
 // PersistedGrantService removes persisted grants for subjects and clients.
 // input: subject/client/session -> behavior: remove grants -> output: error.
 type PersistedGrantService interface {
-	RemoveAllGrantsAsync(string, string, string) error
+	RemoveAllGrantsAsync(ctx context.Context, subjectId, clientId, sessionId string) error
 }
 
 // HandleGenerationService creates opaque handles.
@@ -149,11 +150,11 @@ type UserCodeService interface {
 // DeviceFlowCodeService stores and retrieves device-flow codes.
 // input: user/device code -> behavior: store/find/update device authorization -> output: data or error.
 type DeviceFlowCodeService interface {
-	StoreDeviceAuthorization(string, *models.DeviceCode) (string, error)
-	FindByUserCode(string) (*models.DeviceCode, error)
-	FindByDeviceCode(string) (*models.DeviceCode, error)
-	UpdateByUserCode(string, *models.DeviceCode) error
-	RemoveByDeviceCode(string) error
+	StoreDeviceAuthorization(ctx context.Context, userCode string, data *models.DeviceCode) (string, error)
+	FindByUserCode(ctx context.Context, userCode string) (*models.DeviceCode, error)
+	FindByDeviceCode(ctx context.Context, deviceCode string) (*models.DeviceCode, error)
+	UpdateByUserCode(ctx context.Context, userCode string, data *models.DeviceCode) error
+	RemoveByDeviceCode(ctx context.Context, deviceCode string) error
 }
 
 // ConsentService evaluates and stores user consent for an authorization request.
@@ -170,11 +171,11 @@ type ConsentService interface {
 // InteractionService reads and updates user-interaction state.
 // input: return URL/request/consent -> behavior: retrieve context or persist decision -> output: context or error.
 type InteractionService interface {
-	GetAuthorizationContext(string) (*messages.AuthorizationRequest, error)
-	GetLogoutContext(string) (*messages.LogoutRequest, error)
-	GetErrorContext(string) (*messages.ErrorMessage, error)
-	GrantConsent(*messages.AuthorizationRequest, *messages.ConsentResponse, string) error
-	DenyAuthorization(*messages.AuthorizationRequest, string) error
+	GetAuthorizationContext(ctx context.Context, returnUrl string) (*messages.AuthorizationRequest, error)
+	GetLogoutContext(ctx context.Context, logoutId string) (*messages.LogoutRequest, error)
+	GetErrorContext(ctx context.Context, errorId string) (*messages.ErrorMessage, error)
+	GrantConsent(ctx context.Context, request *messages.AuthorizationRequest, consent *messages.ConsentResponse, subject string) error
+	DenyAuthorization(ctx context.Context, request *messages.AuthorizationRequest, subject string) error
 }
 
 // BackchannelLogoutService sends back-channel logout notifications.
@@ -186,7 +187,7 @@ type BackchannelLogoutService interface {
 // DeviceFlowThrottlingService enforces device-flow polling interval.
 // input: device code/details -> behavior: check throttling state -> output: slow-down flag or error.
 type DeviceFlowThrottlingService interface {
-	ShouldSlowDown(string, *models.DeviceCode) (bool, error)
+	ShouldSlowDown(ctx context.Context, deviceCode string, details *models.DeviceCode) (bool, error)
 }
 
 // BackchannelAuthenticationNotificationService sends CIBA ping/push notifications.
@@ -219,5 +220,5 @@ type SessionValidationRequest struct {
 // pass-through when server-side sessions are disabled, real store-backed
 // validation when enabled -> output: validity flag or error.
 type SessionCoordinationService interface {
-	ValidateSession(*SessionValidationRequest) (bool, error)
+	ValidateSession(ctx context.Context, request *SessionValidationRequest) (bool, error)
 }

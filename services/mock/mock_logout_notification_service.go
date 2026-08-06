@@ -5,6 +5,8 @@
 package mock
 
 import (
+	"context"
+
 	"github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/services"
 )
@@ -22,13 +24,13 @@ func NewMockLogoutNotificationService() *MockLogoutNotificationService {
 }
 
 // / Builds the URLs needed for front-channel logout notification.
-func (s *MockLogoutNotificationService) GetFrontChannelLogoutNotificationsUrls(ctx *contexts.LogoutNotificationContext) ([]string, error) {
+func (s *MockLogoutNotificationService) GetFrontChannelLogoutNotificationsUrls(ctx context.Context, notification *contexts.LogoutNotificationContext) ([]string, error) {
 	s.GetFrontChannelLogoutNotificationsUrlsCalled = true
 	return s.FrontChannelLogoutNotificationsUrls, nil
 }
 
 // / Builds the http back-channel logout request data for the collection of clients.
-func (s *MockLogoutNotificationService) GetBackchannelLogoutNotifications(ctx *contexts.LogoutNotificationContext) ([]*services.BackchannelLogoutRequest, error) {
+func (s *MockLogoutNotificationService) GetBackchannelLogoutNotifications(ctx context.Context, notification *contexts.LogoutNotificationContext) ([]*services.BackchannelLogoutRequest, error) {
 	s.SendBackchannelLogoutNotificationsCalled = true
 	return s.BackchannelLogoutRequests, nil
 }

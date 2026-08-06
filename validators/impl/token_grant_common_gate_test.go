@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"testing"
@@ -39,7 +40,7 @@ func TestTokenRequestValidationRejectsNilArguments(t *testing.T) {
 			t.Parallel()
 
 			f := newTokenGrantFixture(t)
-			result := f.validator.ValidateRequest(tt.parameters(t, f), nil)
+			result, _ := f.validator.ValidateRequest(context.Background(), tt.parameters(t, f), nil)
 			if result.Error == nil {
 				t.Fatal("expected an error for nil client validation result")
 			}
@@ -99,7 +100,7 @@ func TestTokenRequestValidationGrantTypeAndProtocolGate(t *testing.T) {
 			t.Parallel()
 
 			f := newTokenGrantFixture(t)
-			result := f.validator.ValidateRequest(tt.parameters(t, f), grantTestSecretResult(t, tt.clientId))
+			result, _ := f.validator.ValidateRequest(context.Background(), tt.parameters(t, f), grantTestSecretResult(t, tt.clientId))
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}

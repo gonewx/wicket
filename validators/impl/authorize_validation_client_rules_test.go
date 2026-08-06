@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"testing"
@@ -180,7 +181,7 @@ func TestAuthorizeClientRuleValidation(t *testing.T) {
 				values.Set(gois.AuthorizeRequestNonce, tt.nonce)
 			}
 
-			result := validator.Validate(values, nil)
+			result := validator.Validate(context.Background(), values, nil)
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}

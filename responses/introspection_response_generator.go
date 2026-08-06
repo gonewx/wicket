@@ -4,10 +4,14 @@
 
 package responses
 
-import validators_models "github.com/gonewx/wicket/validators/models"
+import (
+	"context"
+
+	validators_models "github.com/gonewx/wicket/validators/models"
+)
 
 // IntrospectionResponseGenerator Interface introspection response generator
 type IntrospectionResponseGenerator interface {
 	// Handle the response.
-	Handle(validationResult *validators_models.IntrospectionRequestValidationResult) map[string]any
+	Handle(ctx context.Context, validationResult *validators_models.IntrospectionRequestValidationResult) map[string]any
 }

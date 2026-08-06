@@ -55,6 +55,7 @@ func (lpr *LoginPageResult) Execute(w http.ResponseWriter, r *http.Request) erro
 	lpr.init(r.Context())
 
 	target, err := redirectUrl(
+		r.Context(),
 		lpr.request,
 		lpr.urls,
 		lpr.authorizationParametersMessageStore,

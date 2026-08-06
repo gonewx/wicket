@@ -5,6 +5,7 @@
 package extensions
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -22,7 +23,7 @@ func HasApplicationFormContentType(r *http.Request) bool {
 }
 
 // From: IdentityServer4/src/IdentityServer/Extensions/HttpRequestExtensions.cs
-func GetWicketSignoutFrameCallbackUrl(userSession services.UserSession, clock services.SystemClock, urls services.ServerUrls, endSessionMessageStore storage.MessageStore[models_contexts.LogoutNotificationContext], logoutMessage *messages.LogoutMessage) (string, error) {
+func GetWicketSignoutFrameCallbackUrl(ctx context.Context, userSession services.UserSession, clock services.SystemClock, urls services.ServerUrls, endSessionMessageStore storage.MessageStore[models_contexts.LogoutNotificationContext], logoutMessage *messages.LogoutMessage) (string, error) {
 	user := userSession.GetUser()
 	var currentSubId string
 	if user != nil {
@@ -76,7 +77,7 @@ func GetWicketSignoutFrameCallbackUrl(userSession services.UserSession, clock se
 
 	msg := messages.NewMessageWithCreated(endSessionMsg, clock.Now().Unix())
 
-	id, err := endSessionMessageStore.Write(msg)
+	id, err := endSessionMessageStore.Write(ctx, msg)
 	if err != nil {
 		return "", err
 	}

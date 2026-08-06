@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -58,9 +59,9 @@ func (s *KeyMaterialService) autoEnabled() bool {
 
 // signingChoices returns the eligible signing credentials from the active
 // source: the auto manager when enabled, otherwise host signing stores.
-func (s *KeyMaterialService) signingChoices() ([]signingChoice, error) {
+func (s *KeyMaterialService) signingChoices(ctx context.Context) ([]signingChoice, error) {
 	if s.autoEnabled() {
-		candidates, err := s.manager.SigningCandidates()
+		candidates, err := s.manager.SigningCandidates(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +79,7 @@ func (s *KeyMaterialService) signingChoices() ([]signingChoice, error) {
 	}
 	out := make([]signingChoice, 0, len(s.signingStores))
 	for _, store := range s.signingStores {
-		credential, err := store.GetSigningCredentials()
+		credential, err := store.GetSigningCredentials(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -93,8 +94,8 @@ func (s *KeyMaterialService) signingChoices() ([]signingChoice, error) {
 // requested algorithms with the configured allowed set and applying the single
 // selection rule (priority, then newer NotBefore, then newer CreatedAt, then
 // public id ascending).
-func (s *KeyMaterialService) GetSigningCredentials(allowed []string) (*tokens.SigningCredentials, error) {
-	choices, err := s.signingChoices()
+func (s *KeyMaterialService) GetSigningCredentials(ctx context.Context, allowed []string) (*tokens.SigningCredentials, error) {
+	choices, err := s.signingChoices(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +129,8 @@ func (s *KeyMaterialService) GetSigningCredentials(allowed []string) (*tokens.Si
 
 // GetAllSigningCredentials returns every currently signable credential from the
 // active source.
-func (s *KeyMaterialService) GetAllSigningCredentials() ([]*tokens.SigningCredentials, error) {
-	choices, err := s.signingChoices()
+func (s *KeyMaterialService) GetAllSigningCredentials(ctx context.Context) ([]*tokens.SigningCredentials, error) {
+	choices, err := s.signingChoices(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +150,7 @@ func (s *KeyMaterialService) GetAllSigningCredentials() ([]*tokens.SigningCreden
 // isolated: the kids currently signing could be missing from the output, and a
 // JWKS without them breaks verification, so the error propagates. Host-store
 // aggregation fails closed only when every source errored and no key survived.
-func (s *KeyMaterialService) GetValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
+func (s *KeyMaterialService) GetValidationKeys(ctx context.Context) ([]*core_models.SecurityKeyInfo, error) {
 	out := make([]*core_models.SecurityKeyInfo, 0)
 	seen := map[string]bool{}
 	var firstErr error
@@ -170,7 +171,7 @@ func (s *KeyMaterialService) GetValidationKeys() ([]*core_models.SecurityKeyInfo
 	}
 
 	if s.autoEnabled() {
-		keys, err := s.manager.ValidationKeys()
+		keys, err := s.manager.ValidationKeys(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +181,7 @@ func (s *KeyMaterialService) GetValidationKeys() ([]*core_models.SecurityKeyInfo
 	}
 
 	for _, store := range s.validationStores {
-		keys, err := store.GetValidationKeys()
+		keys, err := store.GetValidationKeys(ctx)
 		if err != nil {
 			failed = true
 			if firstErr == nil {

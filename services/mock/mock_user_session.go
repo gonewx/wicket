@@ -5,6 +5,8 @@
 package mock
 
 import (
+	"context"
+
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/models"
@@ -30,7 +32,7 @@ func NewMockUserSession() *MockUserSession {
 	}
 }
 
-func (s *MockUserSession) EnsureSessionIdCookie() error {
+func (s *MockUserSession) EnsureSessionIdCookie(ctx context.Context) error {
 	s.EnsureSessionIdCookieWasCalled = true
 	return nil
 }
@@ -40,7 +42,7 @@ func (s *MockUserSession) RemoveSessionIdCookie() error {
 	return nil
 }
 
-func (s *MockUserSession) CreateSessionId(principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
+func (s *MockUserSession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	s.CreateSessionIdWasCalled = true
 	s.User = principal
 
@@ -64,7 +66,7 @@ func (s *MockUserSession) GetUser() *claims.ClaimsPrincipal {
 	return s.User
 }
 
-func (s *MockUserSession) AddClientId(clientId string) error {
+func (s *MockUserSession) AddClientId(ctx context.Context, clientId string) error {
 	s.Clients = append(s.Clients, clientId)
 	return nil
 }

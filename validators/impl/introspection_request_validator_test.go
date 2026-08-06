@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -56,13 +57,13 @@ func TestValid_token_should_successfully_validate(t *testing.T) {
 		),
 	}
 
-	handle, err := ti.referenceTokenStore.StoreReferenceToken(token)
+	handle, err := ti.referenceTokenStore.StoreReferenceToken(context.Background(), token)
 	a.NoError(err)
 
 	param := url.Values{}
 	param.Add("token", handle)
 
-	result, err := ti.subject.Validate(param, nil)
+	result, err := ti.subject.Validate(context.Background(), param, nil)
 	a.NoError(err)
 
 	a.NoError(result.Error)
@@ -85,7 +86,7 @@ func TestMissing_token_should_error(t *testing.T) {
 
 	param := url.Values{}
 
-	result, err := ti.subject.Validate(param, nil)
+	result, err := ti.subject.Validate(context.Background(), param, nil)
 	a.NoError(err)
 
 	a.Error(result.Error)
@@ -103,7 +104,7 @@ func TestInvalid_token_should_return_inactive(t *testing.T) {
 	param := url.Values{}
 	param.Add("token", "invalid")
 
-	result, err := ti.subject.Validate(param, nil)
+	result, err := ti.subject.Validate(context.Background(), param, nil)
 	a.NoError(err)
 
 	a.NoError(result.Error)

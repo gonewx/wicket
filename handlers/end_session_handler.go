@@ -58,7 +58,7 @@ func (h *EndSessionHandler) Process(w http.ResponseWriter, r *http.Request) erro
 		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
 	}
 
-	validationResult, err := h.requestValidator.Validate(parameters, h.session.GetUser())
+	validationResult, err := h.requestValidator.Validate(r.Context(), parameters, h.session.GetUser())
 	if err != nil {
 		return fmt.Errorf("validate end-session request: %w", err)
 	}

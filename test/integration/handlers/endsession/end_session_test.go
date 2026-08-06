@@ -4,6 +4,7 @@
 package endsession
 
 import (
+	"context"
 	htmlpkg "html"
 	"io"
 	"mime"
@@ -329,7 +330,7 @@ func signoutFrameUrl(t *testing.T, pipeline *integration_common.WicketPipeline, 
 
 	store := pipeline.Root.NewMessageStore_contexts_LogoutNotificationContext()
 	clock := godi.GetRequired[services.SystemClock](pipeline.Root)
-	handle, err := store.Write(messages.NewMessageWithCreated(&contexts.LogoutNotificationContext{
+	handle, err := store.Write(context.Background(), messages.NewMessageWithCreated(&contexts.LogoutNotificationContext{
 		SubjectId: "bob",
 		SessionId: sessionId,
 		ClientIds: clientIds,

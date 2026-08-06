@@ -5,6 +5,7 @@
 package validators
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/gonewx/wicket/validators/models"
@@ -13,5 +14,5 @@ import (
 // DeviceAuthorizationRequestValidator Device authorization endpoint request validator.
 type DeviceAuthorizationRequestValidator interface {
 	// Validates the request.
-	ValidateRequest(parameters url.Values, clientValidationResult *models.ClientSecretValidationResult) *models.DeviceAuthorizationRequestValidationResult
+	ValidateRequest(ctx context.Context, parameters url.Values, clientValidationResult *models.ClientSecretValidationResult) *models.DeviceAuthorizationRequestValidationResult
 }

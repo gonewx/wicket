@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"log/slog"
@@ -52,7 +53,7 @@ func NewBackchannelAuthenticationRequestValidator(
 	}
 }
 
-func (v *BackchannelAuthenticationRequestValidator) Validate(values url.Values, client *storage_models.Client) *validators_models.BackchannelAuthenticationRequestValidationResult {
+func (v *BackchannelAuthenticationRequestValidator) Validate(ctx context.Context, values url.Values, client *storage_models.Client) *validators_models.BackchannelAuthenticationRequestValidationResult {
 	if client == nil {
 		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidClient, "")
 	}
@@ -81,7 +82,7 @@ func (v *BackchannelAuthenticationRequestValidator) Validate(values url.Values, 
 	if utils.AnyPred(resources, func(x string) bool { return len(x) > v.options.InputLengthRestrictions.ResourceGapMaxLength }) {
 		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidTarget, "")
 	}
-	validation, err := v.resources.ValidateRequestedResources(&validators_models.ResourceValidationRequest{
+	validation, err := v.resources.ValidateRequestedResources(ctx, &validators_models.ResourceValidationRequest{
 		Client:       client,
 		Scopes:       scopes,
 		ResourceGaps: resources,
@@ -106,7 +107,7 @@ func (v *BackchannelAuthenticationRequestValidator) Validate(values url.Values, 
 		tooLong(userCtx.LoginHintToken, v.options.InputLengthRestrictions.LoginHintToken) {
 		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
 	}
-	if err := v.users.Validate(userCtx); err != nil {
+	if err := v.users.Validate(ctx, userCtx); err != nil {
 		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
 	}
 	if tooLong(values.Get(gois.BackchannelAuthenticationRequestBindingMessage), v.options.InputLengthRestrictions.BindingMessage) ||
@@ -153,7 +154,7 @@ func (v *BackchannelAuthenticationRequestValidator) Validate(values url.Values, 
 		ClientNotificationToken:    values.Get(gois.BackchannelAuthenticationRequestClientNotificationToken),
 		ClientNotificationEndpoint: client.ClientNotificationEndpoint,
 	}
-	if err := v.store.StoreBackchannelAuthenticationRequest(requestID, request); err != nil {
+	if err := v.store.StoreBackchannelAuthenticationRequest(ctx, requestID, request); err != nil {
 		return validators_models.NewBackchannelAuthenticationRequestValidationError(err, "")
 	}
 	if mode == gois.BackchannelTokenDeliveryModesPing {

@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 
@@ -28,7 +29,7 @@ func NewIntrospectionResponseGenerator(logger *slog.Logger) *IntrospectionRespon
 }
 
 // Handle the response.
-func (g *IntrospectionResponseGenerator) Handle(validationResult *validators_models.IntrospectionRequestValidationResult) map[string]any {
+func (g *IntrospectionResponseGenerator) Handle(ctx context.Context, validationResult *validators_models.IntrospectionRequestValidationResult) map[string]any {
 	g.logger.Debug("Creating introspection response")
 
 	// standard response

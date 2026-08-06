@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -89,7 +90,7 @@ func TestGetRequestedClaimTypes_when_no_scopes_requested_should_return_empty_cla
 
 	ts := newUserInfoResponseGeneratorTests(t)
 
-	resources := ts.subject.getRequestedResources(nil)
+	resources := ts.subject.getRequestedResources(context.Background(), nil)
 	claims := ts.subject.getRequestedClaimTypes(resources)
 
 	a.Equal([]string{}, claims)
@@ -125,7 +126,7 @@ func TestGetRequestedClaimTypes_should_return_correct_identity_claims(t *testing
 		resourceStore,
 	)
 
-	resources := ts.subject.getRequestedResources([]string{"id1", "id2", "id3"})
+	resources := ts.subject.getRequestedResources(context.Background(), []string{"id1", "id2", "id3"})
 	claims := ts.subject.getRequestedClaimTypes(resources)
 
 	a.ElementsMatch([]string{"c1", "c2", "c3"}, claims)
@@ -162,7 +163,7 @@ func TestGetRequestedClaimTypes_should_only_return_enabled_identity_claims(t *te
 		resourceStore,
 	)
 
-	resources := ts.subject.getRequestedResources([]string{"id1", "id2", "id3"})
+	resources := ts.subject.getRequestedResources(context.Background(), []string{"id1", "id2", "id3"})
 	claims := ts.subject.getRequestedClaimTypes(resources)
 
 	a.ElementsMatch([]string{"c2", "c3"}, claims)
@@ -216,7 +217,7 @@ func TestProcess_should_call_profile_service_with_requested_claim_types(t *testi
 		ts.mockProfileService,
 		resourceStore,
 	)
-	_, err = ts.subject.Handle(result)
+	_, err = ts.subject.Handle(context.Background(), result)
 	a.NoError(err)
 
 	a.True(ts.mockProfileService.GetProfileWasCalled())
@@ -300,7 +301,7 @@ func TestProcess_should_return_claims_issued_by_profile_service(t *testing.T) {
 		ts.mockProfileService,
 		resourceStore,
 	)
-	claims, err := ts.subject.Handle(result)
+	claims, err := ts.subject.Handle(context.Background(), result)
 	a.NoError(err)
 
 	a.Contains(claims, "email")
@@ -370,7 +371,7 @@ func TestProcess_should_return_sub_from_user(t *testing.T) {
 		ts.mockProfileService,
 		resourceStore,
 	)
-	claims, err := ts.subject.Handle(result)
+	claims, err := ts.subject.Handle(context.Background(), result)
 	a.NoError(err)
 
 	a.Contains(claims, "sub")
@@ -432,7 +433,7 @@ func TestProcess_should_throw_if_incorrect_sub_issued_by_profile_service(t *test
 		ts.mockProfileService,
 		resourceStore,
 	)
-	_, err = ts.subject.Handle(result)
+	_, err = ts.subject.Handle(context.Background(), result)
 	a.Error(err)
 	a.ErrorIs(err, gois.InvalidOperationException)
 	a.Contains(err.Error(), "subject")

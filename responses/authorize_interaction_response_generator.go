@@ -5,15 +5,16 @@
 package responses
 
 import (
+	"context"
 	"github.com/gonewx/wicket/models/messages"
 	responses_models "github.com/gonewx/wicket/responses/models"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
 type AuthorizeInteractionResponseGenerator interface {
-	Handle(req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) (resp *responses_models.InteractionResponse)
+	Handle(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) (resp *responses_models.InteractionResponse)
 
-	HandleLogin(req *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse
+	HandleLogin(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse
 
-	HandleConsent(req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse
+	HandleConsent(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse
 }

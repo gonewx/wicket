@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -23,29 +24,29 @@ func (cibaResponseClock) Now() time.Time { return time.Date(2026, 7, 8, 8, 0, 0,
 
 type cibaTokenService struct{}
 
-func (cibaTokenService) CreateAccessToken(*responses_models.TokenCreationRequest) (*storage_models.Token, error) {
+func (cibaTokenService) CreateAccessToken(ctx context.Context, request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
 	return &storage_models.Token{}, nil
 }
 
-func (cibaTokenService) CreateIdentityToken(*responses_models.TokenCreationRequest) (*storage_models.Token, error) {
+func (cibaTokenService) CreateIdentityToken(ctx context.Context, request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
 	return &storage_models.Token{}, nil
 }
 
-func (cibaTokenService) CreateSecurityToken(*storage_models.Token) (string, error) {
+func (cibaTokenService) CreateSecurityToken(ctx context.Context, token *storage_models.Token) (string, error) {
 	return "access-token", nil
 }
 
 type cibaRefreshTokenService struct{}
 
-func (cibaRefreshTokenService) CreateRefreshToken(*responses_models.RefreshTokenCreationRequest) (string, error) {
+func (cibaRefreshTokenService) CreateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenCreationRequest) (string, error) {
 	return "", nil
 }
 
-func (cibaRefreshTokenService) UpdateRefreshToken(*responses_models.RefreshTokenUpdateRequest) (string, error) {
+func (cibaRefreshTokenService) UpdateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenUpdateRequest) (string, error) {
 	return "", nil
 }
 
-func (cibaRefreshTokenService) ValidateRefreshToken(string, *storage_models.Client) *validators_models.TokenValidationResult {
+func (cibaRefreshTokenService) ValidateRefreshToken(ctx context.Context, handle string, client *storage_models.Client) *validators_models.TokenValidationResult {
 	return nil
 }
 
@@ -79,7 +80,7 @@ func TestBackchannelAuthenticationTokenResponseConsumesRequest(t *testing.T) {
 		Status:          storage_models.BackchannelAuthenticationRequestStatusApproved,
 		ExpirationTime:  time.Now().Add(time.Minute),
 	}
-	if err := requestStore.StoreBackchannelAuthenticationRequest(state.RequestId, state); err != nil {
+	if err := requestStore.StoreBackchannelAuthenticationRequest(context.Background(), state.RequestId, state); err != nil {
 		t.Fatalf("store request: %v", err)
 	}
 	validated := validators_models.NewValidatedTokenRequest()
@@ -100,14 +101,14 @@ func TestBackchannelAuthenticationTokenResponseConsumesRequest(t *testing.T) {
 		requestStore,
 		slog.Default(),
 	)
-	response, err := generator.Handle(validators_models.NewTokenRequestValidationResult(validated))
+	response, err := generator.Handle(context.Background(), validators_models.NewTokenRequestValidationResult(validated))
 	if err != nil {
 		t.Fatalf("handle response: %v", err)
 	}
 	if response.AccessToken != "access-token" {
 		t.Fatalf("access token = %q", response.AccessToken)
 	}
-	stored, err := requestStore.FindBackchannelAuthenticationRequest(state.RequestId)
+	stored, err := requestStore.FindBackchannelAuthenticationRequest(context.Background(), state.RequestId)
 	if err != nil {
 		t.Fatalf("find request: %v", err)
 	}

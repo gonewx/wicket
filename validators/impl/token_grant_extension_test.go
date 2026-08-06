@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"testing"
@@ -73,7 +74,7 @@ func TestTokenRequestValidationExtensionGrants(t *testing.T) {
 				gois.TokenRequestScope:     {"resource"},
 			}
 
-			result := f.validator.ValidateRequest(parameters, grantTestSecretResult(t, tt.clientId))
+			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
 			if tt.wantAnyErr {
 				if result.Error == nil {
 					t.Fatal("expected an error for a disabled user")

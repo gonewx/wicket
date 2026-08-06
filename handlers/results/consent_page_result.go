@@ -55,6 +55,7 @@ func (cpr *ConsentPageResult) Execute(w http.ResponseWriter, r *http.Request) er
 	cpr.init(r.Context())
 
 	target, err := redirectUrl(
+		r.Context(),
 		cpr.request,
 		cpr.urls,
 		cpr.authorizationParametersMessageStore,

@@ -5,11 +5,12 @@
 package validators
 
 import (
+	"context"
 	"github.com/gonewx/wicket/validators/models"
 )
 
 // UserInfoRequestValidator Interface for the userinfo request
 type UserInfoRequestValidator interface {
 	// Validates a userinfo request.
-	ValidateRequest(accessToken string) *models.UserInfoRequestValidationResult
+	ValidateRequest(ctx context.Context, accessToken string) (*models.UserInfoRequestValidationResult, error)
 }

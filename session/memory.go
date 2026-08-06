@@ -4,6 +4,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -36,12 +37,12 @@ func (s *MemoryStore) now() (t timeValue) {
 	return t
 }
 
-func (s *MemoryStore) GetSession(sessionID string) (*Record, error) {
+func (s *MemoryStore) GetSession(ctx context.Context, sessionID string) (*Record, error) {
 	s.mu.RLock()
 	rec, ok := s.sessions[sessionID]
 	if !ok {
 		s.mu.RUnlock()
-		return nil, nil
+		return nil, ErrSessionNotFound
 	}
 
 	now := s.now()
@@ -56,12 +57,12 @@ func (s *MemoryStore) GetSession(sessionID string) (*Record, error) {
 
 	if expired {
 		s.deleteIfExpired(sessionID)
-		return nil, nil
+		return nil, ErrSessionNotFound
 	}
 	return cp, nil
 }
 
-func (s *MemoryStore) CreateSession(session *Record) error {
+func (s *MemoryStore) CreateSession(ctx context.Context, session *Record) error {
 	if session == nil || session.SessionID == "" {
 		return fmt.Errorf("session record and session id are required")
 	}
@@ -81,7 +82,7 @@ func (s *MemoryStore) CreateSession(session *Record) error {
 	return nil
 }
 
-func (s *MemoryStore) UpdateSession(session *Record) error {
+func (s *MemoryStore) UpdateSession(ctx context.Context, session *Record) error {
 	if session == nil || session.SessionID == "" {
 		return fmt.Errorf("session record and session id are required")
 	}
@@ -109,7 +110,7 @@ func (s *MemoryStore) UpdateSession(session *Record) error {
 // AddClientID atomically appends a client id to the stored session's client
 // list, deduplicating. It is a no-op (nil error) when the session is absent or
 // expired, so a caller racing with logout/expiry does not resurrect the record.
-func (s *MemoryStore) AddClientID(sessionID, clientID string) error {
+func (s *MemoryStore) AddClientID(ctx context.Context, sessionID, clientID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -125,7 +126,7 @@ func (s *MemoryStore) AddClientID(sessionID, clientID string) error {
 	return nil
 }
 
-func (s *MemoryStore) DeleteSession(sessionID string) error {
+func (s *MemoryStore) DeleteSession(ctx context.Context, sessionID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -139,7 +140,7 @@ func (s *MemoryStore) DeleteSession(sessionID string) error {
 	return nil
 }
 
-func (s *MemoryStore) GetSessionsBySubjectID(subjectID string) ([]*Record, error) {
+func (s *MemoryStore) GetSessionsBySubjectID(ctx context.Context, subjectID string) ([]*Record, error) {
 	s.mu.RLock()
 	ids, ok := s.subjects[subjectID]
 	if !ok {
@@ -192,7 +193,7 @@ func (s *MemoryStore) deleteIfExpired(sessionID string) {
 	delete(s.sessions, sessionID)
 }
 
-func (s *MemoryStore) DeleteSessionsBySubjectID(subjectID string) (int, error) {
+func (s *MemoryStore) DeleteSessionsBySubjectID(ctx context.Context, subjectID string) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -210,6 +211,24 @@ func (s *MemoryStore) DeleteSessionsBySubjectID(subjectID string) (int, error) {
 	}
 	delete(s.subjects, subjectID)
 
+	return count, nil
+}
+
+// DeleteExpired removes sessions whose Expires is set and precedes cutoff,
+// returning how many were removed. It reclaims space only; expiry judgement
+// remains on the core side.
+func (s *MemoryStore) DeleteExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	count := 0
+	for id, rec := range s.sessions {
+		if !rec.Expires.IsZero() && rec.Expires.Before(cutoff) {
+			s.unindexSubject(rec.SubjectID, id)
+			delete(s.sessions, id)
+			count++
+		}
+	}
 	return count, nil
 }
 

@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -49,14 +50,14 @@ func NewAuthorizeResponseGenerator(
 	}
 }
 
-func (g *AuthorizeResponseGenerator) Create(req *validators_models.ValidatedAuthorizeRequest) (*resp_models.AuthorizeResponse, error) {
+func (g *AuthorizeResponseGenerator) Create(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) (*resp_models.AuthorizeResponse, error) {
 	switch req.GrantType {
 	case gois.GrantTypeAuthorizationCode:
-		return g.createCodeFlow(req)
+		return g.createCodeFlow(ctx, req)
 	case gois.GrantTypeImplicit:
-		return g.createImplicitFlow(req, "")
+		return g.createImplicitFlow(ctx, req, "")
 	case gois.GrantTypeHybrid:
-		return g.createHybridFlow(req)
+		return g.createHybridFlow(ctx, req)
 	default:
 		g.logger.Error("Unsupported grant type", slog.String("GrantType", req.GrantType))
 	}
@@ -64,20 +65,20 @@ func (g *AuthorizeResponseGenerator) Create(req *validators_models.ValidatedAuth
 }
 
 // createHybridFlow Creates the response for a hybrid flow request
-func (g *AuthorizeResponseGenerator) createHybridFlow(req *validators_models.ValidatedAuthorizeRequest) (*resp_models.AuthorizeResponse, error) {
+func (g *AuthorizeResponseGenerator) createHybridFlow(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) (*resp_models.AuthorizeResponse, error) {
 	g.logger.Debug("Creating Hybrid flow response")
 
-	code, err := g.createCode(req)
+	code, err := g.createCode(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := g.AuthorizationCodeStore.StoreAuthorizationCode(code)
+	id, err := g.AuthorizationCodeStore.StoreAuthorizationCode(ctx, code)
 	if err != nil {
 		return nil, err
 	}
 
-	resposne, err := g.createImplicitFlow(req, id)
+	resposne, err := g.createImplicitFlow(ctx, req, id)
 	if err != nil {
 		return nil, err
 	}
@@ -88,15 +89,15 @@ func (g *AuthorizeResponseGenerator) createHybridFlow(req *validators_models.Val
 }
 
 // createCodeFlow Creates the response for a code flow request
-func (g *AuthorizeResponseGenerator) createCodeFlow(req *validators_models.ValidatedAuthorizeRequest) (*resp_models.AuthorizeResponse, error) {
+func (g *AuthorizeResponseGenerator) createCodeFlow(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) (*resp_models.AuthorizeResponse, error) {
 	g.logger.Debug("Creating authorization code flow response")
 
-	code, err := g.createCode(req)
+	code, err := g.createCode(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := g.AuthorizationCodeStore.StoreAuthorizationCode(code)
+	id, err := g.AuthorizationCodeStore.StoreAuthorizationCode(ctx, code)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func (g *AuthorizeResponseGenerator) createCodeFlow(req *validators_models.Valid
 }
 
 // createImplicitFlow Creates the response for a implicit flow request
-func (g *AuthorizeResponseGenerator) createImplicitFlow(req *validators_models.ValidatedAuthorizeRequest, authorizationCode string) (*resp_models.AuthorizeResponse, error) {
+func (g *AuthorizeResponseGenerator) createImplicitFlow(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, authorizationCode string) (*resp_models.AuthorizeResponse, error) {
 	g.logger.Debug("Creating Implicit flow response")
 
 	accessTokenValue := ""
@@ -128,12 +129,12 @@ func (g *AuthorizeResponseGenerator) createImplicitFlow(req *validators_models.V
 			ValidatedResources: req.ValidatedResources,
 			ValidatedRequest:   req.ValidatedRequest,
 		}
-		accessToken, err := g.TokenService.CreateAccessToken(tokenRequest)
+		accessToken, err := g.TokenService.CreateAccessToken(ctx, tokenRequest)
 		if err != nil {
 			return nil, err
 		}
 		accessTokenLifetime = accessToken.Lifetime
-		accessTokenValue, err = g.TokenService.CreateSecurityToken(accessToken)
+		accessTokenValue, err = g.TokenService.CreateSecurityToken(ctx, accessToken)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +145,7 @@ func (g *AuthorizeResponseGenerator) createImplicitFlow(req *validators_models.V
 		var err error
 		stateHash := ""
 		if g.options.EmitStateHash && strings.TrimSpace(req.State) != "" {
-			credential, err := g.KeyMaterialService.GetSigningCredentials(req.Client.AllowedIdentityTokenSigningAlgorithms)
+			credential, err := g.KeyMaterialService.GetSigningCredentials(ctx, req.Client.AllowedIdentityTokenSigningAlgorithms)
 			if err != nil || credential == nil {
 				return nil, fmt.Errorf(" %w : No signing credential is configured.", err)
 			}
@@ -164,11 +165,11 @@ func (g *AuthorizeResponseGenerator) createImplicitFlow(req *validators_models.V
 			AuthorizationCodeToHash:  authorizationCode,
 			StateHash:                stateHash,
 		}
-		idToken, err := g.TokenService.CreateIdentityToken(tokenRequest)
+		idToken, err := g.TokenService.CreateIdentityToken(ctx, tokenRequest)
 		if err != nil {
 			return nil, err
 		}
-		jwt, err = g.TokenService.CreateSecurityToken(idToken)
+		jwt, err = g.TokenService.CreateSecurityToken(ctx, idToken)
 		if err != nil {
 			return nil, err
 		}
@@ -183,12 +184,12 @@ func (g *AuthorizeResponseGenerator) createImplicitFlow(req *validators_models.V
 }
 
 // createCode Creates an authorization code
-func (g *AuthorizeResponseGenerator) createCode(req *validators_models.ValidatedAuthorizeRequest) (*storage_models.AuthorizationCode, error) {
+func (g *AuthorizeResponseGenerator) createCode(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) (*storage_models.AuthorizationCode, error) {
 	g.logger.Debug("Creating authorization code")
 
 	stateHash := ""
 	if req.State != "" && g.options.EmitStateHash {
-		credential, err := g.KeyMaterialService.GetSigningCredentials(req.Client.AllowedIdentityTokenSigningAlgorithms)
+		credential, err := g.KeyMaterialService.GetSigningCredentials(ctx, req.Client.AllowedIdentityTokenSigningAlgorithms)
 		if err != nil {
 			return nil, err
 		}

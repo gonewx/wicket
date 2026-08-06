@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 	"reflect"
 	"sort"
@@ -111,7 +112,7 @@ func TestResourceValidatorTable(t *testing.T) {
 			t.Parallel()
 
 			validator := NewResourceValidator(newResourceValidatorStore(t), NewScopeParser(), slog.Default())
-			result, err := validator.ValidateRequestedResources(&validators_models.ResourceValidationRequest{
+			result, err := validator.ValidateRequestedResources(context.Background(), &validators_models.ResourceValidationRequest{
 				Client:                         newResourceValidatorClient(tt.clientScopes),
 				Scopes:                         tt.scopes,
 				ResourceGaps:                   tt.resources,

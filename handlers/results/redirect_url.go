@@ -4,6 +4,7 @@
 package results
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -25,6 +26,7 @@ import (
 // dual to OidcReturnUrlParser.Parse, so the return URL it emits is exactly what
 // that parser reads.
 func redirectUrl(
+	ctx context.Context,
 	request *validators_models.ValidatedAuthorizeRequest,
 	urls services.ServerUrls,
 	apmStore storage.AuthorizationParametersMessageStore,
@@ -35,7 +37,7 @@ func redirectUrl(
 
 	returnURL := gois.ProtocolRoutePathsAuthorizeCallback
 	if apmStore != nil {
-		handle, err := apmStore.Write(messages.NewMessage[url.Values](params))
+		handle, err := apmStore.Write(ctx, messages.NewMessage[url.Values](params))
 		if err != nil {
 			return "", fmt.Errorf("store authorize parameters: %w", err)
 		}

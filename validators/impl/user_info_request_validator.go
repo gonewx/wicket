@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/gonewx/wicket"
@@ -36,16 +37,20 @@ func NewUserInfoRequestValidator(
 	}
 }
 
-// Validates a userinfo request.
-func (v *UserInfoRequestValidator) ValidateRequest(accessToken string) *validators_models.UserInfoRequestValidationResult {
+// Validates a userinfo request. A non-nil error reports an infrastructure
+// failure so the caller can distinguish it from a protocol-level invalid result.
+func (v *UserInfoRequestValidator) ValidateRequest(ctx context.Context, accessToken string) (*validators_models.UserInfoRequestValidationResult, error) {
 	result := validators_models.NewUserInfoRequestValidationResult()
 
 	// the access token needs to be valid and have at least the openid scope
-	tokenResult := v.tokenValidator.ValidateAccessToken(accessToken, gois.StandardScopesOpenId)
+	tokenResult, err := v.tokenValidator.ValidateAccessToken(ctx, accessToken, gois.StandardScopesOpenId)
+	if err != nil {
+		return nil, err
+	}
 
 	if tokenResult.Error != nil {
 		result.Error = tokenResult.Error
-		return result
+		return result, nil
 	}
 
 	// the token must have a one sub claim
@@ -56,7 +61,7 @@ func (v *UserInfoRequestValidator) ValidateRequest(accessToken string) *validato
 		v.logger.Error("Token contains no sub claim")
 
 		result.Error = gois.ProtectedResourceErrorsInvalidToken
-		return result
+		return result, nil
 	}
 
 	// create subject from incoming access token
@@ -80,11 +85,11 @@ func (v *UserInfoRequestValidator) ValidateRequest(accessToken string) *validato
 		v.logger.Error("User is not active", slog.String("sub", extensions.GetSubjectIdFromPrincipal(subject)))
 
 		result.Error = gois.ProtectedResourceErrorsInvalidToken
-		return result
+		return result, nil
 	}
 
 	result.TokenValidationResult = tokenResult
 	result.Subject = subject
 
-	return result
+	return result, nil
 }

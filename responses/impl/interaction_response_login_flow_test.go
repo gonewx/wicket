@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"net/url"
 	"testing"
 	"time"
@@ -136,7 +137,7 @@ func TestHandleLoginDecision(t *testing.T) {
 			tc.setup(req)
 			g := buildGenerator(fixedClock(now), common.NewMockConsentService(), common.NewMockProfileService())
 
-			resp := g.HandleLogin(req)
+			resp := g.HandleLogin(context.Background(), req)
 
 			if resp.IsLogin != tc.wantLogin {
 				t.Fatalf("IsLogin = %v, want %v", resp.IsLogin, tc.wantLogin)
@@ -165,7 +166,7 @@ func TestHandleLoginForcesLoginForInactiveSubject(t *testing.T) {
 
 	g := buildGenerator(fixedClock(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)), common.NewMockConsentService(), inactiveProfile{})
 
-	resp := g.HandleLogin(req)
+	resp := g.HandleLogin(context.Background(), req)
 
 	if !resp.IsLogin {
 		t.Fatalf("IsLogin = false, want true for an inactive subject")
@@ -186,7 +187,7 @@ func TestHandleLoginSuppressesPromptOnForcedLogin(t *testing.T) {
 
 	g := buildGenerator(fixedClock(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)), common.NewMockConsentService(), common.NewMockProfileService())
 
-	resp := g.HandleLogin(req)
+	resp := g.HandleLogin(context.Background(), req)
 
 	if !resp.IsLogin {
 		t.Fatalf("IsLogin = false, want true for prompt=login")

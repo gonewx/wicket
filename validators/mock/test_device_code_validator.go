@@ -5,6 +5,7 @@
 package mock
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/gonewx/wicket"
@@ -25,18 +26,18 @@ func NewTestDeviceCodeValidator(shouldError bool) *TestDeviceCodeValidator {
 	}
 }
 
-func (c *TestDeviceCodeValidator) Validate(ctx *validators_models.DeviceCodeValidationContext) error {
+func (c *TestDeviceCodeValidator) Validate(ctx context.Context, validation *validators_models.DeviceCodeValidationContext) error {
 	opts := make([]gois.Option[validators_models.TokenRequestValidationResult], 0)
 	if c.shouldError {
 		opts = append(opts, validators_models.WithTokenRequestValidationResultError(fmt.Errorf("error")))
 	}
 
-	ctx.Result = validators_models.NewTokenRequestValidationResult(
-		ctx.Request,
+	validation.Result = validators_models.NewTokenRequestValidationResult(
+		validation.Request,
 		opts...,
 	)
 
-	ctx.Request.DeviceCode = c.DeviceCodeResult
+	validation.Request.DeviceCode = c.DeviceCodeResult
 
 	return nil
 }

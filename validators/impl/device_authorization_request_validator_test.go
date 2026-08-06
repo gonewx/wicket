@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -46,7 +47,7 @@ func TestNull_Parameter(t *testing.T) {
 	validator, err := createDeviceAuthorizationRequestValidator()
 	r.NoError(err)
 
-	result := validator.ValidateRequest(nil, nil)
+	result := validator.ValidateRequest(context.Background(), nil, nil)
 	r.Error(result.Error)
 }
 
@@ -62,7 +63,7 @@ func TestInvalid_Protocol_Client(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(tests.testParameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), tests.testParameters, clientValidationResult)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.AuthorizeErrorsUnauthorizedClient)
@@ -81,7 +82,7 @@ func TestInvalid_Grant_Type(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(tests.testParameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), tests.testParameters, clientValidationResult)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.AuthorizeErrorsUnauthorizedClient)
@@ -101,7 +102,7 @@ func TestUnauthorized_Scope(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(parameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.AuthorizeErrorsInvalidScope)
@@ -121,7 +122,7 @@ func TestDeviceUnknown_Scope(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(parameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.AuthorizeErrorsInvalidScope)
@@ -141,7 +142,7 @@ func TestValid_OpenId_Request(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(parameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.NoError(result.Error)
 	r.True(result.ValidatedRequest.IsOpenIdRequest)
@@ -172,7 +173,7 @@ func TestValid_Resource_Request(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(parameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.NoError(result.Error)
 	r.False(result.ValidatedRequest.IsOpenIdRequest)
@@ -208,7 +209,7 @@ func TestValid_Mixed_Request(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(parameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.NoError(result.Error)
 	r.True(result.ValidatedRequest.IsOpenIdRequest)
@@ -248,7 +249,7 @@ func TestMissing_Scopes_Expect_Client_Scopes(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(parameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.NoError(result.Error)
 	r.True(result.ValidatedRequest.IsOpenIdRequest)
@@ -269,7 +270,7 @@ func TestMissing_Scopes_And_Client_Scopes_Empty(t *testing.T) {
 	clientValidationResult := validators_models.NewClientSecretValidationResult()
 	clientValidationResult.Client = tests.testClient
 
-	result := validator.ValidateRequest(parameters, clientValidationResult)
+	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.AuthorizeErrorsInvalidScope)

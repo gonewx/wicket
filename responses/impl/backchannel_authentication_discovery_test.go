@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 
@@ -18,15 +19,15 @@ import (
 
 type cibaDiscoveryKeys struct{}
 
-func (cibaDiscoveryKeys) GetSigningCredentials([]string) (*tokens.SigningCredentials, error) {
+func (cibaDiscoveryKeys) GetSigningCredentials(ctx context.Context, allowed []string) (*tokens.SigningCredentials, error) {
 	return nil, nil
 }
 
-func (cibaDiscoveryKeys) GetAllSigningCredentials() ([]*tokens.SigningCredentials, error) {
+func (cibaDiscoveryKeys) GetAllSigningCredentials(ctx context.Context) ([]*tokens.SigningCredentials, error) {
 	return nil, nil
 }
 
-func (cibaDiscoveryKeys) GetValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
+func (cibaDiscoveryKeys) GetValidationKeys(ctx context.Context) ([]*core_models.SecurityKeyInfo, error) {
 	return nil, nil
 }
 
@@ -49,7 +50,7 @@ func TestBackchannelAuthenticationDiscoveryMetadata(t *testing.T) {
 		validators_impl.NewSecretParser(nil, slog.Default()),
 		slog.Default(),
 	)
-	doc, err := generator.CreateDiscoveryDocument("https://wicket.test", "https://wicket.test")
+	doc, err := generator.CreateDiscoveryDocument(context.Background(), "https://wicket.test", "https://wicket.test")
 	if err != nil {
 		t.Fatalf("create discovery: %v", err)
 	}

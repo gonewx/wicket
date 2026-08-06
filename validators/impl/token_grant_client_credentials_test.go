@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"reflect"
@@ -96,7 +97,7 @@ func TestTokenRequestValidationClientCredentialsInvalid(t *testing.T) {
 				}
 			}
 
-			result := f.validator.ValidateRequest(parameters, grantTestSecretResult(t, tt.clientId))
+			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}
@@ -116,7 +117,7 @@ func TestTokenRequestValidationClientCredentialsWithoutScopeFiltersIdentityScope
 		gois.TokenRequestGrantType: {gois.GrantTypeClientCredentials},
 	}
 
-	result := f.validator.ValidateRequest(parameters, grantTestSecretResult(t, "client"))
+	result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "client"))
 	if result.Error != nil {
 		t.Fatalf("unexpected error: %v", result.Error)
 	}
@@ -170,7 +171,7 @@ func TestTokenRequestValidationClientCredentialsValid(t *testing.T) {
 				parameters.Set(gois.TokenRequestScope, tt.scope)
 			}
 
-			result := f.validator.ValidateRequest(parameters, grantTestSecretResult(t, tt.clientId))
+			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
 			if result.Error != nil {
 				t.Fatalf("unexpected error: %v (description %q)", result.Error, result.Description)
 			}

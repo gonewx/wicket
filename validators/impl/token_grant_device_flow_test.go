@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strings"
@@ -80,7 +81,7 @@ func TestTokenRequestValidationDeviceFlowInvalid(t *testing.T) {
 				parameters.Set(gois.TokenRequestResource, tt.resource)
 			}
 
-			result := f.validator.ValidateRequest(parameters, grantTestSecretResult(t, tt.clientId))
+			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
 			if tt.wantAnyErr {
 				if result.Error == nil {
 					t.Fatal("expected an error from device code verification")
@@ -113,7 +114,7 @@ func TestTokenRequestValidationDeviceFlowValid(t *testing.T) {
 		gois.TokenRequestDeviceCode: {"device"},
 	}
 
-	result := f.validator.ValidateRequest(parameters, grantTestSecretResult(t, "device_flow"))
+	result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "device_flow"))
 	if result.Error != nil {
 		t.Fatalf("unexpected error: %v (description %q)", result.Error, result.Description)
 	}

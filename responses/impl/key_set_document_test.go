@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -20,13 +21,13 @@ type staticValidationKeys struct {
 	keys []*core_models.SecurityKeyInfo
 }
 
-func (s staticValidationKeys) GetSigningCredentials([]string) (*tokens.SigningCredentials, error) {
+func (s staticValidationKeys) GetSigningCredentials(ctx context.Context, allowed []string) (*tokens.SigningCredentials, error) {
 	return nil, nil
 }
-func (s staticValidationKeys) GetAllSigningCredentials() ([]*tokens.SigningCredentials, error) {
+func (s staticValidationKeys) GetAllSigningCredentials(ctx context.Context) ([]*tokens.SigningCredentials, error) {
 	return nil, nil
 }
-func (s staticValidationKeys) GetValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
+func (s staticValidationKeys) GetValidationKeys(ctx context.Context) ([]*core_models.SecurityKeyInfo, error) {
 	return s.keys, nil
 }
 
@@ -71,7 +72,7 @@ func TestCreateJwkDocumentPublishesStableKidWithoutPrivateMaterial(t *testing.T)
 				logger: slog.Default(),
 			}
 
-			docs, err := g.CreateJwkDocument()
+			docs, err := g.CreateJwkDocument(context.Background())
 			if err != nil {
 				t.Fatalf("CreateJwkDocument: %v", err)
 			}

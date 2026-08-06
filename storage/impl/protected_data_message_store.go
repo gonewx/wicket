@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gonewx/wicket/dp"
 	"github.com/gonewx/wicket/models/messages"
+	"github.com/gonewx/wicket/storage"
 )
 
 const (
@@ -37,7 +39,7 @@ func NewProtectedDataMessageStore[T any](
 
 // Writes the message.
 // return An identifier for the message
-func (s *ProtectedDataMessageStore[T]) Write(message *messages.Message[*T]) (string, error) {
+func (s *ProtectedDataMessageStore[T]) Write(ctx context.Context, message *messages.Message[*T]) (string, error) {
 	b, err := json.Marshal(message)
 	if err != nil {
 		s.Logger.Error("Exception writing protected message", slog.String("err", err.Error()))
@@ -50,11 +52,11 @@ func (s *ProtectedDataMessageStore[T]) Write(message *messages.Message[*T]) (str
 }
 
 // Reads the message.
-func (s *ProtectedDataMessageStore[T]) Read(value string) (*messages.Message[*T], error) {
+func (s *ProtectedDataMessageStore[T]) Read(ctx context.Context, value string) (*messages.Message[*T], error) {
 	var message messages.Message[*T]
 
 	if strings.TrimSpace(value) == "" {
-		return nil, nil
+		return nil, storage.ErrNotFound
 
 	}
 

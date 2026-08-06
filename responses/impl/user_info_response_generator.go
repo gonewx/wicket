@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -36,7 +37,7 @@ func NewUserInfoResponseGenerator(logger *slog.Logger, profile services.ProfileS
 }
 
 // Processes the response.
-func (g *UserInfoResponseGenerator) Handle(validationResult *validators_models.UserInfoRequestValidationResult) (map[string]any, error) {
+func (g *UserInfoResponseGenerator) Handle(ctx context.Context, validationResult *validators_models.UserInfoRequestValidationResult) (map[string]any, error) {
 	g.logger.Debug("Creating userinfo response")
 
 	// extract scopes and turn into requested claim types
@@ -47,23 +48,23 @@ func (g *UserInfoResponseGenerator) Handle(validationResult *validators_models.U
 		func(c *claimspkg.Claim) string { return c.Value.(string) },
 	)
 
-	validatedResources := g.getRequestedResources(scopes)
+	validatedResources := g.getRequestedResources(ctx, scopes)
 	requestedClaimTypes := g.getRequestedClaimTypes(validatedResources)
 
 	g.logger.Debug("Requested claim types", slog.String("claimTypes", strings.Join(requestedClaimTypes, " ")))
 
 	// call profile service
-	ctx := models_contexts.NewProfileDataRequestContext(
+	profileCtx := models_contexts.NewProfileDataRequestContext(
 		validationResult.Subject,
 		validationResult.TokenValidationResult.Client,
 		gois.ProfileDataCallersUserInfoEndpoint,
 		requestedClaimTypes,
 	)
-	ctx.RequestedResources = validatedResources
+	profileCtx.RequestedResources = validatedResources
 
-	g.profile.GetProfileData(ctx)
+	g.profile.GetProfileData(profileCtx)
 
-	profileClaims := ctx.IssuedClaims
+	profileClaims := profileCtx.IssuedClaims
 
 	// construct outgoing claims.
 	outgoingClaims := make([]*claimspkg.Claim, 0)
@@ -91,7 +92,7 @@ func (g *UserInfoResponseGenerator) Handle(validationResult *validators_models.U
 	return extensions.ToClaimsMap(outgoingClaims), nil
 }
 
-func (g *UserInfoResponseGenerator) getRequestedResources(scopes []string) *validators_models.ResourceValidationResult {
+func (g *UserInfoResponseGenerator) getRequestedResources(ctx context.Context, scopes []string) *validators_models.ResourceValidationResult {
 	if len(scopes) == 0 {
 		return nil
 	}
@@ -100,7 +101,7 @@ func (g *UserInfoResponseGenerator) getRequestedResources(scopes []string) *vali
 	g.logger.Debug("Scopes in access token", slog.String("scopes", scopeString))
 
 	// if we ever parameterized identity scopes, then we would need to invoke the resource validator's parse API here
-	identityResources, err := extensions.FindEnabledIdentityResourcesByScope(g.resources, scopes)
+	identityResources, err := extensions.FindEnabledIdentityResourcesByScope(ctx, g.resources, scopes)
 	if err != nil {
 		return nil
 	}

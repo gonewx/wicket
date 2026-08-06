@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"io"
@@ -229,7 +230,7 @@ func (v *fixedResultResourceValidator) ParseRequestedScopes(scopeValues []string
 	return parsed
 }
 
-func (v *fixedResultResourceValidator) ValidateRequestedResources(request *validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error) {
+func (v *fixedResultResourceValidator) ValidateRequestedResources(ctx context.Context, request *validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error) {
 	return v.result, nil
 }
 
@@ -238,7 +239,7 @@ func (v *fixedResultResourceValidator) ValidateRequestedResources(request *valid
 func storeGrantTestAuthorizationCode(t *testing.T, f *tokenGrantFixture, code *storage_models.AuthorizationCode) string {
 	t.Helper()
 
-	handle, err := f.authorizationCodes.StoreAuthorizationCode(code)
+	handle, err := f.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
 	if err != nil {
 		t.Fatalf("store authorization code: %v", err)
 	}
@@ -263,7 +264,7 @@ func newGrantTestAuthorizationCode(clientId string, now time.Time) *storage_mode
 func storeGrantTestRefreshToken(t *testing.T, f *tokenGrantFixture, token *storage_models.RefreshToken) string {
 	t.Helper()
 
-	handle, err := f.refreshTokens.StoreRefreshToken(token)
+	handle, err := f.refreshTokens.StoreRefreshToken(context.Background(), token)
 	if err != nil {
 		t.Fatalf("store refresh token: %v", err)
 	}

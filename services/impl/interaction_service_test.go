@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -21,34 +22,34 @@ type recordingConsentStore struct {
 	writes  int
 }
 
-func (s *recordingConsentStore) Write(id string, message *messages.Message[*messages.ConsentResponse]) error {
+func (s *recordingConsentStore) Write(ctx context.Context, id string, message *messages.Message[*messages.ConsentResponse]) error {
 	s.key = id
 	s.message = message
 	s.writes++
 	return nil
 }
 
-func (s *recordingConsentStore) Read(string) (*messages.Message[*messages.ConsentResponse], error) {
+func (s *recordingConsentStore) Read(ctx context.Context, id string) (*messages.Message[*messages.ConsentResponse], error) {
 	return nil, nil
 }
 
-func (s *recordingConsentStore) Delete(string) error { return nil }
+func (s *recordingConsentStore) Delete(ctx context.Context, id string) error { return nil }
 
 // subjectOnlySession is a minimal UserSession fake whose only meaningful
 // behavior is returning a fixed authenticated principal from GetUser.
 type subjectOnlySession struct{ user *claims.ClaimsPrincipal }
 
-func (s *subjectOnlySession) EnsureSessionIdCookie() error { return nil }
-func (s *subjectOnlySession) RemoveSessionIdCookie() error { return nil }
-func (s *subjectOnlySession) CreateSessionId(*claims.ClaimsPrincipal, *auth.Properties) (string, error) {
+func (s *subjectOnlySession) EnsureSessionIdCookie(ctx context.Context) error { return nil }
+func (s *subjectOnlySession) RemoveSessionIdCookie() error                    { return nil }
+func (s *subjectOnlySession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	return "", nil
 }
-func (s *subjectOnlySession) GetSessionId() string             { return "" }
-func (s *subjectOnlySession) GetClientList() ([]string, error) { return nil, nil }
-func (s *subjectOnlySession) GetUser() *claims.ClaimsPrincipal { return s.user }
-func (s *subjectOnlySession) AddClientId(string) error         { return nil }
-func (s *subjectOnlySession) Item(string) (any, bool)          { return nil, false }
-func (s *subjectOnlySession) SetItem(string, any)              {}
+func (s *subjectOnlySession) GetSessionId() string                                   { return "" }
+func (s *subjectOnlySession) GetClientList() ([]string, error)                       { return nil, nil }
+func (s *subjectOnlySession) GetUser() *claims.ClaimsPrincipal                       { return s.user }
+func (s *subjectOnlySession) AddClientId(ctx context.Context, clientId string) error { return nil }
+func (s *subjectOnlySession) Item(string) (any, bool)                                { return nil, false }
+func (s *subjectOnlySession) SetItem(string, any)                                    {}
 
 func consentRequestWithParameters(parameters url.Values) *messages.AuthorizationRequest {
 	return &messages.AuthorizationRequest{Parameters: parameters}
@@ -68,7 +69,7 @@ func TestInteractionServiceGrantConsentStoresAnswerUnderDerivedKey(t *testing.T)
 	parameters := url.Values{"client_id": {"client"}, "scope": {"openid profile"}}
 	response := &messages.ConsentResponse{ScopesValuesConsented: []string{"openid", "profile"}}
 
-	if err := svc.GrantConsent(consentRequestWithParameters(parameters), response, "alice"); err != nil {
+	if err := svc.GrantConsent(context.Background(), consentRequestWithParameters(parameters), response, "alice"); err != nil {
 		t.Fatalf("GrantConsent: %v", err)
 	}
 	if store.writes != 1 {
@@ -100,7 +101,7 @@ func TestInteractionServiceGrantConsentFallsBackToSessionSubject(t *testing.T) {
 	}
 
 	parameters := url.Values{"client_id": {"client"}}
-	if err := svc.GrantConsent(consentRequestWithParameters(parameters), &messages.ConsentResponse{}, ""); err != nil {
+	if err := svc.GrantConsent(context.Background(), consentRequestWithParameters(parameters), &messages.ConsentResponse{}, ""); err != nil {
 		t.Fatalf("GrantConsent: %v", err)
 	}
 	if want := storage.ConsentMessageKey("bob", parameters); store.key != want {
@@ -125,7 +126,7 @@ func TestInteractionServiceGrantConsentWithoutStoreDoesNotFail(t *testing.T) {
 			if svc.consentStore == nil {
 				request = consentRequestWithParameters(url.Values{})
 			}
-			if err := svc.GrantConsent(request, &messages.ConsentResponse{}, "alice"); err != nil {
+			if err := svc.GrantConsent(context.Background(), request, &messages.ConsentResponse{}, "alice"); err != nil {
 				t.Fatalf("GrantConsent: %v", err)
 			}
 		})
@@ -138,7 +139,7 @@ func TestInteractionServiceGetAuthorizationContextWithoutParser(t *testing.T) {
 	t.Parallel()
 
 	svc := &InteractionService{consent: NewConsentService()}
-	request, err := svc.GetAuthorizationContext("/authorize/callback?client_id=client")
+	request, err := svc.GetAuthorizationContext(context.Background(), "/authorize/callback?client_id=client")
 	if err != nil {
 		t.Fatalf("GetAuthorizationContext: %v", err)
 	}

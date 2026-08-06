@@ -5,6 +5,8 @@
 package mock
 
 import (
+	"context"
+
 	"github.com/gonewx/wicket/models/messages"
 	"github.com/google/uuid"
 )
@@ -21,14 +23,14 @@ func NewMockMessageStore[T any]() *MockMessageStore[T] {
 	}
 }
 
-func (s *MockMessageStore[T]) Write(message *messages.Message[*T]) (string, error) {
+func (s *MockMessageStore[T]) Write(ctx context.Context, message *messages.Message[*T]) (string, error) {
 	id := uuid.New().String()
 	s.Ids = append(s.Ids, id)
 	s.Messages = append(s.Messages, message)
 	return id, nil
 }
 
-func (s *MockMessageStore[T]) Read(id string) (*messages.Message[*T], error) {
+func (s *MockMessageStore[T]) Read(ctx context.Context, id string) (*messages.Message[*T], error) {
 	for i, m := range s.Messages {
 		if s.Ids[i] == id {
 			return m, nil

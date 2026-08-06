@@ -65,7 +65,10 @@ func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 		return results.NewTokenErrorResult(response).Execute(w, r)
 	}
 
-	validation := h.requestValidator.ValidateRequest(r.Form, clientResult)
+	validation, err := h.requestValidator.ValidateRequest(r.Context(), r.Form, clientResult)
+	if err != nil {
+		return fmt.Errorf("validate token request: %w", err)
+	}
 	if validation.Error != nil {
 		response := responses_models.NewTokenErrorResponse()
 		response.Error = validation.Error
@@ -76,7 +79,7 @@ func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 		return results.NewTokenErrorResult(response).Execute(w, r)
 	}
 
-	response, err := h.generator.Handle(validation)
+	response, err := h.generator.Handle(r.Context(), validation)
 	if err != nil {
 		// Prefer failing to the client: a recognized standard token error is
 		// written as a 400 error response; an unrecognized error cannot be

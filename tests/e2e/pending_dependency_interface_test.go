@@ -1,6 +1,7 @@
 package e2e_test
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -36,7 +37,7 @@ func TestPendingDependencyInterfacesResolveFromContainerE2E(t *testing.T) {
 	if sessionService == nil {
 		t.Fatal("SessionCoordinationService seam did not resolve")
 	}
-	valid, err := sessionService.ValidateSession(nil)
+	valid, err := sessionService.ValidateSession(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("SessionCoordinationService returned error %v, want nil (pass-through when disabled)", err)
 	}

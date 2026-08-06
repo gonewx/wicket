@@ -47,7 +47,7 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
 	}
 
-	document, err := h.generator.CreateDiscoveryDocument(h.urls.BaseUrl(), h.issuer.GetCurrent())
+	document, err := h.generator.CreateDiscoveryDocument(r.Context(), h.urls.BaseUrl(), h.issuer.GetCurrent())
 	if err != nil {
 		return fmt.Errorf("create discovery document: %w", err)
 	}

@@ -40,7 +40,7 @@ func (h *DiscoveryKeyHandler) Process(w http.ResponseWriter, r *http.Request) er
 		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
 	}
 
-	keys, err := h.generator.CreateJwkDocument()
+	keys, err := h.generator.CreateJwkDocument(r.Context())
 	if err != nil {
 		return fmt.Errorf("create jwk document: %w", err)
 	}

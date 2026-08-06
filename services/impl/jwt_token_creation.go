@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -43,8 +44,8 @@ func NewTokenCreationService(
 // CreateToken builds and signs the JWS for the token. It fails closed: a missing
 // signing credential or any serialization/signing error yields an error rather
 // than an unsigned or partial string.
-func (s *TokenCreationService) CreateToken(token *storage_models.Token) (string, error) {
-	credential, err := s.keys.GetSigningCredentials(token.AllowedSigningAlgorithms)
+func (s *TokenCreationService) CreateToken(ctx context.Context, token *storage_models.Token) (string, error) {
+	credential, err := s.keys.GetSigningCredentials(ctx, token.AllowedSigningAlgorithms)
 	if err != nil {
 		return "", fmt.Errorf("create token: select signing credential: %w", err)
 	}

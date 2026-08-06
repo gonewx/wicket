@@ -4,6 +4,7 @@
 package ciba
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,9 +28,9 @@ type capturingUserValidator struct {
 	subject  string
 }
 
-func (v *capturingUserValidator) Validate(ctx *validators_models.BackchannelAuthenticationUserValidationContext) error {
-	v.captured = ctx
-	ctx.Subject = claimspkg.NewClaimsPrincipal(
+func (v *capturingUserValidator) Validate(ctx context.Context, validation *validators_models.BackchannelAuthenticationUserValidationContext) error {
+	v.captured = validation
+	validation.Subject = claimspkg.NewClaimsPrincipal(
 		claimspkg.WithClaimsPrincipalIdentity(
 			claimspkg.NewClaimsIdentity(
 				claimspkg.WithAuthenticationType("test"),

@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -70,8 +71,10 @@ func NewTokenValidator(
 	}
 }
 
-// ValidateAccessToken Validates an access token.
-func (v *TokenValidator) ValidateAccessToken(token string, expectedScope string) *validators_models.TokenValidationResult {
+// ValidateAccessToken Validates an access token. A non-nil error reports an
+// infrastructure failure so the caller can distinguish it from an invalid-token
+// result.
+func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, expectedScope string) (*validators_models.TokenValidationResult, error) {
 	v.logger.Debug("Start access token validation")
 
 	result := validators_models.NewTokenValidationResult()
@@ -80,32 +83,30 @@ func (v *TokenValidator) ValidateAccessToken(token string, expectedScope string)
 		if len(token) > v.options.InputLengthRestrictions.Jwt {
 			result.Error = gois.ProtectedResourceErrorsInvalidToken
 			result.Description = "Token too long"
-			return result
+			return result, nil
 		}
 
-		keys, err := v.keys.GetValidationKeys()
+		keys, err := v.keys.GetValidationKeys(ctx)
 		if err != nil {
 			v.logger.Error("Error getting validation keys", slog.String("error", err.Error()))
-			result.Error = gois.ProtectedResourceErrorsInvalidToken
-			result.Description = "Error getting validation keys"
-			return result
+			return nil, err
 		}
 
-		result = v.validateJwt(token, keys, true, "")
+		result = v.validateJwt(ctx, token, keys, true, "")
 	} else {
 		if len(token) > v.options.InputLengthRestrictions.TokenHandle {
 			v.logger.Error("token handle too long")
 
 			result.Error = gois.ProtectedResourceErrorsInvalidToken
 			result.Description = "Token handle too long"
-			return result
+			return result, nil
 		}
 
-		result = v.validateReferenceAccessToken(token)
+		result = v.validateReferenceAccessToken(ctx, token)
 	}
 
 	if result.Error != nil {
-		return result
+		return result, nil
 	}
 
 	// make sure client is still active (if client_id claim is present)
@@ -114,10 +115,10 @@ func (v *TokenValidator) ValidateAccessToken(token string, expectedScope string)
 	})
 
 	if clientClaim != nil {
-		client, err := extensions.FindEnabledClientById(v.clients, clientClaim.Value.(string))
+		client, err := extensions.FindEnabledClientById(ctx, v.clients, clientClaim.Value.(string))
 		if err != nil || client == nil {
 			v.logger.Error("Client deleted or disabled", slog.String("clientId", clientClaim.Value.(string)))
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
 		}
 
 	}
@@ -151,7 +152,7 @@ func (v *TokenValidator) ValidateAccessToken(token string, expectedScope string)
 
 		if !isActiveCtx.IsActive {
 			v.logger.Error("User marked as not active", slog.String("subjectId", subClaim.Value.(string)))
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
 		}
 
 		sub := subClaim.Value.(string)
@@ -161,7 +162,7 @@ func (v *TokenValidator) ValidateAccessToken(token string, expectedScope string)
 			if !ok {
 				subjectId = ""
 			}
-			sessionResult, err := v.sessionCoordinationService.ValidateSession(
+			sessionResult, err := v.sessionCoordinationService.ValidateSession(ctx,
 				&services.SessionValidationRequest{
 					SubjectId: sub,
 					SessionId: subjectId,
@@ -170,9 +171,12 @@ func (v *TokenValidator) ValidateAccessToken(token string, expectedScope string)
 				},
 			)
 
-			if err != nil || !sessionResult {
+			if err != nil {
+				return nil, err
+			}
+			if !sessionResult {
 				v.logger.Error("Server-side session invalid for subject Id and session Id.", slog.String("subjectId", sub), slog.String("sessionId", subjectId))
-				return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+				return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
 			}
 		}
 	}
@@ -184,7 +188,7 @@ func (v *TokenValidator) ValidateAccessToken(token string, expectedScope string)
 		})
 		if scope == nil {
 			v.logger.Error("Checking for expected scopefailed", slog.String("expectedScope", expectedScope))
-			return v.invalid(gois.ProtectedResourceErrorsInsufficientScope)
+			return v.invalid(gois.ProtectedResourceErrorsInsufficientScope), nil
 		}
 	}
 
@@ -193,51 +197,52 @@ func (v *TokenValidator) ValidateAccessToken(token string, expectedScope string)
 	customResult := v.customValidator.ValidateAccessToken(result)
 	if customResult.Error != nil {
 		v.logger.Error("Custom validator failed", slog.String("type", customResult.Error.Error()))
-		return customResult
+		return customResult, nil
 	}
 
-	return customResult
+	return customResult, nil
 }
 
-// ValidateIdentityToken Validates an identity token.
-func (v *TokenValidator) ValidateIdentityToken(token string, clientId string, validateLifetime bool) *validators_models.TokenValidationResult {
+// ValidateIdentityToken Validates an identity token. A non-nil error reports an
+// infrastructure failure so the caller can distinguish it from an invalid-token
+// result.
+func (v *TokenValidator) ValidateIdentityToken(ctx context.Context, token string, clientId string, validateLifetime bool) (*validators_models.TokenValidationResult, error) {
 	v.logger.Debug("Start identity token validation")
-
-	var err error
 
 	if len(token) > v.options.InputLengthRestrictions.Jwt {
 		v.logger.Error("JWT too long")
-		return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+		return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
 	}
 
 	if clientId == "" {
+		var err error
 		clientId, err = v.getClientIdFromJwt(token)
 		if err != nil || clientId == "" {
 			v.logger.Error("No clientId supplied, can't find id in identity token.")
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
 		}
 	}
 
-	client, err := extensions.FindEnabledClientById(v.clients, clientId)
+	client, err := extensions.FindEnabledClientById(ctx, v.clients, clientId)
 	if err != nil || client == nil {
 		v.logger.Error("Unknown or disabled client", slog.String("clientId", clientId))
-		return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+		return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
 	}
 
 	v.logger.Debug("Client found", slog.String("clientId", clientId), slog.String("clientName", client.ClientName))
 
-	keys, err := v.keys.GetValidationKeys()
+	keys, err := v.keys.GetValidationKeys(ctx)
 	if err != nil {
 		v.logger.Error("No validate keys")
-		return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+		return nil, err
 	}
 
-	result := v.validateJwt(token, keys, validateLifetime, clientId)
+	result := v.validateJwt(ctx, token, keys, validateLifetime, clientId)
 
 	result.Client = client
 
 	if result.Error != nil {
-		return result
+		return result, nil
 	}
 
 	v.logger.Debug("Calling into custom token validator", slog.String("type", fmt.Sprintf("%T", v.customValidator)))
@@ -245,11 +250,11 @@ func (v *TokenValidator) ValidateIdentityToken(token string, clientId string, va
 	customResult := v.customValidator.ValidateIdentityToken(result)
 
 	if customResult.Error != nil {
-		v.logger.Debug("Custom validator failed:", slog.String("error", err.Error()))
-		return customResult
+		v.logger.Debug("Custom validator failed:", slog.String("error", customResult.Error.Error()))
+		return customResult, nil
 	}
 
-	return customResult
+	return customResult, nil
 }
 
 func (v *TokenValidator) parseJwt(jwtString string, validationKeys []*models.SecurityKeyInfo, validateLifetime bool, audience string) (jwt.Token, error) {
@@ -305,7 +310,7 @@ func (v *TokenValidator) parseJwt(jwtString string, validationKeys []*models.Sec
 	return jwt.Parse([]byte(jwtString), opts...)
 }
 
-func (v *TokenValidator) validateJwt(jwtString string, validationKeys []*models.SecurityKeyInfo, validateLifetime bool, audience string) *validators_models.TokenValidationResult {
+func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, validationKeys []*models.SecurityKeyInfo, validateLifetime bool, audience string) *validators_models.TokenValidationResult {
 	token, err := v.parseJwt(jwtString, validationKeys, validateLifetime, audience)
 	if err != nil {
 		if errors.Is(err, jwt.TokenExpiredError()) {
@@ -332,7 +337,7 @@ func (v *TokenValidator) validateJwt(jwtString string, validationKeys []*models.
 			return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
 		}
 
-		client, err = extensions.FindEnabledClientById(v.clients, cid)
+		client, err = extensions.FindEnabledClientById(ctx, v.clients, cid)
 		if err != nil || client == nil {
 			v.logger.Error("Client deleted or disabled", slog.String("clientId", cid))
 			return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
@@ -440,8 +445,8 @@ func (v *TokenValidator) getClientIdFromJwt(token string) (string, error) {
 	return clientId, nil
 }
 
-func (v *TokenValidator) validateReferenceAccessToken(tokenHandle string) *validators_models.TokenValidationResult {
-	token, err := v.referenceTokenStore.GetReferenceToken(tokenHandle)
+func (v *TokenValidator) validateReferenceAccessToken(ctx context.Context, tokenHandle string) *validators_models.TokenValidationResult {
+	token, err := v.referenceTokenStore.GetReferenceToken(ctx, tokenHandle)
 	if err != nil || token == nil {
 		v.logger.Error("Invalid reference token")
 		return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
@@ -455,7 +460,7 @@ func (v *TokenValidator) validateReferenceAccessToken(tokenHandle string) *valid
 	// load the client that is defined in the token
 	var client *storage_models.Client
 	if token.ClientId != "" {
-		client, err = extensions.FindEnabledClientById(v.clients, token.ClientId)
+		client, err = extensions.FindEnabledClientById(ctx, v.clients, token.ClientId)
 	}
 
 	if err != nil || client == nil {

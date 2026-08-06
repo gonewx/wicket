@@ -53,7 +53,7 @@ func (v *ApiSecretValidator) Validate(req *http.Request) *models.ApiSecretValida
 	}
 
 	// load API resource
-	apis, err := v.resources.FindApiResourcesByName([]string{parsedSecret.Id})
+	apis, err := v.resources.FindApiResourcesByName(req.Context(), []string{parsedSecret.Id})
 	if err != nil || apis == nil || len(apis) == 0 {
 		v.logger.Error("No API resource with that name found. aborting")
 		return fail

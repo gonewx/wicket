@@ -5,6 +5,8 @@
 package impl
 
 import (
+	"context"
+
 	infrastructure "github.com/gonewx/wicket/infrastructure"
 	"github.com/gonewx/wicket/models/messages"
 )
@@ -21,17 +23,17 @@ func NewConsentMessageStore(cookie *infrastructure.MessageCookie[*messages.Conse
 
 // Writes the consent response message.
 // return An identifier for the message
-func (s *ConsentMessageStore) Write(id string, message *messages.Message[*messages.ConsentResponse]) error {
+func (s *ConsentMessageStore) Write(ctx context.Context, id string, message *messages.Message[*messages.ConsentResponse]) error {
 	return s.cookie.Write(id, message)
 }
 
 // Reads the message.
-func (s *ConsentMessageStore) Read(id string) (*messages.Message[*messages.ConsentResponse], error) {
+func (s *ConsentMessageStore) Read(ctx context.Context, id string) (*messages.Message[*messages.ConsentResponse], error) {
 	return s.cookie.Read(id), nil
 }
 
 // Deletes the consent response message.
-func (s *ConsentMessageStore) Delete(id string) error {
+func (s *ConsentMessageStore) Delete(ctx context.Context, id string) error {
 	s.cookie.Clear(id)
 	return nil
 }

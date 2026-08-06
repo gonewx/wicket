@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -40,7 +41,7 @@ func NewDistributedDeviceFlowThrottlingService(
 }
 
 // Decides if the requesting client and device code needs to slow down.
-func (s *DistributedDeviceFlowThrottlingService) ShouldSlowDown(deviceCode string, details *storage_models.DeviceCode) (bool, error) {
+func (s *DistributedDeviceFlowThrottlingService) ShouldSlowDown(ctx context.Context, deviceCode string, details *storage_models.DeviceCode) (bool, error) {
 	if deviceCode == "" {
 		return false, fmt.Errorf("deviceCode is empty")
 	}
@@ -63,7 +64,7 @@ func (s *DistributedDeviceFlowThrottlingService) ShouldSlowDown(deviceCode strin
 	if err == nil {
 		lastSeen = lastSeen.UTC()
 
-		client, err := extensions.FindEnabledClientById(s.clientStore, details.ClientId)
+		client, err := extensions.FindEnabledClientById(ctx, s.clientStore, details.ClientId)
 		if err != nil {
 			return false, err
 		}

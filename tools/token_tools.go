@@ -5,6 +5,7 @@
 package tools
 
 import (
+	"context"
 	"time"
 
 	"github.com/gonewx/wicket"
@@ -35,7 +36,7 @@ func NewTokenTools(
 }
 
 // IssueJwt Issues a JWT.
-func (t *TokenTools) IssueJwt(lifetime int, claims []*claimspkg.Claim) (string, error) {
+func (t *TokenTools) IssueJwt(ctx context.Context, lifetime int, claims []*claimspkg.Claim) (string, error) {
 	if claims == nil {
 		return "", gois.ArgumentNullException
 	}
@@ -49,10 +50,10 @@ func (t *TokenTools) IssueJwt(lifetime int, claims []*claimspkg.Claim) (string, 
 		Claims:       claims,
 	}
 
-	return t.tokenCreation.CreateToken(token)
+	return t.tokenCreation.CreateToken(ctx, token)
 }
 
-func (t *TokenTools) IssueJwtWithIssuer(lifetime int, issuer string, claims []*claimspkg.Claim) (string, error) {
+func (t *TokenTools) IssueJwtWithIssuer(ctx context.Context, lifetime int, issuer string, claims []*claimspkg.Claim) (string, error) {
 	if claims == nil {
 		return "", gois.ArgumentNullException
 	}
@@ -64,5 +65,5 @@ func (t *TokenTools) IssueJwtWithIssuer(lifetime int, issuer string, claims []*c
 		Claims:       claims,
 	}
 
-	return t.tokenCreation.CreateToken(token)
+	return t.tokenCreation.CreateToken(ctx, token)
 }

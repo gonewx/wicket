@@ -190,7 +190,7 @@ func (h *testCookieAuthenticationHandler) SignIn(user *claimspkg.ClaimsPrincipal
 	})
 
 	if h.userSession != nil {
-		if _, err := h.userSession.CreateSessionId(user, properties); err != nil {
+		if _, err := h.userSession.CreateSessionId(h.request.Context(), user, properties); err != nil {
 			return fmt.Errorf("create session: %w", err)
 		}
 	}

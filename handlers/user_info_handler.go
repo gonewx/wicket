@@ -57,12 +57,15 @@ func (h *UserInfoHandler) Process(w http.ResponseWriter, r *http.Request) error 
 		return results.NewProtectedResourceErrorResult(gois.ProtectedResourceErrorsInvalidToken, "").Execute(w, r)
 	}
 
-	validationResult := h.requestValidator.ValidateRequest(usage.Token)
+	validationResult, err := h.requestValidator.ValidateRequest(r.Context(), usage.Token)
+	if err != nil {
+		return fmt.Errorf("validate userinfo request: %w", err)
+	}
 	if validationResult.Error != nil {
 		return results.NewProtectedResourceErrorResult(validationResult.Error, validationResult.Description).Execute(w, r)
 	}
 
-	claims, err := h.generator.Handle(validationResult)
+	claims, err := h.generator.Handle(r.Context(), validationResult)
 	if err != nil {
 		return fmt.Errorf("generate userinfo response: %w", err)
 	}

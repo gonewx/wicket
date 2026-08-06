@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 	urlpkg "net/url"
 	"strings"
@@ -49,7 +50,7 @@ func NewOidcReturnUrlParser(
 }
 
 // Parses a return URL.
-func (p *OidcReturnUrlParser) Parse(returnUrl string) (*messages.AuthorizationRequest, error) {
+func (p *OidcReturnUrlParser) Parse(ctx context.Context, returnUrl string) (*messages.AuthorizationRequest, error) {
 	if !p.IsValidReturnUrl(returnUrl) {
 		p.logger.Debug("No AuthorizationRequest being returned")
 
@@ -64,7 +65,7 @@ func (p *OidcReturnUrlParser) Parse(returnUrl string) (*messages.AuthorizationRe
 	parameters := url.Query()
 	if p.authorizationParametersMessageStore != nil {
 		messageStoreId := parameters.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName)
-		entry, err := p.authorizationParametersMessageStore.Read(messageStoreId)
+		entry, err := p.authorizationParametersMessageStore.Read(ctx, messageStoreId)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +84,7 @@ func (p *OidcReturnUrlParser) Parse(returnUrl string) (*messages.AuthorizationRe
 	}
 
 	user := userSession.GetUser()
-	result := p.validator.Validate(parameters, user)
+	result := p.validator.Validate(ctx, parameters, user)
 	if result == nil {
 		p.logger.Debug("No AuthorizationRequest being returned")
 

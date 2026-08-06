@@ -5,6 +5,8 @@
 package impl
 
 import (
+	"context"
+
 	"github.com/gonewx/wicket/models/messages"
 	"github.com/gonewx/wicket/services"
 )
@@ -19,9 +21,9 @@ func NewReturnUrlParser(parsers []services.ReturnUrlParser) *ReturnUrlParser {
 }
 
 // Parses a return URL.
-func (p *ReturnUrlParser) Parse(returnUrl string) (*messages.AuthorizationRequest, error) {
+func (p *ReturnUrlParser) Parse(ctx context.Context, returnUrl string) (*messages.AuthorizationRequest, error) {
 	for _, parser := range p.parsers {
-		result, err := parser.Parse(returnUrl)
+		result, err := parser.Parse(ctx, returnUrl)
 		if err != nil {
 			return nil, err
 		}

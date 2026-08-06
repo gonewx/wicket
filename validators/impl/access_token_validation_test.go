@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -61,10 +62,10 @@ func TestValid_Reference_Token(t *testing.T) {
 
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-	handle, err := store.StoreReferenceToken(token)
+	handle, err := store.StoreReferenceToken(context.Background(), token)
 	r.NoError(err)
 
-	result := validator.ValidateAccessToken(handle, "")
+	result, err := validator.ValidateAccessToken(context.Background(), handle, "")
 
 	r.NoError(result.Error)
 	r.Len(result.Claims, 9)
@@ -92,10 +93,11 @@ func TestValid_Reference_Token_with_required_Scope(t *testing.T) {
 
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-	handle, err := store.StoreReferenceToken(token)
+	handle, err := store.StoreReferenceToken(context.Background(), token)
 	r.NoError(err)
 
-	result := validator.ValidateAccessToken(handle, "read")
+	result, err := validator.ValidateAccessToken(context.Background(), handle, "read")
+	r.NoError(err)
 
 	r.NoError(result.Error)
 }
@@ -111,10 +113,11 @@ func TestValid_Reference_Token_with_missing_Scope(t *testing.T) {
 
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-	handle, err := store.StoreReferenceToken(token)
+	handle, err := store.StoreReferenceToken(context.Background(), token)
 	r.NoError(err)
 
-	result := validator.ValidateAccessToken(handle, "missing")
+	result, err := validator.ValidateAccessToken(context.Background(), handle, "missing")
+	r.NoError(err)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInsufficientScope)
@@ -125,7 +128,8 @@ func TestUnknown_Reference_Token(t *testing.T) {
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateAccessToken("unknown", "")
+	result, err := validator.ValidateAccessToken(context.Background(), "unknown", "")
+	r.NoError(err)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
@@ -138,7 +142,8 @@ func TestReference_Token_Too_Long(t *testing.T) {
 	options := config_options.NewWicketOptions()
 
 	longToken := strings.Repeat("x", options.InputLengthRestrictions.TokenHandle+1)
-	result := validator.ValidateAccessToken(longToken, "")
+	result, err := validator.ValidateAccessToken(context.Background(), longToken, "")
+	r.NoError(err)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
@@ -163,12 +168,12 @@ func TestExpired_Reference_Token(t *testing.T) {
 	token := createAccessToken(client, "valid", 2, []string{"read", "write"})
 	token.CreationTime = now
 
-	handle, err := store.StoreReferenceToken(token)
+	handle, err := store.StoreReferenceToken(context.Background(), token)
 	r.NoError(err)
 
 	now = now.Add(3 * time.Second)
 
-	result := validator.ValidateAccessToken(handle, "")
+	result, err := validator.ValidateAccessToken(context.Background(), handle, "")
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsExpiredToken)
@@ -179,7 +184,8 @@ func TestMalformed_JWT_Token(t *testing.T) {
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateAccessToken("unk.nown", "")
+	result, err := validator.ValidateAccessToken(context.Background(), "unk.nown", "")
+	r.NoError(err)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
@@ -194,12 +200,13 @@ func TestValid_JWT_Token(t *testing.T) {
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
 	signer := createDefaultTokenCreator(nil)
-	jwt, err := signer.CreateToken(token)
+	jwt, err := signer.CreateToken(context.Background(), token)
 	r.NoError(err)
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateAccessToken(jwt, "")
+	result, err := validator.ValidateAccessToken(context.Background(), jwt, "")
+	r.NoError(err)
 
 	r.NoError(result.Error)
 }
@@ -224,12 +231,13 @@ func TestJWT_Token_with_scopes_have_expected_claims(t *testing.T) {
 
 			token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-			jwt, err := signer.CreateToken(token)
+			jwt, err := signer.CreateToken(context.Background(), token)
 			r.NoError(err)
 
 			validator := createTokenValidator()
 
-			result := validator.ValidateAccessToken(jwt, "")
+			result, err := validator.ValidateAccessToken(context.Background(), jwt, "")
+			r.NoError(err)
 
 			r.NoError(result.Error)
 			r.NotEmpty(result.Jwt)
@@ -258,12 +266,13 @@ func TestJWT_Token_invalid_Issuer(t *testing.T) {
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 	token.Issuer = "invalid"
 
-	jwt, err := signer.CreateToken(token)
+	jwt, err := signer.CreateToken(context.Background(), token)
 	r.NoError(err)
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateAccessToken(jwt, "")
+	result, err := validator.ValidateAccessToken(context.Background(), jwt, "")
+	r.NoError(err)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
@@ -279,12 +288,13 @@ func TestJWT_Token_Too_Long(t *testing.T) {
 
 	token := createAccessTokenLong(client, "valid", 600, 1000, []string{"read", "write"})
 
-	jwt, err := signer.CreateToken(token)
+	jwt, err := signer.CreateToken(context.Background(), token)
 	r.NoError(err)
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateAccessToken(jwt, "")
+	result, err := validator.ValidateAccessToken(context.Background(), jwt, "")
+	r.NoError(err)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
@@ -303,10 +313,10 @@ func TestValid_AccessToken_but_Client_not_active(t *testing.T) {
 
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-	handle, err := store.StoreReferenceToken(token)
+	handle, err := store.StoreReferenceToken(context.Background(), token)
 	r.NoError(err)
 
-	result := validator.ValidateAccessToken(handle, "")
+	result, err := validator.ValidateAccessToken(context.Background(), handle, "")
 
 	r.Error(result.Error)
 }

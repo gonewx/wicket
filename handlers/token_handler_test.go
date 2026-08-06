@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -28,8 +29,8 @@ type fakeTokenRequestValidator struct {
 	result *validators_models.TokenRequestValidationResult
 }
 
-func (v *fakeTokenRequestValidator) ValidateRequest(url.Values, *validators_models.ClientSecretValidationResult) *validators_models.TokenRequestValidationResult {
-	return v.result
+func (v *fakeTokenRequestValidator) ValidateRequest(ctx context.Context, parameters url.Values, clientValidationResult *validators_models.ClientSecretValidationResult) (*validators_models.TokenRequestValidationResult, error) {
+	return v.result, nil
 }
 
 type fakeTokenResponseGenerator struct {
@@ -37,7 +38,7 @@ type fakeTokenResponseGenerator struct {
 	err      error
 }
 
-func (g *fakeTokenResponseGenerator) Handle(*validators_models.TokenRequestValidationResult) (*responses_models.TokenResponse, error) {
+func (g *fakeTokenResponseGenerator) Handle(ctx context.Context, result *validators_models.TokenRequestValidationResult) (*responses_models.TokenResponse, error) {
 	return g.response, g.err
 }
 

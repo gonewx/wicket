@@ -4,6 +4,7 @@
 package keymgmt
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
@@ -82,7 +83,7 @@ func newTestManager(t *testing.T, cfg Config, store RecordStore, clock Clock) *M
 
 func countPhase(t *testing.T, store RecordStore, phase Phase) int {
 	t.Helper()
-	records, err := store.List()
+	records, err := store.List(context.Background())
 	if err != nil {
 		t.Fatalf("list records: %v", err)
 	}
@@ -102,7 +103,7 @@ func TestManagerBootstrapProducesActiveSigningKey(t *testing.T) {
 	store := NewMemoryRecordStore()
 	m := newTestManager(t, enabledConfig(), store, clock)
 
-	candidates, err := m.SigningCandidates()
+	candidates, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("signing candidates: %v", err)
 	}
@@ -130,11 +131,11 @@ func TestManagerValidationKeysExposeOnlyPublicMaterial(t *testing.T) {
 	m := newTestManager(t, enabledConfig(), nil, clock)
 
 	// Trigger bootstrap.
-	signing, err := m.SigningCandidates()
+	signing, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("signing candidates: %v", err)
 	}
-	keys, err := m.ValidationKeys()
+	keys, err := m.ValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("validation keys: %v", err)
 	}
@@ -161,7 +162,7 @@ func TestManagerLifecycleTransitions(t *testing.T) {
 	m := newTestManager(t, cfg, store, clock)
 
 	// Bootstrap the first active key.
-	if _, err := m.SigningCandidates(); err != nil {
+	if _, err := m.SigningCandidates(context.Background()); err != nil {
 		t.Fatalf("bootstrap: %v", err)
 	}
 	if got := countPhase(t, store, PhaseActive); got != 1 {
@@ -171,7 +172,7 @@ func TestManagerLifecycleTransitions(t *testing.T) {
 	// Advance to the rotation warm-up point; a candidate must be created.
 	clock.advance(cfg.RotationInterval - cfg.ActivationLeadTime + time.Second)
 	m.invalidateCache()
-	if _, err := m.SigningCandidates(); err != nil {
+	if _, err := m.SigningCandidates(context.Background()); err != nil {
 		t.Fatalf("rotation warm-up: %v", err)
 	}
 	if got := countPhase(t, store, PhaseCandidate); got != 1 {
@@ -182,7 +183,7 @@ func TestManagerLifecycleTransitions(t *testing.T) {
 	// active moves to retained.
 	clock.advance(cfg.ActivationLeadTime + time.Second)
 	m.invalidateCache()
-	if _, err := m.SigningCandidates(); err != nil {
+	if _, err := m.SigningCandidates(context.Background()); err != nil {
 		t.Fatalf("activation: %v", err)
 	}
 	if got := countPhase(t, store, PhaseActive); got != 1 {
@@ -196,7 +197,7 @@ func TestManagerLifecycleTransitions(t *testing.T) {
 	// while the current active key keeps signing.
 	clock.advance(cfg.RetentionDuration + cfg.ClockSkew + time.Second)
 	m.invalidateCache()
-	keys, err := m.ValidationKeys()
+	keys, err := m.ValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("post-retention validation: %v", err)
 	}
@@ -294,7 +295,7 @@ func TestManagerConfigValidation(t *testing.T) {
 			tc.mutate(&cfg)
 			store := NewMemoryRecordStore()
 			m := NewManager(cfg, store, tc.provider, newFakeClock(), rand.Reader, nil)
-			_, err := m.SigningCandidates()
+			_, err := m.SigningCandidates(context.Background())
 			if tc.wantError && err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -302,7 +303,7 @@ func TestManagerConfigValidation(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if err != nil {
-				records, listErr := store.List()
+				records, listErr := store.List(context.Background())
 				if listErr != nil {
 					t.Fatalf("list records: %v", listErr)
 				}
@@ -321,14 +322,14 @@ func TestManagerDisabledProducesNoMaterial(t *testing.T) {
 	cfg.Enabled = false
 	m := newTestManager(t, cfg, nil, newFakeClock())
 
-	signing, err := m.SigningCandidates()
+	signing, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("signing candidates: %v", err)
 	}
 	if len(signing) != 0 {
 		t.Fatalf("disabled manager returned %d signing candidates, want 0", len(signing))
 	}
-	keys, err := m.ValidationKeys()
+	keys, err := m.ValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("validation keys: %v", err)
 	}
@@ -344,7 +345,7 @@ func TestManagerAutoCreateDisabledFailsClosed(t *testing.T) {
 	cfg.AutoCreate = false
 	m := newTestManager(t, cfg, nil, newFakeClock())
 
-	if _, err := m.SigningCandidates(); err == nil {
+	if _, err := m.SigningCandidates(context.Background()); err == nil {
 		t.Fatal("expected startup error when auto-create is disabled and no key exists")
 	}
 }
@@ -356,12 +357,12 @@ func TestManagerCacheReuseWithinTTL(t *testing.T) {
 	store := NewMemoryRecordStore()
 	m := newTestManager(t, enabledConfig(), store, clock)
 
-	first, err := m.SigningCandidates()
+	first, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("first: %v", err)
 	}
 	// Within the TTL the snapshot is reused and reconcile does not run again.
-	second, err := m.SigningCandidates()
+	second, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("second: %v", err)
 	}
@@ -383,7 +384,7 @@ type failingStore struct {
 	failActive bool
 }
 
-func (s *failingStore) List() ([]*Record, error) {
+func (s *failingStore) List(ctx context.Context) ([]*Record, error) {
 	s.mu.Lock()
 	s.calls++
 	fail := s.failActive && s.calls > s.failAfter
@@ -391,13 +392,17 @@ func (s *failingStore) List() ([]*Record, error) {
 	if fail {
 		return nil, ErrConfiguration
 	}
-	return s.inner.List()
+	return s.inner.List(context.Background())
 }
-func (s *failingStore) Get(h string) (*Record, error)    { return s.inner.Get(h) }
-func (s *failingStore) Create(r *Record) error           { return s.inner.Create(r) }
-func (s *failingStore) Update(r *Record, v uint64) error { return s.inner.Update(r, v) }
-func (s *failingStore) Delete(h string) error            { return s.inner.Delete(h) }
-func (s *failingStore) breakNow()                        { s.mu.Lock(); s.failActive = true; s.mu.Unlock() }
+func (s *failingStore) Get(ctx context.Context, h string) (*Record, error) {
+	return s.inner.Get(ctx, h)
+}
+func (s *failingStore) Create(ctx context.Context, r *Record) error { return s.inner.Create(ctx, r) }
+func (s *failingStore) Update(ctx context.Context, r *Record, v uint64) error {
+	return s.inner.Update(ctx, r, v)
+}
+func (s *failingStore) Delete(ctx context.Context, h string) error { return s.inner.Delete(ctx, h) }
+func (s *failingStore) breakNow()                                  { s.mu.Lock(); s.failActive = true; s.mu.Unlock() }
 
 func TestManagerStorageDisruptionKeepsLastGoodSigningKey(t *testing.T) {
 	t.Parallel()
@@ -406,7 +411,7 @@ func TestManagerStorageDisruptionKeepsLastGoodSigningKey(t *testing.T) {
 	store := &failingStore{inner: NewMemoryRecordStore(), failAfter: 0}
 	m := newTestManager(t, enabledConfig(), store, clock)
 
-	first, err := m.SigningCandidates()
+	first, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("bootstrap: %v", err)
 	}
@@ -417,7 +422,7 @@ func TestManagerStorageDisruptionKeepsLastGoodSigningKey(t *testing.T) {
 	store.breakNow()
 	clock.advance(2 * time.Minute)
 	m.invalidateCache()
-	again, err := m.SigningCandidates()
+	again, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("signing during disruption: %v", err)
 	}
@@ -426,7 +431,7 @@ func TestManagerStorageDisruptionKeepsLastGoodSigningKey(t *testing.T) {
 	}
 
 	// Validation fails closed once the cache TTL has expired.
-	if _, err := m.ValidationKeys(); err == nil {
+	if _, err := m.ValidationKeys(context.Background()); err == nil {
 		t.Fatal("validation should fail closed after TTL during storage disruption")
 	}
 }
@@ -437,7 +442,7 @@ func TestManagerProtectedMaterialRecoveryFailure(t *testing.T) {
 	clock := newFakeClock()
 	store := NewMemoryRecordStore()
 	// Pre-seed a record whose protected private material cannot be recovered.
-	if err := store.Create(&Record{
+	if err := store.Create(context.Background(), &Record{
 		Handle:                   "seed",
 		PublicID:                 "seed-kid",
 		Purpose:                  PurposeTokenSigning,
@@ -456,11 +461,11 @@ func TestManagerProtectedMaterialRecoveryFailure(t *testing.T) {
 	cfg.AutoCreate = false
 	m := newTestManager(t, cfg, store, clock)
 
-	if _, err := m.SigningCandidates(); err == nil {
+	if _, err := m.SigningCandidates(context.Background()); err == nil {
 		t.Fatal("expected signing error when private material cannot be recovered")
 	}
 	// The public material is intact, so validation still publishes the key.
-	keys, err := m.ValidationKeys()
+	keys, err := m.ValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("validation keys: %v", err)
 	}
@@ -477,7 +482,7 @@ func TestManagerRepeatedReconcileIsIdempotent(t *testing.T) {
 	m := newTestManager(t, enabledConfig(), store, clock)
 
 	for i := 0; i < 8; i++ {
-		if _, err := m.SigningCandidates(); err != nil {
+		if _, err := m.SigningCandidates(context.Background()); err != nil {
 			t.Fatalf("iteration %d: %v", i, err)
 		}
 		m.invalidateCache()
@@ -485,7 +490,7 @@ func TestManagerRepeatedReconcileIsIdempotent(t *testing.T) {
 	if got := countPhase(t, store, PhaseActive); got != 1 {
 		t.Fatalf("idempotent reconcile active = %d, want 1", got)
 	}
-	records, _ := store.List()
+	records, _ := store.List(context.Background())
 	if len(records) != 1 {
 		t.Fatalf("idempotent reconcile record count = %d, want 1", len(records))
 	}
@@ -505,7 +510,7 @@ func TestManagerConcurrentInstancesConverge(t *testing.T) {
 			defer wg.Done()
 			m := NewManager(cfg, store, reversibleProvider{}, clock, rand.Reader, nil)
 			for j := 0; j < 5; j++ {
-				_, _ = m.SigningCandidates()
+				_, _ = m.SigningCandidates(context.Background())
 			}
 		}()
 	}
@@ -514,7 +519,7 @@ func TestManagerConcurrentInstancesConverge(t *testing.T) {
 	// A final settling pass demotes any surplus active keys to a single active.
 	settle := NewManager(cfg, store, reversibleProvider{}, clock, rand.Reader, nil)
 	for i := 0; i < 4; i++ {
-		if _, err := settle.SigningCandidates(); err != nil {
+		if _, err := settle.SigningCandidates(context.Background()); err != nil {
 			t.Fatalf("settle: %v", err)
 		}
 		settle.invalidateCache()
@@ -548,14 +553,14 @@ func TestManagerCandidatePublishedBeforeActivation(t *testing.T) {
 	cfg := enabledConfig()
 	m := newTestManager(t, cfg, store, clock)
 
-	if _, err := m.SigningCandidates(); err != nil {
+	if _, err := m.SigningCandidates(context.Background()); err != nil {
 		t.Fatalf("bootstrap: %v", err)
 	}
 
 	// Reach the rotation warm-up point so a candidate is created.
 	clock.advance(cfg.RotationInterval - cfg.ActivationLeadTime + time.Second)
 	m.invalidateCache()
-	signing, err := m.SigningCandidates()
+	signing, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("warm-up: %v", err)
 	}
@@ -565,7 +570,7 @@ func TestManagerCandidatePublishedBeforeActivation(t *testing.T) {
 
 	// The warming candidate must already be resolvable through JWKS so verifier
 	// caches observe its kid before it ever signs.
-	keys, err := m.ValidationKeys()
+	keys, err := m.ValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("validation keys: %v", err)
 	}
@@ -589,7 +594,7 @@ func TestManagerActivePublicMaterialFailureFailsValidationClosed(t *testing.T) {
 
 	clock := newFakeClock()
 	store := NewMemoryRecordStore()
-	if err := store.Create(&Record{
+	if err := store.Create(context.Background(), &Record{
 		Handle:                   "seed",
 		PublicID:                 "seed-kid",
 		Purpose:                  PurposeTokenSigning,
@@ -611,10 +616,10 @@ func TestManagerActivePublicMaterialFailureFailsValidationClosed(t *testing.T) {
 	// An active key whose public material cannot be serialized must fail the
 	// whole validation set: its kid vanishing silently from JWKS would break
 	// verification of everything it signs.
-	if _, err := m.ValidationKeys(); err == nil {
+	if _, err := m.ValidationKeys(context.Background()); err == nil {
 		t.Fatal("expected validation error when an active key's public material is unusable")
 	}
-	if _, err := m.ExportValidationMaterial(); err == nil {
+	if _, err := m.ExportValidationMaterial(context.Background()); err == nil {
 		t.Fatal("expected export error when an active key's public material is unusable")
 	}
 }
@@ -623,7 +628,7 @@ func TestManagerIdentityProtectorFailsClosed(t *testing.T) {
 	t.Parallel()
 
 	m := NewManager(enabledConfig(), NewMemoryRecordStore(), identityProvider{}, newFakeClock(), rand.Reader, nil)
-	if _, err := m.SigningCandidates(); err == nil {
+	if _, err := m.SigningCandidates(context.Background()); err == nil {
 		t.Fatal("expected protector-unavailable error for an identity protector")
 	}
 }
@@ -636,13 +641,13 @@ func TestManagerOrphanCandidateRetiresDirectly(t *testing.T) {
 	cfg := enabledConfig()
 	m := newTestManager(t, cfg, store, clock)
 
-	if _, err := m.SigningCandidates(); err != nil {
+	if _, err := m.SigningCandidates(context.Background()); err != nil {
 		t.Fatalf("bootstrap: %v", err)
 	}
 
 	// Seed a stale candidate that can never activate: created long before the
 	// current active key, with a NotBefore still in the future.
-	if err := store.Create(&Record{
+	if err := store.Create(context.Background(), &Record{
 		Handle:                   "stale",
 		PublicID:                 "stale-kid",
 		Purpose:                  PurposeTokenSigning,
@@ -659,7 +664,7 @@ func TestManagerOrphanCandidateRetiresDirectly(t *testing.T) {
 	}
 
 	m.invalidateCache()
-	if _, err := m.SigningCandidates(); err != nil {
+	if _, err := m.SigningCandidates(context.Background()); err != nil {
 		t.Fatalf("reconcile: %v", err)
 	}
 	// The orphan never signed, so it retires directly instead of spending a
@@ -676,7 +681,7 @@ func TestManagerNilSeamsDoNotPanic(t *testing.T) {
 	t.Parallel()
 
 	m := NewManager(Config{}, nil, nil, nil, nil, nil)
-	signing, err := m.SigningCandidates()
+	signing, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("disabled manager with nil seams: %v", err)
 	}
@@ -695,7 +700,7 @@ func TestManagerExpiredActiveAutoCreatesReplacement(t *testing.T) {
 	// Seed the store with a single signing key whose signing window has already
 	// closed, and no warming candidate behind it.
 	const staleKid = "expired-active-kid"
-	if err := store.Create(&Record{
+	if err := store.Create(context.Background(), &Record{
 		Handle:                   "expired",
 		PublicID:                 staleKid,
 		Purpose:                  PurposeTokenSigning,
@@ -712,7 +717,7 @@ func TestManagerExpiredActiveAutoCreatesReplacement(t *testing.T) {
 
 	m := newTestManager(t, cfg, store, clock)
 
-	signing, err := m.SigningCandidates()
+	signing, err := m.SigningCandidates(context.Background())
 	if err != nil {
 		t.Fatalf("signing candidates: %v", err)
 	}
@@ -732,7 +737,7 @@ func TestManagerExpiredActiveAutoCreatesReplacement(t *testing.T) {
 	}
 	// The retained key is the original expired one, preserving verifiability of
 	// tokens it already signed.
-	records, err := store.List()
+	records, err := store.List(context.Background())
 	if err != nil {
 		t.Fatalf("list records: %v", err)
 	}
@@ -755,10 +760,10 @@ func TestManagerSnapshotExpiresAfterCacheTTL(t *testing.T) {
 	m := newTestManager(t, cfg, store, clock)
 
 	// Build the initial snapshot; its validation set carries the one active key.
-	if _, err := m.SigningCandidates(); err != nil {
+	if _, err := m.SigningCandidates(context.Background()); err != nil {
 		t.Fatalf("bootstrap: %v", err)
 	}
-	initial, err := m.ValidationKeys()
+	initial, err := m.ValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("initial validation keys: %v", err)
 	}
@@ -767,7 +772,7 @@ func TestManagerSnapshotExpiresAfterCacheTTL(t *testing.T) {
 	}
 
 	// A second publishable key appears in the store after the snapshot was built.
-	if err := store.Create(&Record{
+	if err := store.Create(context.Background(), &Record{
 		Handle:                   "arrived",
 		PublicID:                 "arrived-kid",
 		Purpose:                  PurposeTokenSigning,
@@ -787,7 +792,7 @@ func TestManagerSnapshotExpiresAfterCacheTTL(t *testing.T) {
 	// Advancing less than the cache TTL keeps serving the cached snapshot, so the
 	// injected record is not yet reflected.
 	clock.advance(cfg.CacheTTL - 30*time.Second)
-	within, err := m.ValidationKeys()
+	within, err := m.ValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("within-ttl validation keys: %v", err)
 	}
@@ -798,7 +803,7 @@ func TestManagerSnapshotExpiresAfterCacheTTL(t *testing.T) {
 	// Advancing past the cache TTL retires the snapshot: the next access
 	// reconciles and re-reads the store, so the injected record now shows up.
 	clock.advance(cfg.CacheTTL)
-	after, err := m.ValidationKeys()
+	after, err := m.ValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("post-ttl validation keys: %v", err)
 	}

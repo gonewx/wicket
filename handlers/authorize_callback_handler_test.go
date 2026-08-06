@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,16 +29,16 @@ func newFakeConsentMessageStore() *fakeConsentMessageStore {
 	return &fakeConsentMessageStore{entries: make(map[string]*messages.Message[*messages.ConsentResponse])}
 }
 
-func (s *fakeConsentMessageStore) Write(id string, message *messages.Message[*messages.ConsentResponse]) error {
+func (s *fakeConsentMessageStore) Write(ctx context.Context, id string, message *messages.Message[*messages.ConsentResponse]) error {
 	s.entries[id] = message
 	return nil
 }
 
-func (s *fakeConsentMessageStore) Read(id string) (*messages.Message[*messages.ConsentResponse], error) {
+func (s *fakeConsentMessageStore) Read(ctx context.Context, id string) (*messages.Message[*messages.ConsentResponse], error) {
 	return s.entries[id], nil
 }
 
-func (s *fakeConsentMessageStore) Delete(id string) error {
+func (s *fakeConsentMessageStore) Delete(ctx context.Context, id string) error {
 	delete(s.entries, id)
 	return nil
 }
@@ -94,7 +95,7 @@ func TestAuthorizeCallbackHandlerResumeDispatch(t *testing.T) {
 		"valid consent answer resumes to authorize result": {
 			interaction: responses_models.NewInteractionResponse(),
 			seed: func(subject *claims.ClaimsPrincipal, values url.Values, store *fakeConsentMessageStore) {
-				_ = store.Write(consentRequestKey(subject, values), grantedConsentMessage())
+				_ = store.Write(context.Background(), consentRequestKey(subject, values), grantedConsentMessage())
 			},
 			assert: func(t *testing.T, result endpointResult) {
 				if _, ok := result.(*results.AuthorizeResult); !ok {
@@ -114,7 +115,7 @@ func TestAuthorizeCallbackHandlerResumeDispatch(t *testing.T) {
 		"missing consent answer builds error authorize result": {
 			interaction: responses_models.NewInteractionResponse(),
 			seed: func(subject *claims.ClaimsPrincipal, values url.Values, store *fakeConsentMessageStore) {
-				_ = store.Write(consentRequestKey(subject, values), &messages.Message[*messages.ConsentResponse]{})
+				_ = store.Write(context.Background(), consentRequestKey(subject, values), &messages.Message[*messages.ConsentResponse]{})
 			},
 			assert: func(t *testing.T, result endpointResult) {
 				authorizeResult, ok := result.(*results.AuthorizeResult)
@@ -160,7 +161,7 @@ func TestAuthorizeCallbackHandlerConsumesConsentMessage(t *testing.T) {
 	subject := callbackSubject(t)
 	req, values := callbackRequest()
 	store := newFakeConsentMessageStore()
-	_ = store.Write(consentRequestKey(subject, values), grantedConsentMessage())
+	_ = store.Write(context.Background(), consentRequestKey(subject, values), grantedConsentMessage())
 
 	handler := newCallbackHandler(subject, responses_models.NewInteractionResponse(), store)
 	if _, err := handler.result(req); err != nil {

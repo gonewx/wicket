@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
@@ -82,8 +83,9 @@ func NewTokenRequestValidator(
 	}
 }
 
-// Validates the request.
-func (s *TokenRequestValidator) ValidateRequest(parameters url.Values, clientValidationResult *models.ClientSecretValidationResult) *models.TokenRequestValidationResult {
+// Validates the request. A non-nil error reports an infrastructure failure so
+// the caller can distinguish it from a protocol-level invalid result.
+func (s *TokenRequestValidator) ValidateRequest(ctx context.Context, parameters url.Values, clientValidationResult *models.ClientSecretValidationResult) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start token request validation")
 
 	s.validatedRequest = validators_models.NewValidatedTokenRequest()
@@ -93,7 +95,7 @@ func (s *TokenRequestValidator) ValidateRequest(parameters url.Values, clientVal
 
 	if clientValidationResult == nil {
 		s.Logger.Error("Client validation result is nil")
-		return s.invalid(errors.New("argument nil"), "ClientSecretValidationResult")
+		return s.invalid(errors.New("argument nil"), "ClientSecretValidationResult"), nil
 	}
 
 	s.validatedRequest.SetClient(clientValidationResult.Client, clientValidationResult.Secret, clientValidationResult.Confirmation)
@@ -101,19 +103,19 @@ func (s *TokenRequestValidator) ValidateRequest(parameters url.Values, clientVal
 	// check client protocol type
 	if s.validatedRequest.Client.ProtocolType != gois.ProtocolTypesOpenIdConnect {
 		s.Logger.Error("Invalid protocol type for client")
-		return s.invalid(gois.TokenErrorsInvalidClient, "")
+		return s.invalid(gois.TokenErrorsInvalidClient, ""), nil
 	}
 
 	// check grant type
 	grantType := parameters.Get(gois.TokenRequestGrantType)
 	if grantType == "" {
 		s.Logger.Error("Grant type is missing")
-		return s.invalid(gois.TokenErrorsUnsupportedGrantType, "")
+		return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
 	}
 
 	if len(grantType) > s.Options.InputLengthRestrictions.GrantType {
 		s.Logger.Error("Grant type is too long")
-		return s.invalid(gois.TokenErrorsUnsupportedGrantType, "")
+		return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
 	}
 
 	s.validatedRequest.GrantType = grantType
@@ -124,15 +126,15 @@ func (s *TokenRequestValidator) ValidateRequest(parameters url.Values, clientVal
 	if utils.AnyPred(resourceIndicators, func(x string) bool {
 		return len(x) > s.Options.InputLengthRestrictions.ResourceGapMaxLength
 	}) {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator maximum length exceeded")
+		return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator maximum length exceeded"), nil
 	}
 
 	if !utils.AreValidResourceGapFormat(resourceIndicators) {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap format")
+		return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap format"), nil
 	}
 
 	if len(resourceIndicators) > 1 {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "Multiple resource gaps not supported on token endpoint.")
+		return s.invalid(gois.TokenErrorsInvalidTarget, "Multiple resource gaps not supported on token endpoint."), nil
 	}
 
 	s.validatedRequest.RequestedResourceGap = utils.SingleOrDefault(resourceIndicators)
@@ -140,35 +142,38 @@ func (s *TokenRequestValidator) ValidateRequest(parameters url.Values, clientVal
 	// run specific logic for grants
 	switch grantType {
 	case gois.GrantTypeAuthorizationCode:
-		return s.runValidation(s.validateAuthorizationCodeRequest, parameters)
+		return s.runValidation(ctx, s.validateAuthorizationCodeRequest, parameters)
 	case gois.GrantTypeClientCredentials:
-		return s.runValidation(s.validateClientCredentialsRequest, parameters)
+		return s.runValidation(ctx, s.validateClientCredentialsRequest, parameters)
 	case gois.GrantTypePassword:
-		return s.runValidation(s.validateResourceOwnerCredentialRequest, parameters)
+		return s.runValidation(ctx, s.validateResourceOwnerCredentialRequest, parameters)
 	case gois.GrantTypeRefreshToken:
-		return s.runValidation(s.validateRefreshTokenRequest, parameters)
+		return s.runValidation(ctx, s.validateRefreshTokenRequest, parameters)
 	case gois.GrantTypeDeviceCode:
-		return s.runValidation(s.validateDeviceCodeRequest, parameters)
+		return s.runValidation(ctx, s.validateDeviceCodeRequest, parameters)
 	case gois.GrantTypeBackchannelAuthentication:
-		return s.runValidation(s.validateBackchannelAuthenticationRequest, parameters)
+		return s.runValidation(ctx, s.validateBackchannelAuthenticationRequest, parameters)
 	default:
-		return s.runValidation(s.validateExtensionGrantRequest, parameters)
+		return s.runValidation(ctx, s.validateExtensionGrantRequest, parameters)
 	}
 
 }
 
-func (s *TokenRequestValidator) runValidation(validationFunc func(url.Values) *models.TokenRequestValidationResult, parameters url.Values) *models.TokenRequestValidationResult {
+func (s *TokenRequestValidator) runValidation(ctx context.Context, validationFunc func(context.Context, url.Values) (*models.TokenRequestValidationResult, error), parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	// run standard validation
-	result := validationFunc(parameters)
+	result, err := validationFunc(ctx, parameters)
+	if err != nil {
+		return result, err
+	}
 	if result.Error != nil {
-		return result
+		return result, nil
 	}
 
 	// run custom validation
 	s.Logger.Debug("Calling into custom request validator", slog.String("type", fmt.Sprintf("%T", s.CustomRequestValidator)))
 
 	customValidationContext := &validators_contexts.CustomTokenRequestValidationContext{Result: result}
-	err := s.CustomRequestValidator.Validate(customValidationContext)
+	err = s.CustomRequestValidator.Validate(customValidationContext)
 	if err != nil || customValidationContext.Result.Error != nil {
 		if customValidationContext.Result.Error != nil {
 			s.Logger.Error("Custom token request validator", slog.String("error", customValidationContext.Result.Error.Error()))
@@ -176,58 +181,62 @@ func (s *TokenRequestValidator) runValidation(validationFunc func(url.Values) *m
 			s.Logger.Error("Custom token request validator error")
 		}
 
-		return customValidationContext.Result
+		return customValidationContext.Result, nil
 	}
 
-	return customValidationContext.Result
+	return customValidationContext.Result, nil
 }
 
-func (s *TokenRequestValidator) validateAuthorizationCodeRequest(parameters url.Values) *models.TokenRequestValidationResult {
+func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start validation of authorization code token request")
 
 	// check if client is authorized for grant type
 	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeAuthorizationCode) &&
 		!utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeHybrid) {
 		s.Logger.Error("Client not authorized for code flow")
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, "")
+		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	// validate authorization code
 	code := parameters.Get(gois.TokenRequestCode)
 	if code == "" {
 		s.Logger.Error("Authorization code is missing")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if len(code) > s.Options.InputLengthRestrictions.AuthorizationCode {
 		s.Logger.Error("Authorization code is too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.validatedRequest.AuthorizationCodeHandle = code
 
-	authZcode, err := s.AuthorizationCodeStore.GetAuthorizationCode(code)
-	if err != nil || authZcode == nil {
-		s.Logger.Error("Invalid authorization code", slog.String("code", code))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+	authZcode, err := s.AuthorizationCodeStore.GetAuthorizationCode(ctx, code)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			s.Logger.Error("Invalid authorization code", slog.String("code", code))
+			return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		}
+		s.Logger.Error("Error loading authorization code", slog.String("code", code), slog.String("err", err.Error()))
+		return nil, err
 	}
 
 	// validate client binding
 	if authZcode.ClientId != s.validatedRequest.Client.ClientId {
 		s.Logger.Error("Client is trying to use a code from a different client")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// remove code from store
 	// todo: set to consumed in the future?
-	if err := s.AuthorizationCodeStore.RemoveAuthorizationCode(code); err != nil {
+	if err := s.AuthorizationCodeStore.RemoveAuthorizationCode(ctx, code); err != nil {
 		s.Logger.Error("Error removing authorization code", slog.String("code", code))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if authZcode.CreationTime.Add(time.Duration(authZcode.Lifetime) * time.Second).Before(s.Clock.Now()) {
 		s.Logger.Error("Authorization code expired", slog.String("code", code))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// populate session id
@@ -238,7 +247,7 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(parameters url.
 	// validate code expiration
 	if authZcode.CreationTime.Add(time.Duration(s.validatedRequest.Client.AuthorizationCodeLifetime) * time.Second).Before(s.Clock.Now()) {
 		s.Logger.Error("Authorization code is expired", slog.String("code", code))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.validatedRequest.AuthorizationCode = authZcode
@@ -248,28 +257,29 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(parameters url.
 	redirectUri := parameters.Get(gois.TokenRequestRedirectUri)
 	if redirectUri == "" {
 		s.Logger.Error("Redirect URI is missing")
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, "")
+		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	if redirectUri != s.validatedRequest.AuthorizationCode.RedirectUri {
 		s.Logger.Error("Invalid redirect_uri")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// validate scopes are present
 	if len(s.validatedRequest.AuthorizationCode.RequestedScopes) == 0 {
 		s.Logger.Error("Authorization code has no associated scopes")
-		return s.invalid(gois.TokenErrorsInvalidRequest, "")
+		return s.invalid(gois.TokenErrorsInvalidRequest, ""), nil
 	}
 
 	// resource gap
 	if s.validatedRequest.RequestedResourceGap != "" &&
 		!utils.Contains(s.validatedRequest.AuthorizationCode.RequestedResourceGaps, s.validatedRequest.RequestedResourceGap) {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request.")
+		return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request."), nil
 	}
 
 	// resource and scope validation
 	validatedResources, err := s.ResourceValidator.ValidateRequestedResources(
+		ctx,
 		&validators_models.ResourceValidationRequest{
 			Client:       s.validatedRequest.Client,
 			Scopes:       s.validatedRequest.AuthorizationCode.RequestedScopes,
@@ -280,15 +290,15 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(parameters url.
 	)
 
 	if err != nil {
-		return s.invalid(err, "")
+		return s.invalid(err, ""), nil
 	}
 
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidResourceGaps) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap.")
+			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
 		}
 		if len(validatedResources.InvalidScopes) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope.")
+			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope."), nil
 		}
 	}
 
@@ -301,14 +311,14 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(parameters url.
 
 		proofKeyResult := s.validateAuthorizationCodeWithProofKeyParameters(codeVerifier, s.validatedRequest.AuthorizationCode)
 		if proofKeyResult.Error != nil {
-			return proofKeyResult
+			return proofKeyResult, nil
 		}
 
 		s.validatedRequest.CodeVerifier = codeVerifier
 	} else {
 		if codeVerifier != "" {
 			s.Logger.Error("Unexpected code_verifier: This happens when the client is trying to use PKCE, but it is not enabled. Set RequirePkce to true.", slog.String("codeVerifier", codeVerifier))
-			return s.invalid(gois.TokenErrorsInvalidGrant, "")
+			return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 		}
 	}
 
@@ -318,57 +328,57 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(parameters url.
 	s.Profile.IsActive(isActiveCtx)
 	if !isActiveCtx.IsActive {
 		s.Logger.Error("User has been disabled", slog.String("subjectId", extensions.GetSubjectIdFromPrincipal(s.validatedRequest.AuthorizationCode.Subject)))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.Logger.Debug("Validation of authorization code token request success")
 
-	return s.valid()
+	return s.valid(), nil
 }
 
-func (s *TokenRequestValidator) validateClientCredentialsRequest(parameters url.Values) *models.TokenRequestValidationResult {
+func (s *TokenRequestValidator) validateClientCredentialsRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start client credentials token request validation")
 
 	// check if client is authorized for grant type
 	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeClientCredentials) {
 		s.Logger.Error("Client not authorized for client credentials flow, check the AllowedGrantTypes setting")
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, "")
+		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	// check if client is allowed to request scopes
-	scopeError := s.validateRequestedScopesAndResources(parameters, true, true)
+	scopeError := s.validateRequestedScopesAndResources(ctx, parameters, true, true)
 	if scopeError != nil {
-		return s.invalid(scopeError, "")
+		return s.invalid(scopeError, ""), nil
 	}
 
 	if len(s.validatedRequest.ValidatedResources.Resources.IdentityResources()) > 0 {
 		s.Logger.Error("Client cannot request OpenID scopes in client credentials flow", slog.String("clientId", s.validatedRequest.Client.ClientId))
-		return s.invalid(gois.TokenErrorsInvalidScope, "")
+		return s.invalid(gois.TokenErrorsInvalidScope, ""), nil
 	}
 
 	if s.validatedRequest.ValidatedResources.Resources.OfflineAccess {
 		s.Logger.Error("Client cannot request a refresh token in client credentials flow", slog.String("clientId", s.validatedRequest.Client.ClientId))
-		return s.invalid(gois.TokenErrorsInvalidScope, "")
+		return s.invalid(gois.TokenErrorsInvalidScope, ""), nil
 	}
 
 	s.Logger.Debug("credentials token request validation success", slog.String("clientId", s.validatedRequest.Client.ClientId))
 
-	return s.valid()
+	return s.valid(), nil
 }
 
-func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(parameters url.Values) *models.TokenRequestValidationResult {
+func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start resource owner password token request validation")
 
 	// check if client is authorized for grant type
 	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypePassword) {
 		s.Logger.Error("Client not authorized for resource owner password flow, check the AllowedGrantTypes setting", slog.String("clientId", s.validatedRequest.Client.ClientId))
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, "")
+		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	// check if client is allowed to request scopes
-	scopeError := s.validateRequestedScopesAndResources(parameters, false, false)
+	scopeError := s.validateRequestedScopesAndResources(ctx, parameters, false, false)
 	if scopeError != nil {
-		return s.invalid(scopeError, "")
+		return s.invalid(scopeError, ""), nil
 	}
 
 	// check resource owner credentials
@@ -377,13 +387,13 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(parameter
 
 	if userName == "" {
 		s.Logger.Error("Username is missing")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if len(userName) > s.Options.InputLengthRestrictions.UserName ||
 		len(password) > s.Options.InputLengthRestrictions.Password {
 		s.Logger.Error("Username or password is too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.validatedRequest.UserName = userName
@@ -398,14 +408,14 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(parameter
 
 	if err != nil {
 		s.Logger.Error("User authentication failed", slog.String("error", err.Error()))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if resourceOwnerContext.Result.Error != nil {
 		// protect against bad validator implementations
 		if errors.Is(resourceOwnerContext.Result.Error, gois.TokenErrorsUnsupportedGrantType) {
 			s.Logger.Error("Resource owner password credential grant type not supported")
-			return s.invalid(gois.TokenErrorsUnsupportedGrantType, "")
+			return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
 		}
 
 		desc := "invalid_username_or_password"
@@ -416,12 +426,12 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(parameter
 
 		s.Logger.Info("User authentication failed", slog.String("error", resourceOwnerContext.Result.Error.Error()), slog.String("errorDescription", desc))
 
-		return s.invalid(resourceOwnerContext.Result.Error, desc)
+		return s.invalid(resourceOwnerContext.Result.Error, desc), nil
 	}
 
 	if resourceOwnerContext.Result.Subject == nil {
 		s.Logger.Error("User authentication failed: No principal returned")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// make sure user is enabled
@@ -430,7 +440,7 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(parameter
 
 	if !isActiveCtx.IsActive {
 		s.Logger.Error("User has been disabled", slog.String("subjectId", extensions.GetSubjectIdFromPrincipal(resourceOwnerContext.Result.Subject)))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.validatedRequest.UserName = userName
@@ -438,28 +448,32 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(parameter
 
 	s.Logger.Debug("Resource owner password token request validation success")
 
-	return s.valid()
+	return s.valid(), nil
 }
 
-func (s *TokenRequestValidator) validateRefreshTokenRequest(parameters url.Values) *models.TokenRequestValidationResult {
+func (s *TokenRequestValidator) validateRefreshTokenRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start validation of refresh token validation")
 
 	refreshTokenHandle := parameters.Get(gois.TokenRequestRefreshToken)
 	if refreshTokenHandle == "" {
 		s.Logger.Error("Refresh token is missing")
-		return s.invalid(gois.TokenErrorsInvalidRequest, "")
+		return s.invalid(gois.TokenErrorsInvalidRequest, ""), nil
 	}
 
 	if len(refreshTokenHandle) > s.Options.InputLengthRestrictions.RefreshToken {
 		s.Logger.Error("Refresh token is too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
-	result := s.RefreshTokenService.ValidateRefreshToken(refreshTokenHandle, s.validatedRequest.Client)
+	result := s.RefreshTokenService.ValidateRefreshToken(ctx, refreshTokenHandle, s.validatedRequest.Client)
 
 	if result.Error != nil {
-		s.Logger.Error("Refresh token validation failed. aborting")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		if errors.Is(result.Error, storage.ErrNotFound) {
+			s.Logger.Error("Refresh token validation failed. aborting")
+			return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		}
+		s.Logger.Error("Refresh token validation failed. infrastructure error")
+		return nil, result.Error
 	}
 
 	s.validatedRequest.RefreshToken = result.RefreshToken
@@ -474,7 +488,7 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(parameters url.Value
 		if s.validatedRequest.RequestedResourceGap != "" &&
 			!utils.Contains(s.validatedRequest.RefreshToken.AuthorizedResourceGaps, s.validatedRequest.RequestedResourceGap) {
 			s.Logger.Error("Refresh token validation failed. requested resource gap not authorized")
-			return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request.")
+			return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request."), nil
 		}
 	} else {
 		if strings.TrimSpace(s.validatedRequest.RequestedResourceGap) != "" {
@@ -484,6 +498,7 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(parameters url.Value
 
 	// resource and scope validation
 	validatedResources, err := s.ResourceValidator.ValidateRequestedResources(
+		ctx,
 		&validators_models.ResourceValidationRequest{
 			Client:       s.validatedRequest.Client,
 			Scopes:       s.validatedRequest.RefreshToken.AuthorizedScopes,
@@ -495,15 +510,15 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(parameters url.Value
 
 	if err != nil {
 		s.Logger.Error("Resource validation failed. aborting", slog.String("error", err.Error()))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidResourceGaps) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap.")
+			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
 		}
 		if len(validatedResources.InvalidScopes) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope.")
+			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope."), nil
 		}
 	}
 
@@ -512,34 +527,34 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(parameters url.Value
 	s.Logger.Debug("Validation of refresh token request success")
 	// todo: more logging - similar to TokenValidator before
 
-	return s.valid()
+	return s.valid(), nil
 }
 
-func (s *TokenRequestValidator) validateDeviceCodeRequest(parameters url.Values) *models.TokenRequestValidationResult {
+func (s *TokenRequestValidator) validateDeviceCodeRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start validation of device code request")
 
 	// resource gap not supported for device flow
 	if s.validatedRequest.RequestedResourceGap != "" {
 		s.Logger.Error("Resource indicator not supported for device flow")
-		return s.invalid(gois.TokenErrorsInvalidTarget, "")
+		return s.invalid(gois.TokenErrorsInvalidTarget, ""), nil
 	}
 
 	// check if client is authorized for grant type
 	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeDeviceCode) {
 		s.Logger.Error("Client not authorized for device flow")
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, "")
+		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	// validate device code parameter
 	deviceCode := parameters.Get(gois.TokenRequestDeviceCode)
 	if deviceCode == "" {
 		s.Logger.Error("Device code is missing")
-		return s.invalid(gois.TokenErrorsInvalidRequest, "")
+		return s.invalid(gois.TokenErrorsInvalidRequest, ""), nil
 	}
 
 	if len(deviceCode) > s.Options.InputLengthRestrictions.DeviceCode {
 		s.Logger.Error("Device code is too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// validate device code
@@ -548,18 +563,19 @@ func (s *TokenRequestValidator) validateDeviceCodeRequest(parameters url.Values)
 		Request:    s.validatedRequest,
 	}
 
-	err := s.DeviceCodeValidator.Validate(deviceCodeContext)
+	err := s.DeviceCodeValidator.Validate(ctx, deviceCodeContext)
 	if err != nil {
 		s.Logger.Error("Device code validation failed", slog.String("error", err.Error()))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return nil, err
 	}
 
 	if deviceCodeContext.Result.Error != nil {
-		return deviceCodeContext.Result
+		return deviceCodeContext.Result, nil
 	}
 
 	// scope validation
 	validatedResources, err := s.ResourceValidator.ValidateRequestedResources(
+		ctx,
 		&validators_models.ResourceValidationRequest{
 			Client:       s.validatedRequest.Client,
 			Scopes:       s.validatedRequest.DeviceCode.AuthorizedScopes,
@@ -569,56 +585,57 @@ func (s *TokenRequestValidator) validateDeviceCodeRequest(parameters url.Values)
 
 	if err != nil {
 		s.Logger.Error("Resource validation failed. aborting", slog.String("error", err.Error()))
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidResourceGaps) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap.")
+			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
 		}
 		if len(validatedResources.InvalidScopes) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope.")
+			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope."), nil
 		}
 	}
 
 	s.Logger.Debug("Validation of device code token request success")
 
-	return s.valid()
+	return s.valid(), nil
 }
 
-func (s *TokenRequestValidator) validateBackchannelAuthenticationRequest(parameters url.Values) *models.TokenRequestValidationResult {
+func (s *TokenRequestValidator) validateBackchannelAuthenticationRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start validation of CIBA token request")
 	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeBackchannelAuthentication) {
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, "")
+		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
 	}
 	requestID := parameters.Get(gois.TokenRequestAuthenticationRequestId)
 	if requestID == "" {
-		return s.invalid(gois.TokenErrorsInvalidRequest, "")
+		return s.invalid(gois.TokenErrorsInvalidRequest, ""), nil
 	}
 	if len(requestID) > s.Options.InputLengthRestrictions.AuthenticationRequestId {
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
-	ctx := &validators_models.BackchannelAuthenticationRequestIdValidationContext{
+	validationCtx := &validators_models.BackchannelAuthenticationRequestIdValidationContext{
 		RequestId: requestID,
 		Request:   s.validatedRequest,
 	}
-	if err := s.BackchannelAuthenticationRequestIdValidator.Validate(ctx); err != nil {
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+	if err := s.BackchannelAuthenticationRequestIdValidator.Validate(ctx, validationCtx); err != nil {
+		return nil, err
 	}
-	if ctx.Result == nil {
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+	if validationCtx.Result == nil {
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
-	if ctx.Result.Error != nil {
-		return ctx.Result
+	if validationCtx.Result.Error != nil {
+		return validationCtx.Result, nil
 	}
 	if s.validatedRequest.RequestedResourceGap != "" &&
 		!utils.Contains(s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps, s.validatedRequest.RequestedResourceGap) {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "")
+		return s.invalid(gois.TokenErrorsInvalidTarget, ""), nil
 	}
 	if s.validatedRequest.RequestedResourceGap == "" && len(s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps) == 1 {
 		s.validatedRequest.RequestedResourceGap = s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps[0]
 	}
 	validatedResources, err := s.ResourceValidator.ValidateRequestedResources(
+		ctx,
 		&validators_models.ResourceValidationRequest{
 			Client:       s.validatedRequest.Client,
 			Scopes:       s.validatedRequest.BackchannelAuthenticationRequest.RequestedScopes,
@@ -626,37 +643,37 @@ func (s *TokenRequestValidator) validateBackchannelAuthenticationRequest(paramet
 		},
 	)
 	if err != nil {
-		return s.invalid(err, "")
+		return nil, err
 	}
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidResourceGaps) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidTarget, "")
+			return s.invalid(gois.TokenErrorsInvalidTarget, ""), nil
 		}
-		return s.invalid(gois.TokenErrorsInvalidScope, "")
+		return s.invalid(gois.TokenErrorsInvalidScope, ""), nil
 	}
 	s.validatedRequest.ValidatedResources = validatedResources.FilterByResourceGap(s.validatedRequest.RequestedResourceGap)
-	return s.valid()
+	return s.valid(), nil
 }
 
-func (s *TokenRequestValidator) validateExtensionGrantRequest(parameters url.Values) *models.TokenRequestValidationResult {
+func (s *TokenRequestValidator) validateExtensionGrantRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start validation of custom grant token request")
 
 	// check if client is allowed to use grant type
 	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), s.validatedRequest.GrantType) {
 		s.Logger.Error("Client does not have the custom grant type in the allowed list, therefore requested grant is not allowed", slog.String("clientId", s.validatedRequest.Client.ClientId))
-		return s.invalid(gois.TokenErrorsUnsupportedGrantType, "")
+		return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
 	}
 
 	// check if a validator is registered for the grant type
 	if !utils.Contains(s.ExtensionGrantValidator.GetAvailableGrantTypes(), s.validatedRequest.GrantType) {
 		s.Logger.Error("No validator is registered for the grant type", slog.String("grantType", s.validatedRequest.GrantType))
-		return s.invalid(gois.TokenErrorsUnsupportedGrantType, "")
+		return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
 	}
 
 	// check if client is allowed to request scopes
-	scopesError := s.validateRequestedScopesAndResources(parameters, false, false)
+	scopesError := s.validateRequestedScopesAndResources(ctx, parameters, false, false)
 	if scopesError != nil {
-		return s.invalid(scopesError, "")
+		return s.invalid(scopesError, ""), nil
 	}
 
 	// validate custom grant type
@@ -664,12 +681,12 @@ func (s *TokenRequestValidator) validateExtensionGrantRequest(parameters url.Val
 
 	if result == nil {
 		s.Logger.Error("Invalid extension grant")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if result.Error != nil {
 		s.Logger.Error("Invalid extension grant", slog.String("error", result.Error.Error()))
-		return s.invalid(result.Error, result.Description)
+		return s.invalid(result.Error, result.Description), nil
 	}
 
 	if result.Subject != nil {
@@ -680,7 +697,7 @@ func (s *TokenRequestValidator) validateExtensionGrantRequest(parameters url.Val
 
 		if !isActiveCtx.IsActive {
 			s.Logger.Error("User has been disabled", slog.String("subjectId", extensions.GetSubjectIdFromPrincipal(result.Subject)))
-			return s.invalid(gois.TokenErrorsInvalidGrant, "")
+			return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
 		}
 
 		s.validatedRequest.Subject = result.Subject
@@ -688,12 +705,12 @@ func (s *TokenRequestValidator) validateExtensionGrantRequest(parameters url.Val
 
 	s.Logger.Debug("Validation of extension grant token request success")
 
-	return s.valid()
+	return s.valid(), nil
 }
 
 // todo: do we want to rework the semantics of these ignore params?
 // also seems like other workflows other than CC clients can omit scopes?
-func (s *TokenRequestValidator) validateRequestedScopesAndResources(parameters url.Values, ignoreImplicitIdentityScopes bool, ignoreImplicitOfflineAccess bool) error {
+func (s *TokenRequestValidator) validateRequestedScopesAndResources(ctx context.Context, parameters url.Values, ignoreImplicitIdentityScopes bool, ignoreImplicitOfflineAccess bool) error {
 	scopes := parameters.Get(gois.TokenRequestScope)
 	if scopes == "" {
 		s.Logger.Debug("Client provided no scopes - checking allowed scopes list")
@@ -702,7 +719,7 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(parameters u
 			// this finds all the scopes the client is allowed to access
 			clientAllowedScopes := make([]string, 0)
 			if !ignoreImplicitIdentityScopes {
-				resources, err := s.ResourceStore.FindResourcesByScope(s.validatedRequest.Client.AllowedScopes)
+				resources, err := s.ResourceStore.FindResourcesByScope(ctx, s.validatedRequest.Client.AllowedScopes)
 				if err != nil {
 					return err
 				}
@@ -711,7 +728,7 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(parameters u
 					return utils.Contains(s.validatedRequest.Client.AllowedScopes, x)
 				})...)
 			} else {
-				apiScopes, err := s.ResourceStore.FindApiScopesByName(s.validatedRequest.Client.AllowedScopes)
+				apiScopes, err := s.ResourceStore.FindApiScopesByName(ctx, s.validatedRequest.Client.AllowedScopes)
 				if err != nil {
 					return err
 				}
@@ -750,6 +767,7 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(parameters u
 	}
 
 	resourceValidationResult, err := s.ResourceValidator.ValidateRequestedResources(
+		ctx,
 		&validators_models.ResourceValidationRequest{
 			Client:       s.validatedRequest.Client,
 			Scopes:       requestedScopes,

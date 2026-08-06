@@ -5,6 +5,8 @@
 package mock
 
 import (
+	"context"
+
 	storage_models "github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/validators/models"
 )
@@ -21,14 +23,14 @@ func NewStubTokenValidator() *StubTokenValidator {
 	}
 }
 
-func (v *StubTokenValidator) ValidateAccessToken(token string, expectedScope string) *models.TokenValidationResult {
-	return v.AccessTokenValidationResult
+func (v *StubTokenValidator) ValidateAccessToken(ctx context.Context, token string, expectedScope string) (*models.TokenValidationResult, error) {
+	return v.AccessTokenValidationResult, nil
 }
 
-func (v *StubTokenValidator) ValidateIdentityToken(token string, clientId string, validateLifetime bool) *models.TokenValidationResult {
-	return v.IdentityTokenValidationResult
+func (v *StubTokenValidator) ValidateIdentityToken(ctx context.Context, token string, clientId string, validateLifetime bool) (*models.TokenValidationResult, error) {
+	return v.IdentityTokenValidationResult, nil
 }
 
-func (v *StubTokenValidator) ValidateRefreshToken(token string, client *storage_models.Client) *models.TokenValidationResult {
+func (v *StubTokenValidator) ValidateRefreshToken(ctx context.Context, token string, client *storage_models.Client) *models.TokenValidationResult {
 	return nil
 }

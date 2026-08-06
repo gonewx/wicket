@@ -5,7 +5,9 @@
 package di
 
 import (
+	"context"
 	"sync"
+	"time"
 
 	"github.com/gonewx/wicket/storage"
 	storage_memory "github.com/gonewx/wicket/storage/memory"
@@ -28,24 +30,28 @@ func (s *lazyPersistedGrantStore) store() storage.PersistedGrantStore {
 	return s.impl
 }
 
-func (s *lazyPersistedGrantStore) Store(grant *storage_models.PersistedGrant) error {
-	return s.store().Store(grant)
+func (s *lazyPersistedGrantStore) Store(ctx context.Context, grant *storage_models.PersistedGrant) error {
+	return s.store().Store(ctx, grant)
 }
 
-func (s *lazyPersistedGrantStore) Get(key string) (*storage_models.PersistedGrant, error) {
-	return s.store().Get(key)
+func (s *lazyPersistedGrantStore) Get(ctx context.Context, key string) (*storage_models.PersistedGrant, error) {
+	return s.store().Get(ctx, key)
 }
 
-func (s *lazyPersistedGrantStore) GetAll(filter *storage.PersistedGrantFilter) ([]*storage_models.PersistedGrant, error) {
-	return s.store().GetAll(filter)
+func (s *lazyPersistedGrantStore) GetAll(ctx context.Context, filter *storage.PersistedGrantFilter) ([]*storage_models.PersistedGrant, error) {
+	return s.store().GetAll(ctx, filter)
 }
 
-func (s *lazyPersistedGrantStore) Remove(key string) error {
-	return s.store().Remove(key)
+func (s *lazyPersistedGrantStore) Remove(ctx context.Context, key string) error {
+	return s.store().Remove(ctx, key)
 }
 
-func (s *lazyPersistedGrantStore) RemoveAll(filter *storage.PersistedGrantFilter) error {
-	return s.store().RemoveAll(filter)
+func (s *lazyPersistedGrantStore) RemoveAll(ctx context.Context, filter *storage.PersistedGrantFilter) error {
+	return s.store().RemoveAll(ctx, filter)
+}
+
+func (s *lazyPersistedGrantStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	return s.store().RemoveExpired(ctx, cutoff)
 }
 
 type lazyDeviceFlowStore struct {
@@ -64,24 +70,28 @@ func (s *lazyDeviceFlowStore) store() storage.DeviceFlowStore {
 	return s.impl
 }
 
-func (s *lazyDeviceFlowStore) StoreDeviceAuthorization(deviceCode string, userCode string, data *storage_models.DeviceCode) error {
-	return s.store().StoreDeviceAuthorization(deviceCode, userCode, data)
+func (s *lazyDeviceFlowStore) StoreDeviceAuthorization(ctx context.Context, deviceCode string, userCode string, data *storage_models.DeviceCode) error {
+	return s.store().StoreDeviceAuthorization(ctx, deviceCode, userCode, data)
 }
 
-func (s *lazyDeviceFlowStore) FindByUserCode(userCode string) (*storage_models.DeviceCode, error) {
-	return s.store().FindByUserCode(userCode)
+func (s *lazyDeviceFlowStore) FindByUserCode(ctx context.Context, userCode string) (*storage_models.DeviceCode, error) {
+	return s.store().FindByUserCode(ctx, userCode)
 }
 
-func (s *lazyDeviceFlowStore) FindByDeviceCode(deviceCode string) (*storage_models.DeviceCode, error) {
-	return s.store().FindByDeviceCode(deviceCode)
+func (s *lazyDeviceFlowStore) FindByDeviceCode(ctx context.Context, deviceCode string) (*storage_models.DeviceCode, error) {
+	return s.store().FindByDeviceCode(ctx, deviceCode)
 }
 
-func (s *lazyDeviceFlowStore) UpdateByUserCode(userCode string, data *storage_models.DeviceCode) error {
-	return s.store().UpdateByUserCode(userCode, data)
+func (s *lazyDeviceFlowStore) UpdateByUserCode(ctx context.Context, userCode string, data *storage_models.DeviceCode) error {
+	return s.store().UpdateByUserCode(ctx, userCode, data)
 }
 
-func (s *lazyDeviceFlowStore) RemoveByDeviceCode(deviceCode string) error {
-	return s.store().RemoveByDeviceCode(deviceCode)
+func (s *lazyDeviceFlowStore) RemoveByDeviceCode(ctx context.Context, deviceCode string) error {
+	return s.store().RemoveByDeviceCode(ctx, deviceCode)
+}
+
+func (s *lazyDeviceFlowStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	return s.store().RemoveExpired(ctx, cutoff)
 }
 
 type lazyBackchannelAuthenticationRequestStore struct {
@@ -100,18 +110,22 @@ func (s *lazyBackchannelAuthenticationRequestStore) store() storage.BackchannelA
 	return s.impl
 }
 
-func (s *lazyBackchannelAuthenticationRequestStore) StoreBackchannelAuthenticationRequest(requestID string, data *storage_models.BackchannelAuthenticationRequest) error {
-	return s.store().StoreBackchannelAuthenticationRequest(requestID, data)
+func (s *lazyBackchannelAuthenticationRequestStore) StoreBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *storage_models.BackchannelAuthenticationRequest) error {
+	return s.store().StoreBackchannelAuthenticationRequest(ctx, requestID, data)
 }
 
-func (s *lazyBackchannelAuthenticationRequestStore) FindBackchannelAuthenticationRequest(requestID string) (*storage_models.BackchannelAuthenticationRequest, error) {
-	return s.store().FindBackchannelAuthenticationRequest(requestID)
+func (s *lazyBackchannelAuthenticationRequestStore) FindBackchannelAuthenticationRequest(ctx context.Context, requestID string) (*storage_models.BackchannelAuthenticationRequest, error) {
+	return s.store().FindBackchannelAuthenticationRequest(ctx, requestID)
 }
 
-func (s *lazyBackchannelAuthenticationRequestStore) UpdateBackchannelAuthenticationRequest(requestID string, data *storage_models.BackchannelAuthenticationRequest) error {
-	return s.store().UpdateBackchannelAuthenticationRequest(requestID, data)
+func (s *lazyBackchannelAuthenticationRequestStore) UpdateBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *storage_models.BackchannelAuthenticationRequest) error {
+	return s.store().UpdateBackchannelAuthenticationRequest(ctx, requestID, data)
 }
 
-func (s *lazyBackchannelAuthenticationRequestStore) RemoveBackchannelAuthenticationRequest(requestID string) error {
-	return s.store().RemoveBackchannelAuthenticationRequest(requestID)
+func (s *lazyBackchannelAuthenticationRequestStore) RemoveBackchannelAuthenticationRequest(ctx context.Context, requestID string) error {
+	return s.store().RemoveBackchannelAuthenticationRequest(ctx, requestID)
+}
+
+func (s *lazyBackchannelAuthenticationRequestStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	return s.store().RemoveExpired(ctx, cutoff)
 }

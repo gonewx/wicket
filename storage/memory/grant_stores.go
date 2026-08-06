@@ -4,7 +4,9 @@
 package memory
 
 import (
+	"context"
 	"sync"
+	"time"
 
 	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/storage/models"
@@ -20,20 +22,24 @@ func NewMemoryPersistedGrantStore() *MemoryPersistedGrantStore {
 	return &MemoryPersistedGrantStore{grants: map[string]*models.PersistedGrant{}}
 }
 
-func (s *MemoryPersistedGrantStore) Store(grant *models.PersistedGrant) error {
+func (s *MemoryPersistedGrantStore) Store(ctx context.Context, grant *models.PersistedGrant) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.grants[grant.Key] = grant
 	return nil
 }
 
-func (s *MemoryPersistedGrantStore) Get(key string) (*models.PersistedGrant, error) {
+func (s *MemoryPersistedGrantStore) Get(ctx context.Context, key string) (*models.PersistedGrant, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.grants[key], nil
+	grant, ok := s.grants[key]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return grant, nil
 }
 
-func (s *MemoryPersistedGrantStore) GetAll(filter *storage.PersistedGrantFilter) ([]*models.PersistedGrant, error) {
+func (s *MemoryPersistedGrantStore) GetAll(ctx context.Context, filter *storage.PersistedGrantFilter) ([]*models.PersistedGrant, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := make([]*models.PersistedGrant, 0)
@@ -45,14 +51,14 @@ func (s *MemoryPersistedGrantStore) GetAll(filter *storage.PersistedGrantFilter)
 	return out, nil
 }
 
-func (s *MemoryPersistedGrantStore) Remove(key string) error {
+func (s *MemoryPersistedGrantStore) Remove(ctx context.Context, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.grants, key)
 	return nil
 }
 
-func (s *MemoryPersistedGrantStore) RemoveAll(filter *storage.PersistedGrantFilter) error {
+func (s *MemoryPersistedGrantStore) RemoveAll(ctx context.Context, filter *storage.PersistedGrantFilter) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for key, grant := range s.grants {
@@ -61,6 +67,19 @@ func (s *MemoryPersistedGrantStore) RemoveAll(filter *storage.PersistedGrantFilt
 		}
 	}
 	return nil
+}
+
+func (s *MemoryPersistedGrantStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for key, grant := range s.grants {
+		if grant.Expiration != nil && grant.Expiration.Before(cutoff) {
+			delete(s.grants, key)
+			count++
+		}
+	}
+	return count, nil
 }
 
 func grantMatches(filter *storage.PersistedGrantFilter, grant *models.PersistedGrant) bool {
@@ -103,7 +122,7 @@ func NewMemoryDeviceFlowStore() *MemoryDeviceFlowStore {
 	}
 }
 
-func (s *MemoryDeviceFlowStore) StoreDeviceAuthorization(deviceCode string, userCode string, data *models.DeviceCode) error {
+func (s *MemoryDeviceFlowStore) StoreDeviceAuthorization(ctx context.Context, deviceCode string, userCode string, data *models.DeviceCode) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.byUserCode[userCode] = data
@@ -112,26 +131,34 @@ func (s *MemoryDeviceFlowStore) StoreDeviceAuthorization(deviceCode string, user
 	return nil
 }
 
-func (s *MemoryDeviceFlowStore) FindByUserCode(userCode string) (*models.DeviceCode, error) {
+func (s *MemoryDeviceFlowStore) FindByUserCode(ctx context.Context, userCode string) (*models.DeviceCode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.byUserCode[userCode], nil
+	data, ok := s.byUserCode[userCode]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return data, nil
 }
 
-func (s *MemoryDeviceFlowStore) FindByDeviceCode(deviceCode string) (*models.DeviceCode, error) {
+func (s *MemoryDeviceFlowStore) FindByDeviceCode(ctx context.Context, deviceCode string) (*models.DeviceCode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.byDeviceCode[deviceCode], nil
+	data, ok := s.byDeviceCode[deviceCode]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return data, nil
 }
 
-func (s *MemoryDeviceFlowStore) UpdateByUserCode(userCode string, data *models.DeviceCode) error {
+func (s *MemoryDeviceFlowStore) UpdateByUserCode(ctx context.Context, userCode string, data *models.DeviceCode) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.byUserCode[userCode] = data
 	return nil
 }
 
-func (s *MemoryDeviceFlowStore) RemoveByDeviceCode(deviceCode string) error {
+func (s *MemoryDeviceFlowStore) RemoveByDeviceCode(ctx context.Context, deviceCode string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	userCode := s.userByDevice[deviceCode]
@@ -139,6 +166,22 @@ func (s *MemoryDeviceFlowStore) RemoveByDeviceCode(deviceCode string) error {
 	delete(s.userByDevice, deviceCode)
 	delete(s.byUserCode, userCode)
 	return nil
+}
+
+func (s *MemoryDeviceFlowStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for deviceCode, userCode := range s.userByDevice {
+		data := s.byDeviceCode[deviceCode]
+		if data == nil || data.CreationTime.Add(time.Duration(data.Lifetime)*time.Second).Before(cutoff) {
+			delete(s.byDeviceCode, deviceCode)
+			delete(s.userByDevice, deviceCode)
+			delete(s.byUserCode, userCode)
+			count++
+		}
+	}
+	return count, nil
 }
 
 type MemoryBackchannelAuthenticationRequestStore struct {
@@ -150,29 +193,46 @@ func NewMemoryBackchannelAuthenticationRequestStore() *MemoryBackchannelAuthenti
 	return &MemoryBackchannelAuthenticationRequestStore{requests: map[string]*models.BackchannelAuthenticationRequest{}}
 }
 
-func (s *MemoryBackchannelAuthenticationRequestStore) StoreBackchannelAuthenticationRequest(requestID string, data *models.BackchannelAuthenticationRequest) error {
+func (s *MemoryBackchannelAuthenticationRequestStore) StoreBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *models.BackchannelAuthenticationRequest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requests[requestID] = data
 	return nil
 }
 
-func (s *MemoryBackchannelAuthenticationRequestStore) FindBackchannelAuthenticationRequest(requestID string) (*models.BackchannelAuthenticationRequest, error) {
+func (s *MemoryBackchannelAuthenticationRequestStore) FindBackchannelAuthenticationRequest(ctx context.Context, requestID string) (*models.BackchannelAuthenticationRequest, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.requests[requestID], nil
+	data, ok := s.requests[requestID]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return data, nil
 }
 
-func (s *MemoryBackchannelAuthenticationRequestStore) UpdateBackchannelAuthenticationRequest(requestID string, data *models.BackchannelAuthenticationRequest) error {
+func (s *MemoryBackchannelAuthenticationRequestStore) UpdateBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *models.BackchannelAuthenticationRequest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requests[requestID] = data
 	return nil
 }
 
-func (s *MemoryBackchannelAuthenticationRequestStore) RemoveBackchannelAuthenticationRequest(requestID string) error {
+func (s *MemoryBackchannelAuthenticationRequestStore) RemoveBackchannelAuthenticationRequest(ctx context.Context, requestID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.requests, requestID)
 	return nil
+}
+
+func (s *MemoryBackchannelAuthenticationRequestStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for requestID, request := range s.requests {
+		if !request.ExpirationTime.IsZero() && request.ExpirationTime.Before(cutoff) {
+			delete(s.requests, requestID)
+			count++
+		}
+	}
+	return count, nil
 }

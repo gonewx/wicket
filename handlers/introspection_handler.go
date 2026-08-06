@@ -55,7 +55,7 @@ func (h *IntrospectionHandler) Process(w http.ResponseWriter, r *http.Request) e
 		return results.NewStatusCodeResult(http.StatusUnauthorized).Execute(w, r)
 	}
 
-	validationResult, err := h.requestValidator.Validate(r.Form, apiResult.Resource)
+	validationResult, err := h.requestValidator.Validate(r.Context(), r.Form, apiResult.Resource)
 	if err != nil {
 		return fmt.Errorf("validate introspection request: %w", err)
 	}
@@ -63,5 +63,5 @@ func (h *IntrospectionHandler) Process(w http.ResponseWriter, r *http.Request) e
 		return results.NewBadRequestResult(validationResult.Error, validationResult.Description).Execute(w, r)
 	}
 
-	return results.NewIntrospectionResult(h.generator.Handle(validationResult)).Execute(w, r)
+	return results.NewIntrospectionResult(h.generator.Handle(r.Context(), validationResult)).Execute(w, r)
 }

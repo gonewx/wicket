@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -20,12 +21,12 @@ func TestValid_IdentityToken_DefaultKeyType(t *testing.T) {
 
 	creator := createDefaultTokenCreator(nil)
 	token := createIdentityToken("roclient", "valid")
-	jwt, err := creator.CreateToken(token)
+	jwt, err := creator.CreateToken(context.Background(), token)
 	r.NoError(err)
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateIdentityToken(jwt, "roclient", true)
+	result, _ := validator.ValidateIdentityToken(context.Background(), jwt, "roclient", true)
 
 	r.NoError(result.Error)
 }
@@ -35,12 +36,12 @@ func TestValid_IdentityToken_DefaultKeyType_no_ClientId_supplied(t *testing.T) {
 
 	creator := createDefaultTokenCreator(nil)
 	token := createIdentityToken("roclient", "valid")
-	jwt, err := creator.CreateToken(token)
+	jwt, err := creator.CreateToken(context.Background(), token)
 	r.NoError(err)
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateIdentityToken(jwt, "roclient", true)
+	result, _ := validator.ValidateIdentityToken(context.Background(), jwt, "roclient", true)
 
 	r.NoError(result.Error)
 }
@@ -50,12 +51,12 @@ func TestValid_IdentityToken_no_ClientId_supplied(t *testing.T) {
 
 	creator := createDefaultTokenCreator(nil)
 	token := createIdentityToken("roclient", "valid")
-	jwt, err := creator.CreateToken(token)
+	jwt, err := creator.CreateToken(context.Background(), token)
 	r.NoError(err)
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateIdentityToken(jwt, "", true)
+	result, _ := validator.ValidateIdentityToken(context.Background(), jwt, "", true)
 
 	r.NoError(result.Error)
 }
@@ -65,12 +66,12 @@ func TestIdentityToken_InvalidClientId(t *testing.T) {
 
 	creator := createDefaultTokenCreator(nil)
 	token := createIdentityToken("roclient", "valid")
-	jwt, err := creator.CreateToken(token)
+	jwt, err := creator.CreateToken(context.Background(), token)
 	r.NoError(err)
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateIdentityToken(jwt, "invalid", true)
+	result, _ := validator.ValidateIdentityToken(context.Background(), jwt, "invalid", true)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
@@ -81,12 +82,12 @@ func TestIdentityToken_Too_Long(t *testing.T) {
 
 	creator := createDefaultTokenCreator(nil)
 	token := createIdentityTokenLong("roclient", "valid", 1000)
-	jwt, err := creator.CreateToken(token)
+	jwt, err := creator.CreateToken(context.Background(), token)
 	r.NoError(err)
 
 	validator := createTokenValidator()
 
-	result := validator.ValidateIdentityToken(jwt, "roclient", true)
+	result, _ := validator.ValidateIdentityToken(context.Background(), jwt, "roclient", true)
 
 	r.Error(result.Error)
 	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
@@ -103,7 +104,7 @@ func TestClaims_that_collide_with_token_validation_should_be_ignored(t *testing.
 	))
 
 	// this should not throw
-	jwtString, err := creator.CreateToken(id_token)
+	jwtString, err := creator.CreateToken(context.Background(), id_token)
 	r.NoError(err)
 
 	// check that the custom aud was ignored

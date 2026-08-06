@@ -4,6 +4,7 @@
 package validators
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 
@@ -22,7 +23,7 @@ type ClientConfigurationValidator interface {
 // ResourceValidator validates requested scopes and resource gaps.
 // input: resource validation request -> behavior: resolve allowed resources -> output: validation result or error.
 type ResourceValidator interface {
-	ValidateRequestedResources(*validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error)
+	ValidateRequestedResources(ctx context.Context, request *validators_models.ResourceValidationRequest) (*validators_models.ResourceValidationResult, error)
 }
 
 // ResourceOwnerPasswordValidator validates resource-owner credentials.
@@ -53,19 +54,19 @@ type CustomTokenValidator interface {
 // BackchannelAuthenticationRequestIdValidator validates CIBA auth_req_id state for token polling.
 // input: validation context -> behavior: mutate result/store state -> output: error.
 type BackchannelAuthenticationRequestIdValidator interface {
-	Validate(*validators_models.BackchannelAuthenticationRequestIdValidationContext) error
+	Validate(ctx context.Context, validation *validators_models.BackchannelAuthenticationRequestIdValidationContext) error
 }
 
 // BackchannelAuthenticationUserValidator resolves a CIBA user hint into a subject.
 // input: validation context -> behavior: set subject or error -> output: error.
 type BackchannelAuthenticationUserValidator interface {
-	Validate(*validators_models.BackchannelAuthenticationUserValidationContext) error
+	Validate(ctx context.Context, validation *validators_models.BackchannelAuthenticationUserValidationContext) error
 }
 
 // BackchannelAuthenticationRequestValidator validates a CIBA backchannel authentication request.
 // input: raw form values/client -> behavior: save request state -> output: validation result.
 type BackchannelAuthenticationRequestValidator interface {
-	Validate(url.Values, *storage_models.Client) *validators_models.BackchannelAuthenticationRequestValidationResult
+	Validate(ctx context.Context, parameters url.Values, client *storage_models.Client) *validators_models.BackchannelAuthenticationRequestValidationResult
 }
 
 // SecretsListParser selects a parsed secret from an HTTP request.

@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"testing"
@@ -21,7 +22,7 @@ type fakeSigningStore struct {
 	err        error
 }
 
-func (s fakeSigningStore) GetSigningCredentials() (*tokens.SigningCredentials, error) {
+func (s fakeSigningStore) GetSigningCredentials(ctx context.Context) (*tokens.SigningCredentials, error) {
 	return s.credential, s.err
 }
 
@@ -30,7 +31,7 @@ type fakeValidationStore struct {
 	err  error
 }
 
-func (s fakeValidationStore) GetValidationKeys() ([]*core_models.SecurityKeyInfo, error) {
+func (s fakeValidationStore) GetValidationKeys(ctx context.Context) ([]*core_models.SecurityKeyInfo, error) {
 	return s.keys, s.err
 }
 
@@ -144,7 +145,7 @@ func TestKeyMaterialServiceHostSelection(t *testing.T) {
 	)
 
 	// Empty request: no config limit in host mode, tiebreak by public id ascending.
-	credential, err := svc.GetSigningCredentials(nil)
+	credential, err := svc.GetSigningCredentials(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("select: %v", err)
 	}
@@ -153,7 +154,7 @@ func TestKeyMaterialServiceHostSelection(t *testing.T) {
 	}
 
 	// Restrict to ES256: only the ES256 host credential qualifies.
-	credential, err = svc.GetSigningCredentials([]string{"ES256"})
+	credential, err = svc.GetSigningCredentials(context.Background(), []string{"ES256"})
 	if err != nil {
 		t.Fatalf("select ES256: %v", err)
 	}
@@ -162,7 +163,7 @@ func TestKeyMaterialServiceHostSelection(t *testing.T) {
 	}
 
 	// Request an algorithm no host store offers: explicit error.
-	if _, err := svc.GetSigningCredentials([]string{"ES512"}); err == nil {
+	if _, err := svc.GetSigningCredentials(context.Background(), []string{"ES512"}); err == nil {
 		t.Fatal("expected error for unavailable algorithm")
 	}
 }
@@ -178,7 +179,7 @@ func TestKeyMaterialServiceAutoManagerSelection(t *testing.T) {
 		nil, manager, nil,
 	)
 
-	credential, err := svc.GetSigningCredentials(nil)
+	credential, err := svc.GetSigningCredentials(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("select: %v", err)
 	}
@@ -190,7 +191,7 @@ func TestKeyMaterialServiceAutoManagerSelection(t *testing.T) {
 	}
 
 	// The manager's allowed set intersected with a disjoint request is empty.
-	if _, err := svc.GetSigningCredentials([]string{"RS256"}); err == nil {
+	if _, err := svc.GetSigningCredentials(context.Background(), []string{"RS256"}); err == nil {
 		t.Fatal("expected empty-intersection error against the manager allowed set")
 	}
 }
@@ -204,7 +205,7 @@ func TestKeyMaterialServiceValidationErrorIsolation(t *testing.T) {
 		fakeValidationStore{keys: []*core_models.SecurityKeyInfo{good}},
 	}, nil, nil)
 
-	keys, err := svc.GetValidationKeys()
+	keys, err := svc.GetValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("aggregate: %v", err)
 	}
@@ -222,7 +223,7 @@ func TestKeyMaterialServiceValidationDeduplicatesKeyId(t *testing.T) {
 		fakeValidationStore{keys: []*core_models.SecurityKeyInfo{dup}},
 	}, nil, nil)
 
-	keys, err := svc.GetValidationKeys()
+	keys, err := svc.GetValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("aggregate: %v", err)
 	}
@@ -238,7 +239,7 @@ func TestKeyMaterialServiceValidationFailsClosedWhenNothingSurvives(t *testing.T
 		fakeValidationStore{err: errors.New("store down")},
 	}, nil, nil)
 
-	if _, err := svc.GetValidationKeys(); err == nil {
+	if _, err := svc.GetValidationKeys(context.Background()); err == nil {
 		t.Fatal("expected fail-closed error when every source errored")
 	}
 }

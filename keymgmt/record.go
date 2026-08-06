@@ -9,6 +9,7 @@
 package keymgmt
 
 import (
+	"context"
 	"errors"
 	"time"
 )
@@ -89,21 +90,23 @@ type Entropy interface {
 }
 
 // RecordStore persists key records with an optimistic-concurrency marker so
-// concurrent instances can rotate without producing duplicate keys.
+// concurrent instances can rotate without producing duplicate keys. Key
+// retirement is driven by the manager's core-side reconciliation, so the store
+// carries no reclamation method.
 type RecordStore interface {
 	// List returns independent copies of all records.
-	List() ([]*Record, error)
+	List(ctx context.Context) ([]*Record, error)
 	// Get returns an independent copy of the record with the given handle, or
 	// ErrRecordNotFound.
-	Get(handle string) (*Record, error)
+	Get(ctx context.Context, handle string) (*Record, error)
 	// Create inserts a new record. It fails with ErrDuplicateKey if the handle or
 	// a non-retired public id already exists.
-	Create(record *Record) error
+	Create(ctx context.Context, record *Record) error
 	// Update writes record only when expectedVersion matches the stored version,
 	// then increments the stored version. A mismatch returns ErrVersionConflict.
-	Update(record *Record, expectedVersion uint64) error
+	Update(ctx context.Context, record *Record, expectedVersion uint64) error
 	// Delete removes the record with the given handle.
-	Delete(handle string) error
+	Delete(ctx context.Context, handle string) error
 }
 
 var (

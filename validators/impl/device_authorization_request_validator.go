@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/url"
@@ -39,7 +40,7 @@ func NewDeviceAuthorizationRequestValidator(
 }
 
 // Validates the request.
-func (v *DeviceAuthorizationRequestValidator) ValidateRequest(parameters url.Values, clientValidationResult *models.ClientSecretValidationResult) *models.DeviceAuthorizationRequestValidationResult {
+func (v *DeviceAuthorizationRequestValidator) ValidateRequest(ctx context.Context, parameters url.Values, clientValidationResult *models.ClientSecretValidationResult) *models.DeviceAuthorizationRequestValidationResult {
 	v.Logger.Debug("Start device authorization request validation")
 
 	request := models.NewValidatedDeviceAuthorizationRequest()
@@ -51,7 +52,7 @@ func (v *DeviceAuthorizationRequestValidator) ValidateRequest(parameters url.Val
 		return clientResult
 	}
 
-	scopeResult := v.validateScope(request)
+	scopeResult := v.validateScope(ctx, request)
 	if scopeResult.Error != nil {
 		return scopeResult
 	}
@@ -84,7 +85,7 @@ func (v *DeviceAuthorizationRequestValidator) validateClient(request *models.Val
 	return v.valid(request)
 }
 
-func (v *DeviceAuthorizationRequestValidator) validateScope(request *models.ValidatedDeviceAuthorizationRequest) *models.DeviceAuthorizationRequestValidationResult {
+func (v *DeviceAuthorizationRequestValidator) validateScope(ctx context.Context, request *models.ValidatedDeviceAuthorizationRequest) *models.DeviceAuthorizationRequestValidationResult {
 	// scope must be present
 	scope := request.Raw.Get(gois.AuthorizeRequestScope)
 	if scope == "" {
@@ -117,6 +118,7 @@ func (v *DeviceAuthorizationRequestValidator) validateScope(request *models.Vali
 
 	// check if scopes are valid/supported
 	validatedResources, err := v.ResourceValidator.ValidateRequestedResources(
+		ctx,
 		&validators_models.ResourceValidationRequest{
 			Client: request.Client,
 			Scopes: request.RequestedScopes,

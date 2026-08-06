@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"crypto/rand"
 	"testing"
 	"time"
@@ -55,7 +56,7 @@ func TestCreateTokenHeaderKidResolvesThroughValidationKeys(t *testing.T) {
 		},
 	}
 
-	signed, err := creator.CreateToken(token)
+	signed, err := creator.CreateToken(context.Background(), token)
 	if err != nil {
 		t.Fatalf("create token: %v", err)
 	}
@@ -73,7 +74,7 @@ func TestCreateTokenHeaderKidResolvesThroughValidationKeys(t *testing.T) {
 	// That kid is present in the published validation key set, and building the
 	// key set the way the validation side does (re-deriving the RFC 7638 key id)
 	// yields a set that verifies the signature.
-	validationKeys, err := keys.GetValidationKeys()
+	validationKeys, err := keys.GetValidationKeys(context.Background())
 	if err != nil {
 		t.Fatalf("validation keys: %v", err)
 	}

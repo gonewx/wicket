@@ -4,15 +4,19 @@
 
 package services
 
-import "github.com/gonewx/wicket/models/contexts"
+import (
+	"context"
+
+	"github.com/gonewx/wicket/models/contexts"
+)
 
 // LogoutNotificationService Provides features for OIDC signout notifications.
 type LogoutNotificationService interface {
 	/// Builds the URLs needed for front-channel logout notification.
-	GetFrontChannelLogoutNotificationsUrls(ctx *contexts.LogoutNotificationContext) ([]string, error)
+	GetFrontChannelLogoutNotificationsUrls(ctx context.Context, notification *contexts.LogoutNotificationContext) ([]string, error)
 
 	/// Builds the http back-channel logout request data for the collection of clients.
-	GetBackchannelLogoutNotifications(ctx *contexts.LogoutNotificationContext) ([]*BackchannelLogoutRequest, error)
+	GetBackchannelLogoutNotifications(ctx context.Context, notification *contexts.LogoutNotificationContext) ([]*BackchannelLogoutRequest, error)
 }
 
 // BackchannelLogoutRequest Information necessary to make a back-channel logout request to a client.
@@ -20,7 +24,7 @@ type BackchannelLogoutRequest struct {
 	/// Gets or sets the client identifier.
 	ClientId string
 
-	/// Gets the subject identifier.
+	/// Gets or sets the subject identifier.
 	SubjectId string
 
 	/// Gets or sets the session identifier.

@@ -157,7 +157,7 @@ func (p *WicketPipeline) readLoginRequest(r *http.Request, w http.ResponseWriter
 	interaction := p.createInteractionService(r)
 	// p.LoginReturnUrl = r.Header.Get(p.Options.UserInteraction.LoginReturnUrlParameter)
 	p.LoginReturnUrl = r.URL.Query().Get(p.Options.UserInteraction.LoginReturnUrlParameter)
-	p.LoginRequest, err = interaction.GetAuthorizationContext(p.LoginReturnUrl)
+	p.LoginRequest, err = interaction.GetAuthorizationContext(r.Context(), p.LoginReturnUrl)
 	if err != nil {
 		panic(err)
 	}
@@ -224,7 +224,7 @@ func (p *WicketPipeline) readLogoutRequest(r *http.Request, w http.ResponseWrite
 	var err error
 
 	interaction := p.createInteractionService(r)
-	p.LogoutRequest, err = interaction.GetLogoutContext(r.URL.Query().Get("logoutId"))
+	p.LogoutRequest, err = interaction.GetLogoutContext(r.Context(), r.URL.Query().Get("logoutId"))
 	if err != nil {
 		panic(err)
 	}
@@ -243,7 +243,7 @@ func (p *WicketPipeline) readConsentRequest(r *http.Request, w http.ResponseWrit
 	var err error
 
 	interaction := p.createInteractionService(r)
-	p.ConsentRequest, err = interaction.GetAuthorizationContext(r.URL.Query().Get("returnUrl"))
+	p.ConsentRequest, err = interaction.GetAuthorizationContext(r.Context(), r.URL.Query().Get("returnUrl"))
 	if err != nil {
 		panic(err)
 	}
@@ -255,7 +255,7 @@ func (p *WicketPipeline) createConsentResponse(r *http.Request, w http.ResponseW
 	}
 
 	interaction := p.createInteractionService(r)
-	err := interaction.GrantConsent(p.ConsentRequest, p.ConsentResponse, "")
+	err := interaction.GrantConsent(r.Context(), p.ConsentRequest, p.ConsentResponse, "")
 	if err != nil {
 		panic(err)
 	}
@@ -276,7 +276,7 @@ func (p *WicketPipeline) onCustom() http.HandlerFunc {
 
 		var err error
 		interaction := p.createInteractionService(r)
-		p.CustomRequest, err = interaction.GetAuthorizationContext(r.URL.Query().Get(p.Options.UserInteraction.ConsentReturnUrlParameter))
+		p.CustomRequest, err = interaction.GetAuthorizationContext(r.Context(), r.URL.Query().Get(p.Options.UserInteraction.ConsentReturnUrlParameter))
 		if err != nil {
 			panic(err)
 		}
@@ -297,7 +297,7 @@ func (p *WicketPipeline) readErrorMessage(r *http.Request, w http.ResponseWriter
 	var err error
 	interaction := p.createInteractionService(r)
 
-	p.ErrorMessage, err = interaction.GetErrorContext(r.URL.Query().Get("errorId"))
+	p.ErrorMessage, err = interaction.GetErrorContext(r.Context(), r.URL.Query().Get("errorId"))
 	if err != nil {
 		panic(err)
 	}

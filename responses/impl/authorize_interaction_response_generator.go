@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -35,8 +36,8 @@ type AuthorizeInteractionResponseGenerator struct {
 	// loginHandler and consentHandler are the substitutable stages Handle composes.
 	// They default to this generator's own methods; a caller may replace either to
 	// contribute a custom interaction result, which Handle then classifies.
-	loginHandler   func(*validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse
-	consentHandler func(*validators_models.ValidatedAuthorizeRequest, *messages.ConsentResponse) *responses_models.InteractionResponse
+	loginHandler   func(context.Context, *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse
+	consentHandler func(context.Context, *validators_models.ValidatedAuthorizeRequest, *messages.ConsentResponse) *responses_models.InteractionResponse
 }
 
 func NewAuthorizeInteractionResponseGenerator(
@@ -64,8 +65,8 @@ func NewAuthorizeInteractionResponseGenerator(
 
 // Handle composes the login and consent stages. Under prompt=none any interaction
 // the stages would demand is turned into the matching standard error instead.
-func (g *AuthorizeInteractionResponseGenerator) Handle(req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
-	login := g.loginHandler(req)
+func (g *AuthorizeInteractionResponseGenerator) Handle(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
+	login := g.loginHandler(ctx, req)
 	if promptNone(req) {
 		if login.IsRedirect() {
 			return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsInteractionRequired}
@@ -78,7 +79,7 @@ func (g *AuthorizeInteractionResponseGenerator) Handle(req *validators_models.Va
 		return login
 	}
 
-	result := g.consentHandler(req, consent)
+	result := g.consentHandler(ctx, req, consent)
 	if promptNone(req) && result.IsConsent {
 		return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsConsentRequired}
 	}
@@ -88,7 +89,7 @@ func (g *AuthorizeInteractionResponseGenerator) Handle(req *validators_models.Va
 // HandleLogin reports whether the request still needs an interactive login. The
 // prompt and unauthenticated checks come first, before any client field is read,
 // because those requests may carry no client.
-func (g *AuthorizeInteractionResponseGenerator) HandleLogin(req *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse {
+func (g *AuthorizeInteractionResponseGenerator) HandleLogin(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse {
 	// an explicit login/select_account prompt forces re-authentication; the prompt
 	// is suppressed so the follow-up request does not trigger it again.
 	if utils.Contains(req.PromptModes, gois.PromptModesLogin) || utils.Contains(req.PromptModes, gois.PromptModesSelectAccount) {
@@ -142,7 +143,7 @@ func (g *AuthorizeInteractionResponseGenerator) HandleLogin(req *validators_mode
 
 // HandleConsent decides whether the request needs a consent interaction and, once
 // the user has answered, whether the grant is acceptable.
-func (g *AuthorizeInteractionResponseGenerator) HandleConsent(req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
+func (g *AuthorizeInteractionResponseGenerator) HandleConsent(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
 	if req == nil {
 		return &responses_models.InteractionResponse{Error: gois.ArgumentNullException}
 	}

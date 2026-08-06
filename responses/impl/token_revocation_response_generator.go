@@ -5,6 +5,8 @@
 package impl
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/gonewx/wicket"
@@ -33,7 +35,7 @@ func NewTokenRevocationResponseGenerator(
 }
 
 // Handle Creates the revocation endpoint response and processes the revocation request.
-func (g *TokenRevocationResponseGenerator) Handle(validationResult *validators_models.TokenRevocationRequestValidationResult) (*responses_models.TokenRevocationResponse, error) {
+func (g *TokenRevocationResponseGenerator) Handle(ctx context.Context, validationResult *validators_models.TokenRevocationRequestValidationResult) (*responses_models.TokenRevocationResponse, error) {
 	response := &responses_models.TokenRevocationResponse{
 		Success:   true,
 		TokenType: validationResult.TokenTypeHint,
@@ -43,7 +45,7 @@ func (g *TokenRevocationResponseGenerator) Handle(validationResult *validators_m
 	// revoke tokens
 	if validationResult.TokenTypeHint == gois.TokenTypeHintsAccessToken {
 		g.logger.Debug("Hint was for access token")
-		response.Success, err = g.revokeAccessToken(validationResult)
+		response.Success, err = g.revokeAccessToken(ctx, validationResult)
 		if err != nil {
 			return nil, err
 		}
@@ -51,19 +53,19 @@ func (g *TokenRevocationResponseGenerator) Handle(validationResult *validators_m
 		if validationResult.TokenTypeHint == gois.TokenTypeHintsRefreshToken {
 			g.logger.Debug("Hint was for refresh token")
 
-			response.Success, err = g.revokeRefreshToken(validationResult)
+			response.Success, err = g.revokeRefreshToken(ctx, validationResult)
 			if err != nil {
 				return nil, err
 			}
 		} else {
 			g.logger.Debug("No hint for token type")
-			response.Success, err = g.revokeAccessToken(validationResult)
+			response.Success, err = g.revokeAccessToken(ctx, validationResult)
 			if err != nil {
 				return nil, err
 			}
 
 			if !response.Success {
-				response.Success, err = g.revokeRefreshToken(validationResult)
+				response.Success, err = g.revokeRefreshToken(ctx, validationResult)
 				if err != nil {
 					return nil, err
 				}
@@ -77,16 +79,22 @@ func (g *TokenRevocationResponseGenerator) Handle(validationResult *validators_m
 	return response, nil
 }
 
-func (g *TokenRevocationResponseGenerator) revokeAccessToken(validationResult *validators_models.TokenRevocationRequestValidationResult) (bool, error) {
-	token, err := g.referenceTokenStore.GetReferenceToken(validationResult.Token)
-
-	if err != nil || token == nil {
+func (g *TokenRevocationResponseGenerator) revokeAccessToken(ctx context.Context, validationResult *validators_models.TokenRevocationRequestValidationResult) (bool, error) {
+	token, err := g.referenceTokenStore.GetReferenceToken(ctx, validationResult.Token)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// Nothing to revoke: RFC 7009 revocations are idempotent.
+			return true, nil
+		}
 		return false, err
+	}
+	if token == nil {
+		return true, nil
 	}
 
 	if token.ClientId == validationResult.Client.ClientId {
 		g.logger.Debug("Access token revoked")
-		if err := g.referenceTokenStore.RemoveReferenceToken(validationResult.Token); err != nil {
+		if err := g.referenceTokenStore.RemoveReferenceToken(ctx, validationResult.Token); err != nil {
 			return false, err
 		}
 	} else {
@@ -97,19 +105,25 @@ func (g *TokenRevocationResponseGenerator) revokeAccessToken(validationResult *v
 }
 
 // revokeRefreshToken Revoke refresh token only if it belongs to client doing the request
-func (g *TokenRevocationResponseGenerator) revokeRefreshToken(validationResult *validators_models.TokenRevocationRequestValidationResult) (bool, error) {
-	token, err := g.refreshTokenStore.GetRefreshToken(validationResult.Token)
-
-	if err != nil || token == nil {
+func (g *TokenRevocationResponseGenerator) revokeRefreshToken(ctx context.Context, validationResult *validators_models.TokenRevocationRequestValidationResult) (bool, error) {
+	token, err := g.refreshTokenStore.GetRefreshToken(ctx, validationResult.Token)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// Nothing to revoke: RFC 7009 revocations are idempotent.
+			return true, nil
+		}
 		return false, err
+	}
+	if token == nil {
+		return true, nil
 	}
 
 	if token.ClientId == validationResult.Client.ClientId {
 		g.logger.Debug("Refresh token revoked")
-		if err := g.refreshTokenStore.RemoveRefreshToken(validationResult.Token); err != nil {
+		if err := g.refreshTokenStore.RemoveRefreshToken(ctx, validationResult.Token); err != nil {
 			return false, err
 		}
-		if err := g.referenceTokenStore.RemoveReferenceTokens(token.SubjectId(), token.ClientId); err != nil {
+		if err := g.referenceTokenStore.RemoveReferenceTokens(ctx, token.SubjectId(), token.ClientId); err != nil {
 			return false, err
 		}
 	} else {

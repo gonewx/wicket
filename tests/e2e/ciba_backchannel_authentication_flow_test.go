@@ -4,6 +4,7 @@
 package e2e_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -73,7 +74,7 @@ func TestCIBABackchannelAuthenticationPollRequestE2E(t *testing.T) {
 		t.Fatalf("interval = %#v, want 7", body["interval"])
 	}
 
-	stored, err := fixture.requests.FindBackchannelAuthenticationRequest(authReqID)
+	stored, err := fixture.requests.FindBackchannelAuthenticationRequest(context.Background(), authReqID)
 	if err != nil {
 		t.Fatalf("find stored auth request: %v", err)
 	}

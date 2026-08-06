@@ -4,6 +4,7 @@
 package impl
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strings"
@@ -108,7 +109,7 @@ func TestTokenRequestValidationRefreshTokenInvalid(t *testing.T) {
 			t.Parallel()
 
 			f := newTokenGrantFixture(t, tt.options...)
-			result := f.validator.ValidateRequest(tt.parameters(t, f), grantTestSecretResult(t, tt.clientId))
+			result, _ := f.validator.ValidateRequest(context.Background(), tt.parameters(t, f), grantTestSecretResult(t, tt.clientId))
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}
@@ -144,7 +145,7 @@ func TestTokenRequestValidationRefreshTokenValid(t *testing.T) {
 				gois.TokenRequestRefreshToken: {handle},
 			}
 
-			result := f.validator.ValidateRequest(parameters, grantTestSecretResult(t, tt.clientId))
+			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
 			if result.Error != nil {
 				t.Fatalf("unexpected error: %v (description %q)", result.Error, result.Description)
 			}

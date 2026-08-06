@@ -5,6 +5,7 @@
 package impl
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -54,7 +55,7 @@ func NewEndSessionRequestValidator(
 }
 
 // Validates end session endpoint requests.
-func (v *EndSessionRequestValidator) Validate(parameters url.Values, subject *claims.ClaimsPrincipal) (*validators_models.EndSessionValidationResult, error) {
+func (v *EndSessionRequestValidator) Validate(ctx context.Context, parameters url.Values, subject *claims.ClaimsPrincipal) (*validators_models.EndSessionValidationResult, error) {
 	v.logger.Debug("Start validating end session request.")
 
 	// TODO: 是否可优化？ golang 对 interface 参数判断是否为空的，需要明确赋 nil
@@ -80,7 +81,10 @@ func (v *EndSessionRequestValidator) Validate(parameters url.Values, subject *cl
 
 	if idTokenHint != "" {
 		// validate id_token - no need to validate token life time
-		tokenValidationResult := v.TokenValidator.ValidateIdentityToken(idTokenHint, "", false)
+		tokenValidationResult, err := v.TokenValidator.ValidateIdentityToken(ctx, idTokenHint, "", false)
+		if err != nil {
+			return nil, err
+		}
 
 		validatedRequest.SetClient(tokenValidationResult.Client, nil, "")
 
@@ -146,18 +150,18 @@ func (v *EndSessionRequestValidator) Validate(parameters url.Values, subject *cl
 }
 
 // Validates requests from logout page iframe to trigger single signout.
-func (v *EndSessionRequestValidator) ValidateCallback(parameters url.Values) (*validators_models.EndSessionCallbackValidationResult, error) {
+func (v *EndSessionRequestValidator) ValidateCallback(ctx context.Context, parameters url.Values) (*validators_models.EndSessionCallbackValidationResult, error) {
 	result := models.NewEndSessionCallbackValidationResult()
 
 	endSessionId := parameters.Get(gois.UIConstantsDefaultRoutePathParamsEndSessionCallback)
-	endSessionMessage, err := v.EndSessionMessageStore.Read(endSessionId)
+	endSessionMessage, err := v.EndSessionMessageStore.Read(ctx, endSessionId)
 
 	if err != nil || endSessionMessage == nil || endSessionMessage.Data == nil || len(endSessionMessage.Data.ClientIds) == 0 {
 		result.Error = fmt.Errorf("Failed to read end session callback message")
 		return result, nil
 	}
 
-	result.FrontChannelLogoutUrls, err = v.LogoutNotificationService.GetFrontChannelLogoutNotificationsUrls(endSessionMessage.Data)
+	result.FrontChannelLogoutUrls, err = v.LogoutNotificationService.GetFrontChannelLogoutNotificationsUrls(ctx, endSessionMessage.Data)
 	if err != nil {
 		result.Error = fmt.Errorf("Failed to get front channel logout urls")
 	}

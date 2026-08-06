@@ -54,7 +54,7 @@ func (v *ClientSecretValidator) Validate(req *http.Request) *models.ClientSecret
 	}
 
 	// load client
-	client, err := extensions.FindEnabledClientById(v.clients, parsedSecret.Id)
+	client, err := extensions.FindEnabledClientById(req.Context(), v.clients, parsedSecret.Id)
 	if err != nil || client == nil {
 		v.logger.Error("No client with id '{clientId}' found. aborting", slog.String("clientId", parsedSecret.Id))
 		return fail

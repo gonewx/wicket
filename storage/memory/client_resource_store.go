@@ -4,8 +4,10 @@
 package memory
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/utils"
 )
@@ -31,8 +33,12 @@ func NewMemoryClientStore(clients []*models.Client) (*MemoryClientStore, error) 
 	return store, nil
 }
 
-func (s *MemoryClientStore) FindClientById(id string) (*models.Client, error) {
-	return s.clients[id], nil
+func (s *MemoryClientStore) FindClientById(ctx context.Context, id string) (*models.Client, error) {
+	client, ok := s.clients[id]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return client, nil
 }
 
 type MemoryResourcesStore struct {
@@ -49,7 +55,7 @@ func NewMemoryResourcesStore(identityResources []*models.IdentityResource, apiRe
 	}, nil
 }
 
-func (s *MemoryResourcesStore) GetAllEnabledResources() (*models.Resources, error) {
+func (s *MemoryResourcesStore) GetAllEnabledResources(ctx context.Context) (*models.Resources, error) {
 	return models.NewResources(
 		models.WithResourcesIdentityResources(utils.Where(s.identityResources, func(x *models.IdentityResource) bool { return x.Enabled })),
 		models.WithResourcesApiResources(utils.Where(s.apiResources, func(x *models.ApiResource) bool { return x.Enabled })),
@@ -57,9 +63,9 @@ func (s *MemoryResourcesStore) GetAllEnabledResources() (*models.Resources, erro
 	), nil
 }
 
-func (s *MemoryResourcesStore) FindResourcesByScope(scopes []string) (*models.Resources, error) {
-	identity, _ := s.FindIdentityResourcesByScope(scopes)
-	apiScopes, _ := s.FindApiScopesByName(scopes)
+func (s *MemoryResourcesStore) FindResourcesByScope(ctx context.Context, scopes []string) (*models.Resources, error) {
+	identity, _ := s.FindIdentityResourcesByScope(ctx, scopes)
+	apiScopes, _ := s.FindApiScopesByName(ctx, scopes)
 	apiScopeNames := utils.Select(apiScopes, func(scope *models.ApiScope) string { return scope.Name })
 	apiResources := utils.Where(s.apiResources, func(resource *models.ApiResource) bool {
 		return resource != nil && utils.AnyPred(resource.Scopes, func(scope string) bool {
@@ -73,19 +79,19 @@ func (s *MemoryResourcesStore) FindResourcesByScope(scopes []string) (*models.Re
 	), nil
 }
 
-func (s *MemoryResourcesStore) FindApiResourcesByName(names []string) ([]*models.ApiResource, error) {
+func (s *MemoryResourcesStore) FindApiResourcesByName(ctx context.Context, names []string) ([]*models.ApiResource, error) {
 	return utils.Where(s.apiResources, func(resource *models.ApiResource) bool {
 		return resource != nil && utils.Contains(names, resource.Name)
 	}), nil
 }
 
-func (s *MemoryResourcesStore) FindApiScopesByName(names []string) ([]*models.ApiScope, error) {
+func (s *MemoryResourcesStore) FindApiScopesByName(ctx context.Context, names []string) ([]*models.ApiScope, error) {
 	return utils.Where(s.apiScopes, func(scope *models.ApiScope) bool {
 		return scope != nil && utils.Contains(names, scope.Name)
 	}), nil
 }
 
-func (s *MemoryResourcesStore) FindIdentityResourcesByScope(scopes []string) ([]*models.IdentityResource, error) {
+func (s *MemoryResourcesStore) FindIdentityResourcesByScope(ctx context.Context, scopes []string) ([]*models.IdentityResource, error) {
 	return utils.Where(s.identityResources, func(resource *models.IdentityResource) bool {
 		return resource != nil && utils.Contains(scopes, resource.Name)
 	}), nil
