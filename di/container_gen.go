@@ -612,7 +612,7 @@ func (r *Root) NewAuthorizeInteractionResponseGenerator() responses.AuthorizeInt
 }
 
 func (r *Root) NewAuthorizeResponseGenerator() responses.AuthorizeResponseGenerator {
-	return impl3.NewAuthorizeResponseGenerator(r.f_Ptr_WicketOptions, r.f_SystemClock, r.NewTokenService(), r.NewKeyMaterialService(), r.f_AuthorizationCodeStore, r.f_Ptr_Logger)
+	return impl3.NewAuthorizeResponseGenerator(r.f_Ptr_WicketOptions, r.f_SystemClock, r.NewTokenService(), r.NewKeyMaterialService(), r.f_AuthorizationCodeStore, r.NewHandleGenerationService(), r.f_Ptr_Logger)
 }
 
 func (r *Root) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGenerator {
@@ -808,7 +808,7 @@ func (r *Root) NewClaimsService() services.ClaimsService {
 }
 
 func (r *Root) NewRefreshTokenService() services.RefreshTokenService {
-	return impl.NewRefreshTokenService(r.f_RefreshTokenStore)
+	return impl.NewRefreshTokenService(r.f_RefreshTokenStore, r.NewHandleGenerationService())
 }
 
 func (r *Root) NewDeviceFlowCodeService() services.DeviceFlowCodeService {
@@ -3517,7 +3517,7 @@ func (s *scope) NewAuthorizeInteractionResponseGenerator() responses.AuthorizeIn
 }
 
 func (s *scope) NewAuthorizeResponseGenerator() responses.AuthorizeResponseGenerator {
-	return impl3.NewAuthorizeResponseGenerator(s.root.f_Ptr_WicketOptions, s.root.f_SystemClock, s.NewTokenService(), s.NewKeyMaterialService(), s.root.f_AuthorizationCodeStore, s.root.f_Ptr_Logger)
+	return impl3.NewAuthorizeResponseGenerator(s.root.f_Ptr_WicketOptions, s.root.f_SystemClock, s.NewTokenService(), s.NewKeyMaterialService(), s.root.f_AuthorizationCodeStore, s.NewHandleGenerationService(), s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewDiscoveryResponseGenerator() responses.DiscoveryResponseGenerator {
@@ -3713,7 +3713,7 @@ func (s *scope) NewClaimsService() services.ClaimsService {
 }
 
 func (s *scope) NewRefreshTokenService() services.RefreshTokenService {
-	return impl.NewRefreshTokenService(s.root.f_RefreshTokenStore)
+	return impl.NewRefreshTokenService(s.root.f_RefreshTokenStore, s.NewHandleGenerationService())
 }
 
 func (s *scope) NewDeviceFlowCodeService() services.DeviceFlowCodeService {
