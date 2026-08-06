@@ -57,7 +57,8 @@ func TestValid_token_should_successfully_validate(t *testing.T) {
 		),
 	}
 
-	handle, err := ti.referenceTokenStore.StoreReferenceToken(context.Background(), token)
+	handle := "introspect-token"
+	err := ti.referenceTokenStore.StoreReferenceToken(context.Background(), handle, token)
 	a.NoError(err)
 
 	param := url.Values{}

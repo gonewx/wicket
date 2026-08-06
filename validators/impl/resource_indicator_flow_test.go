@@ -114,8 +114,8 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.RedirectUri = "https://client.example.com/callback"
 				code.RequestedScopes = []string{"orders.read"}
 				code.RequestedResourceGaps = []string{resourceOrders}
-				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
-				if err != nil {
+				handle := "resource-code"
+				if err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 					t.Fatalf("store code: %v", err)
 				}
 				return url.Values{
@@ -138,8 +138,8 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.RedirectUri = "https://client.example.com/callback"
 				code.RequestedScopes = []string{"orders.read", "common.read", gois.StandardScopesOfflineAccess}
 				code.RequestedResourceGaps = []string{resourceOrders}
-				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
-				if err != nil {
+				handle := "resource-code"
+				if err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 					t.Fatalf("store code: %v", err)
 				}
 				return url.Values{
@@ -160,8 +160,8 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.RedirectUri = "https://client.example.com/callback"
 				code.RequestedScopes = []string{"orders.read"}
 				code.RequestedResourceGaps = []string{resourceOrders}
-				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
-				if err != nil {
+				handle := "resource-code"
+				if err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 					t.Fatalf("store code: %v", err)
 				}
 				return url.Values{
@@ -181,8 +181,8 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.Lifetime = 300
 				code.RedirectUri = "https://client.example.com/callback"
 				code.RequestedScopes = []string{"orders.read"}
-				handle, err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
-				if err != nil {
+				handle := "resource-code"
+				if err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 					t.Fatalf("store code: %v", err)
 				}
 				return url.Values{
@@ -229,8 +229,8 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				refresh := storage_models.NewRefreshToken()
 				refresh.AuthorizedScopes = []string{"orders.read", "payments.read"}
 				refresh.AuthorizedResourceGaps = []string{resourceOrders, resourcePayments}
-				handle, err := ctx.refreshTokens.StoreRefreshToken(context.Background(), refresh)
-				if err != nil {
+				handle := "resource-refresh"
+				if err := ctx.refreshTokens.StoreRefreshToken(context.Background(), handle, refresh); err != nil {
 					t.Fatalf("store refresh token: %v", err)
 				}
 				return url.Values{
@@ -249,8 +249,8 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				refresh := storage_models.NewRefreshToken()
 				refresh.AuthorizedScopes = []string{"orders.read"}
 				refresh.AuthorizedResourceGaps = []string{}
-				handle, err := ctx.refreshTokens.StoreRefreshToken(context.Background(), refresh)
-				if err != nil {
+				handle := "resource-refresh"
+				if err := ctx.refreshTokens.StoreRefreshToken(context.Background(), handle, refresh); err != nil {
 					t.Fatalf("store refresh token: %v", err)
 				}
 				return url.Values{
@@ -463,7 +463,7 @@ func newResourceTokenValidatorContext(t *testing.T) *resourceTokenValidatorConte
 	authorizationCodes := storage_impl.NewAuthorizationCodeStore()
 	refreshTokens := storage_impl.NewRefreshTokenStore()
 	backchannelRequests := memory.NewMemoryBackchannelAuthenticationRequestStore()
-	refreshService := services_impl.NewRefreshTokenService(refreshTokens)
+	refreshService := services_impl.NewRefreshTokenService(refreshTokens, services_impl.NewHandleGenerationService())
 
 	return &resourceTokenValidatorContext{
 		client:              client,

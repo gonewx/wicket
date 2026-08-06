@@ -62,7 +62,8 @@ func TestValid_Reference_Token(t *testing.T) {
 
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-	handle, err := store.StoreReferenceToken(context.Background(), token)
+	handle := "ref-token"
+	err := store.StoreReferenceToken(context.Background(), handle, token)
 	r.NoError(err)
 
 	result, err := validator.ValidateAccessToken(context.Background(), handle, "")
@@ -93,7 +94,8 @@ func TestValid_Reference_Token_with_required_Scope(t *testing.T) {
 
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-	handle, err := store.StoreReferenceToken(context.Background(), token)
+	handle := "ref-token"
+	err := store.StoreReferenceToken(context.Background(), handle, token)
 	r.NoError(err)
 
 	result, err := validator.ValidateAccessToken(context.Background(), handle, "read")
@@ -113,7 +115,8 @@ func TestValid_Reference_Token_with_missing_Scope(t *testing.T) {
 
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-	handle, err := store.StoreReferenceToken(context.Background(), token)
+	handle := "ref-token"
+	err := store.StoreReferenceToken(context.Background(), handle, token)
 	r.NoError(err)
 
 	result, err := validator.ValidateAccessToken(context.Background(), handle, "missing")
@@ -168,7 +171,8 @@ func TestExpired_Reference_Token(t *testing.T) {
 	token := createAccessToken(client, "valid", 2, []string{"read", "write"})
 	token.CreationTime = now
 
-	handle, err := store.StoreReferenceToken(context.Background(), token)
+	handle := "ref-token"
+	err := store.StoreReferenceToken(context.Background(), handle, token)
 	r.NoError(err)
 
 	now = now.Add(3 * time.Second)
@@ -313,7 +317,8 @@ func TestValid_AccessToken_but_Client_not_active(t *testing.T) {
 
 	token := createAccessToken(client, "valid", 600, []string{"read", "write"})
 
-	handle, err := store.StoreReferenceToken(context.Background(), token)
+	handle := "ref-token"
+	err := store.StoreReferenceToken(context.Background(), handle, token)
 	r.NoError(err)
 
 	result, err := validator.ValidateAccessToken(context.Background(), handle, "")

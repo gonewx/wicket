@@ -170,8 +170,8 @@ func validateCodeExchange(t *testing.T, authorizeResources []string, tokenResour
 	code.RedirectUri = client.RedirectUris[0]
 	code.RequestedScopes = []string{"orders.read"}
 	code.RequestedResourceGaps = authorizeResources
-	handle, err := codeStore.StoreAuthorizationCode(context.Background(), code)
-	if err != nil {
+	handle := "resource-code"
+	if err := codeStore.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 		t.Fatalf("store code: %v", err)
 	}
 	values := url.Values{
@@ -199,8 +199,8 @@ func validateRefreshExchange(t *testing.T, authorizedResources []string, tokenRe
 	refresh := storage_models.NewRefreshToken()
 	refresh.AuthorizedScopes = []string{"orders.read", "payments.read"}
 	refresh.AuthorizedResourceGaps = authorizedResources
-	handle, err := refreshStore.StoreRefreshToken(context.Background(), refresh)
-	if err != nil {
+	handle := "resource-refresh"
+	if err := refreshStore.StoreRefreshToken(context.Background(), handle, refresh); err != nil {
 		t.Fatalf("store refresh token: %v", err)
 	}
 	values := url.Values{
@@ -237,7 +237,7 @@ func tokenValidator(
 		validators_impl.NewCustomTokenRequestValidator(),
 		validators_impl.NewResourceValidator(resourceStore, validators_impl.NewScopeParser(), slog.Default()),
 		resourceStore,
-		services_impl.NewRefreshTokenService(refreshStore),
+		services_impl.NewRefreshTokenService(refreshStore, services_impl.NewHandleGenerationService()),
 		validators_impl.NewNotSupportedResourceOwnerPasswordValidator(slog.Default()),
 		services_impl.NewProfileService(slog.Default()),
 		nil,

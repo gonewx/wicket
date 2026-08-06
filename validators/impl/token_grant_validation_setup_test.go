@@ -135,7 +135,7 @@ func newTokenGrantFixture(t *testing.T, opts ...tokenGrantOption) *tokenGrantFix
 		NewCustomTokenRequestValidator(),
 		cfg.resourceValidator,
 		resourceStore,
-		services_impl.NewRefreshTokenService(refreshTokens),
+		services_impl.NewRefreshTokenService(refreshTokens, services_impl.NewHandleGenerationService()),
 		cfg.resourceOwner,
 		cfg.profile,
 		cfg.deviceCodes,
@@ -240,8 +240,8 @@ func (v *fixedResultResourceValidator) ValidateRequestedResources(ctx context.Co
 func storeGrantTestAuthorizationCode(t *testing.T, f *tokenGrantFixture, code *storage_models.AuthorizationCode) string {
 	t.Helper()
 
-	handle, err := f.authorizationCodes.StoreAuthorizationCode(context.Background(), code)
-	if err != nil {
+	handle := "grant-code"
+	if err := f.authorizationCodes.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 		t.Fatalf("store authorization code: %v", err)
 	}
 	return handle
@@ -265,8 +265,8 @@ func newGrantTestAuthorizationCode(clientId string, now time.Time) *storage_mode
 func storeGrantTestRefreshToken(t *testing.T, f *tokenGrantFixture, token *storage_models.RefreshToken) string {
 	t.Helper()
 
-	handle, err := f.refreshTokens.StoreRefreshToken(context.Background(), token)
-	if err != nil {
+	handle := "grant-refresh"
+	if err := f.refreshTokens.StoreRefreshToken(context.Background(), handle, token); err != nil {
 		t.Fatalf("store refresh token: %v", err)
 	}
 	return handle
@@ -291,8 +291,8 @@ func newGrantTestRefreshToken(clientId string, now time.Time) *storage_models.Re
 // disguised as invalid_grant.
 type failingAuthorizationCodeStore struct{}
 
-func (failingAuthorizationCodeStore) StoreAuthorizationCode(context.Context, *storage_models.AuthorizationCode) (string, error) {
-	return "", errors.New("store unavailable")
+func (failingAuthorizationCodeStore) StoreAuthorizationCode(context.Context, string, *storage_models.AuthorizationCode) error {
+	return errors.New("store unavailable")
 }
 func (failingAuthorizationCodeStore) GetAuthorizationCode(context.Context, string) (*storage_models.AuthorizationCode, error) {
 	return nil, errors.New("store unavailable")
@@ -328,7 +328,7 @@ func TestAuthorizationCodeInfrastructureFailureSurfacesAsError(t *testing.T) {
 		NewCustomTokenRequestValidator(),
 		NewResourceValidator(resourceStore, NewScopeParser(), logger),
 		resourceStore,
-		services_impl.NewRefreshTokenService(nil),
+		services_impl.NewRefreshTokenService(nil, services_impl.NewHandleGenerationService()),
 		validators_mock.NewTestResourceOwnerPasswordValidator(nil, ""),
 		validators_mock.NewTestProfileService(true),
 		validators_mock.NewTestDeviceCodeValidator(false),
