@@ -7,6 +7,7 @@ package impl
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -206,6 +207,9 @@ func (g *TokenResponseGenerator) handleRefreshTokenRequest(ctx context.Context, 
 		},
 	)
 	if err != nil {
+		if errors.Is(err, storage.ErrVersionConflict) {
+			return nil, fmt.Errorf("%w: %w", gois.TokenErrorsInvalidGrant, err)
+		}
 		return nil, err
 	}
 

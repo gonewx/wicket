@@ -30,6 +30,7 @@ type AuthorizeResponseGenerator struct {
 	TokenService           services.TokenService
 	KeyMaterialService     services.KeyMaterialService
 	AuthorizationCodeStore storage.AuthorizationCodeStore
+	handles                services.HandleGenerationService
 }
 
 func NewAuthorizeResponseGenerator(
@@ -38,6 +39,7 @@ func NewAuthorizeResponseGenerator(
 	tokenService services.TokenService,
 	keyMaterialService services.KeyMaterialService,
 	authorizationCodeStore storage.AuthorizationCodeStore,
+	handles services.HandleGenerationService,
 	logger *slog.Logger,
 ) *AuthorizeResponseGenerator {
 	return &AuthorizeResponseGenerator{
@@ -46,6 +48,7 @@ func NewAuthorizeResponseGenerator(
 		TokenService:           tokenService,
 		KeyMaterialService:     keyMaterialService,
 		AuthorizationCodeStore: authorizationCodeStore,
+		handles:                handles,
 		logger:                 logger,
 	}
 }
@@ -73,17 +76,20 @@ func (g *AuthorizeResponseGenerator) createHybridFlow(ctx context.Context, req *
 		return nil, err
 	}
 
-	id, err := g.AuthorizationCodeStore.StoreAuthorizationCode(ctx, code)
+	handle, err := g.handles.Generate()
+	if err != nil {
+		return nil, err
+	}
+	if err := g.AuthorizationCodeStore.StoreAuthorizationCode(ctx, handle, code); err != nil {
+		return nil, err
+	}
+
+	resposne, err := g.createImplicitFlow(ctx, req, handle)
 	if err != nil {
 		return nil, err
 	}
 
-	resposne, err := g.createImplicitFlow(ctx, req, id)
-	if err != nil {
-		return nil, err
-	}
-
-	resposne.Code = id
+	resposne.Code = handle
 
 	return resposne, nil
 }
@@ -97,14 +103,17 @@ func (g *AuthorizeResponseGenerator) createCodeFlow(ctx context.Context, req *va
 		return nil, err
 	}
 
-	id, err := g.AuthorizationCodeStore.StoreAuthorizationCode(ctx, code)
+	handle, err := g.handles.Generate()
 	if err != nil {
+		return nil, err
+	}
+	if err := g.AuthorizationCodeStore.StoreAuthorizationCode(ctx, handle, code); err != nil {
 		return nil, err
 	}
 
 	response := resp_models.NewAuthorizeResponse()
 	response.Request = req
-	response.Code = id
+	response.Code = handle
 	if req != nil {
 		response.Issuer = req.IssuerName
 		response.SessionState = req.GenerateSessionStateValue()
