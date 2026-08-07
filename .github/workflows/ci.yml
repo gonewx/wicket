@@ -55,6 +55,7 @@ jobs:
         working-directory: wicket
         run: go build ./...
 
+      # tests/e2e 依赖本仓外的私有证据档案（见上），在本地执行，CI 排除。
       - name: Run all tests
         working-directory: wicket
-        run: go test ./...
+        run: go test $(go list ./... | grep -v '/tests/e2e')
