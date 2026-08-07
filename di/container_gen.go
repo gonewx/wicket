@@ -1253,6 +1253,24 @@ func (r *Root) UserSession() services.UserSession { return r.f_UserSession }
 
 func (r *Root) Service() *core.Service { return r.f_Service }
 
+func (r *Root) Get[T any]() (T, bool) {
+	v := r.GetService(reflect.TypeFor[T]())
+	if v == nil {
+		var zero T
+		return zero, false
+	}
+	t, ok := v.(T)
+	return t, ok
+}
+
+func (r *Root) GetRequired[T any]() T {
+	if v, ok := r.Get[T](); ok {
+		return v
+	}
+	godi.GetRequiredPanic[T]()
+	panic("unreachable")
+}
+
 // GetService dispatches by reflect.Type (Tier B, AD-13) — no reflective construction.
 func (r *Root) GetService(t reflect.Type) any {
 	if r.closed {
@@ -4195,3 +4213,21 @@ func (s *scope) HandlerProvider() auth.HandlerProvider { return s.f_HandlerProvi
 func (s *scope) UserSession() services.UserSession { return s.f_UserSession }
 
 func (s *scope) Service() *core.Service { return s.f_Service }
+
+func (s *scope) Get[T any]() (T, bool) {
+	v := s.GetService(reflect.TypeFor[T]())
+	if v == nil {
+		var zero T
+		return zero, false
+	}
+	t, ok := v.(T)
+	return t, ok
+}
+
+func (s *scope) GetRequired[T any]() T {
+	if v, ok := s.Get[T](); ok {
+		return v
+	}
+	godi.GetRequiredPanic[T]()
+	panic("unreachable")
+}
