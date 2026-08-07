@@ -60,12 +60,12 @@ GitHub Actions（`.github/workflows/ci.yml`）在每次 push 与 pull request �
 | 工具链 | mise 安装 `mise.toml` pin 的版本（当前 `go = "1.27rc1"`），不使用运行器自带 Go |
 | 漂移门禁 | `go generate ./...` 后 `git status --porcelain` 必须为空 |
 | 构建 | `go build ./...` |
-| 全量测试 | `go test ./...` |
-| 血缘门禁 | `go test ./tests/e2e/...`（整包，含溯源、命名卫生与协议回归） |
+| 全量测试 | `go test ./...`（排除 `tests/e2e` 包，见下） |
+| 血缘门禁 | `go test ./tests/e2e/...`（整包，含溯源、命名卫生与协议回归）——**本地发布窗口执行，不参与 CI** |
 
-**证据仓兄弟布局：** `tests/e2e` 的溯源类测试要求私有证据仓检出为本仓的兄弟目录（名称约定见 `tests/e2e/source_provenance_ledger_test.go` 的 `evidenceRepositoryRoot`；需要完整 git 历史，非 shallow），找不到即失败、无降级。CI 经仓库 secret `WICKET_EVIDENCE_TOKEN`（只读）检出证据仓；secret 未就位时 CI 直接红，不得合并。
+**证据仓兄弟布局：** `tests/e2e` 的溯源类测试要求私有证据仓检出为本仓的兄弟目录（名称约定见 `tests/e2e/source_provenance_ledger_test.go` 的 `evidenceRepositoryRoot`；需要完整 git 历史，非 shallow），找不到即失败、无降级。**该证据仓凭据与历史均不进入 CI**：CI 不检出证据仓、也不运行 `tests/e2e` 包（`go test` 命令显式排除整包）；血缘门禁在本地发布窗口（如发版前）执行，CI 侧仅保留编译级覆盖（`go vet ./tests/e2e/...`）以捕获包内 API 漂移导致的编译断裂。
 
-**CI 与本地门禁的关系：** CI 为干净检出，不受本地工具态目录影响；本地主工作树可能含工具态伪影（例如 `.rnix/` 下的缓存文件），个别命名规范类测试的跳过目录集较窄，可能据此误伤。本地需要全量验证时，用 `git worktree add` 建干净 worktree、在兄弟位置放置证据仓后复跑上述命令。
+**CI 与本地门禁的关系：** CI 为干净检出，不受本地工具态目录影响；本地主工作树可能含工具态伪影（例如 `.rnix/` 下的缓存文件），个别命名规范类测试的跳过目录集较窄，可能据此误伤。本地需要全量验证时，用 `git worktree add` 建干净 worktree、在兄弟位置放置证据仓后复跑上述命令（含 `go test ./tests/e2e/...` 血缘门禁）。
 
 ## 开发工作流
 

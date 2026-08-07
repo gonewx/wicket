@@ -1,5 +1,6 @@
-# CI 承载：构建门禁（生成物漂移检查 + 构建）、全量测试、以及 tests/e2e 整包
-# 门禁（仓库溯源、命名卫生与协议回归）。工具链版本由 mise.toml pin，
+# CI 承载：构建门禁（生成物漂移检查 + 构建）与全量测试。溯源类 e2e 门禁
+# （仓库溯源、命名卫生与协议回归）依赖本仓外的私有证据档案，在本地发布
+# 窗口执行，不参与 CI（见下方说明）。工具链版本由 mise.toml pin，
 # 不使用运行器自带版本。
 name: ci
 
@@ -56,6 +57,21 @@ jobs:
         run: go build ./...
 
       # tests/e2e 依赖本仓外的私有证据档案（见上），在本地执行，CI 排除。
+      # 锚定整包路径（含未来子包），避免子串误配（如未来 tests/e2e-extra）；
+      # go list 为空则显式失败，防静默绿。
       - name: Run all tests
         working-directory: wicket
-        run: go test $(go list ./... | grep -v '/tests/e2e')
+        run: |
+          pkgs="$(go list ./... | grep -vE '/tests/e2e(/|$)')"
+          if [ -z "$pkgs" ]; then
+            echo "no packages to test (go list empty); failing loudly"
+            exit 1
+          fi
+          go test $pkgs
+
+      # tests/e2e 整包在本地发布窗口执行（依赖兄弟证据仓，凭据不进 CI）。
+      # CI 侧保留编译级覆盖：go build 不编译 _test.go，go vet 可捕获该包
+      # 因 API 漂移导致的编译断裂（不执行测试，无需证据仓）。
+      - name: Compile lineage gates (vet)
+        working-directory: wicket
+        run: go vet ./tests/e2e/...

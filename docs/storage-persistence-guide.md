@@ -1,7 +1,7 @@
 # 存储持久化接入指南
 
-> 状态：**目标形态已落地**。存储端口契约、契约测试套件与注入缝均已定型；首个发布版本 `v0.1.0` 发布后，适配器仓即可直接 `require github.com/gonewx/wicket`。
-> 权威约束见 [ARCHITECTURE-SPINE](../_bmad-output/planning-artifacts/architecture/architecture-wicket-2026-07-31/ARCHITECTURE-SPINE.md)（AD-2 至 AD-14）。
+> 状态：**目标形态已落地**。存储端口契约、契约测试套件与注入缝均已定型；首个发布版本 `v0.1.0` 已发布，使用 Go 1.27 工具链（正式版或 rc）时适配器仓即可直接 `require github.com/gonewx/wicket`。
+> 权威约束见 ARCHITECTURE-SPINE（AD-2 至 AD-14；该文档位于开发工作区 `_bmad-output/` 下，不随发布产物分发，适配器作者如需查阅请自开发仓库获取）。
 
 ## 概述
 
@@ -156,7 +156,7 @@ if got := adapter.ConformsTo(); got != storagetest.SuiteVersion {
 
 ## 当前状态与前置条件
 
-本文所述形态的落地依赖一条不可颠倒的顺序链（AD-8）；链上各前置环节均已解除，末两步（首版发布、适配器仓 require）随首个版本 `v0.1.0` 发布完成：
+本文所述形态的落地依赖一条不可颠倒的顺序链（AD-8）；首版 `v0.1.0` 已发布，链上其余前置环节均已解除；适配器仓的 `require wicket` 步骤由适配器项目按交接说明文档执行（尚未发生）。
 
 ```
 godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗留
@@ -167,14 +167,14 @@ godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗�
 
 已解除的前置：
 
-- `github.com/gonewx/godi` 已发布 `v0.1.0` 并入 `go.mod`；wicket 首个版本 `v0.1.0` 发布后即可被外部 `go get`。
+- `github.com/gonewx/godi` 已发布 `v0.1.0` 并入 `go.mod`；wicket 首个版本 `v0.1.0` 发布后即可被外部 `go get`（需 Go 1.27 工具链，正式版发布前为 rc）。
 - `go.mod` 已切 `go 1.27` 无 rc directive；首个 tag 不携带 rc。
 
-**适配器仓已建骨架。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器的独立骨架仓，已含 LICENSE、PROVENANCE、交接说明 HANDOFF.md 与三项血缘门禁（文件头归属断言、禁上游血缘标注、commit message 扫描）。适配器实现、schema 与迁移属该仓范围，按 HANDOFF.md 中的后续步骤执行（第 1 步为 `require wicket` 首个 semver tag）。
+**适配器仓已建骨架。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器的独立骨架仓，已含 LICENSE、PROVENANCE 与三项血缘门禁（文件头归属断言、禁上游血缘标注、commit message 扫描）。适配器实现、schema 与迁移属该仓范围；骨架仓内另有交接说明文档，按其中后续步骤执行（第 1 步为 `require wicket` 首个 semver tag）。
 
 ## 相关文档
 
-- [ARCHITECTURE-SPINE](../_bmad-output/planning-artifacts/architecture/architecture-wicket-2026-07-31/ARCHITECTURE-SPINE.md) — 权威架构约束
+- ARCHITECTURE-SPINE — 权威架构约束（开发工作区 `_bmad-output/` 下，不随发布产物分发）
 - [架构文档](./architecture.md) — 整体架构
 - [外部认证提供者配置指南](./external-providers-guide.md) — 无状态验签路径（不需要 store）
 - [开发指南](./development-guide.md) — 构建与测试

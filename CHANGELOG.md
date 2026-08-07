@@ -7,18 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-07
+
+Review corrections to the v0.1.1 artifacts: CI compile coverage for the
+locally-executed lineage gate package, hardened package exclusion (anchored
+path covering future subpackages), and documentation alignment with the
+released CI shape.
+
+### Changed
+
+- CI workflow: the `tests/e2e` exclusion now anchors the full package path
+  (including future subpackages) and fails loudly on an empty package list;
+  the lineage gate package keeps compile-level coverage via `go vet` so API
+  drift cannot pass CI silently.
+- Docs: development guide CI section and storage persistence guide updated to
+  reflect the released CI shape (lineage gates run in the local release
+  window; no evidence-archive credentials in CI; internal workspace document
+  references no longer shipped as links).
+
+[0.1.2]: https://github.com/gonewx/wicket/releases/tag/v0.1.2
+
 ## [0.1.1] - 2026-08-07
 
 Assembly container regenerated with the pinned generator release, and the CI
-workflow scoped so the build/test gate set runs on CI while lineage gates run
-locally. No behavior change.
+workflow scoped so the build/test gate set runs on CI while the tests/e2e
+package (which depends on an out-of-repo private evidence archive) runs in the
+local release window.
+
+### Added
+
+- Generic typed accessors on the assembly root: `Get[T any]() (T, bool)`
+  and `GetRequired[T any]() T`.
 
 ### Changed
 
 - Regenerated the assembly container from the pinned generator release
   (`godi-gen` at the version declared in `go.mod`).
-- CI workflow: the lineage gate package is excluded from the CI test run;
-  lineage gates execute in the local release window.
+- CI workflow: the `tests/e2e` package is excluded from the CI test run;
+  those gates execute in the local release window.
 
 [0.1.1]: https://github.com/gonewx/wicket/releases/tag/v0.1.1
 
@@ -29,7 +55,8 @@ conformance test suites for adapter authors, and stabilizes the hosting assembly
 
 ### Added
 
-- First externally consumable release, resolvable via `go get github.com/gonewx/wicket`.
+- First externally consumable release, resolvable via `go get github.com/gonewx/wicket`
+  on a Go 1.27 toolchain (release candidate until the 1.27.0 final ships).
 - Public storage port family with context-first method signatures, sentinel errors
   for missing records, handle-based access, versioned refresh-token rotation, and
   core-side expiry semantics.
