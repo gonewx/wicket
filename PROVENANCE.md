@@ -6,7 +6,7 @@ This document records the Apache 2.0 provenance migrated into wicket.
 
 - Source Go implementation: `gonewx/gois main@5d5f97c` (`5d5f97c8ed145791c5e5eb5b104135a61f5fe72e`)
 - IdentityServer4 Apache reference: tag `4.1.1`
-- IdentityServer4 Apache reference tag `4.1.1` retained: the 4.1.2 line lacks the CIBA ref_path surface per tree-level verification; rationale recorded in the evidence archive
+- tag `4.1.1` retained: the 4.1.2 line lacks the CIBA ref_path surface per tree-level verification; rationale recorded in the evidence archive
 - Evidence ledger commit: `694508f`
 - §5.5 item 3/4 risk-acceptance evidence commit: `9503eaf`
 - Upstream authors: Brock Allen & Dominick Baier

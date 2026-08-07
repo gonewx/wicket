@@ -156,7 +156,7 @@ if got := adapter.ConformsTo(); got != storagetest.SuiteVersion {
 
 ## 当前状态与前置条件
 
-本文所述形态的落地依赖一条不可颠倒的顺序链（AD-8），自首版发布起已全部达成：
+本文所述形态的落地依赖一条不可颠倒的顺序链（AD-8）；链上各前置环节均已解除，末两步（首版发布、适配器仓 require）随首个版本 `v0.1.0` 发布完成：
 
 ```
 godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗留
@@ -167,7 +167,7 @@ godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗�
 
 已解除的前置：
 
-- `github.com/gonewx/godi` 已发布 `v0.1.0` 并入 `go.mod`，wicket 可被外部 `go get`。
+- `github.com/gonewx/godi` 已发布 `v0.1.0` 并入 `go.mod`；wicket 首个版本 `v0.1.0` 发布后即可被外部 `go get`。
 - `go.mod` 已切 `go 1.27` 无 rc directive；首个 tag 不携带 rc。
 
 **适配器仓已建骨架。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器的独立骨架仓，已含 LICENSE、PROVENANCE、交接说明 HANDOFF.md 与三项血缘门禁（文件头归属断言、禁上游血缘标注、commit message 扫描）。适配器实现、schema 与迁移属该仓范围，按 HANDOFF.md 中的后续步骤执行（第 1 步为 `require wicket` 首个 semver tag）。
