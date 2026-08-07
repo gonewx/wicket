@@ -1,6 +1,6 @@
 # 存储持久化接入指南
 
-> 状态：**规划中**。本文描述的目标形态尚未实现，当前 wicket 只提供内存实现。
+> 状态：**目标形态已落地**。存储端口契约、契约测试套件与注入缝均已定型；首个发布版本 `v0.1.0` 发布后，适配器仓即可直接 `require github.com/gonewx/wicket`。
 > 权威约束见 [ARCHITECTURE-SPINE](../_bmad-output/planning-artifacts/architecture/architecture-wicket-2026-07-31/ARCHITECTURE-SPINE.md)（AD-2 至 AD-14）。
 
 ## 概述
@@ -156,7 +156,7 @@ if got := adapter.ConformsTo(); got != storagetest.SuiteVersion {
 
 ## 当前状态与前置条件
 
-本文所述形态的落地依赖一条不可颠倒的顺序链（AD-8）：
+本文所述形态的落地依赖一条不可颠倒的顺序链（AD-8），自首版发布起已全部达成：
 
 ```
 godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗留
@@ -165,12 +165,12 @@ godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗�
   → wicket v0.x 首个 tag → 适配器仓 require wicket
 ```
 
-两处当前阻塞：
+已解除的前置：
 
-- `github.com/gonewx/godi` 未入 `go.mod`（40 个文件 import 之，仅靠 `go.work` 解析），且该仓零 remote、零 tag —— wicket 现在**无法被外部 `go get`**。
-- 工具链 pin 在 `go 1.27rc1`。首个 tag 不得携带 rc（会强迫所有下游用 rc），须等 1.27 正式版（预计 2026-08）。
+- `github.com/gonewx/godi` 已发布 `v0.1.0` 并入 `go.mod`，wicket 可被外部 `go get`。
+- `go.mod` 已切 `go 1.27` 无 rc directive；首个 tag 不携带 rc。
 
-在此之前，适配器只能以 `go.work` 本机成员形式开发。
+**适配器仓已建骨架。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器的独立骨架仓，已含 LICENSE、PROVENANCE、交接说明 HANDOFF.md 与三项血缘门禁（文件头归属断言、禁上游血缘标注、commit message 扫描）。适配器实现、schema 与迁移属该仓范围，按 HANDOFF.md 中的后续步骤执行（第 1 步为 `require wicket` 首个 semver tag）。
 
 ## 相关文档
 
