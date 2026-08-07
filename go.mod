@@ -5,11 +5,11 @@ go 1.27rc1
 require (
 	github.com/aliyun/alibaba-cloud-sdk-go v1.63.107
 	github.com/gonewx/godi v0.1.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.6.0
 	github.com/lestrrat-go/httprc/v3 v3.0.6
 	github.com/lestrrat-go/jwx/v3 v3.2.0
 	github.com/stretchr/testify v1.11.1
-	github.com/tidwall/gjson v1.16.0
+	github.com/tidwall/gjson v1.19.0
 )
 
 require (
