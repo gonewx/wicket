@@ -30,7 +30,7 @@ func TestTrademarkStringsAreLimitedToAllowedE2E(t *testing.T) {
 
 		if d.IsDir() {
 			switch rel {
-			case ".git", ".claude", ".agents", "_bmad-output":
+			case ".git", ".claude", ".agents", ".qoder", ".rnix", ".codegraph", ".cursor", ".opencode", "_bmad-output":
 				return filepath.SkipDir
 			}
 			return nil
