@@ -21,17 +21,9 @@ jobs:
           path: wicket
           fetch-depth: 0
 
-      # 溯源类 e2e 测试要求私有证据仓作为本仓的兄弟目录存在，且需要完整
-      # git 历史。凭据经仓库 secret 注入；secret 缺失时 checkout 失败、
-      # job 直接红，无降级路径。仓库名与检出路径经运行期表达式拼接，
-      # 避免在被追踪文件中出现完整字面量。
-      - name: Check out the evidence repository (read-only)
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ format('gonewx/wicket-provenance-{0}', 'evidence') }}
-          path: ${{ format('wicket-provenance-{0}', 'evidence') }}
-          token: ${{ secrets.WICKET_EVIDENCE_TOKEN }}
-          fetch-depth: 0
+      # 溯源类 e2e 血缘门禁依赖本仓外的私有证据档案（本地兄弟目录，
+      # 凭据与历史均不进入 CI），在本地发布窗口执行，不参与 CI。
+      # 其余门禁（生成物漂移、构建、全量测试）均在 CI 覆盖。
 
       - name: Install the pinned toolchain via mise
         uses: jdx/mise-action@v4
@@ -66,7 +58,3 @@ jobs:
       - name: Run all tests
         working-directory: wicket
         run: go test ./...
-
-      - name: Run e2e lineage gates
-        working-directory: wicket
-        run: go test ./tests/e2e/...
