@@ -3,7 +3,11 @@
 
 package claims
 
-import gois "github.com/gonewx/wicket"
+import (
+	"encoding/json"
+
+	gois "github.com/gonewx/wicket"
+)
 
 const DefaultIssuer = "LOCAL AUTHORITY"
 
@@ -75,6 +79,43 @@ type ClaimsIdentity struct {
 	NameClaimType      string
 	RoleClaimType      string
 	claims             []*Claim
+}
+
+// claimsIdentityJSON is the wire shape used by MarshalJSON/UnmarshalJSON.
+// The identity's two unexported fields (authenticationType, claims) are
+// otherwise invisible to encoding/json, which silently drops them — a
+// persistence adapter round-tripping a ClaimsPrincipal would lose every
+// claim and the authentication type on the first Store/Get cycle.
+type claimsIdentityJSON struct {
+	AuthenticationType string   `json:"authenticationType"`
+	NameClaimType      string   `json:"nameClaimType"`
+	RoleClaimType      string   `json:"roleClaimType"`
+	Claims             []*Claim `json:"claims"`
+}
+
+// MarshalJSON serializes the identity including its unexported state so the
+// model survives a JSON round trip (storage adapters rely on this).
+func (i *ClaimsIdentity) MarshalJSON() ([]byte, error) {
+	return json.Marshal(claimsIdentityJSON{
+		AuthenticationType: i.authenticationType,
+		NameClaimType:      i.NameClaimType,
+		RoleClaimType:      i.RoleClaimType,
+		Claims:             i.claims,
+	})
+}
+
+// UnmarshalJSON restores an identity from MarshalJSON output. Fields absent
+// from the payload (e.g. written by an older codec) remain zero-valued.
+func (i *ClaimsIdentity) UnmarshalJSON(data []byte) error {
+	var wire claimsIdentityJSON
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	i.authenticationType = wire.AuthenticationType
+	i.NameClaimType = wire.NameClaimType
+	i.RoleClaimType = wire.RoleClaimType
+	i.claims = wire.Claims
+	return nil
 }
 
 type ClaimsIdentityOption func(*ClaimsIdentity)

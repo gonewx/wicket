@@ -4,6 +4,7 @@
 package claims
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -153,5 +154,113 @@ func TestTryRemoveClaimMiddleElement(t *testing.T) {
 	}
 	if remaining[0] != c1 || remaining[1] != c3 {
 		t.Fatal("expected c1 and c3 to remain in order")
+	}
+}
+
+func TestClaimsIdentityJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	identity := NewClaimsIdentity(
+		WithAuthenticationType("wicket"),
+	)
+	identity.NameClaimType = "name"
+	identity.RoleClaimType = "role"
+	identity.AddClaim(NewClaim(
+		WithClaimType("sub"),
+		WithClaimValue("1"),
+	))
+	identity.AddClaim(NewClaim(
+		WithClaimType("name"),
+		WithClaimValue("alice"),
+		WithClaimIssuer("issuer-a"),
+		WithClaimOriginalIssuer("issuer-a"),
+		WithClaimValueType("string"),
+	))
+
+	data, err := json.Marshal(identity)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded ClaimsIdentity
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if decoded.AuthenticationType() != "wicket" {
+		t.Errorf("AuthenticationType() = %q, want %q", decoded.AuthenticationType(), "wicket")
+	}
+	if decoded.NameClaimType != "name" {
+		t.Errorf("NameClaimType = %q, want %q", decoded.NameClaimType, "name")
+	}
+	if decoded.RoleClaimType != "role" {
+		t.Errorf("RoleClaimType = %q, want %q", decoded.RoleClaimType, "role")
+	}
+	if len(decoded.Claims()) != 2 {
+		t.Fatalf("Claims() = %d, want 2", len(decoded.Claims()))
+	}
+	sub := decoded.FindFirst("sub")
+	if sub == nil || sub.Value != "1" {
+		t.Errorf("sub claim lost in round trip: %+v", sub)
+	}
+	name := decoded.FindFirst("name")
+	if name == nil || name.Value != "alice" || name.Issuer != "issuer-a" || name.OriginalIssuer != "issuer-a" || name.ValueType != "string" {
+		t.Errorf("name claim fields lost in round trip: %+v", name)
+	}
+}
+
+func TestClaimsIdentityJSONRoundTripThroughPrincipal(t *testing.T) {
+	t.Parallel()
+
+	principal := NewClaimsPrincipal(
+		WithClaimsPrincipalIdentity(NewClaimsIdentity(
+			WithAuthenticationType("wicket"),
+			WithClaims([]*Claim{
+				NewClaim(WithClaimType("sub"), WithClaimValue("1")),
+				NewClaim(WithClaimType("name"), WithClaimValue("alice")),
+			}),
+		)),
+	)
+
+	data, err := json.Marshal(principal)
+	if err != nil {
+		t.Fatalf("marshal principal: %v", err)
+	}
+
+	var decoded ClaimsPrincipal
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal principal: %v", err)
+	}
+	if len(decoded.Identities) != 1 {
+		t.Fatalf("Identities = %d, want 1", len(decoded.Identities))
+	}
+	identity := decoded.Identities[0]
+	if identity.AuthenticationType() != "wicket" {
+		t.Errorf("AuthenticationType() = %q, want %q", identity.AuthenticationType(), "wicket")
+	}
+	if got := len(identity.Claims()); got != 2 {
+		t.Fatalf("Claims() = %d, want 2", got)
+	}
+	if sub := identity.FindFirst("sub"); sub == nil || sub.Value != "1" {
+		t.Errorf("sub claim lost in round trip: %+v", sub)
+	}
+}
+
+func TestClaimsIdentityJSONRoundTripEmptyFields(t *testing.T) {
+	t.Parallel()
+
+	data, err := json.Marshal(NewClaimsIdentity())
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded ClaimsIdentity
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if decoded.AuthenticationType() != "" || decoded.NameClaimType != "" || decoded.RoleClaimType != "" {
+		t.Errorf("zero identity did not round trip: %+v", decoded)
+	}
+	if len(decoded.Claims()) != 0 {
+		t.Errorf("zero identity claims = %d, want 0", len(decoded.Claims()))
 	}
 }
