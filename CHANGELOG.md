@@ -7,9 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-08
+
+### Fixed
+
+- Claims: `ClaimsIdentity` now implements `MarshalJSON`/`UnmarshalJSON` so the
+  model survives a JSON round trip. The identity's `authenticationType` and
+  `claims` fields are unexported and were silently dropped by `encoding/json`,
+  which made every persistence adapter lose the subject claims (and the
+  authentication type) of stored authorization codes, refresh tokens, device
+  codes and backchannel requests on the first Store/Get cycle. Hosts on the
+  PostgreSQL adapter observe this as an access token without a `sub` claim at
+  UserInfo; the fix restores it.
+
 ### Changed
 
 - Docs: 全面刷新 `docs/` 文档集至 v0.1.2 状态——技术栈版本（jwx v3.2.0、gjson 1.19.0、uuid 1.6.0、httprc v3.0.6、godi v0.1.0）、di 装配文件改名（`dsl_*.go`）、scheme 名（`wicket` / `wicket.external`）、新增存储端口三族与契约测试套件、`wechatverify` / `phoneverify` 无状态验证包；新增根 README.md 作为发布库入口。
+
+[0.1.3]: https://github.com/gonewx/wicket/releases/tag/v0.1.3
 
 ## [0.1.2] - 2026-08-07
 
