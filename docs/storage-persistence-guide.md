@@ -113,6 +113,64 @@ for {
 defer root.Close()
 ```
 
+## PostgreSQL 适配器
+
+`github.com/gonewx/wicket-pg` 是官方 PostgreSQL 适配器：九个 store 端口已全部实现并随发布版本分发，宿主无需阅读适配器源码即可按本节装配。
+
+### 安装
+
+```bash
+GOWORK=off go get github.com/gonewx/wicket-pg@v0.1.1
+```
+
+版本号以该仓 release 页的最新已发布版本为准。宿主需 Go 1.27 工具链（正式版或 rc，见「当前状态与前置条件」）。
+
+### 执行迁移
+
+适配器仓自备迁移（表所有权归适配器仓），宿主在启动序列中调用迁移入口。迁移幂等、不自动触发、不起后台 goroutine（AD-12）：
+
+```go
+import (
+	"context"
+
+	"github.com/gonewx/wicket-pg/migrations"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+pool, err := pgxpool.New(ctx, dsn)
+if err != nil {
+	// handle error
+}
+
+if err := migrations.Up(ctx, pool); err != nil {
+	// handle error
+}
+```
+
+需要回滚时调用 `migrations.Down(ctx, pool)`。
+
+### 注入 store
+
+九个 store 构造器逐一注入，签名均为 `store.NewXxxStore(pool *pgxpool.Pool, logger *slog.Logger)`。连接池由宿主创建与管理，适配器不创建也不关闭；logger 传 `nil` 时回退 `slog.Default()`：
+
+```go
+cfg := di.NewServerConfig()
+
+cfg.SetAuthorizationCodeStore(store.NewAuthorizationCodeStore(pool, logger))
+cfg.SetRefreshTokenStore(store.NewRefreshTokenStore(pool, logger))
+cfg.SetReferenceTokenStore(store.NewReferenceTokenStore(pool, logger))
+cfg.SetUserConsentStore(store.NewUserConsentStore(pool, logger))
+cfg.SetPersistedGrantStore(store.NewPersistedGrantStore(pool, logger))
+cfg.SetDeviceFlowStore(store.NewDeviceFlowStore(pool, logger))
+cfg.SetBackchannelAuthenticationRequestStore(store.NewBackchannelAuthenticationRequestStore(pool, logger))
+cfg.SetSessionStore(store.NewSessionStore(pool, logger))
+cfg.SetKeyRecordStore(store.NewKeyRecordStore(pool, logger))
+```
+
+九个 store 均暴露 `ConformsTo()` 版本凭证，可按下节方式校验。过期数据的回收由宿主驱动（各 store 暴露显式回收入口，如 `RemoveExpired` / `DeleteExpired`），wicket 不自起后台任务（AD-12）。
+
+更完整的快速开始见适配器仓 README（`github.com/gonewx/wicket-pg`），表结构与索引设计见该仓的 schema 设计记录（`docs/schema-design-record.md`）。
+
 ## 校验适配器合规性
 
 适配器必须通过 wicket 的契约测试套件，并暴露版本凭证（AD-6）。装配时校验：
@@ -156,7 +214,7 @@ if got := adapter.ConformsTo(); got != storagetest.SuiteVersion {
 
 ## 当前状态与前置条件
 
-本文所述形态的落地依赖一条不可颠倒的顺序链（AD-8）；首版 `v0.1.0` 已发布，链上其余前置环节均已解除；适配器仓的 `require wicket` 步骤由适配器项目按交接说明文档执行（尚未发生）。
+本文所述形态的落地依赖一条不可颠倒的顺序链（AD-8）；首版 `v0.1.0` 已发布，链上其余前置环节均已解除；适配器仓 `github.com/gonewx/wicket-pg` 已发布 `v0.1.x` 并完成 `require wicket` 接入（见上文「PostgreSQL 适配器」节）。
 
 ```
 godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗留
@@ -170,7 +228,7 @@ godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗�
 - `github.com/gonewx/godi` 已发布 `v0.1.0` 并入 `go.mod`；wicket 首个版本 `v0.1.0` 发布后即可被外部 `go get`（需 Go 1.27 工具链，正式版发布前为 rc）。
 - `go.mod` 已切 `go 1.27` 无 rc directive；首个 tag 不携带 rc。
 
-**适配器仓已建骨架。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器的独立骨架仓，已含 LICENSE、PROVENANCE 与三项血缘门禁（文件头归属断言、禁上游血缘标注、commit message 扫描）。适配器实现、schema 与迁移属该仓范围；骨架仓内另有交接说明文档，按其中后续步骤执行（第 1 步为 `require wicket` 首个 semver tag）。
+**PostgreSQL 适配器已实现并发布。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器仓，九个 store 实现、schema 与迁移均已落地并发布 `v0.1.x`，表所有权归该仓；快速开始见上文「PostgreSQL 适配器」节与本仓 README。
 
 ## 相关文档
 
