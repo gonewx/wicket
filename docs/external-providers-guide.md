@@ -15,7 +15,7 @@ Wicket 支持多种外部身份提供者（IdP），允许用户通过第三方�
     ├── ServerConfig.SetAuthenticationHandlerProvider(scheme, factory)
     │       → 注入自定义 Handler（覆盖内置默认）
     │
-    ├── di/core.go 内置注册
+    ├── di/dsl_core.go 内置注册
     │       → Google / Facebook / JWT Bearer Handler
     │
     └── DynamicProviderOptions
@@ -621,8 +621,8 @@ cfg.SetExternalFailurePath("/account/external-failure")
 
 | Scheme | 用途 |
 |--------|------|
-| `idsrv.cookie`（DefaultCookie） | 主会话 Cookie |
-| `idsrv.external`（ExternalCookie） | 外部 IdP 临时 Cookie（认证完成后清除） |
+| `wicket`（DefaultCookie） | 主会话 Cookie |
+| `wicket.external`（ExternalCookie） | 外部 IdP 临时 Cookie（认证完成后清除） |
 
 Cookie 选项通过 `authcookies.AuthenticationOptions` 配置，支持数据保护加密。
 
@@ -652,7 +652,6 @@ func main() {
     cfg.SetLogger(slog.Default())
     cfg.SetClients(myClients())
     cfg.SetSigningCredentialStores(mySigningKeys())
-    cfg.SetExternalFailurePath("/account/external-error")
 
     // 外部认证失败路径
     cfg.SetExternalFailurePath("/account/external-failure")

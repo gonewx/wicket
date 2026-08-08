@@ -1,20 +1,20 @@
 {
   "workflow_version": "1.2.0",
-  "timestamps": {"started": "2026-07-23T00:00:00Z", "last_updated": "2026-07-23T00:00:00Z", "completed": "2026-07-23T00:00:00Z"},
-  "mode": "initial_scan",
+  "timestamps": {"started": "2026-07-23T00:00:00Z", "last_updated": "2026-08-08T00:00:00Z", "completed": "2026-08-08T00:00:00Z"},
+  "mode": "refresh",
   "scan_level": "deep",
   "project_root": "/mnt/disk0/project/auth/wicket",
   "project_knowledge": "/mnt/disk0/project/auth/wicket/docs",
   "completed_steps": [
     {"step": "step_1", "status": "completed", "summary": "Classified as monolith with 1 part, project_type: backend"},
-    {"step": "step_2", "status": "completed", "summary": "Found 3 existing docs (PROVENANCE.md, NOTICE, LICENSE)"},
-    {"step": "step_3", "status": "completed", "summary": "Tech stack: Go 1.27rc1 + godi DI + jwx/v3"},
+    {"step": "step_2", "status": "completed", "summary": "Found existing docs (PROVENANCE.md, NOTICE, LICENSE, CHANGELOG.md)"},
+    {"step": "step_3", "status": "completed", "summary": "Tech stack: Go 1.27 + godi v0.1.0 + jwx/v3 + gjson + uuid + aliyun SDK (phoneverify)"},
     {"step": "step_4", "status": "completed", "summary": "Conditional analysis: API scan + data models"},
     {"step": "step_5", "status": "completed", "summary": "Source tree documented with 25+ critical folders"},
     {"step": "step_6", "status": "completed", "summary": "Dev setup and build commands documented"},
-    {"step": "step_8", "status": "completed", "summary": "Architecture docs written for 1 part"},
-    {"step": "step_9", "status": "completed", "summary": "All supporting docs written"},
-    {"step": "step_10", "status": "completed", "summary": "Master index generated"},
+    {"step": "step_8", "status": "completed", "summary": "Architecture docs refreshed for 1 part"},
+    {"step": "step_9", "status": "completed", "summary": "All supporting docs refreshed (storage persistence, external providers)"},
+    {"step": "step_10", "status": "completed", "summary": "Master index refreshed"},
     {"step": "step_11", "status": "completed", "summary": "Validation and review complete"},
     {"step": "step_12", "status": "completed", "summary": "Workflow complete"}
   ],
@@ -22,7 +22,10 @@
   "project_types": [{"part_id": "wicket", "project_type_id": "backend", "display_name": "Backend API/Service"}],
   "findings": {
     "project_classification": "monolith, 1 part, Go backend (OIDC/OAuth server library)",
-    "technology_stack": "Go 1.27rc1, godi DI, jwx/v3, gjson, uuid"
+    "technology_stack": "Go 1.27, godi v0.1.0, jwx/v3 3.2.0, gjson 1.19.0, uuid 1.6.0, aliyun SDK (phoneverify)",
+    "release_state": "v0.1.2 published; official PostgreSQL adapter github.com/gonewx/wicket-pg",
+    "store_port_families": "storage (12 ports) + session + keymgmt; conformance suites storagetest/sessiontest/keymgmttest",
+    "stateless_verification": "oidcverify (local JWKS) / wechatverify / phoneverify (server-side exchange)"
   },
   "outputs_generated": [
     "project-scan-report.json",
@@ -31,7 +34,10 @@
     "source-tree-analysis.md",
     "development-guide.md",
     "api-contracts.md",
-    "index.md"
+    "index.md",
+    "storage-persistence-guide.md",
+    "external-providers-guide.md",
+    "README.md"
   ],
   "resume_instructions": "Workflow completed"
 }

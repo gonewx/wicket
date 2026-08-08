@@ -2,7 +2,7 @@
 
 ## 协议端点
 
-Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter` 按路径分发。
+Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter` 按路径分发。路由路径常量见 `constants.go`（`ProtocolRoutePaths*`）。
 
 ### 端点列表
 
@@ -20,6 +20,8 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | Check Session | `/connect/checksession` | GET | `CheckSessionHandler` | 会话状态 iframe |
 | CIBA | `/connect/ciba` | POST | `BackchannelAuthenticationHandler` | 后端通道认证 |
 
+> 常量中还定义了 `Revocation`（`/connect/revocation`）、`DeviceAuthorization`（`/connect/deviceauthorization`）与 mTLS 路径（`/connect/mtls/*`），端点注册随 handler 落地逐步启用。
+
 ## 支持的授权类型（Grant Types）
 
 | Grant Type | 说明 |
@@ -31,12 +33,14 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | `urn:openid:params:grant-type:ciba` | CIBA 后端通道 |
 | 扩展授权 | 通过 `ExtensionGrantValidator` 接口扩展 |
 
+> `password`（资源所有者密码）**默认不支持**：默认实现 `NotSupportedResourceOwnerPasswordValidator` 直接拒绝，宿主需注入 `ResourceOwnerPasswordValidator` 方可启用。
+
 ## 认证方案
 
 | Scheme | 说明 |
 |--------|------|
-| `idsrv.cookie`（DefaultCookie） | 主 Cookie 认证 |
-| `idsrv.external`（ExternalCookie） | 外部 IdP Cookie |
+| `wicket`（DefaultCookie） | 主 Cookie 认证 |
+| `wicket.external`（ExternalCookie） | 外部 IdP Cookie |
 | `Google` | Google OAuth 2.0 |
 | `Facebook` | Facebook OAuth 2.0 |
 | `Bearer`（JWT） | JWT Bearer 令牌 |
@@ -88,19 +92,37 @@ grant_type=authorization_code
 }
 ```
 
-## 存储接口（宿主实现）
+## 存储端口（宿主实现）
 
-宿主通过 `ServerConfig` 缝注入以下存储实现：
+存储端口分三族，宿主通过 `ServerConfig` 缝注入实现；未注入且未显式声明 `AllowInMemoryFallback()` 时装配启动失败。契约合规由 `storagetest` / `sessiontest` / `keymgmttest` 三套件校验。
+
+### storage 族（`storage/interfaces.go`）
 
 | 接口 | 用途 |
 |------|------|
 | `ClientStore` | 客户端注册查询 |
 | `ResourceStore` | API/Identity 资源 |
-| `PersistedGrantStore` | 授权码、刷新令牌、引用令牌 |
+| `AuthorizationCodeStore` | 授权码（带句柄、版本化轮换） |
+| `RefreshTokenStore` | 刷新令牌（带句柄、版本化轮换） |
+| `ReferenceTokenStore` | 引用令牌 |
+| `PersistedGrantStore` | 持久化 grant（按 subject 批量吊销） |
 | `DeviceFlowStore` | 设备流记录 |
 | `BackchannelAuthenticationRequestStore` | CIBA 请求状态 |
+| `UserConsentStore` | 用户同意 |
 | `SigningCredentialStore` | 签名凭据 |
 | `ValidationKeysStore` | 验证密钥 |
 | `AuthorizationParametersMessageStore` | 授权参数跨重定向持久化 |
 
-内存实现（开发用）通过 `di/inmemory.go` 的扩展方法注册。
+### session 族（`session/session.go`）
+
+| 接口 | 用途 |
+|------|------|
+| `session.Store` | 服务端会话（`SessionID` 键、按 subject 批量吊销、过期清理） |
+
+### keymgmt 族（`keymgmt/record.go`）
+
+| 接口 | 用途 |
+|------|------|
+| `keymgmt.RecordStore` | 签名密钥记录（乐观并发、四阶段生命周期） |
+
+内存实现（开发用）通过 `di/inmemory.go` 的扩展方法注册；持久化适配器接入见 [存储持久化接入指南](./storage-persistence-guide.md)。

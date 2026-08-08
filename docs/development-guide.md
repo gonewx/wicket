@@ -119,7 +119,7 @@ type(scope): description
 ### 添加新端点
 
 1. 在 `handlers/` 创建 Handler struct
-2. 在 `di/core.go` 注册 Endpoint 元数据 + Handler 工厂
+2. 在 `di/dsl_core.go` 注册 Endpoint 元数据 + Handler 工厂
 3. 运行 `go generate ./...`
 4. 添加集成测试到 `test/integration/handlers/`
 

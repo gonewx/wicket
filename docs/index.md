@@ -3,14 +3,14 @@
 ## 项目概览
 
 - **类型：** 单体 Go 库
-- **主语言：** Go 1.27rc1
+- **主语言：** Go 1.27（mise pin `1.27rc1`）
 - **架构：** 服务/API 驱动 + 依赖注入组合根
 - **用途：** OpenID Connect / OAuth 2.0 身份认证服务器中间件
 
 ## 快速参考
 
-- **Module：** `github.com/gonewx/wicket`
-- **DI 框架：** godi（go.work workspace）
+- **Module：** `github.com/gonewx/wicket`（已发布 v0.1.x）
+- **DI 框架：** godi v0.1.0（go.work workspace + go.mod 依赖）
 - **入口点：** `server.UseWicket()` → 中间件链
 - **组合根：** `di/root.go` → `di/container_gen.go`
 - **配置缝：** `di/server_config.go`（ServerConfig）
@@ -23,7 +23,7 @@
 - [开发指南](./development-guide.md)
 - [API 端点](./api-contracts.md)
 - [外部认证提供者配置指南](./external-providers-guide.md)
-- [存储持久化接入指南](./storage-persistence-guide.md) — 宿主如何装配持久化 store（目标形态已落地）
+- [存储持久化接入指南](./storage-persistence-guide.md) — 宿主如何装配持久化 store（含 PostgreSQL 适配器）
 
 ## 现有文档
 
@@ -57,7 +57,7 @@ defer root.Close()
 // 通过 ServerConfig 注入存储、客户端、密钥等
 cfg := godi.GetRequired[*di.ServerConfig](root)
 cfg.SetClients(...)
-cfg.SetSigningCredentialStore(...)
+cfg.SetSigningCredentialStores(...)
 
 srv := server.NewServer(root)
 mux := http.NewServeMux()
@@ -67,4 +67,4 @@ http.ListenAndServe(":8080", mux)
 
 ---
 
-*生成时间：2026-07-23 | 扫描模式：深度扫描 | 工作流版本：1.2.0*
+*生成时间：2026-08-08 | 更新：全面同步至 v0.1.2 状态 | 工作流版本：1.2.0*
