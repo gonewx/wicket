@@ -64,20 +64,29 @@ func TestDependencyMajorVersionFloorsE2E(t *testing.T) {
 	}
 }
 
-// TestLanguageVersionDirectiveCarriesNoRCVersionE2E pins the toolchain split:
-// the language version directive in go.mod is published to downstream modules
-// and must never carry a release candidate, while the actual toolchain pin
-// stays in mise.toml, which is not published.
-func TestLanguageVersionDirectiveCarriesNoRCVersionE2E(t *testing.T) {
+// TestToolchainVersionsCarryNoRCVersionE2E pins both halves of the toolchain
+// declaration against release candidates: the language version directive in
+// go.mod is published to downstream modules and must never carry one, and the
+// toolchain pin in mise.toml — while not published — must stay on a released
+// version so local and CI builds remain reproducible. The two were
+// deliberately split while 1.27 was still pre-release; now that the released
+// toolchain is pinned, the same rule covers both.
+func TestToolchainVersionsCarryNoRCVersionE2E(t *testing.T) {
 	t.Parallel()
 
 	goDirective, _ := readModuleMetadata(t)
 	if goDirective != "1.27" {
-		t.Fatalf("language version directive = %q, want 1.27 (no release candidate)", goDirective)
+		t.Fatalf("language version directive = %q, want 1.27", goDirective)
+	}
+	if strings.Contains(goDirective, "rc") {
+		t.Fatalf("language version directive %q carries a release candidate marker", goDirective)
 	}
 
 	toolchain := readProjectFile(t, "mise.toml")
-	if !strings.Contains(toolchain, `go = "1.27rc1"`) {
-		t.Fatalf("mise.toml does not pin the release candidate toolchain:\n%s", toolchain)
+	if !strings.Contains(toolchain, `go = "1.27.0"`) {
+		t.Fatalf("mise.toml does not pin the released 1.27.0 toolchain:\n%s", toolchain)
+	}
+	if strings.Contains(toolchain, "rc") {
+		t.Fatalf("mise.toml pins a release candidate toolchain:\n%s", toolchain)
 	}
 }

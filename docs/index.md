@@ -3,7 +3,7 @@
 ## 项目概览
 
 - **类型：** 单体 Go 库
-- **主语言：** Go 1.27（mise pin `1.27rc1`）
+- **主语言：** Go 1.27（mise pin `1.27.0`）
 - **架构：** 服务/API 驱动 + 依赖注入组合根
 - **用途：** OpenID Connect / OAuth 2.0 身份认证服务器中间件
 
@@ -39,13 +39,13 @@
 mise install
 
 # 2. 构建
-mise exec go@1.27rc1 -- go build ./...
+mise exec go@1.27.0 -- go build ./...
 
 # 3. 运行测试
-mise exec go@1.27rc1 -- go test ./...
+mise exec go@1.27.0 -- go test ./...
 
 # 4. 代码生成（修改 di/ 后）
-mise exec go@1.27rc1 -- go generate ./...
+mise exec go@1.27.0 -- go generate ./...
 ```
 
 ## 宿主集成示例

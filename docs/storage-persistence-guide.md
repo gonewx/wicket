@@ -1,6 +1,6 @@
 # 存储持久化接入指南
 
-> 状态：**目标形态已落地**。存储端口契约、契约测试套件与注入缝均已定型；首个发布版本 `v0.1.0` 已发布，使用 Go 1.27 工具链（正式版或 rc）时适配器仓即可直接 `require github.com/gonewx/wicket`。
+> 状态：**目标形态已落地**。存储端口契约、契约测试套件与注入缝均已定型；首个发布版本 `v0.1.0` 已发布，使用 Go 1.27 工具链时适配器仓即可直接 `require github.com/gonewx/wicket`。
 > 权威约束见 ARCHITECTURE-SPINE（AD-2 至 AD-14；该文档位于开发工作区 `_bmad-output/` 下，不随发布产物分发，适配器作者如需查阅请自开发仓库获取）。
 
 ## 概述
@@ -123,7 +123,7 @@ defer root.Close()
 GOWORK=off go get github.com/gonewx/wicket-pg@v0.1.1
 ```
 
-版本号以该仓 release 页的最新已发布版本为准。宿主需 Go 1.27 工具链（正式版或 rc，见「当前状态与前置条件」）。
+版本号以该仓 release 页的最新已发布版本为准。宿主需 Go 1.27 工具链（见「当前状态与前置条件」）。
 
 ### 执行迁移
 
@@ -236,8 +236,9 @@ godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗�
 
 已解除的前置：
 
-- `github.com/gonewx/godi` 已发布 `v0.1.0` 并入 `go.mod`；wicket 首个版本 `v0.1.0` 发布后即可被外部 `go get`（需 Go 1.27 工具链，正式版发布前为 rc）。
+- `github.com/gonewx/godi` 已发布 `v0.1.0` 并入 `go.mod`；wicket 首个版本 `v0.1.0` 发布后即可被外部 `go get`（需 Go 1.27 工具链）。
 - `go.mod` 已切 `go 1.27` 无 rc directive；首个 tag 不携带 rc。
+- Go 1.27 正式版已发布，`mise.toml` 工具链 pin 已由 release candidate 切至正式版 `1.27.0`。
 
 **PostgreSQL 适配器已实现并发布。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器仓，九个 store 实现、schema 与迁移均已落地并发布 `v0.1.x`，表所有权归该仓；快速开始见上文「PostgreSQL 适配器」节与适配器仓 README。
 

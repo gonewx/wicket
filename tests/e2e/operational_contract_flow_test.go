@@ -175,7 +175,7 @@ func TestGoroutineSpawningStoreRunsGrantSuite(t *testing.T) {
 }
 `)
 
-	cmd := exec.Command("mise", "exec", "go@1.27rc1", "--", "go", "test", "./"+scratchOperationalContractDir+"/", "-count=1")
+	cmd := exec.Command("mise", "exec", "go@1.27.0", "--", "go", "test", "./"+scratchOperationalContractDir+"/", "-count=1")
 	cmd.Dir = root
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

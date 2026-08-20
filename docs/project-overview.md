@@ -8,7 +8,7 @@ Wicket 是一个用 Go 编写的 OpenID Connect (OIDC) / OAuth 2.0 身份认证�
 
 | 类别 | 技术 | 版本 | 说明 |
 |------|------|------|------|
-| 语言 | Go | 1.27（mise pin `1.27rc1`） | 通过 mise 管理；`go.mod` 声明 `go 1.27`（无 rc 指令） |
+| 语言 | Go | 1.27.0（mise pin `1.27.0`） | 通过 mise 管理；`go.mod` 声明 `go 1.27`（无 rc 指令） |
 | Module | `github.com/gonewx/wicket` | — | 库模式，非独立可执行文件 |
 | DI 框架 | `github.com/gonewx/godi` | v0.1.0 | 已发布，编译期代码生成；本地开发仍经 go.work 引用 |
 | JWT | `github.com/lestrrat-go/jwx/v3` | 3.2.0 | 令牌签发与验证 |

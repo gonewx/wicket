@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Toolchain: `mise.toml` 的 Go 工具链 pin 由 `1.27rc1` 抬升至正式版 `1.27.0`。取精确补丁版本而非宽松 `1.27`，使每次工具链变更都是一次显式记录的改动。`go.mod` 的 `go 1.27` 语言版本 directive 不变——它是对下游模块的语言版本承诺，与不随发布分发的 `mise.toml` pin 相互独立。与该 pin 耦合的 `tests/e2e` 守卫同步更新，其语义由「`go.mod` 无 rc 而 `mise.toml` 有 rc」的过渡态分家收敛为「两处均不携带 rc 标记」的长期不变量。无生产代码改动。
+
 ## [0.1.3] - 2026-08-08
 
 ### Fixed
