@@ -128,14 +128,16 @@ func TestDependencyMajorVersionFloorsE2E(t *testing.T) {
 	}
 }
 
-// TestToolchainVersionsCarryNoRCVersionE2E pins both halves of the toolchain
-// declaration to released versions. The language version directive in go.mod is
-// published to downstream modules; the pin in mise.toml is not published but
-// decides what compiles the code locally and in CI. Both are matched exactly,
-// which is what rejects a release candidate: no rc spelling equals either value.
-// The two were deliberately split while 1.27 was still pre-release; now that the
-// released toolchain is pinned, the same rule covers both.
-func TestToolchainVersionsCarryNoRCVersionE2E(t *testing.T) {
+// TestToolchainVersionsArePinnedToReleasesE2E pins both halves of the toolchain
+// declaration to exact released versions. The language version directive in
+// go.mod is published to downstream modules; the pin in mise.toml is not
+// published but decides what compiles the code locally and in CI. Matching both
+// exactly is what rejects a release candidate — no rc spelling equals either
+// value — and it also means a patch-level bump is a deliberate edit here rather
+// than something that drifts in. The two were deliberately split while 1.27 was
+// still pre-release; now that the released toolchain is pinned, one rule covers
+// both.
+func TestToolchainVersionsArePinnedToReleasesE2E(t *testing.T) {
 	t.Parallel()
 
 	goDirective, _ := readModuleMetadata(t)
