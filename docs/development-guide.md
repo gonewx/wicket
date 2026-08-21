@@ -51,6 +51,10 @@ mise exec go@1.27.0 -- go test ./...
 
 **漂移门禁：** `go generate` 后 `git status --porcelain` 必须为空。如果 `di/container_gen.go` 出现未提交修改，说明装配漂移，构建视为失败。
 
+**缓存纪律（工具链版本变更后必读）：** `go test` 会复用构建缓存，输出 `(cached)` 的包并未重新编译。若缓存中残留的是旧工具链编译的产物，「全绿」只反映旧工具链下的结论，不能证明新工具链可用。因此**抬升或切换 Go 版本后的首轮验证，必须以 `go clean -cache` 起步，或全程加 `-count=1`**；发布窗口的绿跑记录应注明是否清过缓存。
+
+判断缓存是否被污染的信号：编译时逐包报 `compile: version "goX" does not match go tool version "goY"`。
+
 ## 持续集成
 
 GitHub Actions（`.github/workflows/ci.yml`）在每次 push 与 pull request 上自动承载门禁，作为合并阻塞条件。CI 为干净检出，与本地门禁等价：
@@ -72,6 +76,13 @@ GitHub Actions（`.github/workflows/ci.yml`）在每次 push 与 pull request �
 ### BMad Story 循环
 
 所有功能开发遵循：`bmad-create-story` → `bmad-dev-story` → `bmad-code-review` → 合入。
+
+### 判别力自证纪律
+
+新增或改写守卫类测试后，须证明它真的能失败：反转被断言的条件，确认转红并给出预期消息，再还原。两条硬要求：
+
+1. **反转配置文件前先停掉所有有写权限的 agent。** 曾发生自证期间临时改动的 `mise.toml` 中间态被写回源文件（`go@1.27.0` 被回退为 `go@1.27rc1`），靠 `git status` 才发现。
+2. **收尾以 `git diff` 全量复核为准，不得只看测试绿。** 「输出看起来正常」不等于验证通过——命令因配置错误中止时也没有失败行、`(cached)` 命中也显示 `ok`、管道末端的 `tail` 退出码会掩盖前面命令的真实失败。判断依据只能是真实退出码与实际内容。
 
 ### 提交规范（Conventional Commits）
 
@@ -113,6 +124,7 @@ type(scope): description
 - **接口放消费侧** — 不集中在 `interfaces/` 目录
 - **配置通过 ServerConfig 缝注入** — 业务包不用 `os.Getenv` / 全局变量
 - **导入路径一律 `github.com/gonewx/wicket/...`**
+- **一切命令经 `mise exec`** — PATH 上的裸 `go` 可能指向另一个版本（本项目在 1.27.0 抬升时点实测为遗留的 `1.27rc1`），直接敲 `go build` / `go test` 会用错工具链，而声明文件仍然全绿。自查：比较 `which go` 与 `mise which go` 是否一致。`tests/e2e` 的工具链守卫会断言实际运行版本等于 `mise.toml` 的 pin，忘记 `mise exec` 时它会转红并提示。
 
 ## 常用开发任务
 

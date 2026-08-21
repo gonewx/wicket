@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Tests: 工具链守卫新增运行期断言——比对 `runtime.Version()` 与 `mise.toml` 的 pin，关闭「声明文件全绿而实际以另一个工具链编译」这一失效模式（此前只读声明，该组合不被任何门禁捕获）。三处判别力子进程调用的工具链版本改为派生自同一 pin 来源，消除抬升时字面量静默滞后的漂移面。
+- Docs: 开发指南增补三条验证纪律——工具链变更后的缓存处置、一切命令经 `mise exec` 的自查方式、判别力自证的收尾复核要求。
+
 ## [0.1.4] - 2026-08-21
 
 ### Changed

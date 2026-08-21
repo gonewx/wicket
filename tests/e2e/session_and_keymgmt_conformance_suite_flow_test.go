@@ -268,7 +268,7 @@ func TestOverwritingRecordStoreRunsKeymgmtSuite(t *testing.T) {
 }
 `)
 
-	cmd := exec.Command("mise", "exec", "go@1.27.0", "--", "go", "test", "./"+scratchSessionKeymgmtDir+"/", "-count=1")
+	cmd := exec.Command("mise", "exec", "go@"+readGoToolchainPin(t), "--", "go", "test", "./"+scratchSessionKeymgmtDir+"/", "-count=1")
 	cmd.Dir = root
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

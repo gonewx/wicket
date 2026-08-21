@@ -7,9 +7,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+// releasedVersionPattern matches a released Go version as it appears in
+// runtime.Version(): `go` followed by digits and dots only. Release candidates
+// (`go1.27rc1`), betas and development builds (`devel +hash`) do not match, so
+// they are reported rather than silently compared.
+var releasedVersionPattern = regexp.MustCompile(`^go(\d+(?:\.\d+)*)$`)
+
+// runningToolchainVersion strips the `go` prefix from a runtime.Version() string
+// so it can be compared against the mise pin, which carries no prefix. The pin
+// is the single source of truth, so it is never rewritten to match; anything
+// that is not a plain released version is refused instead.
+func runningToolchainVersion(reported string) (string, error) {
+	match := releasedVersionPattern.FindStringSubmatch(reported)
+	if match == nil {
+		return "", fmt.Errorf("running toolchain %q is not a released version", reported)
+	}
+	return match[1], nil
+}
 
 // tomlTableHeaderPattern matches a TOML table header line, e.g. `[tools]`.
 var tomlTableHeaderPattern = regexp.MustCompile(`^\[([^\]]*)\]\s*$`)
@@ -149,6 +168,18 @@ func TestToolchainVersionsArePinnedToReleasesE2E(t *testing.T) {
 	if toolchainPin != "1.27.0" {
 		t.Fatalf("mise.toml pins go %q, want the released 1.27.0 toolchain", toolchainPin)
 	}
+
+	// The two checks above only read declarations. This one closes the gap
+	// between what is declared and what is actually compiling the tests: a
+	// stale PATH entry, a leftover build cache or a forgotten `mise exec` all
+	// leave the files green while the code runs on another toolchain.
+	running, err := runningToolchainVersion(runtime.Version())
+	if err != nil {
+		t.Fatalf("%v (mise.toml pins %s)", err, toolchainPin)
+	}
+	if running != toolchainPin {
+		t.Fatalf("tests are running on go%s, but mise.toml pins %s — run commands through `mise exec`", running, toolchainPin)
+	}
 }
 
 // TestParseGoToolchainPin pins the parser's own failure modes. The guard above
@@ -233,6 +264,51 @@ func TestParseGoToolchainPin(t *testing.T) {
 			}
 			if got != tc.want {
 				t.Fatalf("parseGoToolchainPin() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRunningToolchainVersion pins how a reported toolchain version is compared
+// against the pin. Only plain released versions may be normalised; every
+// pre-release or development spelling must be refused so that a toolchain the
+// project does not pin can never satisfy the guard by accident.
+func TestRunningToolchainVersion(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		reported string
+		want     string
+		wantErr  bool
+	}{
+		"released patch version":  {reported: "go1.27.0", want: "1.27.0"},
+		"released minor version":  {reported: "go1.27", want: "1.27"},
+		"later patch version":     {reported: "go1.27.3", want: "1.27.3"},
+		"release candidate":       {reported: "go1.27rc1", wantErr: true},
+		"beta":                    {reported: "go1.28beta1", wantErr: true},
+		"development build":       {reported: "devel +abc123", wantErr: true},
+		"development with go tag": {reported: "go1.28-devel_abc123", wantErr: true},
+		"empty":                   {reported: "", wantErr: true},
+		"prefix only":             {reported: "go", wantErr: true},
+		"missing prefix":          {reported: "1.27.0", wantErr: true},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := runningToolchainVersion(tc.reported)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("runningToolchainVersion(%q) = %q, want an error", tc.reported, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("runningToolchainVersion(%q) error = %v, want %q", tc.reported, err, tc.want)
+			}
+			if got != tc.want {
+				t.Fatalf("runningToolchainVersion(%q) = %q, want %q", tc.reported, got, tc.want)
 			}
 		})
 	}
