@@ -9,7 +9,7 @@ wicket 的存储端口分三族，职责与持久化必要性各不相同：
 
 | 端口族 | 位置 | 存的是什么 | 不持久化的后果 |
 | --- | --- | --- | --- |
-| `storage` | `storage/interfaces.go` | 授权码、refresh token、reference token、用户同意、grant、设备码 | 进程重启后已签发的 refresh token 全部失效；多副本部署下授权码换令牌随机失败 |
+| `storage` | `storage/interfaces.go` | 授权码、refresh token、reference token、用户同意、grant、设备码 | 进程重启后已签发的 refresh token 与 reference access token 全部失效；多副本部署下授权码换令牌随机失败，reference access token 的内省结果随副本而异 |
 | `session` | `session/` | 服务端会话记录 | 重启即全员登出；多副本下会话不共享 |
 | `keymgmt` | `keymgmt/` | 签名密钥及其轮换状态 | 每次重启换签名密钥，已签发的 JWT 全部验签失败 |
 
@@ -104,6 +104,13 @@ for {
 ```
 
 清理只回收空间，**不承担正确性**——过期判定始终在 wicket 核心侧完成（AD-3 要素 6）。
+
+reference access token 也在须回收之列：client 配置 `AccessTokenType=Reference` 时，令牌端点与授权端点每签发一个 access token（含每次 refresh 换发）就向 `ReferenceTokenStore` 写入一条记录。被撤销的记录会删除；过期而未被撤销的记录 wicket 不回收，须由宿主调用该 store 的 `RemoveExpired`，否则 store 持续增长（in-memory 回退表现为进程内存增长）。
+
+为 Reference client 自备 store 时另有两点：
+
+- `RefreshTokenStore` 须完整往返 refresh token 内保存的 access token 模型，至少包括 `ClientId` 与 `AccessTokenType`。refresh 换发默认复用该模型：丢失 `AccessTokenType` 会使换发静默签发 JWT，丢失 `ClientId` 会使换发失败。契约测试套件目前不检查这一点。
+- `ReferenceTokenStore.StoreReferenceToken` 失败时，wicket 不把 store 的错误文本写入响应或自身日志（只保留错误身份，可用 `errors.Is` / `errors.As` 取得），故障原因须由 store 在自己一侧记录；句柄是凭据，store 的错误文本与日志不应包含句柄或记录内容。
 
 ### 释放资源
 
