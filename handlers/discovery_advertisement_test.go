@@ -378,6 +378,20 @@ func TestFilterDiscoveryAdvertisement(t *testing.T) {
 			},
 		},
 		{
+			name: "host registration endpoint under the base URL is kept",
+			configure: func(o *config_options.WicketOptions) {
+				o.Discovery.CustomEntries = map[string]any{
+					wicket.DiscoveryRegistrationEndpoint: advertisementBaseUrl + "/connect/register",
+				}
+			},
+			edit: func(d map[string]any) {
+				d[wicket.DiscoveryRegistrationEndpoint] = advertisementBaseUrl + "/connect/register"
+			},
+			values: map[string]any{
+				wicket.DiscoveryRegistrationEndpoint: advertisementBaseUrl + "/connect/register",
+			},
+		},
+		{
 			name: "external endpoint URL is kept",
 			edit: func(d map[string]any) {
 				d[wicket.DiscoveryRegistrationEndpoint] = "https://elsewhere.test/connect/register"
@@ -518,16 +532,74 @@ func equalJson(t *testing.T, got any, want any) bool {
 	return bytes.Equal(left, right)
 }
 
-// TestGeneratedDiscoveryKeysCoverTheDiscoveryConstants keeps the generated key
-// name space in step with the wicket.Discovery* constants.
-func TestGeneratedDiscoveryKeysCoverTheDiscoveryConstants(t *testing.T) {
+// TestGeneratedDiscoveryKeysMatchTheGenerator keeps the generated key set in
+// step with the keys the discovery generator writes: every
+// entries[wicket.Discovery*] assignment in the generator source.
+func TestGeneratedDiscoveryKeysMatchTheGenerator(t *testing.T) {
 	t.Parallel()
+
+	constants := discoveryConstantValues(t)
+
+	generator, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "responses", "impl", "discovery_response_generator.go"), nil, 0)
+	if err != nil {
+		t.Fatalf("parse discovery generator: %v", err)
+	}
+	want := map[string]struct{}{}
+	ast.Inspect(generator, func(node ast.Node) bool {
+		assign, ok := node.(*ast.AssignStmt)
+		if !ok {
+			return true
+		}
+		for _, lhs := range assign.Lhs {
+			index, ok := lhs.(*ast.IndexExpr)
+			if !ok {
+				continue
+			}
+			target, ok := index.X.(*ast.Ident)
+			if !ok || target.Name != "entries" {
+				continue
+			}
+			selector, ok := index.Index.(*ast.SelectorExpr)
+			if !ok {
+				continue
+			}
+			pkg, ok := selector.X.(*ast.Ident)
+			if !ok || pkg.Name != "wicket" || !strings.HasPrefix(selector.Sel.Name, "Discovery") {
+				continue
+			}
+			value, ok := constants[selector.Sel.Name]
+			if !ok {
+				t.Fatalf("generator writes wicket.%s which is not a string constant in constants.go", selector.Sel.Name)
+			}
+			want[value] = struct{}{}
+		}
+		return true
+	})
+	if len(want) == 0 {
+		t.Fatal("no entries[wicket.Discovery*] assignments found in the discovery generator")
+	}
+	for key := range want {
+		if _, ok := generatedDiscoveryKeys[key]; !ok {
+			t.Errorf("generatedDiscoveryKeys misses %q which the generator writes", key)
+		}
+	}
+	for key := range generatedDiscoveryKeys {
+		if _, ok := want[key]; !ok {
+			t.Errorf("generatedDiscoveryKeys holds %q which the generator never writes", key)
+		}
+	}
+}
+
+// discoveryConstantValues maps the names of the wicket.Discovery* string
+// constants to their values.
+func discoveryConstantValues(t *testing.T) map[string]string {
+	t.Helper()
 
 	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "constants.go"), nil, 0)
 	if err != nil {
 		t.Fatalf("parse constants.go: %v", err)
 	}
-	want := map[string]struct{}{}
+	values := map[string]string{}
 	for _, decl := range file.Decls {
 		general, ok := decl.(*ast.GenDecl)
 		if !ok || general.Tok != token.CONST {
@@ -541,27 +613,15 @@ func TestGeneratedDiscoveryKeysCoverTheDiscoveryConstants(t *testing.T) {
 				}
 				literal, ok := value.Values[i].(*ast.BasicLit)
 				if !ok || literal.Kind != token.STRING {
-					t.Fatalf("%s is not a string literal constant", name.Name)
+					continue
 				}
 				unquoted, err := strconv.Unquote(literal.Value)
 				if err != nil {
 					t.Fatalf("unquote %s: %v", name.Name, err)
 				}
-				want[unquoted] = struct{}{}
+				values[name.Name] = unquoted
 			}
 		}
 	}
-	if len(want) == 0 {
-		t.Fatal("no Discovery constants found in constants.go")
-	}
-	for key := range want {
-		if _, ok := generatedDiscoveryKeys[key]; !ok {
-			t.Errorf("generatedDiscoveryKeys misses %q", key)
-		}
-	}
-	for key := range generatedDiscoveryKeys {
-		if _, ok := want[key]; !ok {
-			t.Errorf("generatedDiscoveryKeys holds %q which is not a Discovery constant", key)
-		}
-	}
+	return values
 }

@@ -65,8 +65,8 @@ func isTlsAuthenticationMethod(method string) bool {
 
 // filterDiscoveryAdvertisement removes the entries of a generated discovery
 // document that the running assembly cannot serve. Entries produced by the
-// host's custom entries under keys outside the generated key name space are
-// left untouched.
+// host's custom entries under keys the generator does not write are left
+// untouched.
 func filterDiscoveryAdvertisement(
 	document map[string]any,
 	baseUrl string,
@@ -126,65 +126,45 @@ func filterDiscoveryAdvertisement(
 	}
 }
 
-// generatedDiscoveryKeys is the key name space of the wicket.Discovery*
-// constants, the names the generator writes. When a custom entry shares one
-// of these names the generator keeps its own value, so such a key is always
-// treated as generated. The set only tells where a value comes from; it does
+// generatedDiscoveryKeys holds the keys the discovery generator writes into
+// the document. When a custom entry shares one of these names the generator
+// keeps its own value, so such a key is always treated as generated. A key
+// the generator never writes (registration_endpoint, for example) can only
+// come from the host. The set only tells where a value comes from; it does
 // not decide whether anything can be served.
 var generatedDiscoveryKeys = map[string]struct{}{
-	wicket.DiscoveryIssuer:                                                    {},
-	wicket.DiscoveryDisplayValuesSupported:                                    {},
-	wicket.DiscoveryAcrValuesSupported:                                        {},
-	wicket.DiscoveryIdTokenEncryptionAlgorithmsSupported:                      {},
-	wicket.DiscoveryIdTokenEncryptionEncValuesSupported:                       {},
-	wicket.DiscoveryIdTokenSigningAlgorithmsSupported:                         {},
-	wicket.DiscoveryOpPolicyUri:                                               {},
-	wicket.DiscoveryOpTosUri:                                                  {},
-	wicket.DiscoveryRequestObjectEncryptionAlgorithmsSupported:                {},
-	wicket.DiscoveryRequestObjectEncryptionEncValuesSupported:                 {},
-	wicket.DiscoveryRequestObjectSigningAlgorithmsSupported:                   {},
-	wicket.DiscoveryRequestParameterSupported:                                 {},
-	wicket.DiscoveryRequestUriParameterSupported:                              {},
-	wicket.DiscoveryRequireRequestUriRegistration:                             {},
-	wicket.DiscoveryServiceDocumentation:                                      {},
-	wicket.DiscoveryTokenEndpointAuthSigningAlgorithmsSupported:               {},
-	wicket.DiscoveryUILocalesSupported:                                        {},
-	wicket.DiscoveryUserInfoEncryptionAlgorithmsSupported:                     {},
-	wicket.DiscoveryUserInfoEncryptionEncValuesSupported:                      {},
-	wicket.DiscoveryUserInfoSigningAlgorithmsSupported:                        {},
-	wicket.DiscoveryTlsClientCertificateBoundAccessTokens:                     {},
-	wicket.DiscoveryAuthorizationResponseIssParameterSupported:                {},
-	wicket.DiscoveryBackchannelTokenDeliveryModesSupported:                    {},
-	wicket.DiscoveryBackchannelAuthenticationEndpoint:                         {},
-	wicket.DiscoveryClaimTypesSupported:                                       {},
-	wicket.DiscoveryBackchannelAuthenticationRequestSigningAlgValuesSupported: {},
-	wicket.DiscoveryClaimsParameterSupported:                                  {},
-	wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported:               {},
-	wicket.DiscoveryAuthorizationEndpoint:                                     {},
-	wicket.DiscoveryDeviceAuthorizationEndpoint:                               {},
-	wicket.DiscoveryTokenEndpoint:                                             {},
-	wicket.DiscoveryUserInfoEndpoint:                                          {},
-	wicket.DiscoveryIntrospectionEndpoint:                                     {},
-	wicket.DiscoveryRevocationEndpoint:                                        {},
-	wicket.DiscoveryDiscoveryEndpoint:                                         {},
-	wicket.DiscoveryJwksUri:                                                   {},
-	wicket.DiscoveryEndSessionEndpoint:                                        {},
-	wicket.DiscoveryCheckSessionIframe:                                        {},
-	wicket.DiscoveryRegistrationEndpoint:                                      {},
-	wicket.DiscoveryMtlsEndpointAliases:                                       {},
-	wicket.DiscoveryFrontChannelLogoutSupported:                               {},
-	wicket.DiscoveryFrontChannelLogoutSessionSupported:                        {},
-	wicket.DiscoveryBackchannelLogoutSupported:                                {},
-	wicket.DiscoveryBackchannelLogoutSessionSupported:                         {},
-	wicket.DiscoveryGrantTypesSupported:                                       {},
-	wicket.DiscoveryCodeChallengeMethodsSupported:                             {},
-	wicket.DiscoveryScopesSupported:                                           {},
-	wicket.DiscoverySubjectTypesSupported:                                     {},
-	wicket.DiscoveryResponseModesSupported:                                    {},
-	wicket.DiscoveryResponseTypesSupported:                                    {},
-	wicket.DiscoveryClaimsSupported:                                           {},
-	wicket.DiscoveryClaimsLocalesSupported:                                    {},
-	wicket.DiscoveryBackchannelUserCodeParameterSupported:                     {},
+	wicket.DiscoveryAuthorizationEndpoint:                       {},
+	wicket.DiscoveryAuthorizationResponseIssParameterSupported:  {},
+	wicket.DiscoveryBackchannelAuthenticationEndpoint:           {},
+	wicket.DiscoveryBackchannelLogoutSessionSupported:           {},
+	wicket.DiscoveryBackchannelLogoutSupported:                  {},
+	wicket.DiscoveryBackchannelTokenDeliveryModesSupported:      {},
+	wicket.DiscoveryBackchannelUserCodeParameterSupported:       {},
+	wicket.DiscoveryCheckSessionIframe:                          {},
+	wicket.DiscoveryClaimsSupported:                             {},
+	wicket.DiscoveryCodeChallengeMethodsSupported:               {},
+	wicket.DiscoveryDeviceAuthorizationEndpoint:                 {},
+	wicket.DiscoveryEndSessionEndpoint:                          {},
+	wicket.DiscoveryFrontChannelLogoutSessionSupported:          {},
+	wicket.DiscoveryFrontChannelLogoutSupported:                 {},
+	wicket.DiscoveryGrantTypesSupported:                         {},
+	wicket.DiscoveryIdTokenSigningAlgorithmsSupported:           {},
+	wicket.DiscoveryIntrospectionEndpoint:                       {},
+	wicket.DiscoveryIssuer:                                      {},
+	wicket.DiscoveryJwksUri:                                     {},
+	wicket.DiscoveryMtlsEndpointAliases:                         {},
+	wicket.DiscoveryRequestObjectSigningAlgorithmsSupported:     {},
+	wicket.DiscoveryRequestParameterSupported:                   {},
+	wicket.DiscoveryRequestUriParameterSupported:                {},
+	wicket.DiscoveryResponseModesSupported:                      {},
+	wicket.DiscoveryResponseTypesSupported:                      {},
+	wicket.DiscoveryRevocationEndpoint:                          {},
+	wicket.DiscoveryScopesSupported:                             {},
+	wicket.DiscoverySubjectTypesSupported:                       {},
+	wicket.DiscoveryTlsClientCertificateBoundAccessTokens:       {},
+	wicket.DiscoveryTokenEndpoint:                               {},
+	wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported: {},
+	wicket.DiscoveryUserInfoEndpoint:                            {},
 }
 
 func isEndpointKey(key string) bool {
@@ -213,7 +193,7 @@ func (f *discoveryFilter) localPath(raw string) (string, bool) {
 
 // isHostEntry reports whether the document value of key was produced by the
 // host's custom entries rather than by the generator: the key is a custom
-// entry and lies outside the generated key name space. A custom entry named
+// entry and is not a key the generator writes. A custom entry named
 // like a generated key never overrides the generated value, so it is filtered
 // like any generated entry and cannot re-advertise a withdrawn capability.
 func (f *discoveryFilter) isHostEntry(key string) bool {
