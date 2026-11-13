@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gonewx/wicket"
+	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/responses"
 	responses_models "github.com/gonewx/wicket/responses/models"
@@ -22,28 +23,56 @@ import (
 // the grant, and issues the token response. Protocol failures are written as
 // 400 JSON error responses; only an unrecoverable infrastructure fault is
 // returned as an error.
+//
+// A handler that holds options enforces Endpoints.EnableTokenEndpoint: while
+// the switch is off it answers 404 to every request. A handler without options
+// does not look at the switch and always serves.
 type TokenHandler struct {
 	clientValidator  validators.ClientSecretValidator
 	requestValidator validators.TokenRequestValidator
 	generator        responses.TokenResponseGenerator
+	options          *config_options.WicketOptions
 	logger           *slog.Logger
 }
 
+// NewTokenHandler builds a token handler that holds no options. It does not
+// enforce Endpoints.EnableTokenEndpoint and serves whatever the switch says;
+// use NewTokenHandlerWithOptions for a handler that honors the switch.
 func NewTokenHandler(
 	clientValidator validators.ClientSecretValidator,
 	requestValidator validators.TokenRequestValidator,
 	generator responses.TokenResponseGenerator,
 	logger *slog.Logger,
 ) *TokenHandler {
+	return NewTokenHandlerWithOptions(clientValidator, requestValidator, generator, nil, logger)
+}
+
+// NewTokenHandlerWithOptions builds a token handler that holds options and
+// enforces Endpoints.EnableTokenEndpoint: while the switch is off the handler
+// answers 404 to every request. The switch is read on each request. Nil
+// options leave the endpoint on.
+func NewTokenHandlerWithOptions(
+	clientValidator validators.ClientSecretValidator,
+	requestValidator validators.TokenRequestValidator,
+	generator responses.TokenResponseGenerator,
+	options *config_options.WicketOptions,
+	logger *slog.Logger,
+) *TokenHandler {
 	return &TokenHandler{
 		clientValidator:  clientValidator,
 		requestValidator: requestValidator,
 		generator:        generator,
+		options:          options,
 		logger:           logger,
 	}
 }
 
 func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
+	// A switched-off endpoint answers as if it did not exist, whatever the
+	// request looks like, and before anything of the request is read.
+	if h.options != nil && !h.options.Endpoints.EnableTokenEndpoint {
+		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
+	}
 	if err := r.ParseForm(); err != nil {
 		return results.NewBadRequestResult(wicket.TokenErrorsInvalidRequest, "").Execute(w, r)
 	}
