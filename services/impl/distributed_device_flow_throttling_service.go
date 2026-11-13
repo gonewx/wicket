@@ -55,12 +55,12 @@ func (s *DistributedDeviceFlowThrottlingService) ShouldSlowDown(ctx context.Cont
 
 	// record new
 	if lastSeenAsString == "" {
-		extensions.DistributedCacheSetString(s.cache, key, s.clock.Now().String(), options)
+		extensions.DistributedCacheSetString(s.cache, key, s.clock.Now().Format(time.RFC3339Nano), options)
 		return false, nil
 	}
 
 	// check interval
-	lastSeen, err := time.Parse(time.RFC3339, lastSeenAsString)
+	lastSeen, err := time.Parse(time.RFC3339Nano, lastSeenAsString)
 	if err == nil {
 		lastSeen = lastSeen.UTC()
 
@@ -70,19 +70,19 @@ func (s *DistributedDeviceFlowThrottlingService) ShouldSlowDown(ctx context.Cont
 		}
 
 		interval := 0
-		if client != nil {
+		if client != nil && client.PollingInterval != nil {
 			interval = *client.PollingInterval
 		} else {
 			interval = s.options.DeviceFlow.Interval
 		}
 
 		if s.clock.Now().Sub(lastSeen) < time.Duration(interval)*time.Second {
-			extensions.DistributedCacheSetString(s.cache, key, s.clock.Now().String(), options)
+			extensions.DistributedCacheSetString(s.cache, key, s.clock.Now().Format(time.RFC3339Nano), options)
 			return true, nil
 		}
 	}
 
 	// store current and continue
-	extensions.DistributedCacheSetString(s.cache, key, s.clock.Now().String(), options)
+	extensions.DistributedCacheSetString(s.cache, key, s.clock.Now().Format(time.RFC3339Nano), options)
 	return false, nil
 }
