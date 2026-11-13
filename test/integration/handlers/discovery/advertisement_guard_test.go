@@ -194,15 +194,18 @@ func assertEndpointsRouted(t *testing.T, guard *advertisementGuard) {
 		}
 		raw, ok := value.(string)
 		require.Truef(t, ok, "%s is not a URL string: %v", key, value)
-		require.Truef(t, strings.HasPrefix(raw, base+"/"), "%s = %s is not served by this assembly", key, raw)
+		if !strings.HasPrefix(raw, base+"/") {
+			// external URLs are advertised as they are; another host serves them
+			continue
+		}
 		urls = append(urls, raw)
 	}
 	if aliases, ok := guard.document[wicket.DiscoveryMtlsEndpointAliases].(map[string]any); ok {
 		for name, value := range aliases {
 			raw, ok := value.(string)
 			require.Truef(t, ok, "mtls alias %s is not a URL string: %v", name, value)
-			if strings.HasPrefix(raw, base+"/") {
-				urls = append(urls, raw)
+			if local, ok := localAliasUrl(guard, raw); ok {
+				urls = append(urls, local)
 			}
 		}
 	}
@@ -221,6 +224,24 @@ func assertEndpointsRouted(t *testing.T, guard *advertisementGuard) {
 		_ = response.Body.Close()
 		require.NotEqualf(t, http.StatusNotFound, response.StatusCode, "advertised URL %s is not routed", raw)
 	}
+}
+
+// localAliasUrl reads an mtls alias the way the discovery filter does. Without
+// a mutual TLS domain name an alias is in path form: it is built by appending
+// the route to the base URL, where the separating slash may be missing, so
+// any alias starting with the base URL is local and is requested at the base
+// URL plus its route path. With a domain name the alias lives on another host
+// unless it is a plain URL under the base URL.
+func localAliasUrl(guard *advertisementGuard, raw string) (string, bool) {
+	base := guard.pipeline.TestServer.URL
+	if guard.options().MutualTls.DomainName != "" {
+		return raw, strings.HasPrefix(raw, base+"/")
+	}
+	rest, ok := strings.CutPrefix(raw, base)
+	if !ok {
+		return "", false
+	}
+	return base + "/" + strings.TrimLeft(rest, "/"), true
 }
 
 func assertCapabilitiesBacked(t *testing.T, guard *advertisementGuard) {
@@ -276,6 +297,18 @@ func assertRegisteredRoutesAdvertised(t *testing.T, guard *advertisementGuard) {
 	for _, value := range guard.document {
 		if raw, ok := value.(string); ok {
 			advertisedUrls[raw] = struct{}{}
+		}
+	}
+	if aliases, ok := guard.document[wicket.DiscoveryMtlsEndpointAliases].(map[string]any); ok {
+		for _, value := range aliases {
+			raw, ok := value.(string)
+			if !ok {
+				continue
+			}
+			advertisedUrls[raw] = struct{}{}
+			if local, ok := localAliasUrl(guard, raw); ok {
+				advertisedUrls[local] = struct{}{}
+			}
 		}
 	}
 

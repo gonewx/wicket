@@ -20,6 +20,7 @@ import (
 
 	"github.com/gonewx/wicket"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/models"
 	"github.com/gonewx/wicket/models/contexts"
 )
 
@@ -251,6 +252,72 @@ func TestFilterDiscoveryAdvertisement(t *testing.T) {
 					wicket.DiscoveryTokenEndpoint: advertisementBaseUrl + ":8443/" + wicket.ProtocolRoutePathsToken,
 				},
 			},
+		},
+		{
+			name:      "mutual TLS fully servable logs no warning",
+			mutualTls: true,
+			configure: func(o *config_options.WicketOptions) { o.MutualTls.Enabled = true },
+			assembly: func(a discoveryAssembly) discoveryAssembly {
+				a.authenticationMethods = append(a.authenticationMethods,
+					wicket.EndpointAuthenticationMethodsTlsClientAuth,
+					wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
+				)
+				a.endpointPaths = append(a.endpointPaths,
+					"/"+wicket.ProtocolRoutePathsRevocation,
+					"/"+wicket.ProtocolRoutePathsDeviceAuthorization,
+					"/"+wicket.ProtocolRoutePathsMtlsToken,
+					"/"+wicket.ProtocolRoutePathsMtlsRevocation,
+					"/"+wicket.ProtocolRoutePathsMtlsIntrospection,
+					"/"+wicket.ProtocolRoutePathsMtlsDeviceAuthorization,
+				)
+				return a
+			},
+			present: []string{wicket.DiscoveryTlsClientCertificateBoundAccessTokens},
+			values: map[string]any{
+				wicket.DiscoveryMtlsEndpointAliases: map[string]string{
+					wicket.DiscoveryTokenEndpoint:               advertisementUrl(wicket.ProtocolRoutePathsMtlsToken),
+					wicket.DiscoveryRevocationEndpoint:          advertisementUrl(wicket.ProtocolRoutePathsMtlsRevocation),
+					wicket.DiscoveryIntrospectionEndpoint:       advertisementUrl(wicket.ProtocolRoutePathsMtlsIntrospection),
+					wicket.DiscoveryDeviceAuthorizationEndpoint: advertisementUrl(wicket.ProtocolRoutePathsMtlsDeviceAuthorization),
+				},
+			},
+			authMethods: []string{
+				wicket.EndpointAuthenticationMethodsBasicAuthentication,
+				wicket.EndpointAuthenticationMethodsPostBody,
+				wicket.EndpointAuthenticationMethodsTlsClientAuth,
+				wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
+			},
+			wantWarnings: 0,
+		},
+		{
+			name:      "mutual TLS with only some aliases pruned logs one warning",
+			mutualTls: true,
+			configure: func(o *config_options.WicketOptions) { o.MutualTls.Enabled = true },
+			assembly: func(a discoveryAssembly) discoveryAssembly {
+				a.authenticationMethods = append(a.authenticationMethods,
+					wicket.EndpointAuthenticationMethodsTlsClientAuth,
+					wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
+				)
+				a.endpointPaths = append(a.endpointPaths,
+					"/"+wicket.ProtocolRoutePathsMtlsToken,
+					"/"+wicket.ProtocolRoutePathsMtlsIntrospection,
+				)
+				return a
+			},
+			present: []string{wicket.DiscoveryTlsClientCertificateBoundAccessTokens},
+			values: map[string]any{
+				wicket.DiscoveryMtlsEndpointAliases: map[string]string{
+					wicket.DiscoveryTokenEndpoint:         advertisementUrl(wicket.ProtocolRoutePathsMtlsToken),
+					wicket.DiscoveryIntrospectionEndpoint: advertisementUrl(wicket.ProtocolRoutePathsMtlsIntrospection),
+				},
+			},
+			authMethods: []string{
+				wicket.EndpointAuthenticationMethodsBasicAuthentication,
+				wicket.EndpointAuthenticationMethodsPostBody,
+				wicket.EndpointAuthenticationMethodsTlsClientAuth,
+				wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
+			},
+			wantWarnings: 1,
 		},
 		{
 			name:      "mutual TLS keeps routed aliases of advertised endpoints",
@@ -516,6 +583,65 @@ func TestDiscoveryHandlerFiltersGeneratedDocument(t *testing.T) {
 	}
 	if _, ok := document[wicket.DiscoveryTokenEndpoint]; !ok {
 		t.Errorf("%s missing from the served document", wicket.DiscoveryTokenEndpoint)
+	}
+}
+
+type fakeSecretsListParser struct{ methods []string }
+
+func (p fakeSecretsListParser) Parse(*http.Request) (*models.ParsedSecret, error) { return nil, nil }
+
+func (p fakeSecretsListParser) GetAvailableAuthenticationMethods() []string {
+	return slices.Clone(p.methods)
+}
+
+func TestDiscoveryHandlerWiresTheAssemblyCapabilities(t *testing.T) {
+	t.Parallel()
+
+	options := config_options.NewWicketOptions()
+	options.MutualTls.Enabled = true
+	handler := NewDiscoveryHandler(
+		&fakeDiscoveryResponseGenerator{document: generatedDocument(true)},
+		&fakeServerUrls{base: advertisementBaseUrl},
+		&fakeIssuerNameService{issuer: advertisementBaseUrl},
+		options,
+		registeredEndpointPaths,
+		markedBackChannelLogout{delivers: true},
+		fakeSecretsListParser{methods: []string{
+			wicket.EndpointAuthenticationMethodsBasicAuthentication,
+			wicket.EndpointAuthenticationMethodsPostBody,
+			wicket.EndpointAuthenticationMethodsTlsClientAuth,
+			wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
+		}},
+		quietLogger(),
+	)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, advertisementBaseUrl+wicket.ProtocolRoutePathsDiscoveryConfiguration, nil)
+	if err := handler.Process(recorder, request); err != nil {
+		t.Fatalf("Process: %v", err)
+	}
+	var document map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &document); err != nil {
+		t.Fatalf("unmarshal document: %v", err)
+	}
+
+	methods, _ := document[wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported].([]any)
+	for _, method := range []string{
+		wicket.EndpointAuthenticationMethodsTlsClientAuth,
+		wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
+	} {
+		if !slices.Contains(methods, any(method)) {
+			t.Errorf("%s missing from %s = %v", method, wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported, methods)
+		}
+	}
+	for _, key := range []string{
+		wicket.DiscoveryTlsClientCertificateBoundAccessTokens,
+		wicket.DiscoveryBackchannelLogoutSupported,
+		wicket.DiscoveryBackchannelLogoutSessionSupported,
+	} {
+		if value, ok := document[key]; !ok || value != true {
+			t.Errorf("%s = %v, want true", key, value)
+		}
 	}
 }
 
