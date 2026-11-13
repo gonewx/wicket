@@ -8,7 +8,7 @@ Wicket 作为中间件嵌入宿主 HTTP 应用，提供 OIDC/OAuth 2.0 协议端
 
 - OIDC 授权码流（含 PKCE）、Discovery、UserInfo、Introspection
 - 令牌端点：`authorization_code`、`refresh_token`、`client_credentials`、CIBA
-- 令牌撤销（RFC 7009）：`POST /connect/revocation`，客户端以 `client_secret_basic` 或 `client_secret_post` 认证，可撤销 refresh token（连带同一用户、同一客户端的 reference access token）与 reference access token；discovery 宣告 `revocation_endpoint`
+- 令牌撤销（RFC 7009）：`POST /connect/revocation`，客户端以 `client_secret_basic` 或 `client_secret_post` 认证，可撤销 refresh token（连带同一用户、同一客户端的 reference access token）与 reference access token；discovery 宣告 `revocation_endpoint`。注意：令牌端点目前只签发 JWT access token，没有生产路径写入 reference token store，只有宿主自行写入的令牌才是 reference token；提交 JWT access token 撤销会返回 200，但不产生任何效果
 - 设备授权流（RFC 8628）、Back-Channel Logout 发送：尚未提供，discovery 不宣告
 - Discovery 按当前装配实际可服务的能力输出宣告（已注册路由、能力实现与客户端认证解析器），未落地的能力不会出现在文档中
 - 外部 IdP：Google / Facebook / Apple / JWT Bearer + 运行时动态方案

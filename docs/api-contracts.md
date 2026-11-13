@@ -120,9 +120,11 @@ token=<refresh_token_or_reference_access_token>
 ```
 
 - 只接受 `POST`（其他方法 405）与 `application/x-www-form-urlencoded` 请求体（其他内容类型 415）。参数只从请求体读取，查询串中的 `token` 不生效。
-- 客户端认证与令牌端点相同（`client_secret_basic` 或 `client_secret_post`）。认证失败一律返回 `{"error":"invalid_client"}`（`application/json`）：请求带 `Authorization` 头时为 **401**，并带 `WWW-Authenticate`（Basic 方案为 `Basic realm="wicket"`，其他方案回写方案名）；未带该头（凭据在请求体或缺失）时为 **400**。
-- `token` 缺失或请求体为空：400 `invalid_request`。`token_type_hint` 只接受 `access_token`、`refresh_token`，其他值返回 400 `unsupported_token_type`。
-- 撤销 refresh token 时，同一用户、同一客户端的 reference access token 一并失效；撤销 reference access token 后，内省返回 `active=false`。JWT access token 无服务端状态，不能撤销。
+- 端点开关 `EnableTokenRevocationEndpoint` 只控制 discovery 是否宣告 `revocation_endpoint`；与 introspection、token 端点一样，开关为 `false` 时路由照常提供服务。
+- 客户端认证与令牌端点相同（`client_secret_basic` 或 `client_secret_post`）。认证先于参数校验执行，认证失败一律返回 `{"error":"invalid_client"}`（`application/json`）：请求带 `Authorization` 头时为 **401**，并带 `WWW-Authenticate`（Basic 方案为 `Basic realm="wicket"`，其他方案回写方案名）；未带该头（凭据在请求体或缺失）时为 **400**。
+- 认证通过后 `token` 缺失：400 `invalid_request`。请求体为空时，只有凭据放在 `Authorization` 头中才返回 400 `invalid_request`；未带该头时请求体中没有凭据，按上一条返回 400 `invalid_client`。
+- `token_type_hint` 只接受 `access_token`、`refresh_token`，其他值返回 400 `unsupported_token_type`。这是对 RFC 7009 §2.2 的已知偏离（该节规定服务端忽略无效的 hint 值），为与现有请求校验器保持兼容而保留。
+- 撤销 refresh token 时，同一用户、同一客户端的 reference access token 一并失效；撤销 reference access token 后，内省返回 `active=false`。注意：令牌端点目前只签发 JWT access token，没有生产路径写入 reference token store，只有宿主自行写入 store 的令牌才是 reference token。JWT access token 无服务端状态，不能撤销：提交 JWT access token 会返回 200，但不产生任何效果，该令牌在过期前仍然有效。
 - 不带 `token_type_hint` 时，先按 reference access token 查找，未找到再按 refresh token 查找。带 hint 时只在该类型中查找：hint 与令牌实际类型不符时不撤销（已知限制，RFC 7009 §2.1 要求扩展到其他类型）。
 - 成功响应为 200、空响应体，带 `Cache-Control: no-store` 等禁止缓存的头。未知令牌、已撤销令牌、属于其他客户端的令牌同样返回 200；属于其他客户端的令牌静默不撤销。
 - 存储故障等基础设施错误不按协议错误处理，由中间件统一写出。

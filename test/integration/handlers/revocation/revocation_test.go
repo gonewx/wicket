@@ -111,6 +111,7 @@ func (f *revocationFixture) storeReferenceToken(t *testing.T, clientId string) s
 }
 
 type tokenPair struct {
+	jwt       string
 	reference string
 	refresh   string
 }
@@ -139,7 +140,11 @@ func issueTokens(t *testing.T, pipeline *revocationFixture, clientId string) tok
 		"password":      {"bob"},
 	})
 	require.Equal(t, http.StatusOK, status, "token endpoint: %s", body)
-	pair := tokenPair{reference: pipeline.storeReferenceToken(t, clientId), refresh: gjson.Get(body, "refresh_token").String()}
+	pair := tokenPair{
+		jwt:       gjson.Get(body, "access_token").String(),
+		reference: pipeline.storeReferenceToken(t, clientId),
+		refresh:   gjson.Get(body, "refresh_token").String(),
+	}
 	require.NotEmpty(t, pair.refresh)
 	require.True(t, introspectActive(t, pipeline, pair.reference), "seeded reference token must start active")
 	return pair
@@ -388,6 +393,20 @@ func TestRevocationAcrossClientsIsSilent(t *testing.T) {
 			requireRefreshUsable(t, pipeline, clientA, tokens.refresh)
 		})
 	}
+}
+
+// The token endpoint issues JWT access tokens, which carry no server-side
+// state the revocation endpoint can remove: revoking one answers 200 and the
+// token stays active. Update this test together with that behavior.
+func TestRevocationKnownLimitationJwtAccessTokenStaysActive(t *testing.T) {
+	pipeline := newRevocationPipeline()
+	tokens := issueTokens(t, pipeline, clientA)
+	require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
+	require.True(t, introspectActive(t, pipeline, tokens.jwt))
+
+	requireRevocationOk(t, revokeAs(t, pipeline, clientA, tokens.jwt, wicket.TokenTypeHintsAccessToken))
+
+	require.True(t, introspectActive(t, pipeline, tokens.jwt))
 }
 
 // The generator does not search the other token type when the hint names the
