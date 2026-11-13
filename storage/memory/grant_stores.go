@@ -163,10 +163,22 @@ func (s *MemoryDeviceFlowStore) FindByDeviceCode(ctx context.Context, deviceCode
 	return data, nil
 }
 
+// UpdateByUserCode replaces the record stored under userCode, and the record
+// under the matching device code with it, so both lookups return the new
+// record. A user code that is not stored fails with ErrNotFound.
 func (s *MemoryDeviceFlowStore) UpdateByUserCode(ctx context.Context, userCode string, data *models.DeviceCode) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, ok := s.byUserCode[userCode]; !ok {
+		return storage.ErrNotFound
+	}
 	s.byUserCode[userCode] = data
+	for deviceCode, stored := range s.userByDevice {
+		if stored == userCode {
+			s.byDeviceCode[deviceCode] = data
+			break
+		}
+	}
 	return nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/storage/models"
 )
@@ -193,6 +194,55 @@ func RunDeviceFlowStoreSuite(t *testing.T, newStore func() storage.DeviceFlowSto
 		}
 		if !got.IsAuthorized {
 			t.Fatal("updated record not authorized")
+		}
+	})
+	// Derived from: https://www.rfc-editor.org/rfc/rfc8628#section-3.4 and
+	// #section-3.5. The user's decision is written under the user code while
+	// the device polls with the device code, so the replaced record must be
+	// what both lookups return.
+	cfg.mayCase(t, "UpdateVisibleByDeviceCode", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		initial := newDeviceCode("client-a")
+		if err := store.StoreDeviceAuthorization(context.Background(), "device-1", "user-1", initial); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		updated := newDeviceCode("client-a")
+		updated.IsAuthorized = true
+		updated.AuthorizedScopes = []string{"openid"}
+		updated.RequestedScopes = []string{"openid"}
+		updated.SessionId = "session-1"
+		updated.Subject = claims.NewClaimsPrincipal(claims.WithClaimsPrincipalIdentity(claims.NewClaimsIdentity(
+			claims.WithAuthenticationType("test"),
+			claims.WithClaims([]*claims.Claim{claims.NewClaim(claims.WithClaimType("sub"), claims.WithClaimValue("subject-1"))}),
+		)))
+		if err := store.UpdateByUserCode(context.Background(), "user-1", updated); err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		byUser, err := store.FindByUserCode(context.Background(), "user-1")
+		if err != nil {
+			t.Fatalf("FindByUserCode after update: %v", err)
+		}
+		byDevice, err := store.FindByDeviceCode(context.Background(), "device-1")
+		if err != nil {
+			t.Fatalf("FindByDeviceCode after update: %v", err)
+		}
+		for name, got := range map[string]*models.DeviceCode{"FindByUserCode": byUser, "FindByDeviceCode": byDevice} {
+			if !got.IsAuthorized {
+				t.Fatalf("%s: IsAuthorized = false after update", name)
+			}
+			if len(got.AuthorizedScopes) != 1 || got.AuthorizedScopes[0] != "openid" {
+				t.Fatalf("%s: AuthorizedScopes = %v, want [openid]", name, got.AuthorizedScopes)
+			}
+			if len(got.RequestedScopes) != 1 || got.RequestedScopes[0] != "openid" {
+				t.Fatalf("%s: RequestedScopes = %v, want [openid]", name, got.RequestedScopes)
+			}
+			if got.SessionId != "session-1" {
+				t.Fatalf("%s: SessionId = %q, want session-1", name, got.SessionId)
+			}
+			if sub := got.Subject.FindFirst("sub"); sub == nil || sub.Value != "subject-1" {
+				t.Fatalf("%s: subject sub = %v, want subject-1", name, sub)
+			}
 		}
 	})
 	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
