@@ -206,3 +206,15 @@ func TestCtxCancellationPropagatesIntoStore(t *testing.T) {
 		t.Fatalf("Get with cancelled ctx = %v, want ErrNotFound", err)
 	}
 }
+
+func TestMemoryDeviceFlowStoreUpdateOfUnknownUserCode(t *testing.T) {
+	store := NewMemoryDeviceFlowStore()
+
+	err := store.UpdateByUserCode(context.Background(), "missing", &models.DeviceCode{ClientId: "client-a"})
+	if !errors.Is(err, storage.ErrNotFound) {
+		t.Fatalf("UpdateByUserCode(missing) = %v, want ErrNotFound", err)
+	}
+	if _, err := store.FindByUserCode(context.Background(), "missing"); !errors.Is(err, storage.ErrNotFound) {
+		t.Fatalf("FindByUserCode(missing) after update = %v, want ErrNotFound", err)
+	}
+}

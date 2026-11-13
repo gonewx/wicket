@@ -141,11 +141,11 @@ client_id=<client_id>
 &scope=openid%20api1%20offline_access
 ```
 
-- `EnableDeviceAuthorizationEndpoint=false` 时，端点对任何请求都返回 404，discovery 不宣告 `device_authorization_endpoint`，`grant_types_supported` 也不含 `device_code`。默认为 `true`。
+- `EnableDeviceAuthorizationEndpoint=false` 时，端点对任何请求都返回 404，discovery 不宣告 `device_authorization_endpoint`，`grant_types_supported` 也不含 `device_code`。默认为 `true`。关闭开关前已签发的 device code 在过期前仍可在令牌端点兑换。
 - 只接受 `POST`（其他方法 405）与 `application/x-www-form-urlencoded` 请求体（其他内容类型 415）。参数只从请求体读取，查询串不生效；请求体无法按表单解析时返回 400 `invalid_request`。
-- 客户端认证与令牌端点相同（`client_secret_basic` 或 `client_secret_post`），`RequireClientSecret=false` 的公共客户端只需在请求体中带 `client_id`。认证失败返回 `{"error":"invalid_client"}`：请求带 `Authorization` 头时为 **401** 并带 `WWW-Authenticate`，否则为 **400**，与撤销端点一致。
+- 客户端认证与令牌端点相同：经 DI 注册的 secret parser 解析凭据（默认含 `client_secret_basic`、`client_secret_post`），不要求密钥的公共客户端（`RequireClientSecret=false`）只需在请求体中带 `client_id`。认证失败返回 `{"error":"invalid_client"}`：请求带 `Authorization` 头时为 **401** 并带 `WWW-Authenticate`，否则为 **400**，与撤销端点一致。
 - 客户端不允许 device_code 授权类型时返回 400 `unauthorized_client`；scope 无效、身份 scope 缺少 `openid`，或未传 `scope` 且客户端没有 `AllowedScopes` 时返回 400 `invalid_scope`；`scope` 超长返回 400 `invalid_request`。这些错误的响应体只含 `error`，`Content-Type: application/json`，并带禁止缓存的头。未传 `scope` 时默认取客户端全部 `AllowedScopes`（`AllowOfflineAccess=true` 时追加 `offline_access`）。
-- 成功响应为 200、`application/json`、禁止缓存：
+- 成功响应为 200、`application/json`、禁止缓存（示例假设宿主已把 `DeviceFlow.Interval` 设为 5；默认值为 0，见下文已知限制）：
 
 ```json
 {
@@ -171,7 +171,7 @@ grant_type=urn:ietf:params:oauth:grant-type:device_code
 &client_secret=<secret>
 ```
 
-  用户尚未处理时返回 400 `authorization_pending`；同一 device_code 在轮询间隔内再次轮询返回 `slow_down`（间隔取客户端的 `PollingInterval`，未设时取 `DeviceFlow.Interval`）；用户拒绝后返回 `access_denied`；过期后返回 `expired_token`；未知或属于其他客户端的 device_code 返回 `invalid_grant`。用户批准后返回令牌，`scope` 为用户批准的 scope；批准范围含 `offline_access` 时同时签发 refresh token，用它刷新得到的 scope 不超出批准范围。兑换成功后记录即删除，再次兑换返回 `invalid_grant`。
+  用户尚未处理时返回 400 `authorization_pending`；同一 device_code 在轮询间隔内再次轮询返回 `slow_down`（间隔取客户端的 `PollingInterval`，未设时取 `DeviceFlow.Interval`）；用户拒绝后返回 `access_denied`；过期后返回 `expired_token`；未知或属于其他客户端的 device_code 返回 `invalid_grant`。用户批准后返回令牌，`scope` 为用户批准的 scope；批准范围含 `offline_access` 时同时签发 refresh token，用它刷新得到的 scope 不超出批准范围。兑换成功后记录即删除，再次兑换返回 `invalid_grant`。令牌端点先判定轮询间隔，再判定过期与拒绝：在间隔内再次轮询已过期或已拒绝的 device code 时，返回 `slow_down` 而不是 `expired_token` 或 `access_denied`。
 - 请求校验与生成阶段的存储故障等基础设施错误不按协议错误处理，由中间件统一写出。
 
 #### 宿主验证页面：`services.DeviceFlowInteractionService`

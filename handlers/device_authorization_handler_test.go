@@ -223,6 +223,12 @@ func TestDeviceAuthorizationHandlerClientAuthenticationFailure(t *testing.T) {
 			req.SetBasicAuth("device.client", "wrong")
 			outcome := runDeviceAuthorization(req, deviceSetup{clientResult: clientResult})
 
+			if outcome.err != nil {
+				t.Fatalf("Process: %v", outcome.err)
+			}
+			if outcome.validator.called {
+				t.Fatal("request validated for an unauthenticated client")
+			}
 			if outcome.recorder.Code != http.StatusUnauthorized {
 				t.Fatalf("status = %d, want 401", outcome.recorder.Code)
 			}
@@ -237,6 +243,25 @@ func TestDeviceAuthorizationHandlerClientAuthenticationFailure(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Bearer header answers with the Bearer challenge", func(t *testing.T) {
+		req := deviceRequest(http.MethodPost, "", "")
+		req.Header.Set("Authorization", "Bearer x")
+		outcome := runDeviceAuthorization(req, deviceSetup{clientResult: failedClientResult(wicket.TokenErrorsInvalidClient)})
+
+		if outcome.err != nil {
+			t.Fatalf("Process: %v", outcome.err)
+		}
+		if outcome.recorder.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", outcome.recorder.Code)
+		}
+		if got := outcome.recorder.Header().Get("WWW-Authenticate"); got != "Bearer" {
+			t.Fatalf("WWW-Authenticate = %q, want Bearer", got)
+		}
+		if outcome.validator.called {
+			t.Fatal("request validated for an unauthenticated client")
+		}
+	})
 }
 
 func TestDeviceAuthorizationHandlerProtocolErrors(t *testing.T) {
