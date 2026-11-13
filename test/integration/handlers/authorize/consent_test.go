@@ -30,7 +30,7 @@ func newConsentTests() *ConsentTests {
 
 	client1 := storage_models.NewClient()
 	client1.ClientId = "client1"
-	err := client1.SetAllowedGrantTypes(gois.GrantTypesImplicit)
+	err := client1.SetAllowedGrantTypes(wicket.GrantTypesImplicit)
 	if err != nil {
 		panic(err)
 	}
@@ -42,7 +42,7 @@ func newConsentTests() *ConsentTests {
 
 	client2 := storage_models.NewClient()
 	client2.ClientId = "client2"
-	err = client2.SetAllowedGrantTypes(gois.GrantTypesImplicit)
+	err = client2.SetAllowedGrantTypes(wicket.GrantTypesImplicit)
 	if err != nil {
 		panic(err)
 	}
@@ -54,7 +54,7 @@ func newConsentTests() *ConsentTests {
 
 	client3 := storage_models.NewClient()
 	client3.ClientId = "client3"
-	err = client3.SetAllowedGrantTypes(gois.GrantTypesImplicit)
+	err = client3.SetAllowedGrantTypes(wicket.GrantTypesImplicit)
 	if err != nil {
 		panic(err)
 	}

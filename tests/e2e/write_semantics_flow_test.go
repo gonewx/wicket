@@ -108,7 +108,7 @@ func TestAuthorizationCodeIssuanceStoresResponseHandleE2E(t *testing.T) {
 
 	newRequest := func() *validators_models.ValidatedAuthorizeRequest {
 		request := validators_models.NewValidatedAuthorizeRequest()
-		request.GrantType = gois.GrantTypeAuthorizationCode
+		request.GrantType = wicket.GrantTypeAuthorizationCode
 		request.Client = fixture.client
 		request.ClientId = fixture.client.ClientId
 		request.Subject = claimspkg.ClaimsPrincipalAnonymous()
@@ -201,7 +201,7 @@ func TestRefreshTokenRotationLifecycleE2E(t *testing.T) {
 	if err == nil {
 		t.Fatal("stale rotation succeeded, want invalid_grant")
 	}
-	if !errors.Is(err, gois.TokenErrorsInvalidGrant) {
+	if !errors.Is(err, wicket.TokenErrorsInvalidGrant) {
 		t.Fatalf("stale rotation error = %v, want invalid_grant", err)
 	}
 	if !errors.Is(err, storage.ErrVersionConflict) {

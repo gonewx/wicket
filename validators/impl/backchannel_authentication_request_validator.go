@@ -55,32 +55,32 @@ func NewBackchannelAuthenticationRequestValidator(
 
 func (v *BackchannelAuthenticationRequestValidator) Validate(ctx context.Context, values url.Values, client *storage_models.Client) *validators_models.BackchannelAuthenticationRequestValidationResult {
 	if client == nil {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidClient, "")
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidClient, "")
 	}
-	if !utils.Contains(client.AllowedGrantTypes(), gois.GrantTypeBackchannelAuthentication) {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsUnauthorizedClient, "")
+	if !utils.Contains(client.AllowedGrantTypes(), wicket.GrantTypeBackchannelAuthentication) {
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsUnauthorizedClient, "")
 	}
 	mode := client.BackchannelTokenDeliveryMode
 	if mode == "" {
-		mode = gois.BackchannelTokenDeliveryModesPoll
+		mode = wicket.BackchannelTokenDeliveryModesPoll
 	}
 	if !utils.Contains(v.options.BackchannelAuthentication.AllowedDeliveryModes, mode) {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidRequest, "")
 	}
-	if values.Get(gois.BackchannelAuthenticationRequestRequest) != "" && len(values.Get(gois.BackchannelAuthenticationRequestRequest)) > v.options.InputLengthRestrictions.Jwt {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
+	if values.Get(wicket.BackchannelAuthenticationRequestRequest) != "" && len(values.Get(wicket.BackchannelAuthenticationRequestRequest)) > v.options.InputLengthRestrictions.Jwt {
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidRequest, "")
 	}
-	scope := values.Get(gois.BackchannelAuthenticationRequestScope)
+	scope := values.Get(wicket.BackchannelAuthenticationRequestScope)
 	if scope == "" {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidScope, "")
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidScope, "")
 	}
 	if len(scope) > v.options.InputLengthRestrictions.Scope {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidScope, "")
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidScope, "")
 	}
 	scopes := utils.ParseScopesString(scope)
-	resources := values[gois.BackchannelAuthenticationRequestResource]
+	resources := values[wicket.BackchannelAuthenticationRequestResource]
 	if utils.AnyPred(resources, func(x string) bool { return len(x) > v.options.InputLengthRestrictions.ResourceGapMaxLength }) {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidTarget, "")
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidTarget, "")
 	}
 	validation, err := v.resources.ValidateRequestedResources(ctx, &validators_models.ResourceValidationRequest{
 		Client:       client,
@@ -92,36 +92,36 @@ func (v *BackchannelAuthenticationRequestValidator) Validate(ctx context.Context
 	}
 	if !validation.Succeeded() {
 		if len(validation.InvalidResourceGaps) > 0 {
-			return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidTarget, "")
+			return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidTarget, "")
 		}
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidScope, "")
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidScope, "")
 	}
 	userCtx := &validators_models.BackchannelAuthenticationUserValidationContext{
-		LoginHint:      values.Get(gois.BackchannelAuthenticationRequestLoginHint),
-		IdTokenHint:    values.Get(gois.BackchannelAuthenticationRequestIdTokenHint),
-		LoginHintToken: values.Get(gois.BackchannelAuthenticationRequestLoginHintToken),
+		LoginHint:      values.Get(wicket.BackchannelAuthenticationRequestLoginHint),
+		IdTokenHint:    values.Get(wicket.BackchannelAuthenticationRequestIdTokenHint),
+		LoginHintToken: values.Get(wicket.BackchannelAuthenticationRequestLoginHintToken),
 		Client:         client,
 	}
 	if tooLong(userCtx.LoginHint, v.options.InputLengthRestrictions.LoginHint) ||
 		tooLong(userCtx.IdTokenHint, v.options.InputLengthRestrictions.IdTokenHint) ||
 		tooLong(userCtx.LoginHintToken, v.options.InputLengthRestrictions.LoginHintToken) {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidRequest, "")
 	}
 	if err := v.users.Validate(ctx, userCtx); err != nil {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidRequest, "")
 	}
-	if tooLong(values.Get(gois.BackchannelAuthenticationRequestBindingMessage), v.options.InputLengthRestrictions.BindingMessage) ||
-		tooLong(values.Get(gois.BackchannelAuthenticationRequestUserCode), v.options.InputLengthRestrictions.UserCode) {
-		return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
+	if tooLong(values.Get(wicket.BackchannelAuthenticationRequestBindingMessage), v.options.InputLengthRestrictions.BindingMessage) ||
+		tooLong(values.Get(wicket.BackchannelAuthenticationRequestUserCode), v.options.InputLengthRestrictions.UserCode) {
+		return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidRequest, "")
 	}
 	lifetime := v.options.BackchannelAuthentication.DefaultRequestLifetime
 	if client.BackchannelAuthenticationLifetime != nil && *client.BackchannelAuthenticationLifetime > 0 {
 		lifetime = *client.BackchannelAuthenticationLifetime
 	}
-	if raw := strings.TrimSpace(values.Get(gois.BackchannelAuthenticationRequestRequestedExpiry)); raw != "" {
+	if raw := strings.TrimSpace(values.Get(wicket.BackchannelAuthenticationRequestRequestedExpiry)); raw != "" {
 		requested, err := strconv.Atoi(raw)
 		if err != nil || requested <= 0 {
-			return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
+			return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidRequest, "")
 		}
 		if requested < lifetime {
 			lifetime = requested
@@ -144,22 +144,22 @@ func (v *BackchannelAuthenticationRequestValidator) Validate(ctx context.Context
 		RequestedScopes:            scopes,
 		RequestedResourceGaps:      resources,
 		DeliveryMode:               mode,
-		BindingMessage:             values.Get(gois.BackchannelAuthenticationRequestBindingMessage),
-		UserCode:                   values.Get(gois.BackchannelAuthenticationRequestUserCode),
-		RequestObject:              values.Get(gois.BackchannelAuthenticationRequestRequest),
+		BindingMessage:             values.Get(wicket.BackchannelAuthenticationRequestBindingMessage),
+		UserCode:                   values.Get(wicket.BackchannelAuthenticationRequestUserCode),
+		RequestObject:              values.Get(wicket.BackchannelAuthenticationRequestRequest),
 		Status:                     storage_models.BackchannelAuthenticationRequestStatusPending,
 		CreationTime:               now,
 		ExpirationTime:             now.Add(time.Duration(lifetime) * time.Second),
 		PollInterval:               interval,
-		ClientNotificationToken:    values.Get(gois.BackchannelAuthenticationRequestClientNotificationToken),
+		ClientNotificationToken:    values.Get(wicket.BackchannelAuthenticationRequestClientNotificationToken),
 		ClientNotificationEndpoint: client.ClientNotificationEndpoint,
 	}
 	if err := v.store.StoreBackchannelAuthenticationRequest(ctx, requestID, request); err != nil {
 		return validators_models.NewBackchannelAuthenticationRequestValidationError(err, "")
 	}
-	if mode == gois.BackchannelTokenDeliveryModesPing {
+	if mode == wicket.BackchannelTokenDeliveryModesPing {
 		if err := v.notifications.Notify(request); err != nil {
-			return validators_models.NewBackchannelAuthenticationRequestValidationError(gois.TokenErrorsInvalidRequest, "")
+			return validators_models.NewBackchannelAuthenticationRequestValidationError(wicket.TokenErrorsInvalidRequest, "")
 		}
 	}
 	result := validators_models.NewBackchannelAuthenticationRequestValidationResult()

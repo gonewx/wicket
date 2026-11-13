@@ -94,10 +94,10 @@ func TestAuthorizeResponseHandlerPromptNoneErrorsShouldReturnToClient(t *testing
 	a := require.New(t)
 
 	errs := []error{
-		gois.AuthorizeErrorsAccountSelectionRequired,
-		gois.AuthorizeErrorsLoginRequired,
-		gois.AuthorizeErrorsConsentRequired,
-		gois.AuthorizeErrorsInteractionRequired,
+		wicket.AuthorizeErrorsAccountSelectionRequired,
+		wicket.AuthorizeErrorsLoginRequired,
+		wicket.AuthorizeErrorsConsentRequired,
+		wicket.AuthorizeErrorsInteractionRequired,
 	}
 
 	for _, err := range errs {
@@ -105,9 +105,9 @@ func TestAuthorizeResponseHandlerPromptNoneErrorsShouldReturnToClient(t *testing
 		tc.response.Error = err
 
 		tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
-		tc.response.Request.ResponseMode = gois.ResponseModesQuery
+		tc.response.Request.ResponseMode = wicket.ResponseModesQuery
 		tc.response.Request.RedirectUri = "http://client/callback"
-		tc.response.Request.PromptModes = []string{gois.PromptModesNone}
+		tc.response.Request.PromptModes = []string{wicket.PromptModesNone}
 
 		_ = tc.subject.Execute(tc.writer, tc.httpRequest)
 
@@ -123,10 +123,10 @@ func TestAuthorizeResponseHandlerPromptNoneErrorsForAnonymousUsersShouldIncludeS
 	a := require.New(t)
 
 	errs := []error{
-		gois.AuthorizeErrorsAccountSelectionRequired,
-		gois.AuthorizeErrorsLoginRequired,
-		gois.AuthorizeErrorsConsentRequired,
-		gois.AuthorizeErrorsInteractionRequired,
+		wicket.AuthorizeErrorsAccountSelectionRequired,
+		wicket.AuthorizeErrorsLoginRequired,
+		wicket.AuthorizeErrorsConsentRequired,
+		wicket.AuthorizeErrorsInteractionRequired,
 	}
 
 	for _, err := range errs {
@@ -134,9 +134,9 @@ func TestAuthorizeResponseHandlerPromptNoneErrorsForAnonymousUsersShouldIncludeS
 		tc.response.Error = err
 
 		tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
-		tc.response.Request.ResponseMode = gois.ResponseModesQuery
+		tc.response.Request.ResponseMode = wicket.ResponseModesQuery
 		tc.response.Request.RedirectUri = "http://client/callback"
-		tc.response.Request.PromptModes = []string{gois.PromptModesNone}
+		tc.response.Request.PromptModes = []string{wicket.PromptModesNone}
 
 		tc.response.SessionState = "some_session_state"
 
@@ -156,11 +156,11 @@ func TestAuthorizeResponseHandlerAccessDeniedShouldReturnToClient(t *testing.T) 
 	const errorDescription = "some error description"
 
 	tc := newAuthorizeResultTests()
-	tc.response.Error = gois.AuthorizeErrorsAccessDenied
+	tc.response.Error = wicket.AuthorizeErrorsAccessDenied
 	tc.response.ErrorDescription = errorDescription
 
 	tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
-	tc.response.Request.ResponseMode = gois.ResponseModesQuery
+	tc.response.Request.ResponseMode = wicket.ResponseModesQuery
 	tc.response.Request.RedirectUri = "http://client/callback"
 
 	_ = tc.subject.Execute(tc.writer, tc.httpRequest)
@@ -175,7 +175,7 @@ func TestAuthorizeResponseHandlerAccessDeniedShouldReturnToClient(t *testing.T) 
 	a.NoError(err)
 
 	queryParams := u.Query()
-	a.Equal(gois.AuthorizeErrorsAccessDenied.Error(), queryParams.Get("error"))
+	a.Equal(wicket.AuthorizeErrorsAccessDenied.Error(), queryParams.Get("error"))
 	a.Equal(errorDescription, queryParams.Get("error_description"))
 }
 
@@ -186,7 +186,7 @@ func TestAuthorizeResponseHandlerSuccessShouldAddClientToClientList(t *testing.T
 
 	tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
 	tc.response.Request.ClientId = "client"
-	tc.response.Request.ResponseMode = gois.ResponseModesQuery
+	tc.response.Request.ResponseMode = wicket.ResponseModesQuery
 	tc.response.Request.RedirectUri = "http://client/callback"
 
 	_ = tc.subject.Execute(tc.writer, tc.httpRequest)
@@ -202,7 +202,7 @@ func TestAuthorizeResponseHandlerQueryModeShouldPassResultsInQuery(t *testing.T)
 
 	tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
 	tc.response.Request.ClientId = "client"
-	tc.response.Request.ResponseMode = gois.ResponseModesQuery
+	tc.response.Request.ResponseMode = wicket.ResponseModesQuery
 	tc.response.Request.RedirectUri = "http://client/callback"
 	tc.response.Request.State = "state"
 
@@ -225,7 +225,7 @@ func TestAuthorizeResponseHandlerFragmentModeShouldPassResultsInFragment(t *test
 
 	tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
 	tc.response.Request.ClientId = "client"
-	tc.response.Request.ResponseMode = gois.ResponseModesFragment
+	tc.response.Request.ResponseMode = wicket.ResponseModesFragment
 	tc.response.Request.RedirectUri = "http://client/callback"
 	tc.response.Request.State = "state"
 
@@ -248,7 +248,7 @@ func TestAuthorizeResponseHandlerFormPostModeShouldPassResultsInBody(t *testing.
 
 	tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
 	tc.response.Request.ClientId = "client"
-	tc.response.Request.ResponseMode = gois.ResponseModesFormPost
+	tc.response.Request.ResponseMode = wicket.ResponseModesFormPost
 	tc.response.Request.RedirectUri = "http://client/callback"
 	tc.response.Request.State = "state"
 
@@ -277,11 +277,11 @@ func TestAuthorizeResponseHandlerFormPostModeShouldAddUnsafeInlineForCspLevel1(t
 
 	tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
 	tc.response.Request.ClientId = "client"
-	tc.response.Request.ResponseMode = gois.ResponseModesFormPost
+	tc.response.Request.ResponseMode = wicket.ResponseModesFormPost
 	tc.response.Request.RedirectUri = "http://client/callback"
 	tc.response.Request.State = "state"
 
-	tc.options.Csp.Level = gois.CspLevelOne
+	tc.options.Csp.Level = wicket.CspLevelOne
 
 	_ = tc.subject.Execute(tc.writer, tc.httpRequest)
 
@@ -296,7 +296,7 @@ func TestAuthorizeResponseHandlerFormPostModeShouldNotAddDeprecatedHeaderWhenItI
 
 	tc.response.Request = validators_models.NewValidatedAuthorizeRequest()
 	tc.response.Request.ClientId = "client"
-	tc.response.Request.ResponseMode = gois.ResponseModesFormPost
+	tc.response.Request.ResponseMode = wicket.ResponseModesFormPost
 	tc.response.Request.RedirectUri = "http://client/callback"
 	tc.response.Request.State = "state"
 

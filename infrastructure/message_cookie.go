@@ -181,7 +181,7 @@ func (m *MessageCookie[T]) Write(id string, message *models_messages.Message[T])
 	m.clearOverflow()
 
 	if message == nil {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 
 	name := m.cookieFullName(id)

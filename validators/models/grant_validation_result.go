@@ -23,42 +23,42 @@ type GrantValidationResult struct {
 	CustomResponse map[string]any
 }
 
-func WithGrantValidationResultPrincipal(principal *claims.ClaimsPrincipal) gois.Option[GrantValidationResult] {
+func WithGrantValidationResultPrincipal(principal *claims.ClaimsPrincipal) wicket.Option[GrantValidationResult] {
 	return func(r *GrantValidationResult) {
 		r.Subject = principal
 	}
 }
 
-func WithGrantValidationResultError(err gois.TokenRequestErrors, desc string) gois.Option[GrantValidationResult] {
+func WithGrantValidationResultError(err wicket.TokenRequestErrors, desc string) wicket.Option[GrantValidationResult] {
 	return func(r *GrantValidationResult) {
 		r.Error = convertTokenErrorEnum(err)
 		r.Description = desc
 	}
 }
 
-func WithGrantValidationResultCustomResponse(customResponse map[string]any) gois.Option[GrantValidationResult] {
+func WithGrantValidationResultCustomResponse(customResponse map[string]any) wicket.Option[GrantValidationResult] {
 	return func(r *GrantValidationResult) {
 		r.CustomResponse = customResponse
 	}
 }
 
-func WithGrantValidationResultSubject(subject, authenticationMethod string, authTime time.Time, claims []*claimspkg.Claim, identtityProvider string, customResponse map[string]any) gois.Option[GrantValidationResult] {
+func WithGrantValidationResultSubject(subject, authenticationMethod string, authTime time.Time, claims []*claimspkg.Claim, identtityProvider string, customResponse map[string]any) wicket.Option[GrantValidationResult] {
 	return func(r *GrantValidationResult) {
 		resultClaims := []*claimspkg.Claim{
 			claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesSubject),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesSubject),
 				claimspkg.WithClaimValue(subject),
 			),
 			claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesAuthenticationMethod),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesAuthenticationMethod),
 				claimspkg.WithClaimValue(authenticationMethod),
 			),
 			claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesIdentityProvider),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesIdentityProvider),
 				claimspkg.WithClaimValue(identtityProvider),
 			),
 			claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesAuthenticationTime),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesAuthenticationTime),
 				claimspkg.WithClaimValue(authTime.Unix()),
 			),
 		}
@@ -83,7 +83,7 @@ func WithGrantValidationResultSubject(subject, authenticationMethod string, auth
 	}
 
 }
-func NewGrantValidationResult(opts ...gois.Option[GrantValidationResult]) *GrantValidationResult {
+func NewGrantValidationResult(opts ...wicket.Option[GrantValidationResult]) *GrantValidationResult {
 	r := &GrantValidationResult{
 		ValidationResult: NewValidationResult(),
 	}
@@ -94,22 +94,22 @@ func NewGrantValidationResult(opts ...gois.Option[GrantValidationResult]) *Grant
 	return r
 }
 
-func convertTokenErrorEnum(err gois.TokenRequestErrors) error {
+func convertTokenErrorEnum(err wicket.TokenRequestErrors) error {
 	switch err {
-	case gois.TokenRequestErrorsInvalidClient:
-		return gois.TokenErrorsInvalidClient
-	case gois.TokenRequestErrorsInvalidGrant:
-		return gois.TokenErrorsInvalidGrant
-	case gois.TokenRequestErrorsInvalidRequest:
-		return gois.TokenErrorsInvalidRequest
-	case gois.TokenRequestErrorsInvalidScope:
-		return gois.TokenErrorsInvalidScope
-	case gois.TokenRequestErrorsUnauthorizedClient:
-		return gois.TokenErrorsUnauthorizedClient
-	case gois.TokenRequestErrorsUnsupportedGrantType:
-		return gois.TokenErrorsUnsupportedGrantType
-	case gois.TokenRequestErrorsInvalidTarget:
-		return gois.TokenErrorsInvalidTarget
+	case wicket.TokenRequestErrorsInvalidClient:
+		return wicket.TokenErrorsInvalidClient
+	case wicket.TokenRequestErrorsInvalidGrant:
+		return wicket.TokenErrorsInvalidGrant
+	case wicket.TokenRequestErrorsInvalidRequest:
+		return wicket.TokenErrorsInvalidRequest
+	case wicket.TokenRequestErrorsInvalidScope:
+		return wicket.TokenErrorsInvalidScope
+	case wicket.TokenRequestErrorsUnauthorizedClient:
+		return wicket.TokenErrorsUnauthorizedClient
+	case wicket.TokenRequestErrorsUnsupportedGrantType:
+		return wicket.TokenErrorsUnsupportedGrantType
+	case wicket.TokenRequestErrorsInvalidTarget:
+		return wicket.TokenErrorsInvalidTarget
 	}
 	return nil
 }

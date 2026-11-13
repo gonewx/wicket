@@ -27,7 +27,7 @@ func TestImplicit_should_be_allowed(t *testing.T) {
 	a := require.New(t)
 
 	client := NewClient()
-	err := client.SetAllowedGrantTypes(gois.GrantTypesImplicit)
+	err := client.SetAllowedGrantTypes(wicket.GrantTypesImplicit)
 
 	a.NoError(err)
 }
@@ -53,8 +53,8 @@ func TestCustom_should_be_allowed_raw(t *testing.T) {
 func TestForbidden_grant_type_combinations_should_throw(t *testing.T) {
 	a := require.New(t)
 
-	grantTypes1 := []string{gois.GrantTypeImplicit, gois.GrantTypeImplicit, gois.GrantTypeAuthorizationCode}
-	grantTypes2 := []string{gois.GrantTypeHybrid, gois.GrantTypeAuthorizationCode, gois.GrantTypeHybrid}
+	grantTypes1 := []string{wicket.GrantTypeImplicit, wicket.GrantTypeImplicit, wicket.GrantTypeAuthorizationCode}
+	grantTypes2 := []string{wicket.GrantTypeHybrid, wicket.GrantTypeAuthorizationCode, wicket.GrantTypeHybrid}
 
 	for i := range grantTypes1 {
 		client := NewClient()
@@ -69,8 +69,8 @@ func TestForbidden_grant_type_combinations_should_throw(t *testing.T) {
 func TestCustom_and_forbidden_grant_type_combinations_should_throw(t *testing.T) {
 	a := require.New(t)
 
-	grantTypes1 := []string{gois.GrantTypeImplicit, gois.GrantTypeImplicit, gois.GrantTypeAuthorizationCode}
-	grantTypes2 := []string{gois.GrantTypeHybrid, gois.GrantTypeAuthorizationCode, gois.GrantTypeHybrid}
+	grantTypes1 := []string{wicket.GrantTypeImplicit, wicket.GrantTypeImplicit, wicket.GrantTypeAuthorizationCode}
+	grantTypes2 := []string{wicket.GrantTypeHybrid, wicket.GrantTypeAuthorizationCode, wicket.GrantTypeHybrid}
 
 	for i := range grantTypes1 {
 		client := NewClient()

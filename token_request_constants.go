@@ -1,7 +1,7 @@
 // Copyright 2026 Decker.
 // Licensed under the Apache License, Version 2.0.
 
-package gois
+package wicket
 
 const (
 	TokenRequestGrantType               = "grant_type"

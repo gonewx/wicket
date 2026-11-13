@@ -79,7 +79,7 @@ func (v *JwtRequestValidator) Validate(ctx *validators_contexts.JwtRequestValida
 		return nil, err
 	}
 
-	if jwtSecurityToken.Has(gois.AuthorizeRequestRequest) || jwtSecurityToken.Has(gois.AuthorizeRequestRequestUri) {
+	if jwtSecurityToken.Has(wicket.AuthorizeRequestRequest) || jwtSecurityToken.Has(wicket.AuthorizeRequestRequestUri) {
 		return nil, fmt.Errorf("JWT payload must not contain request or request_uri")
 	}
 
@@ -122,7 +122,7 @@ func (v *JwtRequestValidator) ValidateJwt(ctx *validators_contexts.JwtRequestVal
 				return fmt.Errorf("cannot found type [%s]", typ)
 			}
 
-			if typ != string(gois.JwtTypesAuthorizationRequest) {
+			if typ != string(wicket.JwtTypesAuthorizationRequest) {
 				return fmt.Errorf("invalid type [%s]", typ)
 			}
 			return nil
@@ -142,7 +142,7 @@ func (v *JwtRequestValidator) ValidateJwt(ctx *validators_contexts.JwtRequestVal
 // Processes the JWT contents
 func (v *JwtRequestValidator) ProcessPayload(validationCtx *validators_contexts.JwtRequestValidationContext, token jwt.Token) []*claimspkg.Claim {
 	// filter JWT validation values
-	filter := gois.JwtRequestClaimTypesFilter
+	filter := wicket.JwtRequestClaimTypesFilter
 	if validationCtx.IncludeJti {
 		// don't filter out the jti claim
 		for i, v := range filter {

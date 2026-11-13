@@ -30,7 +30,7 @@ func clientCredentialsClient(id string) *storage_models.Client {
 	secret.Value = utils.Sha256("secret")
 	client.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesClientCredentials); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesClientCredentials); err != nil {
 		panic(err)
 	}
 	client.AllowedScopes = []string{"api1", "api2", "api3-a", "api3-b"}
@@ -56,7 +56,7 @@ func newIntrospectionPipeline() *integration_common.WicketPipeline {
 	secret := storage_models.NewSecret()
 	secret.Value = utils.Sha256("secret")
 	passwordClient.ClientSecrets = []*storage_models.Secret{secret}
-	if err := passwordClient.SetAllowedGrantTypes(gois.GrantTypesPassword); err != nil {
+	if err := passwordClient.SetAllowedGrantTypes(wicket.GrantTypesPassword); err != nil {
 		panic(err)
 	}
 	passwordClient.AllowedScopes = []string{"api1", "api2", "api3-a", "api3-b"}

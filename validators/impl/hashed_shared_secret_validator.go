@@ -32,13 +32,13 @@ func (s *HashedSharedSecretValidator) Validate(secrets []*storage_models.Secret,
 	fail := &validtors_models.SecretValidationResult{Success: false}
 	success := &validtors_models.SecretValidationResult{Success: true}
 
-	if parsedSecret.Type != gois.ParsedSecretTypesSharedSecret {
+	if parsedSecret.Type != wicket.ParsedSecretTypesSharedSecret {
 		s.logger.Debug("Hashed shared secret validator cannot process", slog.String("type", parsedSecret.Type))
 		return fail, nil
 	}
 
 	sharedSecrets := utils.Where(secrets, func(s *storage_models.Secret) bool {
-		return s.Type == gois.ParsedSecretTypesSharedSecret
+		return s.Type == wicket.ParsedSecretTypesSharedSecret
 	})
 	if len(sharedSecrets) == 0 {
 		s.logger.Debug("No shared secret configured for client.")

@@ -69,10 +69,10 @@ func (g *AuthorizeInteractionResponseGenerator) Handle(ctx context.Context, req 
 	login := g.loginHandler(ctx, req)
 	if promptNone(req) {
 		if login.IsRedirect() {
-			return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsInteractionRequired}
+			return &responses_models.InteractionResponse{Error: wicket.AuthorizeErrorsInteractionRequired}
 		}
 		if login.IsLogin {
-			return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsLoginRequired}
+			return &responses_models.InteractionResponse{Error: wicket.AuthorizeErrorsLoginRequired}
 		}
 	}
 	if login.IsLogin || login.IsError() || login.IsRedirect() {
@@ -81,7 +81,7 @@ func (g *AuthorizeInteractionResponseGenerator) Handle(ctx context.Context, req 
 
 	result := g.consentHandler(ctx, req, consent)
 	if promptNone(req) && result.IsConsent {
-		return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsConsentRequired}
+		return &responses_models.InteractionResponse{Error: wicket.AuthorizeErrorsConsentRequired}
 	}
 	return result
 }
@@ -92,7 +92,7 @@ func (g *AuthorizeInteractionResponseGenerator) Handle(ctx context.Context, req 
 func (g *AuthorizeInteractionResponseGenerator) HandleLogin(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse {
 	// an explicit login/select_account prompt forces re-authentication; the prompt
 	// is suppressed so the follow-up request does not trigger it again.
-	if utils.Contains(req.PromptModes, gois.PromptModesLogin) || utils.Contains(req.PromptModes, gois.PromptModesSelectAccount) {
+	if utils.Contains(req.PromptModes, wicket.PromptModesLogin) || utils.Contains(req.PromptModes, wicket.PromptModesSelectAccount) {
 		req.RemovePrompt()
 		return &responses_models.InteractionResponse{IsLogin: true}
 	}
@@ -122,7 +122,7 @@ func (g *AuthorizeInteractionResponseGenerator) HandleLogin(ctx context.Context,
 	}
 
 	// a locally established session against a client that disables local login.
-	if currentIdp == gois.LocalIdentityProvider && req.Client != nil && !req.Client.EnableLocalLogin {
+	if currentIdp == wicket.LocalIdentityProvider && req.Client != nil && !req.Client.EnableLocalLogin {
 		return &responses_models.InteractionResponse{IsLogin: true}
 	}
 
@@ -145,16 +145,16 @@ func (g *AuthorizeInteractionResponseGenerator) HandleLogin(ctx context.Context,
 // the user has answered, whether the grant is acceptable.
 func (g *AuthorizeInteractionResponseGenerator) HandleConsent(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
 	if req == nil {
-		return &responses_models.InteractionResponse{Error: gois.ArgumentNullException}
+		return &responses_models.InteractionResponse{Error: wicket.ArgumentNullException}
 	}
 
 	// consent handling accepts only a consent-class prompt; a login-class prompt
 	// reaching here is a misdirected request.
-	if utils.Contains(req.PromptModes, gois.PromptModesLogin) || utils.Contains(req.PromptModes, gois.PromptModesSelectAccount) {
-		return &responses_models.InteractionResponse{Error: gois.InvalidOperationException}
+	if utils.Contains(req.PromptModes, wicket.PromptModesLogin) || utils.Contains(req.PromptModes, wicket.PromptModesSelectAccount) {
+		return &responses_models.InteractionResponse{Error: wicket.InvalidOperationException}
 	}
 
-	consentRequired := utils.Contains(req.PromptModes, gois.PromptModesConsent)
+	consentRequired := utils.Contains(req.PromptModes, wicket.PromptModesConsent)
 	if !consentRequired {
 		required, err := g.consent.RequiresConsent(req.Subject, req.Client, req.ValidatedResources.ParsedScopes)
 		if err != nil {
@@ -169,7 +169,7 @@ func (g *AuthorizeInteractionResponseGenerator) HandleConsent(ctx context.Contex
 
 	// consent is required; prompt=none cannot present the page.
 	if promptNone(req) {
-		return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsConsentRequired}
+		return &responses_models.InteractionResponse{Error: wicket.AuthorizeErrorsConsentRequired}
 	}
 
 	// the user has not answered yet; present the consent page.
@@ -189,12 +189,12 @@ func (g *AuthorizeInteractionResponseGenerator) HandleConsent(ctx context.Contex
 				ErrorDescription: consent.ErrorDescription,
 			}
 		}
-		return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsAccessDenied}
+		return &responses_models.InteractionResponse{Error: wicket.AuthorizeErrorsAccessDenied}
 	}
 
 	for _, required := range req.ValidatedResources.GetRequiredScopeValues() {
 		if !utils.Contains(consent.ScopesValuesConsented, required) {
-			return &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsAccessDenied}
+			return &responses_models.InteractionResponse{Error: wicket.AuthorizeErrorsAccessDenied}
 		}
 	}
 
@@ -220,7 +220,7 @@ func (g *AuthorizeInteractionResponseGenerator) HandleConsent(ctx context.Contex
 // subjectActive reports whether the profile service still considers the subject
 // active for this client.
 func (g *AuthorizeInteractionResponseGenerator) subjectActive(req *validators_models.ValidatedAuthorizeRequest) bool {
-	ctx := contexts.NewIsActiveContext(req.Subject, req.Client, gois.ProfileIsActiveCallersAuthorizeEndpoint)
+	ctx := contexts.NewIsActiveContext(req.Subject, req.Client, wicket.ProfileIsActiveCallersAuthorizeEndpoint)
 	g.profile.IsActive(ctx)
 	return ctx.IsActive
 }
@@ -236,22 +236,22 @@ func (g *AuthorizeInteractionResponseGenerator) sessionAge(req *validators_model
 func consentAuthorizationError(e messages.AuthorizationError) error {
 	switch e {
 	case messages.AccessDenied:
-		return gois.AuthorizeErrorsAccessDenied
+		return wicket.AuthorizeErrorsAccessDenied
 	case messages.InteractionRequired:
-		return gois.AuthorizeErrorsInteractionRequired
+		return wicket.AuthorizeErrorsInteractionRequired
 	case messages.LoginRequired:
-		return gois.AuthorizeErrorsLoginRequired
+		return wicket.AuthorizeErrorsLoginRequired
 	case messages.AccountSelectionRequired:
-		return gois.AuthorizeErrorsAccountSelectionRequired
+		return wicket.AuthorizeErrorsAccountSelectionRequired
 	case messages.ConsentRequired:
-		return gois.AuthorizeErrorsConsentRequired
+		return wicket.AuthorizeErrorsConsentRequired
 	case messages.TemporarilyUnavailable:
-		return gois.AuthorizeErrorsTemporarilyUnavailable
+		return wicket.AuthorizeErrorsTemporarilyUnavailable
 	default:
-		return gois.AuthorizeErrorsAccessDenied
+		return wicket.AuthorizeErrorsAccessDenied
 	}
 }
 
 func promptNone(req *validators_models.ValidatedAuthorizeRequest) bool {
-	return utils.Contains(req.PromptModes, gois.PromptModesNone)
+	return utils.Contains(req.PromptModes, wicket.PromptModesNone)
 }

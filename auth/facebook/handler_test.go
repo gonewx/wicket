@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
 	authevents "github.com/gonewx/wicket/auth/core/events"
 	"github.com/gonewx/wicket/auth/facebook"
@@ -212,7 +212,7 @@ func TestFacebookOptionsValidate(t *testing.T) {
 			err := opts.Validate()
 			if tc.wantErr {
 				require.Error(t, err)
-				assert.ErrorIs(t, err, gois.ArgumentNullException)
+				assert.ErrorIs(t, err, wicket.ArgumentNullException)
 				assert.Contains(t, err.Error(), tc.wantErrContains)
 				return
 			}

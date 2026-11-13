@@ -59,7 +59,7 @@ func (v *EndSessionRequestValidator) Validate(ctx context.Context, parameters ur
 	v.logger.Debug("Start validating end session request.")
 
 	// TODO: 是否可优化？ golang 对 interface 参数判断是否为空的，需要明确赋 nil
-	var user gois.Principal
+	var user wicket.Principal
 	if subject == nil {
 		user = nil
 	} else {
@@ -77,7 +77,7 @@ func (v *EndSessionRequestValidator) Validate(ctx context.Context, parameters ur
 		},
 	}
 
-	idTokenHint := parameters.Get(gois.EndSessionRequestIdTokenHint)
+	idTokenHint := parameters.Get(wicket.EndSessionRequestIdTokenHint)
 
 	if idTokenHint != "" {
 		// validate id_token - no need to validate token life time
@@ -89,7 +89,7 @@ func (v *EndSessionRequestValidator) Validate(ctx context.Context, parameters ur
 		validatedRequest.SetClient(tokenValidationResult.Client, nil, "")
 
 		// validate sub claim against currently logged on user
-		subClaim := utils.FirstOrDefaultPred(tokenValidationResult.Claims, func(c *claims.Claim) bool { return c.Type == gois.JwtClaimTypesSubject })
+		subClaim := utils.FirstOrDefaultPred(tokenValidationResult.Claims, func(c *claims.Claim) bool { return c.Type == wicket.JwtClaimTypesSubject })
 		if subClaim != nil && isAuthenticated {
 			if extensions.GetSubjectIdFromPrincipal(user) != subClaim.Value {
 				return v.invalid("Current user does not match identity token", validatedRequest), nil
@@ -106,7 +106,7 @@ func (v *EndSessionRequestValidator) Validate(ctx context.Context, parameters ur
 			validatedRequest.ClientIds = clintList
 		}
 
-		redirectUri := parameters.Get(gois.EndSessionRequestPostLogoutRedirectUri)
+		redirectUri := parameters.Get(wicket.EndSessionRequestPostLogoutRedirectUri)
 		if redirectUri != "" {
 			if v.UriValidator.IsPostLogoutRedirectUriValid(redirectUri, tokenValidationResult.Client) {
 				validatedRequest.PostLogOutUri = redirectUri
@@ -116,7 +116,7 @@ func (v *EndSessionRequestValidator) Validate(ctx context.Context, parameters ur
 		}
 
 		if validatedRequest.PostLogOutUri != "" {
-			state := parameters.Get(gois.EndSessionRequestState)
+			state := parameters.Get(wicket.EndSessionRequestState)
 			if state != "" {
 				validatedRequest.State = state
 			}
@@ -135,7 +135,7 @@ func (v *EndSessionRequestValidator) Validate(ctx context.Context, parameters ur
 		validatedRequest.ClientIds = clientList
 	}
 
-	uilocales := parameters.Get(gois.EndSessionRequestUiLocales)
+	uilocales := parameters.Get(wicket.EndSessionRequestUiLocales)
 	if uilocales != "" {
 		if len(uilocales) > v.options.InputLengthRestrictions.UiLocale {
 			v.logger.Warn("UI locale too long. It will be ignored.", slog.Any("request", validatedRequest))
@@ -153,7 +153,7 @@ func (v *EndSessionRequestValidator) Validate(ctx context.Context, parameters ur
 func (v *EndSessionRequestValidator) ValidateCallback(ctx context.Context, parameters url.Values) (*validators_models.EndSessionCallbackValidationResult, error) {
 	result := models.NewEndSessionCallbackValidationResult()
 
-	endSessionId := parameters.Get(gois.UIConstantsDefaultRoutePathParamsEndSessionCallback)
+	endSessionId := parameters.Get(wicket.UIConstantsDefaultRoutePathParamsEndSessionCallback)
 	endSessionMessage, err := v.EndSessionMessageStore.Read(ctx, endSessionId)
 
 	if err != nil || endSessionMessage == nil || endSessionMessage.Data == nil || len(endSessionMessage.Data.ClientIds) == 0 {

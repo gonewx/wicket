@@ -27,7 +27,7 @@ func NewTestDeviceCodeValidator(shouldError bool) *TestDeviceCodeValidator {
 }
 
 func (c *TestDeviceCodeValidator) Validate(ctx context.Context, validation *validators_models.DeviceCodeValidationContext) error {
-	opts := make([]gois.Option[validators_models.TokenRequestValidationResult], 0)
+	opts := make([]wicket.Option[validators_models.TokenRequestValidationResult], 0)
 	if c.shouldError {
 		opts = append(opts, validators_models.WithTokenRequestValidationResultError(fmt.Errorf("error")))
 	}

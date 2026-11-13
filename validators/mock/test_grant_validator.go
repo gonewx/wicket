@@ -27,23 +27,23 @@ func NewTestGrantValidator(isInvalid bool, desc string) *TestGrantValidator {
 func (v *TestGrantValidator) ValidateAsync(request *validators_models.ValidatedTokenRequest) (*validators_models.GrantValidationResult, error) {
 	if v.isInvalid {
 		return validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultError(gois.TokenRequestErrorsInvalidGrant, v.desc),
+			validators_models.WithGrantValidationResultError(wicket.TokenRequestErrorsInvalidGrant, v.desc),
 		), nil
 	}
 
 	return validators_models.NewGrantValidationResult(
-		validators_models.WithGrantValidationResultSubject("bob", "CustomGrant", time.Now(), nil, gois.LocalIdentityProvider, nil),
+		validators_models.WithGrantValidationResultSubject("bob", "CustomGrant", time.Now(), nil, wicket.LocalIdentityProvider, nil),
 	), nil
 }
 
 func (v *TestGrantValidator) Validate(ctx *validators_contexts.ExtensionGrantValidationContext) error {
 	if v.isInvalid {
 		ctx.Result = validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultError(gois.TokenRequestErrorsInvalidGrant, v.desc),
+			validators_models.WithGrantValidationResultError(wicket.TokenRequestErrorsInvalidGrant, v.desc),
 		)
 	} else {
 		ctx.Result = validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultSubject("bob", "CustomGrant", time.Now(), nil, gois.LocalIdentityProvider, nil),
+			validators_models.WithGrantValidationResultSubject("bob", "CustomGrant", time.Now(), nil, wicket.LocalIdentityProvider, nil),
 		)
 	}
 

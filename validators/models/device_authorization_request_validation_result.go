@@ -14,20 +14,20 @@ type DeviceAuthorizationRequestValidationResult struct {
 	ValidatedRequest *ValidatedDeviceAuthorizationRequest
 }
 
-func WithDeviceAuthorizationRequestValidationResultError(err error) gois.Option[DeviceAuthorizationRequestValidationResult] {
+func WithDeviceAuthorizationRequestValidationResultError(err error) wicket.Option[DeviceAuthorizationRequestValidationResult] {
 	return func(r *DeviceAuthorizationRequestValidationResult) {
 		r.Error = err
 	}
 }
 
-func WithDeviceAuthorizationRequestValidationResultDescription(description string) gois.Option[DeviceAuthorizationRequestValidationResult] {
+func WithDeviceAuthorizationRequestValidationResultDescription(description string) wicket.Option[DeviceAuthorizationRequestValidationResult] {
 	return func(r *DeviceAuthorizationRequestValidationResult) {
 		r.Description = description
 	}
 }
 
 // Initializes a new instance
-func NewDeviceAuthorizationRequestValidationResult(validatedRequest *ValidatedDeviceAuthorizationRequest, opts ...gois.Option[DeviceAuthorizationRequestValidationResult]) *DeviceAuthorizationRequestValidationResult {
+func NewDeviceAuthorizationRequestValidationResult(validatedRequest *ValidatedDeviceAuthorizationRequest, opts ...wicket.Option[DeviceAuthorizationRequestValidationResult]) *DeviceAuthorizationRequestValidationResult {
 	r := &DeviceAuthorizationRequestValidationResult{
 		ValidationResult: NewValidationResult(),
 		ValidatedRequest: validatedRequest,

@@ -77,7 +77,7 @@ func (g *fakeAuthorizeResponseGenerator) Create(ctx context.Context, req *valida
 func validRequest() *validators_models.ValidatedAuthorizeRequest {
 	req := validators_models.NewValidatedAuthorizeRequest()
 	req.ClientId = "some-client"
-	req.GrantType = gois.GrantTypeAuthorizationCode
+	req.GrantType = wicket.GrantTypeAuthorizationCode
 	req.RedirectUri = "https://client.example/callback"
 	return req
 }
@@ -86,7 +86,7 @@ func sessionBoundRequest() *validators_models.ValidatedAuthorizeRequest {
 	req := validRequest()
 	req.IsOpenIdRequest = true
 	req.SessionId = "some-session"
-	req.PromptModes = []string{gois.PromptModesNone}
+	req.PromptModes = []string{wicket.PromptModesNone}
 	return req
 }
 
@@ -136,7 +136,7 @@ func TestAuthorizeHandlerResultDispatch(t *testing.T) {
 		"validation error builds error authorize result": {
 			method: http.MethodGet,
 			validation: func() *validators_models.AuthorizeRequestValidationResult {
-				return validators_models.NewAuthorizeRequestValidationResultWithErr(validRequest(), gois.AuthorizeErrorsInvalidRequest, errorDescription)
+				return validators_models.NewAuthorizeRequestValidationResultWithErr(validRequest(), wicket.AuthorizeErrorsInvalidRequest, errorDescription)
 			},
 			interaction: responses_models.NewInteractionResponse(),
 			assert: func(t *testing.T, result endpointResult) {
@@ -152,7 +152,7 @@ func TestAuthorizeHandlerResultDispatch(t *testing.T) {
 		"openid session validation error carries session_state": {
 			method: http.MethodGet,
 			validation: func() *validators_models.AuthorizeRequestValidationResult {
-				return validators_models.NewAuthorizeRequestValidationResultWithErr(sessionBoundRequest(), gois.AuthorizeErrorsInvalidRequest, "")
+				return validators_models.NewAuthorizeRequestValidationResultWithErr(sessionBoundRequest(), wicket.AuthorizeErrorsInvalidRequest, "")
 			},
 			interaction: responses_models.NewInteractionResponse(),
 			assert: func(t *testing.T, result endpointResult) {
@@ -197,7 +197,7 @@ func TestAuthorizeHandlerResultDispatch(t *testing.T) {
 			validation: func() *validators_models.AuthorizeRequestValidationResult {
 				return validators_models.NewAuthorizeRequestValidationResult(validRequest())
 			},
-			interaction: &responses_models.InteractionResponse{Error: gois.AuthorizeErrorsLoginRequired},
+			interaction: &responses_models.InteractionResponse{Error: wicket.AuthorizeErrorsLoginRequired},
 			assert: func(t *testing.T, result endpointResult) {
 				authorizeResult, ok := result.(*results.AuthorizeResult)
 				if !ok {
@@ -214,7 +214,7 @@ func TestAuthorizeHandlerResultDispatch(t *testing.T) {
 				return validators_models.NewAuthorizeRequestValidationResult(validRequest())
 			},
 			interaction: &responses_models.InteractionResponse{
-				Error:            gois.AuthorizeErrorsAccessDenied,
+				Error:            wicket.AuthorizeErrorsAccessDenied,
 				ErrorDescription: errorDescription,
 			},
 			assert: func(t *testing.T, result endpointResult) {
@@ -244,7 +244,7 @@ func TestAuthorizeHandlerResultDispatch(t *testing.T) {
 			t.Parallel()
 
 			handler := newAuthorizeHandler(tt.validation(), tt.interaction, tt.response)
-			req := httptest.NewRequest(tt.method, "https://wicket.test"+gois.ProtocolRoutePathsAuthorize+"?client_id=some-client", nil)
+			req := httptest.NewRequest(tt.method, "https://wicket.test"+wicket.ProtocolRoutePathsAuthorize+"?client_id=some-client", nil)
 
 			result, err := handler.result(req)
 			if err != nil {
@@ -263,7 +263,7 @@ func TestAuthorizeHandlerRejectsNonFormPost(t *testing.T) {
 		responses_models.NewInteractionResponse(),
 		responses_models.NewAuthorizeResponse(),
 	)
-	req := httptest.NewRequest(http.MethodPost, "https://wicket.test"+gois.ProtocolRoutePathsAuthorize, strings.NewReader(`{"client_id":"x"}`))
+	req := httptest.NewRequest(http.MethodPost, "https://wicket.test"+wicket.ProtocolRoutePathsAuthorize, strings.NewReader(`{"client_id":"x"}`))
 	req.Header.Set("Content-Type", "application/json")
 
 	result, err := handler.result(req)

@@ -79,10 +79,10 @@ func SetClientListAuthenticationProperties(properties *auth.Properties, clientId
 // AddClientToClientListAuthenticationProperties Adds a client to the list of clients the user has signed into during their session.
 func AddClientToClientListAuthenticationProperties(properties *auth.Properties, clientId string) error {
 	if properties == nil {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 	if clientId == "" {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 
 	clients, err := GetClientListAuthenticationProperties(properties)

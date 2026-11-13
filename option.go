@@ -1,7 +1,7 @@
 // Copyright 2026 Decker.
 // Licensed under the Apache License, Version 2.0.
 
-package gois
+package wicket
 
 type Option[T any] func(*T)
 

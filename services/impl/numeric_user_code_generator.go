@@ -19,7 +19,7 @@ type NumericUserCodeGenerator struct {
 
 func NewNumericUserCodeGenerator() *NumericUserCodeGenerator {
 	return &NumericUserCodeGenerator{
-		UserCodeType: gois.UserCodeTypesNumeric,
+		UserCodeType: wicket.UserCodeTypesNumeric,
 		RetryLimit:   5,
 	}
 }

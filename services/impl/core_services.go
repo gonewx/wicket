@@ -498,9 +498,9 @@ func (s *TokenService) CreateAccessToken(ctx context.Context, request *responses
 	// ends up with more than one, which would serialize as a JSON array.
 	if request.ValidatedRequest != nil && request.ValidatedRequest.SessionId != "" {
 		tokenClaims = append(
-			utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesSessionId }),
+			utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != wicket.JwtClaimTypesSessionId }),
 			claims.NewClaim(
-				claims.WithClaimType(gois.JwtClaimTypesSessionId),
+				claims.WithClaimType(wicket.JwtClaimTypesSessionId),
 				claims.WithClaimValue(request.ValidatedRequest.SessionId),
 			),
 		)
@@ -510,23 +510,23 @@ func (s *TokenService) CreateAccessToken(ctx context.Context, request *responses
 	// dropped first so each stays single-valued per grant.
 	if request.ValidatedRequest != nil && request.ValidatedRequest.ClientId != "" {
 		tokenClaims = append(
-			utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesClientId }),
+			utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != wicket.JwtClaimTypesClientId }),
 			claims.NewClaim(
-				claims.WithClaimType(gois.JwtClaimTypesClientId),
+				claims.WithClaimType(wicket.JwtClaimTypesClientId),
 				claims.WithClaimValue(request.ValidatedRequest.ClientId),
 			),
 		)
 	}
 	if request.ValidatedResources != nil {
-		tokenClaims = utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesScope })
+		tokenClaims = utils.Where(tokenClaims, func(c *claims.Claim) bool { return c.Type != wicket.JwtClaimTypesScope })
 		for _, scope := range request.ValidatedResources.RawScopeValues() {
 			tokenClaims = append(tokenClaims, claims.NewClaim(
-				claims.WithClaimType(gois.JwtClaimTypesScope),
+				claims.WithClaimType(wicket.JwtClaimTypesScope),
 				claims.WithClaimValue(scope),
 			))
 		}
 	}
-	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesAccessToken, Claims: tokenClaims, Audiences: audiences}
+	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: wicket.TokenTypesAccessToken, Claims: tokenClaims, Audiences: audiences}
 	if request.ValidatedRequest != nil {
 		token.Issuer = request.ValidatedRequest.IssuerName
 		token.Lifetime = request.ValidatedRequest.AccessTokenLifetime
@@ -548,8 +548,8 @@ func (s *TokenService) CreateIdentityToken(ctx context.Context, request *respons
 			claims.NewClaim(claims.WithClaimType(claimType), claims.WithClaimValue(value)),
 		)
 	}
-	appendClaim(gois.JwtClaimTypesNonce, request.Nonce)
-	appendClaim(gois.JwtClaimTypesStateHash, request.StateHash)
+	appendClaim(wicket.JwtClaimTypesNonce, request.Nonce)
+	appendClaim(wicket.JwtClaimTypesStateHash, request.StateHash)
 	if request.AccessTokenToHash != "" || request.AuthorizationCodeToHash != "" {
 		algorithm, err := s.identitySigningAlgorithm(ctx, request)
 		if err != nil {
@@ -560,17 +560,17 @@ func (s *TokenService) CreateIdentityToken(ctx context.Context, request *respons
 			if err != nil {
 				return nil, fmt.Errorf("create identity token: hash access token: %w", err)
 			}
-			appendClaim(gois.JwtClaimTypesAccessTokenHash, hash)
+			appendClaim(wicket.JwtClaimTypesAccessTokenHash, hash)
 		}
 		if request.AuthorizationCodeToHash != "" {
 			hash, err := utils.CreateHashClaimValue(request.AuthorizationCodeToHash, algorithm)
 			if err != nil {
 				return nil, fmt.Errorf("create identity token: hash authorization code: %w", err)
 			}
-			appendClaim(gois.JwtClaimTypesAuthorizationCodeHash, hash)
+			appendClaim(wicket.JwtClaimTypesAuthorizationCodeHash, hash)
 		}
 	}
-	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: gois.TokenTypesIdentityToken, Claims: tokenClaims}
+	token := &storage_models.Token{CreationTime: s.clock.Now(), Type: wicket.TokenTypesIdentityToken, Claims: tokenClaims}
 	if request.ValidatedRequest != nil {
 		token.Issuer = request.ValidatedRequest.IssuerName
 		// An identity token is addressed to the requesting client (OIDC Core
@@ -606,15 +606,15 @@ func (s *TokenService) CreateSecurityToken(ctx context.Context, token *storage_m
 	// Only access tokens carry a jwt id, and only when the client opted in. Any
 	// value carried in from an earlier assembly is dropped and replaced with a
 	// freshly generated one so the id is never reused.
-	if token.Type == gois.TokenTypesAccessToken && token.IncludeJwtId {
+	if token.Type == wicket.TokenTypesAccessToken && token.IncludeJwtId {
 		jwtId, err := utils.CreateUniqueId(16, utils.Base64Url)
 		if err != nil {
 			return "", fmt.Errorf("create security token: generate jwt id: %w", err)
 		}
 		token.Claims = append(
-			utils.Where(token.Claims, func(c *claims.Claim) bool { return c.Type != gois.JwtClaimTypesJwtId }),
+			utils.Where(token.Claims, func(c *claims.Claim) bool { return c.Type != wicket.JwtClaimTypesJwtId }),
 			claims.NewClaim(
-				claims.WithClaimType(gois.JwtClaimTypesJwtId),
+				claims.WithClaimType(wicket.JwtClaimTypesJwtId),
 				claims.WithClaimValue(jwtId),
 			),
 		)
@@ -833,8 +833,8 @@ func (s *InteractionService) signOutIframeUrl(ctx context.Context, logout *messa
 		return "", fmt.Errorf("write end-session notification: %w", err)
 	}
 
-	callback := strings.TrimRight(s.urls.BaseUrl(), "/") + utils.EnsureLeadingSlash(gois.ProtocolRoutePathsEndSessionCallback)
-	return utils.AddQuery(callback, gois.UIConstantsDefaultRoutePathParamsEndSessionCallback, handle), nil
+	callback := strings.TrimRight(s.urls.BaseUrl(), "/") + utils.EnsureLeadingSlash(wicket.ProtocolRoutePathsEndSessionCallback)
+	return utils.AddQuery(callback, wicket.UIConstantsDefaultRoutePathParamsEndSessionCallback, handle), nil
 }
 func (s *InteractionService) GetErrorContext(ctx context.Context, errorId string) (*messages.ErrorMessage, error) {
 	if s.errors == nil || errorId == "" {

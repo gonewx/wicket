@@ -56,7 +56,7 @@ func TestBackchannelAuthenticationTokenResponseConsumesRequest(t *testing.T) {
 	client := storage_models.NewClient()
 	client.ClientId = "client"
 	client.RequireClientSecret = false
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesBackchannelAuthentication); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesBackchannelAuthentication); err != nil {
 		t.Fatalf("set grants: %v", err)
 	}
 	clientStore, err := memory.NewMemoryClientStore([]*storage_models.Client{client})
@@ -67,8 +67,8 @@ func TestBackchannelAuthenticationTokenResponseConsumesRequest(t *testing.T) {
 	subject := claims.NewClaimsPrincipal(
 		claims.WithClaimsPrincipalIdentity(
 			claims.NewClaimsIdentity(
-				claims.WithAuthenticationType(gois.WicketAuthenticationType),
-				claims.WithClaims([]*claims.Claim{claims.NewClaim(claims.WithClaimType(gois.JwtClaimTypesSubject), claims.WithClaimValue("alice"))}),
+				claims.WithAuthenticationType(wicket.WicketAuthenticationType),
+				claims.WithClaims([]*claims.Claim{claims.NewClaim(claims.WithClaimType(wicket.JwtClaimTypesSubject), claims.WithClaimValue("alice"))}),
 			),
 		),
 	)
@@ -76,7 +76,7 @@ func TestBackchannelAuthenticationTokenResponseConsumesRequest(t *testing.T) {
 		RequestId:       "request-id",
 		ClientId:        client.ClientId,
 		Subject:         subject,
-		RequestedScopes: []string{gois.StandardScopesOpenId},
+		RequestedScopes: []string{wicket.StandardScopesOpenId},
 		Status:          storage_models.BackchannelAuthenticationRequestStatusApproved,
 		ExpirationTime:  time.Now().Add(time.Minute),
 	}
@@ -85,11 +85,11 @@ func TestBackchannelAuthenticationTokenResponseConsumesRequest(t *testing.T) {
 	}
 	validated := validators_models.NewValidatedTokenRequest()
 	validated.SetClient(client, nil, "")
-	validated.GrantType = gois.GrantTypeBackchannelAuthentication
+	validated.GrantType = wicket.GrantTypeBackchannelAuthentication
 	validated.Subject = subject
 	validated.BackchannelAuthenticationRequest = state
 	validated.ValidatedResources = validators_models.NewResourceValidationResult()
-	validated.ValidatedResources.ParsedScopes = []*validators_models.ParsedScopeValue{{RawValue: gois.StandardScopesOpenId, ParsedName: gois.StandardScopesOpenId}}
+	validated.ValidatedResources.ParsedScopes = []*validators_models.ParsedScopeValue{{RawValue: wicket.StandardScopesOpenId, ParsedName: wicket.StandardScopesOpenId}}
 
 	generator := NewTokenResponseGeneratorWithBackchannelRequests(
 		cibaResponseClock{},

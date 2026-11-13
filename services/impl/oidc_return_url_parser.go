@@ -64,7 +64,7 @@ func (p *OidcReturnUrlParser) Parse(ctx context.Context, returnUrl string) (*mes
 
 	parameters := url.Query()
 	if p.authorizationParametersMessageStore != nil {
-		messageStoreId := parameters.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName)
+		messageStoreId := parameters.Get(wicket.AuthorizationParamsStoreMessageStoreIdParameterName)
 		entry, err := p.authorizationParametersMessageStore.Read(ctx, messageStoreId)
 		if err != nil {
 			return nil, err
@@ -110,8 +110,8 @@ func (p *OidcReturnUrlParser) IsValidReturnUrl(returnUrl string) bool {
 			returnUrl = returnUrl[:index]
 		}
 
-		if strings.HasSuffix(returnUrl, gois.ProtocolRoutePathsAuthorize) ||
-			strings.HasSuffix(returnUrl, gois.ProtocolRoutePathsAuthorizeCallback) {
+		if strings.HasSuffix(returnUrl, wicket.ProtocolRoutePathsAuthorize) ||
+			strings.HasSuffix(returnUrl, wicket.ProtocolRoutePathsAuthorizeCallback) {
 			p.logger.Debug("Return URL is valid")
 			return true
 		}

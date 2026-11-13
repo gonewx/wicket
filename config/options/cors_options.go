@@ -23,8 +23,8 @@ type CorsOptions struct {
 
 func NewCorsOptions() *CorsOptions {
 	return &CorsOptions{
-		CorsPolicyName: gois.WicketName,
-		CorsPaths: utils.Select(gois.CorsPaths, func(x string) string {
+		CorsPolicyName: wicket.WicketName,
+		CorsPaths: utils.Select(wicket.CorsPaths, func(x string) string {
 			return utils.EnsureLeadingSlash(x)
 		}),
 	}

@@ -30,12 +30,12 @@ func TestTokenRequestValidationExtensionGrants(t *testing.T) {
 		"client credentials client requesting an unregistered grant type is rejected": {
 			clientId:  "client",
 			grantType: "customGrant",
-			wantErr:   gois.TokenErrorsUnsupportedGrantType,
+			wantErr:   wicket.TokenErrorsUnsupportedGrantType,
 		},
 		"extension client requesting an unregistered grant type is rejected": {
 			clientId:  "customgrantclient",
 			grantType: "unknown_grant_type",
-			wantErr:   gois.TokenErrorsUnsupportedGrantType,
+			wantErr:   wicket.TokenErrorsUnsupportedGrantType,
 		},
 		"validator error and description are passed through": {
 			clientId:  "customgrantclient",
@@ -43,7 +43,7 @@ func TestTokenRequestValidationExtensionGrants(t *testing.T) {
 			options: []tokenGrantOption{withGrantExtensionValidators(
 				validators_mock.NewTestGrantValidator(true, "custom error description"),
 			)},
-			wantErr:  gois.TokenErrorsInvalidGrant,
+			wantErr:  wicket.TokenErrorsInvalidGrant,
 			wantDesc: "custom error description",
 		},
 		"disabled user is rejected": {
@@ -70,8 +70,8 @@ func TestTokenRequestValidationExtensionGrants(t *testing.T) {
 
 			f := newTokenGrantFixture(t, tt.options...)
 			parameters := url.Values{
-				gois.TokenRequestGrantType: {tt.grantType},
-				gois.TokenRequestScope:     {"resource"},
+				wicket.TokenRequestGrantType: {tt.grantType},
+				wicket.TokenRequestScope:     {"resource"},
 			}
 
 			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))

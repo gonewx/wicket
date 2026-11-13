@@ -43,7 +43,7 @@ func (g *UserInfoResponseGenerator) Handle(ctx context.Context, validationResult
 	// extract scopes and turn into requested claim types
 	scopes := utils.Select(
 		utils.Where(validationResult.TokenValidationResult.Claims, func(c *claimspkg.Claim) bool {
-			return c.Type == gois.JwtClaimTypesScope
+			return c.Type == wicket.JwtClaimTypesScope
 		}),
 		func(c *claimspkg.Claim) string { return c.Value.(string) },
 	)
@@ -57,7 +57,7 @@ func (g *UserInfoResponseGenerator) Handle(ctx context.Context, validationResult
 	profileCtx := models_contexts.NewProfileDataRequestContext(
 		validationResult.Subject,
 		validationResult.TokenValidationResult.Client,
-		gois.ProfileDataCallersUserInfoEndpoint,
+		wicket.ProfileDataCallersUserInfoEndpoint,
 		requestedClaimTypes,
 	)
 	profileCtx.RequestedResources = validatedResources
@@ -76,16 +76,16 @@ func (g *UserInfoResponseGenerator) Handle(ctx context.Context, validationResult
 		g.logger.Info("Profile service returned the following claim types", slog.String("types", strings.Join(utils.Select(profileClaims, func(c *claimspkg.Claim) string { return c.Type }), " ")))
 	}
 
-	subClaim := utils.SingleOrDefaultPred(outgoingClaims, func(x *claimspkg.Claim) bool { return x.Type == gois.JwtClaimTypesSubject })
+	subClaim := utils.SingleOrDefaultPred(outgoingClaims, func(x *claimspkg.Claim) bool { return x.Type == wicket.JwtClaimTypesSubject })
 	if subClaim == nil {
 		outgoingClaims = append(outgoingClaims, claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesSubject),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesSubject),
 			claimspkg.WithClaimValue(extensions.GetSubjectIdFromPrincipal(validationResult.Subject)),
 		))
 	} else {
 		if subClaim.Value != extensions.GetSubjectIdFromPrincipal(validationResult.Subject) {
 			g.logger.Error("Profile service returned incorrect subject value", slog.Any("sub", subClaim))
-			return nil, fmt.Errorf("Profile service returned incorrect subject value: %w", gois.InvalidOperationException)
+			return nil, fmt.Errorf("Profile service returned incorrect subject value: %w", wicket.InvalidOperationException)
 		}
 	}
 

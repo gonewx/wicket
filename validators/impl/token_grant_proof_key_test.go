@@ -31,74 +31,74 @@ func TestTokenRequestValidationProofKey(t *testing.T) {
 		"plain method with matching verifier succeeds for enforcing client": {
 			clientId:        "codeclient.pkce",
 			challenge:       grantTestPlainChallenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsPlain,
+			challengeMethod: wicket.CodeChallengeMethodsPlain,
 			codeVerifier:    verifier,
 		},
 		"plain method with matching verifier succeeds for non-enforcing client": {
 			clientId:        "codeclient",
 			challenge:       grantTestPlainChallenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsPlain,
+			challengeMethod: wicket.CodeChallengeMethodsPlain,
 			codeVerifier:    verifier,
 		},
 		"plain method with matching verifier succeeds for hybrid client": {
 			clientId:        "hybridclient.pkce",
 			challenge:       grantTestPlainChallenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsPlain,
+			challengeMethod: wicket.CodeChallengeMethodsPlain,
 			codeVerifier:    verifier,
 		},
 		"S256 method with matching verifier succeeds for enforcing client": {
 			clientId:        "codeclient.pkce",
 			challenge:       grantTestS256Challenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsSha256,
+			challengeMethod: wicket.CodeChallengeMethodsSha256,
 			codeVerifier:    verifier,
 		},
 		"S256 method with matching verifier succeeds for non-enforcing client": {
 			clientId:        "codeclient",
 			challenge:       grantTestS256Challenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsSha256,
+			challengeMethod: wicket.CodeChallengeMethodsSha256,
 			codeVerifier:    verifier,
 		},
 		"missing challenge and verifier is rejected for enforcing client": {
 			clientId: "codeclient.pkce",
-			wantErr:  gois.TokenErrorsInvalidGrant,
+			wantErr:  wicket.TokenErrorsInvalidGrant,
 		},
 		"verifier without stored challenge is rejected for enforcing client": {
 			clientId:     "codeclient.pkce",
 			codeVerifier: verifier,
-			wantErr:      gois.TokenErrorsInvalidGrant,
+			wantErr:      wicket.TokenErrorsInvalidGrant,
 		},
 		"verifier without stored challenge is rejected for non-enforcing client": {
 			clientId:     "codeclient",
 			codeVerifier: verifier,
-			wantErr:      gois.TokenErrorsInvalidGrant,
+			wantErr:      wicket.TokenErrorsInvalidGrant,
 		},
 		"plain method with mismatching verifier is rejected for enforcing client": {
 			clientId:        "codeclient.pkce",
 			challenge:       grantTestPlainChallenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsPlain,
+			challengeMethod: wicket.CodeChallengeMethodsPlain,
 			codeVerifier:    verifier + "-mismatch",
-			wantErr:         gois.TokenErrorsInvalidGrant,
+			wantErr:         wicket.TokenErrorsInvalidGrant,
 		},
 		"plain method with mismatching verifier is rejected for non-enforcing client": {
 			clientId:        "codeclient",
 			challenge:       grantTestPlainChallenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsPlain,
+			challengeMethod: wicket.CodeChallengeMethodsPlain,
 			codeVerifier:    verifier + "-mismatch",
-			wantErr:         gois.TokenErrorsInvalidGrant,
+			wantErr:         wicket.TokenErrorsInvalidGrant,
 		},
 		"S256 method rejects a value other than the original verifier for enforcing client": {
 			clientId:        "codeclient.pkce",
 			challenge:       grantTestS256Challenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsSha256,
+			challengeMethod: wicket.CodeChallengeMethodsSha256,
 			codeVerifier:    grantTestPlainChallenge(verifier),
-			wantErr:         gois.TokenErrorsInvalidGrant,
+			wantErr:         wicket.TokenErrorsInvalidGrant,
 		},
 		"S256 method rejects a value other than the original verifier for non-enforcing client": {
 			clientId:        "codeclient",
 			challenge:       grantTestS256Challenge(verifier),
-			challengeMethod: gois.CodeChallengeMethodsSha256,
+			challengeMethod: wicket.CodeChallengeMethodsSha256,
 			codeVerifier:    grantTestPlainChallenge(verifier),
-			wantErr:         gois.TokenErrorsInvalidGrant,
+			wantErr:         wicket.TokenErrorsInvalidGrant,
 		},
 	}
 
@@ -113,12 +113,12 @@ func TestTokenRequestValidationProofKey(t *testing.T) {
 			handle := storeGrantTestAuthorizationCode(t, f, code)
 
 			parameters := url.Values{
-				gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-				gois.TokenRequestCode:        {handle},
-				gois.TokenRequestRedirectUri: {code.RedirectUri},
+				wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+				wicket.TokenRequestCode:        {handle},
+				wicket.TokenRequestRedirectUri: {code.RedirectUri},
 			}
 			if tt.codeVerifier != "" {
-				parameters.Set(gois.TokenRequestCodeVerifier, tt.codeVerifier)
+				parameters.Set(wicket.TokenRequestCodeVerifier, tt.codeVerifier)
 			}
 
 			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))

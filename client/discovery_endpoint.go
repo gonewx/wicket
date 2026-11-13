@@ -21,16 +21,16 @@ type DiscoveryEndpoint struct {
 
 func ParseUrl(input string, path string) (*DiscoveryEndpoint, error) {
 	if path == "" {
-		path = gois.DiscoveryDiscoveryEndpoint
+		path = wicket.DiscoveryDiscoveryEndpoint
 	}
 
 	uri, err := url.Parse(input)
 	if err != nil {
-		return nil, gois.InvalidOperationException
+		return nil, wicket.InvalidOperationException
 	}
 
 	if !IsValidScheme(uri) {
-		return nil, gois.InvalidOperationException
+		return nil, wicket.InvalidOperationException
 	}
 
 	u := utils.RemoveTrailingSlash(input)

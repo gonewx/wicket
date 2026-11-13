@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/gonewx/godi"
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
 	authcore "github.com/gonewx/wicket/auth/core"
 	"github.com/gonewx/wicket/hosting"
@@ -29,7 +29,7 @@ func TestDefaultSchemeResolutionFromConfiguredOptions(t *testing.T) {
 
 	root := newAuthRoot(t)
 	provider := godi.GetRequired[auth.SchemeProvider](root)
-	require.NoError(t, provider.AddScheme(auth.NewScheme(gois.DefaultCookieAuthenticationScheme, "cookie")))
+	require.NoError(t, provider.AddScheme(auth.NewScheme(wicket.DefaultCookieAuthenticationScheme, "cookie")))
 
 	resolvers := map[string]func() *auth.Scheme{
 		"authenticate": provider.GetDefaultAuthenticateScheme,
@@ -41,7 +41,7 @@ func TestDefaultSchemeResolutionFromConfiguredOptions(t *testing.T) {
 	for category, resolve := range resolvers {
 		scheme := resolve()
 		require.NotNil(t, scheme, "%s default must resolve", category)
-		require.Equal(t, gois.DefaultCookieAuthenticationScheme, scheme.Name, "%s default must come from configuration", category)
+		require.Equal(t, wicket.DefaultCookieAuthenticationScheme, scheme.Name, "%s default must come from configuration", category)
 	}
 }
 
@@ -105,7 +105,7 @@ func TestAuthenticationServiceOrchestratesRegisteredScheme(t *testing.T) {
 	t.Parallel()
 
 	root := newAuthRoot(t)
-	require.NoError(t, godi.GetRequired[auth.SchemeProvider](root).AddScheme(auth.NewScheme(gois.DefaultCookieAuthenticationScheme, "cookie")))
+	require.NoError(t, godi.GetRequired[auth.SchemeProvider](root).AddScheme(auth.NewScheme(wicket.DefaultCookieAuthenticationScheme, "cookie")))
 
 	scope := root.CreateScope()
 	defer scope.Close()
@@ -114,12 +114,12 @@ func TestAuthenticationServiceOrchestratesRegisteredScheme(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	response := httptest.NewRecorder()
 
-	result, err := service.Authenticate(request, response, gois.DefaultCookieAuthenticationScheme)
+	result, err := service.Authenticate(request, response, wicket.DefaultCookieAuthenticationScheme)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.None, "the placeholder handler must authenticate to no result")
 
-	err = service.Challenge(request, response, gois.DefaultCookieAuthenticationScheme, auth.NewProperties())
+	err = service.Challenge(request, response, wicket.DefaultCookieAuthenticationScheme, auth.NewProperties())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported")
 }
@@ -133,7 +133,7 @@ func TestMiddlewareAnonymousRequestPassesThrough(t *testing.T) {
 
 	root := newAuthRoot(t)
 	provider := godi.GetRequired[auth.SchemeProvider](root)
-	require.NoError(t, provider.AddScheme(auth.NewScheme(gois.DefaultCookieAuthenticationScheme, "cookie")))
+	require.NoError(t, provider.AddScheme(auth.NewScheme(wicket.DefaultCookieAuthenticationScheme, "cookie")))
 
 	scope := root.CreateScope()
 	defer scope.Close()

@@ -38,7 +38,7 @@ func pkceClient(id string, requirePkce bool, allowPlain bool) *storage_models.Cl
 	secret.Value = utils.Sha256(clientSecret)
 	client.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesCode); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesCode); err != nil {
 		panic(err)
 	}
 	client.RequirePkce = requirePkce

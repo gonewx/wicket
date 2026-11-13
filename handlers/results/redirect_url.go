@@ -35,13 +35,13 @@ func redirectUrl(
 ) (string, error) {
 	params := request.ToOptimizedRawValues()
 
-	returnURL := gois.ProtocolRoutePathsAuthorizeCallback
+	returnURL := wicket.ProtocolRoutePathsAuthorizeCallback
 	if apmStore != nil {
 		handle, err := apmStore.Write(ctx, messages.NewMessage[url.Values](params))
 		if err != nil {
 			return "", fmt.Errorf("store authorize parameters: %w", err)
 		}
-		returnURL = utils.AddQuery(returnURL, gois.AuthorizationParamsStoreMessageStoreIdParameterName, handle)
+		returnURL = utils.AddQuery(returnURL, wicket.AuthorizationParamsStoreMessageStoreIdParameterName, handle)
 	} else {
 		returnURL = utils.AddQueryString(returnURL, params)
 	}

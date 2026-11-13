@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/gonewx/godi"
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/di"
 	"github.com/stretchr/testify/require"
@@ -40,8 +40,8 @@ func TestKeyedHandlerIsTransient(t *testing.T) {
 	scope := root.CreateScope()
 	defer scope.Close()
 
-	first := godi.GetRequiredKeyed[auth.Handler](scope, gois.DefaultCookieAuthenticationScheme)
-	second := godi.GetRequiredKeyed[auth.Handler](scope, gois.DefaultCookieAuthenticationScheme)
+	first := godi.GetRequiredKeyed[auth.Handler](scope, wicket.DefaultCookieAuthenticationScheme)
+	second := godi.GetRequiredKeyed[auth.Handler](scope, wicket.DefaultCookieAuthenticationScheme)
 	require.NotSame(t, first, second, "keyed handlers must be transient")
 }
 
@@ -52,7 +52,7 @@ func TestHandlerProviderCachesWithinScopeIsolatesAcrossScopes(t *testing.T) {
 	t.Parallel()
 
 	root := newAuthRoot(t)
-	godi.GetRequired[auth.SchemeProvider](root).AddScheme(auth.NewScheme(gois.DefaultCookieAuthenticationScheme, "cookie"))
+	godi.GetRequired[auth.SchemeProvider](root).AddScheme(auth.NewScheme(wicket.DefaultCookieAuthenticationScheme, "cookie"))
 
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	response := httptest.NewRecorder()
@@ -61,17 +61,17 @@ func TestHandlerProviderCachesWithinScopeIsolatesAcrossScopes(t *testing.T) {
 	defer scopeOne.Close()
 	providerOne := godi.GetRequired[auth.HandlerProvider](scopeOne)
 
-	firstA, err := providerOne.GetHandler(request, response, gois.DefaultCookieAuthenticationScheme)
+	firstA, err := providerOne.GetHandler(request, response, wicket.DefaultCookieAuthenticationScheme)
 	require.NoError(t, err)
 	require.NotNil(t, firstA)
-	firstB, err := providerOne.GetHandler(request, response, gois.DefaultCookieAuthenticationScheme)
+	firstB, err := providerOne.GetHandler(request, response, wicket.DefaultCookieAuthenticationScheme)
 	require.NoError(t, err)
 	require.Same(t, firstA, firstB, "same scope same scheme must reuse the cached handler")
 
 	scopeTwo := root.CreateScope()
 	defer scopeTwo.Close()
 	providerTwo := godi.GetRequired[auth.HandlerProvider](scopeTwo)
-	second, err := providerTwo.GetHandler(request, response, gois.DefaultCookieAuthenticationScheme)
+	second, err := providerTwo.GetHandler(request, response, wicket.DefaultCookieAuthenticationScheme)
 	require.NoError(t, err)
 	require.NotSame(t, firstA, second, "distinct scopes must resolve distinct handlers")
 }

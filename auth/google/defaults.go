@@ -4,11 +4,11 @@
 
 package google
 
-import gois "github.com/gonewx/wicket"
+import "github.com/gonewx/wicket"
 
 const (
 	// The default value used for Options.AuthenticationScheme
-	AuthenticationScheme = gois.GoogleAuthenticationScheme
+	AuthenticationScheme = wicket.GoogleAuthenticationScheme
 
 	// The default display name for Google authentication.
 	DisplayName = "Google"

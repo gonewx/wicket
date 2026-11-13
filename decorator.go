@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0.
 // Modifications Copyright 2026 Decker.
 
-package gois
+package wicket
 
 type Decorator[T any] struct {
 	Instance T

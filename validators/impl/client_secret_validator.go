@@ -43,13 +43,13 @@ func (v *ClientSecretValidator) Validate(req *http.Request) *models.ClientSecret
 	v.logger.Debug("Start client validation")
 
 	fail := validators_models.NewClientSecretValidationResult()
-	fail.Error = gois.TokenErrorsInvalidClient
+	fail.Error = wicket.TokenErrorsInvalidClient
 
 	parsedSecret, err := v.parser.Parse(req)
 	if err != nil || parsedSecret == nil {
 		v.logger.Error("No client identifier found")
 
-		fail.Error = gois.TokenErrorsInvalidRequest
+		fail.Error = wicket.TokenErrorsInvalidRequest
 		return fail
 	}
 

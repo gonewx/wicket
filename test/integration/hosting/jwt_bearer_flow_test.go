@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gonewx/godi"
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
 	authcore "github.com/gonewx/wicket/auth/core"
 	"github.com/gonewx/wicket/auth/jwt"
@@ -81,7 +81,7 @@ func signJWTE2EToken(t *testing.T, key jwk.Key, mutate func(jwxjwt.Token)) strin
 // the handler is built.
 func installJWTSeamHandler(t *testing.T, root *di.Root, verifyKeys jwk.Set, configure func(*jwt.Options)) {
 	t.Helper()
-	root.ServerConfig().SetAuthenticationHandlerProvider(gois.JwtBearerAuthenticationScheme, func(p godi.Provider) auth.Handler {
+	root.ServerConfig().SetAuthenticationHandlerProvider(wicket.JwtBearerAuthenticationScheme, func(p godi.Provider) auth.Handler {
 		opts := jwt.NewOptions()
 		opts.TokenValidationParameters = &jwt.TokenValidationParameters{
 			ValidIssuer:         jwtE2EIssuer,
@@ -95,7 +95,7 @@ func installJWTSeamHandler(t *testing.T, root *di.Root, verifyKeys jwk.Set, conf
 		}
 		return jwt.NewHandler(staticJWTMonitor{opts: opts}, discardJWTLogger(t), svcimpl.SystemClock{})
 	})
-	require.NoError(t, godi.GetRequired[auth.SchemeProvider](root).AddScheme(auth.NewScheme(gois.JwtBearerAuthenticationScheme, "handler")))
+	require.NoError(t, godi.GetRequired[auth.SchemeProvider](root).AddScheme(auth.NewScheme(wicket.JwtBearerAuthenticationScheme, "handler")))
 }
 
 // staticJWTMonitor hands the seam handler a fixed options instance, standing in
@@ -173,7 +173,7 @@ func TestJWTBearerAuthenticatesThroughCompositionRootE2E(t *testing.T) {
 			}
 			response := httptest.NewRecorder()
 
-			result, err := service.Authenticate(request, response, gois.JwtBearerAuthenticationScheme)
+			result, err := service.Authenticate(request, response, wicket.JwtBearerAuthenticationScheme)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 
@@ -212,7 +212,7 @@ func TestJWTBearerSaveTokenThroughCompositionRootE2E(t *testing.T) {
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 
-	result, err := service.Authenticate(request, response, gois.JwtBearerAuthenticationScheme)
+	result, err := service.Authenticate(request, response, wicket.JwtBearerAuthenticationScheme)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.Succeeded())
@@ -232,12 +232,12 @@ func TestJWTBearerHandlerResolvesFromContainerDefaultFactoryE2E(t *testing.T) {
 	t.Parallel()
 
 	root := newAuthRoot(t)
-	require.NoError(t, godi.GetRequired[auth.SchemeProvider](root).AddScheme(auth.NewScheme(gois.JwtBearerAuthenticationScheme, "handler")))
+	require.NoError(t, godi.GetRequired[auth.SchemeProvider](root).AddScheme(auth.NewScheme(wicket.JwtBearerAuthenticationScheme, "handler")))
 
 	scope := root.CreateScope()
 	defer scope.Close()
 
-	handler := godi.GetRequiredKeyed[auth.Handler](scope, gois.JwtBearerAuthenticationScheme)
+	handler := godi.GetRequiredKeyed[auth.Handler](scope, wicket.JwtBearerAuthenticationScheme)
 	require.NotNil(t, handler, "the container must resolve a handler for the bearer scheme")
 	_, ok := handler.(*jwt.Handler)
 	require.True(t, ok, "the default keyed factory must resolve the concrete jwt handler, got %T", handler)

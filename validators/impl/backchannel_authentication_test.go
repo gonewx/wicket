@@ -40,27 +40,27 @@ func TestBackchannelAuthenticationRequestValidatorTable(t *testing.T) {
 		{
 			name: "success stores opaque poll request",
 			values: url.Values{
-				gois.BackchannelAuthenticationRequestScope:     {"openid api"},
-				gois.BackchannelAuthenticationRequestLoginHint: {"alice"},
+				wicket.BackchannelAuthenticationRequestScope:     {"openid api"},
+				wicket.BackchannelAuthenticationRequestLoginHint: {"alice"},
 			},
 		},
 		{
 			name: "unsupported delivery mode",
 			client: func(c *storage_models.Client) {
-				c.BackchannelTokenDeliveryMode = gois.BackchannelTokenDeliveryModesPush
+				c.BackchannelTokenDeliveryMode = wicket.BackchannelTokenDeliveryModesPush
 			},
 			values: url.Values{
-				gois.BackchannelAuthenticationRequestScope:     {"openid api"},
-				gois.BackchannelAuthenticationRequestLoginHint: {"alice"},
+				wicket.BackchannelAuthenticationRequestScope:     {"openid api"},
+				wicket.BackchannelAuthenticationRequestLoginHint: {"alice"},
 			},
-			wantErr: gois.TokenErrorsInvalidRequest,
+			wantErr: wicket.TokenErrorsInvalidRequest,
 		},
 		{
 			name: "missing user hint",
 			values: url.Values{
-				gois.BackchannelAuthenticationRequestScope: {"openid api"},
+				wicket.BackchannelAuthenticationRequestScope: {"openid api"},
 			},
-			wantErr: gois.TokenErrorsInvalidRequest,
+			wantErr: wicket.TokenErrorsInvalidRequest,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestBackchannelAuthenticationRequestIdValidatorTable(t *testing.T) {
 				ExpirationTime: now.Add(time.Minute),
 				PollInterval:   5,
 			},
-			wantErr: gois.TokenErrorsAuthorizationPending,
+			wantErr: wicket.TokenErrorsAuthorizationPending,
 		},
 		{
 			name: "slow down increases interval",
@@ -134,7 +134,7 @@ func TestBackchannelAuthenticationRequestIdValidatorTable(t *testing.T) {
 				PollInterval:   5,
 				LastPollTime:   &now,
 			},
-			wantErr:      gois.TokenErrorsSlowDown,
+			wantErr:      wicket.TokenErrorsSlowDown,
 			wantInterval: 10,
 		},
 		{
@@ -145,7 +145,7 @@ func TestBackchannelAuthenticationRequestIdValidatorTable(t *testing.T) {
 				Status:         storage_models.BackchannelAuthenticationRequestStatusPending,
 				ExpirationTime: now.Add(-time.Second),
 			},
-			wantErr: gois.TokenErrorsExpiredToken,
+			wantErr: wicket.TokenErrorsExpiredToken,
 		},
 		{
 			name: "consumed is invalid grant",
@@ -155,7 +155,7 @@ func TestBackchannelAuthenticationRequestIdValidatorTable(t *testing.T) {
 				Status:         storage_models.BackchannelAuthenticationRequestStatusConsumed,
 				ExpirationTime: now.Add(time.Minute),
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -195,7 +195,7 @@ func newCIBARequestValidator(t *testing.T, options *config_options.WicketOptions
 	t.Helper()
 
 	identity := storage_models.NewIdentityResource()
-	identity.Name = gois.StandardScopesOpenId
+	identity.Name = wicket.StandardScopesOpenId
 	apiScope := storage_models.NewApiScope()
 	apiScope.Name = "api"
 	apiResource := storage_models.NewApiResource()
@@ -222,9 +222,9 @@ func newCIBAClient(t *testing.T) *storage_models.Client {
 	client := storage_models.NewClient()
 	client.ClientId = "client"
 	client.RequireClientSecret = false
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesBackchannelAuthentication); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesBackchannelAuthentication); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
-	client.AllowedScopes = []string{gois.StandardScopesOpenId, "api"}
+	client.AllowedScopes = []string{wicket.StandardScopesOpenId, "api"}
 	return client
 }

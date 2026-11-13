@@ -26,7 +26,7 @@ func browserTokenClient(t *testing.T, clientId string, grantTypes []string, allo
 	client.RequireConsent = false
 	client.AllowAccessTokensViaBrowser = allowBrowserTokens
 	client.RedirectUris = []string{"https://client.example/callback"}
-	client.AllowedScopes = []string{gois.StandardScopesOpenId, "api1"}
+	client.AllowedScopes = []string{wicket.StandardScopesOpenId, "api1"}
 	if err := client.SetAllowedGrantTypes(grantTypes); err != nil {
 		t.Fatalf("grant types: %v", err)
 	}
@@ -37,10 +37,10 @@ func newBrowserTokenPipeline(t *testing.T) *integration_common.WicketPipeline {
 	t.Helper()
 	p := integration_common.NewWicketPipeline()
 	p.Clients = []*storage_models.Client{
-		browserTokenClient(t, "implicit-open", gois.GrantTypesImplicit, true),
-		browserTokenClient(t, "implicit-restricted", gois.GrantTypesImplicit, false),
-		browserTokenClient(t, "hybrid-open", gois.GrantTypesHybrid, true),
-		browserTokenClient(t, "hybrid-restricted", gois.GrantTypesHybrid, false),
+		browserTokenClient(t, "implicit-open", wicket.GrantTypesImplicit, true),
+		browserTokenClient(t, "implicit-restricted", wicket.GrantTypesImplicit, false),
+		browserTokenClient(t, "hybrid-open", wicket.GrantTypesHybrid, true),
+		browserTokenClient(t, "hybrid-restricted", wicket.GrantTypesHybrid, false),
 	}
 	p.IdentityScopes = []*storage_models.IdentityResource{storage_models.IdentityResourcesOpenId()}
 	apiScope := storage_models.NewApiScope()
@@ -108,9 +108,9 @@ func TestAuthorizeRestrictsAccessTokensViaBrowser(t *testing.T) {
 				t.Fatalf("login: %v", err)
 			}
 
-			scope := gois.StandardScopesOpenId
+			scope := wicket.StandardScopesOpenId
 			if tt.wantAccessToken || tt.wantError {
-				scope = gois.StandardScopesOpenId + " api1"
+				scope = wicket.StandardScopesOpenId + " api1"
 			}
 			authorizeUrl, err := p.CreateAuthorizeUrl(&integration_common.AuthorizeUrl{
 				ClientId:     tt.clientId,

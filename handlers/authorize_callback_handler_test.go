@@ -54,11 +54,11 @@ func callbackSubject(t *testing.T) *claims.ClaimsPrincipal {
 
 func callbackRequest() (*http.Request, url.Values) {
 	values := url.Values{
-		gois.AuthorizeRequestClientId: {"some-client"},
-		gois.AuthorizeRequestScope:    {"openid"},
-		gois.AuthorizeRequestNonce:    {"some-nonce"},
+		wicket.AuthorizeRequestClientId: {"some-client"},
+		wicket.AuthorizeRequestScope:    {"openid"},
+		wicket.AuthorizeRequestNonce:    {"some-nonce"},
 	}
-	target := "https://wicket.test" + gois.ProtocolRoutePathsAuthorizeCallback + "?" + values.Encode()
+	target := "https://wicket.test" + wicket.ProtocolRoutePathsAuthorizeCallback + "?" + values.Encode()
 	return httptest.NewRequest(http.MethodGet, target, nil), values
 }
 
@@ -180,7 +180,7 @@ func TestAuthorizeCallbackHandlerRejectsNonGet(t *testing.T) {
 	store := newFakeConsentMessageStore()
 	handler := newCallbackHandler(subject, responses_models.NewInteractionResponse(), store)
 
-	req := httptest.NewRequest(http.MethodPost, "https://wicket.test"+gois.ProtocolRoutePathsAuthorizeCallback, nil)
+	req := httptest.NewRequest(http.MethodPost, "https://wicket.test"+wicket.ProtocolRoutePathsAuthorizeCallback, nil)
 	rec := httptest.NewRecorder()
 	if err := handler.Process(rec, req); err != nil {
 		t.Fatalf("process: %v", err)
@@ -205,9 +205,9 @@ func TestAuthorizeCallbackHandlerRecoverParameters(t *testing.T) {
 		t.Fatalf("recovered without handle = %q, want inline %q", got.Encode(), values.Encode())
 	}
 
-	stored := url.Values{gois.AuthorizeRequestClientId: {"stored-client"}}
-	target := "https://wicket.test" + gois.ProtocolRoutePathsAuthorizeCallback + "?" +
-		url.Values{gois.AuthorizationParamsStoreMessageStoreIdParameterName: {stored.Encode()}}.Encode()
+	stored := url.Values{wicket.AuthorizeRequestClientId: {"stored-client"}}
+	target := "https://wicket.test" + wicket.ProtocolRoutePathsAuthorizeCallback + "?" +
+		url.Values{wicket.AuthorizationParamsStoreMessageStoreIdParameterName: {stored.Encode()}}.Encode()
 	if got := handler.recoverParameters(httptest.NewRequest(http.MethodGet, target, nil)); got.Encode() != stored.Encode() {
 		t.Fatalf("recovered with handle = %q, want stored %q", got.Encode(), stored.Encode())
 	}

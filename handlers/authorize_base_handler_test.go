@@ -44,7 +44,7 @@ func TestAuthorizeBaseHandlerDispatchPrecedence(t *testing.T) {
 	}{
 		"validation error precedes interaction": {
 			validation: func() *validators_models.AuthorizeRequestValidationResult {
-				return validators_models.NewAuthorizeRequestValidationResultWithErr(validRequest(), gois.AuthorizeErrorsInvalidRequest, "")
+				return validators_models.NewAuthorizeRequestValidationResultWithErr(validRequest(), wicket.AuthorizeErrorsInvalidRequest, "")
 			},
 			interaction: &responses_models.InteractionResponse{IsLogin: true},
 			assert: func(t *testing.T, result endpointResult) {
@@ -62,7 +62,7 @@ func TestAuthorizeBaseHandlerDispatchPrecedence(t *testing.T) {
 				return validators_models.NewAuthorizeRequestValidationResult(validRequest())
 			},
 			interaction: &responses_models.InteractionResponse{
-				Error:     gois.AuthorizeErrorsLoginRequired,
+				Error:     wicket.AuthorizeErrorsLoginRequired,
 				IsLogin:   true,
 				IsConsent: true,
 			},
@@ -88,7 +88,7 @@ func TestAuthorizeBaseHandlerDispatchPrecedence(t *testing.T) {
 				return validators_models.NewAuthorizeRequestValidationResult(validRequest())
 			},
 			interaction: responses_models.NewInteractionResponse(),
-			generator:   gois.AuthorizeErrorsInvalidRequest,
+			generator:   wicket.AuthorizeErrorsInvalidRequest,
 			assert: func(t *testing.T, result endpointResult) {
 				authorizeResult, ok := result.(*results.AuthorizeResult)
 				if !ok {

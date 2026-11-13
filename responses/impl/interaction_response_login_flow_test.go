@@ -54,7 +54,7 @@ func TestHandleLoginDecision(t *testing.T) {
 			setup: func(r *validators_models.ValidatedAuthorizeRequest) {
 				r.Subject = localSubject(t, nil)
 				c := storage_models.NewClient()
-				c.IdentityProviderRestrictions = []string{gois.LocalIdentityProvider}
+				c.IdentityProviderRestrictions = []string{wicket.LocalIdentityProvider}
 				r.Client = c
 			},
 			wantLogin: false,
@@ -70,7 +70,7 @@ func TestHandleLoginDecision(t *testing.T) {
 			setup: func(r *validators_models.ValidatedAuthorizeRequest) {
 				r.Subject = localSubject(t, nil)
 				r.Client = storage_models.NewClient()
-				r.AuthenticationContextReferenceClasses = []string{gois.KnownAcrValuesHomeRealm + gois.LocalIdentityProvider}
+				r.AuthenticationContextReferenceClasses = []string{wicket.KnownAcrValuesHomeRealm + wicket.LocalIdentityProvider}
 			},
 			wantLogin: false,
 		},
@@ -78,7 +78,7 @@ func TestHandleLoginDecision(t *testing.T) {
 			setup: func(r *validators_models.ValidatedAuthorizeRequest) {
 				r.Subject = localSubject(t, nil)
 				r.Client = storage_models.NewClient()
-				r.AuthenticationContextReferenceClasses = []string{gois.KnownAcrValuesHomeRealm + "some_idp"}
+				r.AuthenticationContextReferenceClasses = []string{wicket.KnownAcrValuesHomeRealm + "some_idp"}
 			},
 			wantLogin: true,
 		},
@@ -115,7 +115,7 @@ func TestHandleLoginDecision(t *testing.T) {
 			setup: func(r *validators_models.ValidatedAuthorizeRequest) {
 				r.Subject = localSubject(t, nil)
 				r.Raw = url.Values{}
-				r.PromptModes = []string{gois.PromptModesLogin}
+				r.PromptModes = []string{wicket.PromptModesLogin}
 			},
 			wantLogin: true,
 		},
@@ -123,7 +123,7 @@ func TestHandleLoginDecision(t *testing.T) {
 			setup: func(r *validators_models.ValidatedAuthorizeRequest) {
 				r.Subject = localSubject(t, nil)
 				r.Raw = url.Values{}
-				r.PromptModes = []string{gois.PromptModesSelectAccount}
+				r.PromptModes = []string{wicket.PromptModesSelectAccount}
 			},
 			wantLogin: true,
 		},
@@ -182,8 +182,8 @@ func TestHandleLoginSuppressesPromptOnForcedLogin(t *testing.T) {
 
 	req := validators_models.NewValidatedAuthorizeRequest()
 	req.Subject = localSubject(t, nil)
-	req.PromptModes = []string{gois.PromptModesLogin}
-	req.Raw = url.Values{gois.AuthorizeRequestPrompt: {gois.PromptModesLogin}}
+	req.PromptModes = []string{wicket.PromptModesLogin}
+	req.Raw = url.Values{wicket.AuthorizeRequestPrompt: {wicket.PromptModesLogin}}
 
 	g := buildGenerator(fixedClock(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)), common.NewMockConsentService(), common.NewMockProfileService())
 
@@ -192,7 +192,7 @@ func TestHandleLoginSuppressesPromptOnForcedLogin(t *testing.T) {
 	if !resp.IsLogin {
 		t.Fatalf("IsLogin = false, want true for prompt=login")
 	}
-	if !req.Raw.Has(gois.SuppressedPrompt) {
-		t.Fatalf("expected the raw parameters to carry the %q suppression marker, got %v", gois.SuppressedPrompt, req.Raw)
+	if !req.Raw.Has(wicket.SuppressedPrompt) {
+		t.Fatalf("expected the raw parameters to carry the %q suppression marker, got %v", wicket.SuppressedPrompt, req.Raw)
 	}
 }

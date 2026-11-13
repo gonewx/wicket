@@ -55,11 +55,11 @@ func NewAuthorizeResponseGenerator(
 
 func (g *AuthorizeResponseGenerator) Create(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) (*resp_models.AuthorizeResponse, error) {
 	switch req.GrantType {
-	case gois.GrantTypeAuthorizationCode:
+	case wicket.GrantTypeAuthorizationCode:
 		return g.createCodeFlow(ctx, req)
-	case gois.GrantTypeImplicit:
+	case wicket.GrantTypeImplicit:
 		return g.createImplicitFlow(ctx, req, "")
-	case gois.GrantTypeHybrid:
+	case wicket.GrantTypeHybrid:
 		return g.createHybridFlow(ctx, req)
 	default:
 		g.logger.Error("Unsupported grant type", slog.String("GrantType", req.GrantType))
@@ -131,7 +131,7 @@ func (g *AuthorizeResponseGenerator) createImplicitFlow(ctx context.Context, req
 
 	responseTypes := strings.Split(req.ResponseType, " ")
 
-	if utils.Contains(responseTypes, gois.ResponseTypesToken) {
+	if utils.Contains(responseTypes, wicket.ResponseTypesToken) {
 		tokenRequest := &responses_models.TokenCreationRequest{
 			Subject: req.Subject,
 			// implicit responses do not allow resource gap, so no resource gap filtering needed here
@@ -150,7 +150,7 @@ func (g *AuthorizeResponseGenerator) createImplicitFlow(ctx context.Context, req
 	}
 
 	jwt := ""
-	if utils.Contains(responseTypes, gois.ResponseTypesIdToken) {
+	if utils.Contains(responseTypes, wicket.ResponseTypesIdToken) {
 		var err error
 		stateHash := ""
 		if g.options.EmitStateHash && strings.TrimSpace(req.State) != "" {
@@ -168,7 +168,7 @@ func (g *AuthorizeResponseGenerator) createImplicitFlow(ctx context.Context, req
 			ValidatedRequest:         req.ValidatedRequest,
 			Subject:                  req.Subject,
 			ValidatedResources:       req.ValidatedResources,
-			Nonce:                    req.Raw.Get(gois.AuthorizeRequestNonce),
+			Nonce:                    req.Raw.Get(wicket.AuthorizeRequestNonce),
 			IncludeAllIdentityClaims: !req.AccessTokenRequested(),
 			AccessTokenToHash:        accessTokenValue,
 			AuthorizationCodeToHash:  authorizationCode,

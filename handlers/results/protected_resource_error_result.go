@@ -30,15 +30,15 @@ func (prer *ProtectedResourceErrorResult) Execute(w http.ResponseWriter, r *http
 
 	statusCode := http.StatusUnauthorized
 
-	if code, ok := gois.ProtectedResourceErrorStatusCodes[prer.Error]; ok {
+	if code, ok := wicket.ProtectedResourceErrorStatusCodes[prer.Error]; ok {
 		statusCode = code
 	}
 
 	w.WriteHeader(statusCode)
 	HttpRespSetNoCache(w)
 
-	if prer.Error == gois.ProtectedResourceErrorsExpiredToken {
-		prer.Error = gois.ProtectedResourceErrorsInvalidToken
+	if prer.Error == wicket.ProtectedResourceErrorsExpiredToken {
+		prer.Error = wicket.ProtectedResourceErrorsInvalidToken
 		prer.ErrorDescription = "The access token expired"
 	}
 

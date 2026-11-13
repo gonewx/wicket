@@ -49,7 +49,7 @@ func (r *ResourceValidationResult) RawScopeValues() []string {
 func (r *ResourceValidationResult) Filter(scopeValues []string) *ResourceValidationResult {
 	result := &ResourceValidationResult{}
 
-	offline := utils.Contains(scopeValues, gois.StandardScopesOfflineAccess)
+	offline := utils.Contains(scopeValues, wicket.StandardScopesOfflineAccess)
 
 	parsedScopesToKeep := utils.Where(r.ParsedScopes, func(x *ParsedScopeValue) bool {
 		return utils.Contains(scopeValues, x.RawValue)
@@ -121,7 +121,7 @@ func (r *ResourceValidationResult) FilterByResourceGap(resourceIndicator string)
 			return utils.Contains(scopeNamesToKeep, x.ParsedName)
 		})
 		if r.Resources.OfflineAccess {
-			parsedScopesToKeepList = append(parsedScopesToKeepList, &ParsedScopeValue{RawValue: gois.StandardScopesOfflineAccess})
+			parsedScopesToKeepList = append(parsedScopesToKeepList, &ParsedScopeValue{RawValue: wicket.StandardScopesOfflineAccess})
 		}
 		parsedScopesToKeep = parsedScopesToKeepList
 	}

@@ -90,7 +90,7 @@ func newStoragePortContractClient(t *testing.T) *storage_models.Client {
 	client.RedirectUris = []string{"https://client.example.com/callback"}
 	client.AllowOfflineAccess = true
 	client.AllowedScopes = []string{"orders.read"}
-	if err := client.SetAllowedGrantTypes([]string{gois.GrantTypeAuthorizationCode, gois.GrantTypeRefreshToken}); err != nil {
+	if err := client.SetAllowedGrantTypes([]string{wicket.GrantTypeAuthorizationCode, wicket.GrantTypeRefreshToken}); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
 	return client
@@ -133,9 +133,9 @@ func (f *storagePortContractFixture) exchangeCode(t *testing.T, handle string) (
 	t.Helper()
 
 	values := url.Values{
-		gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-		gois.TokenRequestCode:        {handle},
-		gois.TokenRequestRedirectUri: {f.client.RedirectUris[0]},
+		wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+		wicket.TokenRequestCode:        {handle},
+		wicket.TokenRequestRedirectUri: {f.client.RedirectUris[0]},
 	}
 	return f.tokenValidator.ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: f.client})
 }
@@ -160,8 +160,8 @@ func (f *storagePortContractFixture) exchangeRefreshToken(t *testing.T, handle s
 	t.Helper()
 
 	values := url.Values{
-		gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-		gois.TokenRequestRefreshToken: {handle},
+		wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+		wicket.TokenRequestRefreshToken: {handle},
 	}
 	return f.tokenValidator.ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: f.client})
 }
@@ -198,7 +198,7 @@ func TestAuthorizationCodeExchangeFlowE2E(t *testing.T) {
 		if err != nil {
 			t.Fatalf("second exchange surfaced infrastructure error: %v", err)
 		}
-		if !errors.Is(second.Error, gois.TokenErrorsInvalidGrant) {
+		if !errors.Is(second.Error, wicket.TokenErrorsInvalidGrant) {
 			t.Fatalf("second exchange error = %v, want invalid_grant", second.Error)
 		}
 	})
@@ -210,7 +210,7 @@ func TestAuthorizationCodeExchangeFlowE2E(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unknown code surfaced infrastructure error: %v", err)
 		}
-		if !errors.Is(result.Error, gois.TokenErrorsInvalidGrant) {
+		if !errors.Is(result.Error, wicket.TokenErrorsInvalidGrant) {
 			t.Fatalf("unknown code error = %v, want invalid_grant", result.Error)
 		}
 	})
@@ -253,7 +253,7 @@ func TestRefreshTokenValidationFlowE2E(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unknown refresh token surfaced infrastructure error: %v", err)
 		}
-		if !errors.Is(result.Error, gois.TokenErrorsInvalidGrant) {
+		if !errors.Is(result.Error, wicket.TokenErrorsInvalidGrant) {
 			t.Fatalf("unknown refresh token error = %v, want invalid_grant", result.Error)
 		}
 	})
@@ -294,7 +294,7 @@ func TestTokenRevocationIdempotencyE2E(t *testing.T) {
 
 	t.Run("missing access token revokes idempotently", func(t *testing.T) {
 		t.Parallel()
-		response, err := generator.Handle(context.Background(), newResult("missing", gois.TokenTypeHintsAccessToken))
+		response, err := generator.Handle(context.Background(), newResult("missing", wicket.TokenTypeHintsAccessToken))
 		if err != nil {
 			t.Fatalf("revoke missing access token: %v", err)
 		}
@@ -305,7 +305,7 @@ func TestTokenRevocationIdempotencyE2E(t *testing.T) {
 
 	t.Run("missing refresh token revokes idempotently", func(t *testing.T) {
 		t.Parallel()
-		response, err := generator.Handle(context.Background(), newResult("missing", gois.TokenTypeHintsRefreshToken))
+		response, err := generator.Handle(context.Background(), newResult("missing", wicket.TokenTypeHintsRefreshToken))
 		if err != nil {
 			t.Fatalf("revoke missing refresh token: %v", err)
 		}
@@ -321,7 +321,7 @@ func TestTokenRevocationIdempotencyE2E(t *testing.T) {
 		if err := referenceTokens.StoreReferenceToken(context.Background(), handle, token); err != nil {
 			t.Fatalf("store reference token: %v", err)
 		}
-		response, err := generator.Handle(context.Background(), newResult(handle, gois.TokenTypeHintsAccessToken))
+		response, err := generator.Handle(context.Background(), newResult(handle, wicket.TokenTypeHintsAccessToken))
 		if err != nil {
 			t.Fatalf("revoke present token: %v", err)
 		}
@@ -572,7 +572,7 @@ func TestExpiredRecordsStillReadableE2E(t *testing.T) {
 	if err != nil {
 		t.Fatalf("exchange expired code surfaced infrastructure error: %v", err)
 	}
-	if !errors.Is(result.Error, gois.TokenErrorsInvalidGrant) {
+	if !errors.Is(result.Error, wicket.TokenErrorsInvalidGrant) {
 		t.Fatalf("expired code error = %v, want invalid_grant", result.Error)
 	}
 }

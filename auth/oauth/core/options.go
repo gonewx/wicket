@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
 	authcore "github.com/gonewx/wicket/auth/core"
 	"github.com/gonewx/wicket/auth/oauth"
@@ -79,23 +79,23 @@ func (o *Options) Validate() error {
 	}
 
 	if strings.TrimSpace(o.clientId) == "" {
-		return fmt.Errorf("Exception_OptionMustBeProvided (clientId): %w", gois.ArgumentNullException)
+		return fmt.Errorf("Exception_OptionMustBeProvided (clientId): %w", wicket.ArgumentNullException)
 	}
 
 	if strings.TrimSpace(o.clientSecret) == "" {
-		return fmt.Errorf("Exception_OptionMustBeProvided (clientSecret): %w", gois.ArgumentNullException)
+		return fmt.Errorf("Exception_OptionMustBeProvided (clientSecret): %w", wicket.ArgumentNullException)
 	}
 
 	if strings.TrimSpace(o.authorizationEndpoint) == "" {
-		return fmt.Errorf("Exception_OptionMustBeProvided (authorizationEndpoint): %w", gois.ArgumentNullException)
+		return fmt.Errorf("Exception_OptionMustBeProvided (authorizationEndpoint): %w", wicket.ArgumentNullException)
 	}
 
 	if strings.TrimSpace(o.tokenEndpoint) == "" {
-		return fmt.Errorf("Exception_OptionMustBeProvided (tokenEndpoint): %w", gois.ArgumentNullException)
+		return fmt.Errorf("Exception_OptionMustBeProvided (tokenEndpoint): %w", wicket.ArgumentNullException)
 	}
 
 	if strings.TrimSpace(o.CallbackPath()) == "" {
-		return fmt.Errorf("Exception_OptionMustBeProvided (CallbackPath): %w", gois.ArgumentNullException)
+		return fmt.Errorf("Exception_OptionMustBeProvided (CallbackPath): %w", wicket.ArgumentNullException)
 	}
 
 	return nil

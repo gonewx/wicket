@@ -21,7 +21,7 @@ type WicketAuthenticationService struct {
 }
 
 func NewWicketAuthenticationService(
-	decorator *gois.Decorator[auth.Service],
+	decorator *wicket.Decorator[auth.Service],
 	schemes auth.SchemeProvider,
 	clock services.SystemClock,
 	user services.UserSession,

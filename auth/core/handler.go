@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
 	optspkg "github.com/gonewx/wicket/di/options"
 	"github.com/gonewx/wicket/services"
@@ -64,11 +64,11 @@ func (h *Handler[T]) Initialize(
 	scheme *auth.Scheme,
 ) error {
 	if scheme == nil {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 
 	if request == nil || response == nil {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 
 	h.Scheme = scheme

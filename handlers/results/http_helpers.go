@@ -48,7 +48,7 @@ func AddScriptCspHeaders(w http.ResponseWriter, options *config_options.CspOptio
 	directives := []string{"default-src 'none'"}
 	if len(hashes) > 0 && hashes[0] != "" {
 		sources := hashes
-		if options != nil && options.Level == gois.CspLevelOne {
+		if options != nil && options.Level == wicket.CspLevelOne {
 			// CSP Level 1 browsers do not recognise hash-sources and would block the
 			// inline script; 'unsafe-inline' is the backward-compatible fallback. CSP2+
 			// browsers ignore 'unsafe-inline' when a hash is present (W3C CSP).
@@ -63,7 +63,7 @@ func AddStyleCspHeaders(w http.ResponseWriter, options *config_options.CspOption
 	directives := []string{"default-src 'none'"}
 	if hash != "" {
 		styleSrc := "'" + hash + "'"
-		if options != nil && options.Level == gois.CspLevelOne {
+		if options != nil && options.Level == wicket.CspLevelOne {
 			styleSrc = "'unsafe-inline' " + styleSrc
 		}
 		directives = append(directives, "style-src "+styleSrc)

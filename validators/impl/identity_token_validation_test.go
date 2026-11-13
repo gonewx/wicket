@@ -74,7 +74,7 @@ func TestIdentityToken_InvalidClientId(t *testing.T) {
 	result, _ := validator.ValidateIdentityToken(context.Background(), jwt, "invalid", true)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }
 
 func TestIdentityToken_Too_Long(t *testing.T) {
@@ -90,7 +90,7 @@ func TestIdentityToken_Too_Long(t *testing.T) {
 	result, _ := validator.ValidateIdentityToken(context.Background(), jwt, "roclient", true)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }
 
 func TestClaims_that_collide_with_token_validation_should_be_ignored(t *testing.T) {

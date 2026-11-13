@@ -165,7 +165,7 @@ func (p *WicketPipeline) readLoginRequest(r *http.Request, w http.ResponseWriter
 
 func service(ctx context.Context) (auth.Service, error) {
 	if ctx == nil {
-		return nil, gois.InvalidOperationException
+		return nil, wicket.InvalidOperationException
 	}
 
 	return godi.GetRequired[auth.Service](hosting.ScopeFrom(ctx)), nil
@@ -184,7 +184,7 @@ func (p *WicketPipeline) issueLoginCookie(r *http.Request, w http.ResponseWriter
 		panic(err)
 	}
 
-	err = svc.SignIn(r, w, gois.DefaultCookieAuthenticationScheme, p.Subject, props)
+	err = svc.SignIn(r, w, wicket.DefaultCookieAuthenticationScheme, p.Subject, props)
 	if err != nil {
 		panic(err)
 	}
@@ -331,15 +331,15 @@ func (p *WicketPipeline) Login(subject string) error {
 }
 
 func (p *WicketPipeline) RemoveLoginCookie() {
-	p.BrowserClient.RemoveCookie(p.TestServer.URL, gois.DefaultCookieAuthenticationScheme)
+	p.BrowserClient.RemoveCookie(p.TestServer.URL, wicket.DefaultCookieAuthenticationScheme)
 }
 
 func (p *WicketPipeline) RemoveSessionCookie() {
-	p.BrowserClient.RemoveCookie(p.TestServer.URL, gois.DefaultCheckSessionCookieName)
+	p.BrowserClient.RemoveCookie(p.TestServer.URL, wicket.DefaultCheckSessionCookieName)
 }
 
 func (p *WicketPipeline) GetSessionCookie() *http.Cookie {
-	return p.BrowserClient.GetCookie(p.TestServer.URL, gois.DefaultCheckSessionCookieName)
+	return p.BrowserClient.GetCookie(p.TestServer.URL, wicket.DefaultCheckSessionCookieName)
 }
 
 func (p *WicketPipeline) Initialize() {
@@ -350,13 +350,13 @@ func (p *WicketPipeline) Initialize() {
 	// Host wiring the cookie-options post-configuration would normally apply:
 	// interaction pages default to the host account routes.
 	if p.Options.UserInteraction.LoginUrl == "" {
-		p.Options.UserInteraction.LoginUrl = gois.UIConstantsDefaultRoutePathsLogin
+		p.Options.UserInteraction.LoginUrl = wicket.UIConstantsDefaultRoutePathsLogin
 	}
 	if p.Options.UserInteraction.LoginReturnUrlParameter == "" {
-		p.Options.UserInteraction.LoginReturnUrlParameter = gois.UIConstantsDefaultRoutePathParamsLogin
+		p.Options.UserInteraction.LoginReturnUrlParameter = wicket.UIConstantsDefaultRoutePathParamsLogin
 	}
 	if p.Options.UserInteraction.LogoutUrl == "" {
-		p.Options.UserInteraction.LogoutUrl = gois.UIConstantsDefaultRoutePathsLogout
+		p.Options.UserInteraction.LogoutUrl = wicket.UIConstantsDefaultRoutePathsLogout
 	}
 
 	p.UserStore = test.NewTestUserStore(p.Users)
@@ -368,11 +368,11 @@ func (p *WicketPipeline) Initialize() {
 	wicketMiddleware := p.Server.UseWicket()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(utils.EnsureLeadingSlash(gois.UIConstantsDefaultRoutePathsLogin), p.onLogin())
-	mux.HandleFunc(utils.EnsureLeadingSlash(gois.UIConstantsDefaultRoutePathsLogout), p.onLogout())
-	mux.HandleFunc(utils.EnsureLeadingSlash(gois.UIConstantsDefaultRoutePathsConsent), p.onConsent())
+	mux.HandleFunc(utils.EnsureLeadingSlash(wicket.UIConstantsDefaultRoutePathsLogin), p.onLogin())
+	mux.HandleFunc(utils.EnsureLeadingSlash(wicket.UIConstantsDefaultRoutePathsLogout), p.onLogout())
+	mux.HandleFunc(utils.EnsureLeadingSlash(wicket.UIConstantsDefaultRoutePathsConsent), p.onConsent())
 	mux.HandleFunc("/custom", p.onCustom())
-	mux.HandleFunc(utils.EnsureLeadingSlash(gois.UIConstantsDefaultRoutePathsError), p.onError())
+	mux.HandleFunc(utils.EnsureLeadingSlash(wicket.UIConstantsDefaultRoutePathsError), p.onError())
 
 	p.TestServer = httptest.NewServer(hosting.ScopeMiddleware(p.Root)(wicketMiddleware(mux)))
 	p.TestServer.Config.RegisterOnShutdown(func() {
@@ -416,13 +416,13 @@ func (p *WicketPipeline) configureServices() {
 	cfg.SetResourceOwnerValidator(p.ResourceOwnerValidator)
 	cfg.SetProfileProvider(func() services.ProfileService { return p.Profile })
 	cfg.SetBackChannelLogoutHttpClient(p.BackChannelClient)
-	cfg.SetAuthenticationHandlerProvider(gois.DefaultCookieAuthenticationScheme, func(prov godi.Provider) auth.Handler {
+	cfg.SetAuthenticationHandlerProvider(wicket.DefaultCookieAuthenticationScheme, func(prov godi.Provider) auth.Handler {
 		return newTestCookieAuthenticationHandler(godi.GetRequired[services.UserSession](prov))
 	})
 	// Host startup registers the default cookie scheme so the scheme registry
 	// can resolve it; the handler itself comes from the seam above.
 	if err := godi.GetRequired[*authcore.SchemeProvider](p.Root).AddScheme(
-		auth.NewScheme(gois.DefaultCookieAuthenticationScheme, "testCookieAuthenticationHandler"),
+		auth.NewScheme(wicket.DefaultCookieAuthenticationScheme, "testCookieAuthenticationHandler"),
 	); err != nil {
 		panic(err)
 	}
@@ -454,7 +454,7 @@ func (p *WicketPipeline) AddDeveloperSigningCredential(signingAlgorithm jwa.Sign
 }
 
 func (p *WicketPipeline) AddSigningCredential(credential *tokens.SigningCredentials) {
-	if !utils.Contains(gois.SupportedSigningAlgorithms, credential.Algorithm) {
+	if !utils.Contains(wicket.SupportedSigningAlgorithms, credential.Algorithm) {
 		panic(fmt.Sprintf("credential.Algorithm is not supported %s", credential.Algorithm))
 	}
 	p.SigningCredentialStores = append(p.SigningCredentialStores, storage_memory.NewMemorySigningCredentialStore(credential))
@@ -487,7 +487,7 @@ type AuthorizeUrl struct {
 
 func (p *WicketPipeline) CreateAuthorizeUrl(au *AuthorizeUrl) (*url.URL, error) {
 
-	rawURL, err := url.JoinPath(p.TestServer.URL, gois.ProtocolRoutePathsAuthorize)
+	rawURL, err := url.JoinPath(p.TestServer.URL, wicket.ProtocolRoutePathsAuthorize)
 	if err != nil {
 		return nil, err
 	}

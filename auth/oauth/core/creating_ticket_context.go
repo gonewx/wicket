@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
 	authevents "github.com/gonewx/wicket/auth/core/events"
 	"github.com/gonewx/wicket/auth/oauth"
@@ -38,10 +38,10 @@ func NewCreatingTicketContext[T oauth.Options[T]](
 	user string,
 ) (*CreatingTicketContext[T], error) {
 	if backchannel == nil {
-		return nil, gois.ArgumentNullException
+		return nil, wicket.ArgumentNullException
 	}
 	if tokens == nil {
-		return nil, gois.ArgumentNullException
+		return nil, wicket.ArgumentNullException
 	}
 	c := &CreatingTicketContext[T]{
 		ResultContext: authevents.NewResultContext(r, w, scheme, options),

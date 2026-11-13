@@ -45,7 +45,7 @@ func (h *IntrospectionHandler) Process(w http.ResponseWriter, r *http.Request) e
 		return results.NewStatusCodeResult(http.StatusUnsupportedMediaType).Execute(w, r)
 	}
 	if err := r.ParseForm(); err != nil {
-		return results.NewBadRequestResult(gois.TokenErrorsInvalidRequest, "").Execute(w, r)
+		return results.NewBadRequestResult(wicket.TokenErrorsInvalidRequest, "").Execute(w, r)
 	}
 
 	apiResult := h.apiValidator.Validate(r)

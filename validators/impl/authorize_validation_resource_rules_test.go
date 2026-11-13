@@ -43,10 +43,10 @@ func TestAuthorizeResourceParameterRules(t *testing.T) {
 					t.Fatalf("build validator: %v", err)
 				}
 				return validator, url.Values{
-					gois.AuthorizeRequestClientId:     {"codeclient"},
-					gois.AuthorizeRequestScope:        {"openid scope1"},
-					gois.AuthorizeRequestRedirectUri:  {"https://server/cb"},
-					gois.AuthorizeRequestResponseType: {gois.ResponseTypesCode},
+					wicket.AuthorizeRequestClientId:     {"codeclient"},
+					wicket.AuthorizeRequestScope:        {"openid scope1"},
+					wicket.AuthorizeRequestRedirectUri:  {"https://server/cb"},
+					wicket.AuthorizeRequestResponseType: {wicket.ResponseTypesCode},
 				}
 			},
 			wantResources: []string{},
@@ -58,24 +58,24 @@ func TestAuthorizeResourceParameterRules(t *testing.T) {
 					t.Fatalf("build validator: %v", err)
 				}
 				return validator, url.Values{
-					gois.AuthorizeRequestClientId:     {"codeclient"},
-					gois.AuthorizeRequestScope:        {"openid scope1"},
-					gois.AuthorizeRequestRedirectUri:  {"https://server/cb"},
-					gois.AuthorizeRequestResponseType: {gois.ResponseTypesCode},
-					gois.AuthorizeRequestResource:     {"https://server/resources/" + strings.Repeat("a", 512)},
+					wicket.AuthorizeRequestClientId:     {"codeclient"},
+					wicket.AuthorizeRequestScope:        {"openid scope1"},
+					wicket.AuthorizeRequestRedirectUri:  {"https://server/cb"},
+					wicket.AuthorizeRequestResponseType: {wicket.ResponseTypesCode},
+					wicket.AuthorizeRequestResource:     {"https://server/resources/" + strings.Repeat("a", 512)},
 				}
 			},
-			wantErr: gois.AuthorizeErrorsInvalidTarget,
+			wantErr: wicket.AuthorizeErrorsInvalidTarget,
 		},
 		"multiple valid resources are all collected": {
 			arrange: func(t *testing.T) (*AuthorizeRequestValidator, url.Values) {
 				validator := newMultiResourceAuthorizeValidator(t)
 				return validator, url.Values{
-					gois.AuthorizeRequestClientId:     {"resource-client"},
-					gois.AuthorizeRequestScope:        {"alpha.read beta.read gamma.read"},
-					gois.AuthorizeRequestRedirectUri:  {"https://client.example.com/callback"},
-					gois.AuthorizeRequestResponseType: {gois.ResponseTypesCode},
-					gois.AuthorizeRequestResource: {
+					wicket.AuthorizeRequestClientId:     {"resource-client"},
+					wicket.AuthorizeRequestScope:        {"alpha.read beta.read gamma.read"},
+					wicket.AuthorizeRequestRedirectUri:  {"https://client.example.com/callback"},
+					wicket.AuthorizeRequestResponseType: {wicket.ResponseTypesCode},
+					wicket.AuthorizeRequestResource: {
 						resourceIndicatorAlpha,
 						resourceIndicatorBeta,
 						resourceIndicatorGamma,
@@ -91,33 +91,33 @@ func TestAuthorizeResourceParameterRules(t *testing.T) {
 		"failed scope validation maps to invalid scope": {
 			arrange: func(t *testing.T) (*AuthorizeRequestValidator, url.Values) {
 				result := validators_models.NewResourceValidationResult()
-				result.InvalidScopes = []string{gois.StandardScopesOpenId}
+				result.InvalidScopes = []string{wicket.StandardScopesOpenId}
 				validator := newMappedResourceAuthorizeValidator(t, result)
 				return validator, url.Values{
-					gois.AuthorizeRequestClientId:     {"codeclient"},
-					gois.AuthorizeRequestScope:        {gois.StandardScopesOpenId},
-					gois.AuthorizeRequestRedirectUri:  {"https://server/cb"},
-					gois.AuthorizeRequestResponseType: {gois.ResponseTypesCode},
-					gois.AuthorizeRequestResource:     {resourceIndicatorAlpha},
+					wicket.AuthorizeRequestClientId:     {"codeclient"},
+					wicket.AuthorizeRequestScope:        {wicket.StandardScopesOpenId},
+					wicket.AuthorizeRequestRedirectUri:  {"https://server/cb"},
+					wicket.AuthorizeRequestResponseType: {wicket.ResponseTypesCode},
+					wicket.AuthorizeRequestResource:     {resourceIndicatorAlpha},
 				}
 			},
-			wantErr: gois.AuthorizeErrorsInvalidScope,
+			wantErr: wicket.AuthorizeErrorsInvalidScope,
 		},
 		"failed resource validation maps to invalid target before invalid scope": {
 			arrange: func(t *testing.T) (*AuthorizeRequestValidator, url.Values) {
 				result := validators_models.NewResourceValidationResult()
-				result.InvalidScopes = []string{gois.StandardScopesOpenId}
+				result.InvalidScopes = []string{wicket.StandardScopesOpenId}
 				result.InvalidResourceGaps = []string{resourceIndicatorAlpha}
 				validator := newMappedResourceAuthorizeValidator(t, result)
 				return validator, url.Values{
-					gois.AuthorizeRequestClientId:     {"codeclient"},
-					gois.AuthorizeRequestScope:        {gois.StandardScopesOpenId},
-					gois.AuthorizeRequestRedirectUri:  {"https://server/cb"},
-					gois.AuthorizeRequestResponseType: {gois.ResponseTypesCode},
-					gois.AuthorizeRequestResource:     {resourceIndicatorAlpha},
+					wicket.AuthorizeRequestClientId:     {"codeclient"},
+					wicket.AuthorizeRequestScope:        {wicket.StandardScopesOpenId},
+					wicket.AuthorizeRequestRedirectUri:  {"https://server/cb"},
+					wicket.AuthorizeRequestResponseType: {wicket.ResponseTypesCode},
+					wicket.AuthorizeRequestResource:     {resourceIndicatorAlpha},
 				}
 			},
-			wantErr: gois.AuthorizeErrorsInvalidTarget,
+			wantErr: wicket.AuthorizeErrorsInvalidTarget,
 		},
 	}
 
@@ -155,7 +155,7 @@ func newMultiResourceAuthorizeValidator(t *testing.T) *AuthorizeRequestValidator
 	client.RequirePkce = false
 	client.RedirectUris = []string{"https://client.example.com/callback"}
 	client.AllowedScopes = []string{"alpha.read", "beta.read", "gamma.read"}
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesCode); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesCode); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
 	clientStore, err := memory.NewMemoryClientStore([]*storage_models.Client{client})

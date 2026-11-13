@@ -21,7 +21,7 @@ type ExtensionGrantValidationContext struct {
 func NewExtensionGrantValidationContext() *ExtensionGrantValidationContext {
 	return &ExtensionGrantValidationContext{
 		Result: validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultError(gois.TokenRequestErrorsInvalidGrant, ""),
+			validators_models.WithGrantValidationResultError(wicket.TokenRequestErrorsInvalidGrant, ""),
 		),
 	}
 }

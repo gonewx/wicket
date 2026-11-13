@@ -435,6 +435,6 @@ func TestProcess_should_throw_if_incorrect_sub_issued_by_profile_service(t *test
 	)
 	_, err = ts.subject.Handle(context.Background(), result)
 	a.Error(err)
-	a.ErrorIs(err, gois.InvalidOperationException)
+	a.ErrorIs(err, wicket.InvalidOperationException)
 	a.Contains(err.Error(), "subject")
 }

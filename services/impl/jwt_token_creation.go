@@ -89,7 +89,7 @@ func (s *TokenCreationService) CreateToken(ctx context.Context, token *storage_m
 // validation path can distinguish them from other JWTs; every other token uses
 // the RFC 7519 default.
 func (s *TokenCreationService) headerType(token *storage_models.Token) string {
-	if token.Type == gois.TokenTypesAccessToken && s.options.AccessTokenJwtType != "" {
+	if token.Type == wicket.TokenTypesAccessToken && s.options.AccessTokenJwtType != "" {
 		return s.options.AccessTokenJwtType
 	}
 	return "JWT"

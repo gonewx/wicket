@@ -13,10 +13,10 @@ type IdentityResources struct {
 // Models the standard openid scope
 func IdentityResourcesOpenId() *IdentityResource {
 	resource := NewIdentityResource()
-	resource.Resource.Name = gois.StandardScopesOpenId
+	resource.Resource.Name = wicket.StandardScopesOpenId
 	resource.Resource.DisplayName = "Your user identifier"
 	resource.Required = true
-	resource.UserClaims = append(resource.UserClaims, gois.JwtClaimTypesSubject)
+	resource.UserClaims = append(resource.UserClaims, wicket.JwtClaimTypesSubject)
 
 	return resource
 }
@@ -25,11 +25,11 @@ func IdentityResourcesOpenId() *IdentityResource {
 func IdentityResourcesProfile() *IdentityResource {
 	resource := NewIdentityResource()
 
-	resource.Resource.Name = gois.StandardScopesProfile
+	resource.Resource.Name = wicket.StandardScopesProfile
 	resource.Resource.DisplayName = "User profile"
 	resource.Resource.Description = "Your user profile information (first name, last name, etc.)"
 	resource.Emphasize = true
-	resource.UserClaims = gois.ScopeToClaimsMapping[gois.StandardScopesProfile]
+	resource.UserClaims = wicket.ScopeToClaimsMapping[wicket.StandardScopesProfile]
 
 	return resource
 }
@@ -39,10 +39,10 @@ func IdentityResourcesProfile() *IdentityResource {
 func IdentityResourcesEmail() *IdentityResource {
 	resource := NewIdentityResource()
 
-	resource.Resource.Name = gois.StandardScopesEmail
+	resource.Resource.Name = wicket.StandardScopesEmail
 	resource.Resource.DisplayName = "Your email address"
 	resource.Emphasize = true
-	resource.UserClaims = gois.ScopeToClaimsMapping[gois.StandardScopesEmail]
+	resource.UserClaims = wicket.ScopeToClaimsMapping[wicket.StandardScopesEmail]
 
 	return resource
 }
@@ -51,10 +51,10 @@ func IdentityResourcesEmail() *IdentityResource {
 func IdentityResourcesPhone() *IdentityResource {
 	resource := NewIdentityResource()
 
-	resource.Resource.Name = gois.StandardScopesPhone
+	resource.Resource.Name = wicket.StandardScopesPhone
 	resource.Resource.DisplayName = "Your phone number"
 	resource.Emphasize = true
-	resource.UserClaims = append(resource.UserClaims, gois.StandardScopesPhone)
+	resource.UserClaims = append(resource.UserClaims, wicket.StandardScopesPhone)
 
 	return resource
 }
@@ -63,10 +63,10 @@ func IdentityResourcesPhone() *IdentityResource {
 func IdentityResourcesAddress() *IdentityResource {
 	resource := NewIdentityResource()
 
-	resource.Resource.Name = gois.StandardScopesAddress
+	resource.Resource.Name = wicket.StandardScopesAddress
 	resource.Resource.DisplayName = "Your postal addressuser identifier"
 	resource.Emphasize = true
-	resource.UserClaims = append(resource.UserClaims, gois.StandardScopesAddress)
+	resource.UserClaims = append(resource.UserClaims, wicket.StandardScopesAddress)
 
 	return resource
 }

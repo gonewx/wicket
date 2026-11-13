@@ -77,46 +77,46 @@ func registerCore() {
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L109 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesAuthorize, gois.ProtocolRoutePathsAuthorize, endpointHandler[*handlers.AuthorizeHandler])
+		return newEndpoint(wicket.EndpointNamesAuthorize, wicket.ProtocolRoutePathsAuthorize, endpointHandler[*handlers.AuthorizeHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L110 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesAuthorize, gois.ProtocolRoutePathsAuthorizeCallback, endpointHandler[*handlers.AuthorizeCallbackHandler])
+		return newEndpoint(wicket.EndpointNamesAuthorize, wicket.ProtocolRoutePathsAuthorizeCallback, endpointHandler[*handlers.AuthorizeCallbackHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L111 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesToken, gois.ProtocolRoutePathsToken, endpointHandler[*handlers.TokenHandler])
+		return newEndpoint(wicket.EndpointNamesToken, wicket.ProtocolRoutePathsToken, endpointHandler[*handlers.TokenHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L112 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesDiscovery, gois.ProtocolRoutePathsDiscoveryConfiguration, endpointHandler[*handlers.DiscoveryHandler])
+		return newEndpoint(wicket.EndpointNamesDiscovery, wicket.ProtocolRoutePathsDiscoveryConfiguration, endpointHandler[*handlers.DiscoveryHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L113 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesDiscovery, gois.ProtocolRoutePathsDiscoveryWebKeys, endpointHandler[*handlers.DiscoveryKeyHandler])
+		return newEndpoint(wicket.EndpointNamesDiscovery, wicket.ProtocolRoutePathsDiscoveryWebKeys, endpointHandler[*handlers.DiscoveryKeyHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L114 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesCheckSession, gois.ProtocolRoutePathsCheckSession, endpointHandler[*handlers.CheckSessionHandler])
+		return newEndpoint(wicket.EndpointNamesCheckSession, wicket.ProtocolRoutePathsCheckSession, endpointHandler[*handlers.CheckSessionHandler])
 	})
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesBackchannelAuthentication, gois.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
+		return newEndpoint(wicket.EndpointNamesBackchannelAuthentication, wicket.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L116 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesIntrospection, gois.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
+		return newEndpoint(wicket.EndpointNamesIntrospection, wicket.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L117 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesUserInfo, gois.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
+		return newEndpoint(wicket.EndpointNamesUserInfo, wicket.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L118 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesEndSession, gois.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
+		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L119 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesEndSession, gois.ProtocolRoutePathsEndSessionCallback, endpointHandler[*handlers.EndSessionCallbackHandler])
+		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSessionCallback, endpointHandler[*handlers.EndSessionCallbackHandler])
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L137 (AddTransient<T>)
 	godi.AddTransientFactory[*handlers.AuthorizeHandler](&r, newAuthorizeHandlerFromProvider)
@@ -157,8 +157,8 @@ func registerCore() {
 		return authcore.NewSchemeProvider(opts)
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L390 (Decorator descriptor is Transient).
-	godi.AddTransientFactory[*gois.Decorator[auth.SchemeProvider]](&r, func(p godi.Provider) *gois.Decorator[auth.SchemeProvider] {
-		return gois.NewDecorator[auth.SchemeProvider](godi.GetRequired[*authcore.SchemeProvider](p))
+	godi.AddTransientFactory[*wicket.Decorator[auth.SchemeProvider]](&r, func(p godi.Provider) *wicket.Decorator[auth.SchemeProvider] {
+		return wicket.NewDecorator[auth.SchemeProvider](godi.GetRequired[*authcore.SchemeProvider](p))
 	})
 	// The outer scheme provider merges the static registry with runtime dynamic
 	// providers. Its constructor params (decorator, options, resolver, logger)
@@ -202,16 +202,16 @@ func registerCore() {
 	// cookie handler is not yet available, so without a seam value the keyed
 	// registration serves the neutral unsupported handler until it lands.
 	// TODO: pending Epic 5 implementation
-	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.DefaultCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.DefaultCookieAuthenticationScheme); provider != nil {
+	godi.AddKeyedTransientFactory[auth.Handler](&r, wicket.DefaultCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.DefaultCookieAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
 		}
 		return authcore.NewUnsupportedHandler()
 	})
-	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.ExternalCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.ExternalCookieAuthenticationScheme); provider != nil {
+	godi.AddKeyedTransientFactory[auth.Handler](&r, wicket.ExternalCookieAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.ExternalCookieAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -234,8 +234,8 @@ func registerCore() {
 	godi.AddTransientFactory[optspkg.OptionsMonitor[*google.Options]](&r, func(p godi.Provider) optspkg.OptionsMonitor[*google.Options] {
 		return optspkg.NewOptionsMonitor[*google.Options](godi.GetRequired[optspkg.OptionsFactory[*google.Options]](p))
 	})
-	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.GoogleAuthenticationScheme, func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.GoogleAuthenticationScheme); provider != nil {
+	godi.AddKeyedTransientFactory[auth.Handler](&r, wicket.GoogleAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.GoogleAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -254,8 +254,8 @@ func registerCore() {
 	godi.AddTransientFactory[optspkg.OptionsMonitor[*facebook.Options]](&r, func(p godi.Provider) optspkg.OptionsMonitor[*facebook.Options] {
 		return optspkg.NewOptionsMonitor[*facebook.Options](godi.GetRequired[optspkg.OptionsFactory[*facebook.Options]](p))
 	})
-	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.FacebookAuthenticationScheme, func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.FacebookAuthenticationScheme); provider != nil {
+	godi.AddKeyedTransientFactory[auth.Handler](&r, wicket.FacebookAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.FacebookAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -273,8 +273,8 @@ func registerCore() {
 	godi.AddTransientFactory[optspkg.OptionsMonitor[*jwt.Options]](&r, func(p godi.Provider) optspkg.OptionsMonitor[*jwt.Options] {
 		return optspkg.NewOptionsMonitor[*jwt.Options](godi.GetRequired[optspkg.OptionsFactory[*jwt.Options]](p))
 	})
-	godi.AddKeyedTransientFactory[auth.Handler](&r, gois.JwtBearerAuthenticationScheme, func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.JwtBearerAuthenticationScheme); provider != nil {
+	godi.AddKeyedTransientFactory[auth.Handler](&r, wicket.JwtBearerAuthenticationScheme, func(p godi.Provider) auth.Handler {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.JwtBearerAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -305,8 +305,8 @@ func registerCore() {
 	// Core.cs#L358 AddDecorator to concrete self-registration with Scoped lifetime.
 	godi.AddScoped[*authcore.Service, authcore.Service](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L390 (Decorator descriptor is Transient).
-	godi.AddTransientFactory[*gois.Decorator[auth.Service]](&r, func(p godi.Provider) *gois.Decorator[auth.Service] {
-		return gois.NewDecorator[auth.Service](godi.GetRequired[*authcore.Service](p))
+	godi.AddTransientFactory[*wicket.Decorator[auth.Service]](&r, func(p godi.Provider) *wicket.Decorator[auth.Service] {
+		return wicket.NewDecorator[auth.Service](godi.GetRequired[*authcore.Service](p))
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L94 (AddTransientDecorator outer AddTransient).
 	// Form B enforces request-scope-only resolution; Form A would let Root
@@ -314,7 +314,7 @@ func registerCore() {
 	godi.AddTransientFactory[auth.Service](&r, func(p godi.Provider) auth.Service {
 		requestFromProvider(p)
 		return server.NewWicketAuthenticationService(
-			godi.GetRequired[*gois.Decorator[auth.Service]](p),
+			godi.GetRequired[*wicket.Decorator[auth.Service]](p),
 			godi.GetRequired[auth.SchemeProvider](p),
 			godi.GetRequired[services.SystemClock](p),
 			godi.GetRequired[services.UserSession](p),
@@ -326,7 +326,7 @@ func registerCore() {
 	godi.AddSingletonFactory[optspkg.ConfigureOptions[*auth.Options]](&r, func(p godi.Provider) optspkg.ConfigureOptions[*auth.Options] {
 		serverConfig := godi.GetRequired[*ServerConfig](p)
 		return optspkg.NewConfigureNameOptions(optspkg.DefaultName, func(o *auth.Options) error {
-			o.DefaultScheme = gois.DefaultCookieAuthenticationScheme
+			o.DefaultScheme = wicket.DefaultCookieAuthenticationScheme
 			o.ExternalFailurePath = serverConfig.ExternalFailurePath()
 			return nil
 		})
@@ -348,12 +348,12 @@ func registerCore() {
 		)
 	})
 	godi.AddSingletonFactory[optspkg.ValidateOptions[*authcookies.AuthenticationOptions]](&r, func(p godi.Provider) optspkg.ValidateOptions[*authcookies.AuthenticationOptions] {
-		return optspkg.NewValidateOptions(gois.DefaultCookieAuthenticationScheme,
+		return optspkg.NewValidateOptions(wicket.DefaultCookieAuthenticationScheme,
 			func(o *authcookies.AuthenticationOptions) error { return o.Validate() },
 			optspkg.DefaultValidationFailureMessage)
 	})
 	godi.AddSingletonFactory[optspkg.ValidateOptions[*authcookies.AuthenticationOptions]](&r, func(p godi.Provider) optspkg.ValidateOptions[*authcookies.AuthenticationOptions] {
-		return optspkg.NewValidateOptions(gois.ExternalCookieAuthenticationScheme,
+		return optspkg.NewValidateOptions(wicket.ExternalCookieAuthenticationScheme,
 			func(o *authcookies.AuthenticationOptions) error { return o.Validate() },
 			optspkg.DefaultValidationFailureMessage)
 	})

@@ -101,57 +101,57 @@ func (s *TokenRequestValidator) ValidateRequest(ctx context.Context, parameters 
 	s.validatedRequest.SetClient(clientValidationResult.Client, clientValidationResult.Secret, clientValidationResult.Confirmation)
 
 	// check client protocol type
-	if s.validatedRequest.Client.ProtocolType != gois.ProtocolTypesOpenIdConnect {
+	if s.validatedRequest.Client.ProtocolType != wicket.ProtocolTypesOpenIdConnect {
 		s.Logger.Error("Invalid protocol type for client")
-		return s.invalid(gois.TokenErrorsInvalidClient, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidClient, ""), nil
 	}
 
 	// check grant type
-	grantType := parameters.Get(gois.TokenRequestGrantType)
+	grantType := parameters.Get(wicket.TokenRequestGrantType)
 	if grantType == "" {
 		s.Logger.Error("Grant type is missing")
-		return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
+		return s.invalid(wicket.TokenErrorsUnsupportedGrantType, ""), nil
 	}
 
 	if len(grantType) > s.Options.InputLengthRestrictions.GrantType {
 		s.Logger.Error("Grant type is too long")
-		return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
+		return s.invalid(wicket.TokenErrorsUnsupportedGrantType, ""), nil
 	}
 
 	s.validatedRequest.GrantType = grantType
 
 	// check for resource gap and basic formatting
-	resourceIndicators := parameters[gois.TokenRequestResource]
+	resourceIndicators := parameters[wicket.TokenRequestResource]
 
 	if utils.AnyPred(resourceIndicators, func(x string) bool {
 		return len(x) > s.Options.InputLengthRestrictions.ResourceGapMaxLength
 	}) {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator maximum length exceeded"), nil
+		return s.invalid(wicket.TokenErrorsInvalidTarget, "Resource indicator maximum length exceeded"), nil
 	}
 
 	if !utils.AreValidResourceGapFormat(resourceIndicators) {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap format"), nil
+		return s.invalid(wicket.TokenErrorsInvalidTarget, "Invalid resource gap format"), nil
 	}
 
 	if len(resourceIndicators) > 1 {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "Multiple resource gaps not supported on token endpoint."), nil
+		return s.invalid(wicket.TokenErrorsInvalidTarget, "Multiple resource gaps not supported on token endpoint."), nil
 	}
 
 	s.validatedRequest.RequestedResourceGap = utils.SingleOrDefault(resourceIndicators)
 
 	// run specific logic for grants
 	switch grantType {
-	case gois.GrantTypeAuthorizationCode:
+	case wicket.GrantTypeAuthorizationCode:
 		return s.runValidation(ctx, s.validateAuthorizationCodeRequest, parameters)
-	case gois.GrantTypeClientCredentials:
+	case wicket.GrantTypeClientCredentials:
 		return s.runValidation(ctx, s.validateClientCredentialsRequest, parameters)
-	case gois.GrantTypePassword:
+	case wicket.GrantTypePassword:
 		return s.runValidation(ctx, s.validateResourceOwnerCredentialRequest, parameters)
-	case gois.GrantTypeRefreshToken:
+	case wicket.GrantTypeRefreshToken:
 		return s.runValidation(ctx, s.validateRefreshTokenRequest, parameters)
-	case gois.GrantTypeDeviceCode:
+	case wicket.GrantTypeDeviceCode:
 		return s.runValidation(ctx, s.validateDeviceCodeRequest, parameters)
-	case gois.GrantTypeBackchannelAuthentication:
+	case wicket.GrantTypeBackchannelAuthentication:
 		return s.runValidation(ctx, s.validateBackchannelAuthenticationRequest, parameters)
 	default:
 		return s.runValidation(ctx, s.validateExtensionGrantRequest, parameters)
@@ -191,22 +191,22 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 	s.Logger.Debug("Start validation of authorization code token request")
 
 	// check if client is authorized for grant type
-	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeAuthorizationCode) &&
-		!utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeHybrid) {
+	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), wicket.GrantTypeAuthorizationCode) &&
+		!utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), wicket.GrantTypeHybrid) {
 		s.Logger.Error("Client not authorized for code flow")
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
+		return s.invalid(wicket.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	// validate authorization code
-	code := parameters.Get(gois.TokenRequestCode)
+	code := parameters.Get(wicket.TokenRequestCode)
 	if code == "" {
 		s.Logger.Error("Authorization code is missing")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if len(code) > s.Options.InputLengthRestrictions.AuthorizationCode {
 		s.Logger.Error("Authorization code is too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.validatedRequest.AuthorizationCodeHandle = code
@@ -215,7 +215,7 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			s.Logger.Error("Invalid authorization code", slog.String("code", code))
-			return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+			return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 		}
 		s.Logger.Error("Error loading authorization code", slog.String("code", code), slog.String("err", err.Error()))
 		return nil, err
@@ -224,19 +224,19 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 	// validate client binding
 	if authZcode.ClientId != s.validatedRequest.Client.ClientId {
 		s.Logger.Error("Client is trying to use a code from a different client")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// remove code from store
 	// todo: set to consumed in the future?
 	if err := s.AuthorizationCodeStore.RemoveAuthorizationCode(ctx, code); err != nil {
 		s.Logger.Error("Error removing authorization code", slog.String("code", code))
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if authZcode.CreationTime.Add(time.Duration(authZcode.Lifetime) * time.Second).Before(s.Clock.Now()) {
 		s.Logger.Error("Authorization code expired", slog.String("code", code))
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// populate session id
@@ -247,34 +247,34 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 	// validate code expiration
 	if authZcode.CreationTime.Add(time.Duration(s.validatedRequest.Client.AuthorizationCodeLifetime) * time.Second).Before(s.Clock.Now()) {
 		s.Logger.Error("Authorization code is expired", slog.String("code", code))
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.validatedRequest.AuthorizationCode = authZcode
 	s.validatedRequest.Subject = authZcode.Subject
 
 	// validate redirect_uri
-	redirectUri := parameters.Get(gois.TokenRequestRedirectUri)
+	redirectUri := parameters.Get(wicket.TokenRequestRedirectUri)
 	if redirectUri == "" {
 		s.Logger.Error("Redirect URI is missing")
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
+		return s.invalid(wicket.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	if redirectUri != s.validatedRequest.AuthorizationCode.RedirectUri {
 		s.Logger.Error("Invalid redirect_uri")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// validate scopes are present
 	if len(s.validatedRequest.AuthorizationCode.RequestedScopes) == 0 {
 		s.Logger.Error("Authorization code has no associated scopes")
-		return s.invalid(gois.TokenErrorsInvalidRequest, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidRequest, ""), nil
 	}
 
 	// resource gap
 	if s.validatedRequest.RequestedResourceGap != "" &&
 		!utils.Contains(s.validatedRequest.AuthorizationCode.RequestedResourceGaps, s.validatedRequest.RequestedResourceGap) {
-		return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request."), nil
+		return s.invalid(wicket.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request."), nil
 	}
 
 	// resource and scope validation
@@ -285,7 +285,7 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 			Scopes:       s.validatedRequest.AuthorizationCode.RequestedScopes,
 			ResourceGaps: s.validatedRequest.AuthorizationCode.RequestedResourceGaps,
 			// if we are issuing a refresh token, then we need to allow the non-isolated resource
-			IncludeNonIsolatedApiResources: utils.Contains(s.validatedRequest.AuthorizationCode.RequestedScopes, gois.StandardScopesOfflineAccess),
+			IncludeNonIsolatedApiResources: utils.Contains(s.validatedRequest.AuthorizationCode.RequestedScopes, wicket.StandardScopesOfflineAccess),
 		},
 	)
 
@@ -295,17 +295,17 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidResourceGaps) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
+			return s.invalid(wicket.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
 		}
 		if len(validatedResources.InvalidScopes) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope."), nil
+			return s.invalid(wicket.TokenErrorsInvalidScope, "Invalid scope."), nil
 		}
 	}
 
 	s.validatedRequest.ValidatedResources = validatedResources.FilterByResourceGap(s.validatedRequest.RequestedResourceGap)
 
 	// validate PKCE parameters
-	codeVerifier := parameters.Get(gois.TokenRequestCodeVerifier)
+	codeVerifier := parameters.Get(wicket.TokenRequestCodeVerifier)
 	if s.validatedRequest.Client.RequirePkce || s.validatedRequest.AuthorizationCode.CodeChallenge != "" {
 		s.Logger.Debug("Client required a proof key for code exchange. Starting PKCE validation")
 
@@ -318,17 +318,17 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 	} else {
 		if codeVerifier != "" {
 			s.Logger.Error("Unexpected code_verifier: This happens when the client is trying to use PKCE, but it is not enabled. Set RequirePkce to true.", slog.String("codeVerifier", codeVerifier))
-			return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+			return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 		}
 	}
 
 	// make sure user is enabled
-	isActiveCtx := models_contexts.NewIsActiveContext(s.validatedRequest.AuthorizationCode.Subject, s.validatedRequest.Client, gois.ProfileIsActiveCallersAccessTokenValidation)
+	isActiveCtx := models_contexts.NewIsActiveContext(s.validatedRequest.AuthorizationCode.Subject, s.validatedRequest.Client, wicket.ProfileIsActiveCallersAccessTokenValidation)
 
 	s.Profile.IsActive(isActiveCtx)
 	if !isActiveCtx.IsActive {
 		s.Logger.Error("User has been disabled", slog.String("subjectId", extensions.GetSubjectIdFromPrincipal(s.validatedRequest.AuthorizationCode.Subject)))
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.Logger.Debug("Validation of authorization code token request success")
@@ -340,9 +340,9 @@ func (s *TokenRequestValidator) validateClientCredentialsRequest(ctx context.Con
 	s.Logger.Debug("Start client credentials token request validation")
 
 	// check if client is authorized for grant type
-	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeClientCredentials) {
+	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), wicket.GrantTypeClientCredentials) {
 		s.Logger.Error("Client not authorized for client credentials flow, check the AllowedGrantTypes setting")
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
+		return s.invalid(wicket.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	// check if client is allowed to request scopes
@@ -353,12 +353,12 @@ func (s *TokenRequestValidator) validateClientCredentialsRequest(ctx context.Con
 
 	if len(s.validatedRequest.ValidatedResources.Resources.IdentityResources()) > 0 {
 		s.Logger.Error("Client cannot request OpenID scopes in client credentials flow", slog.String("clientId", s.validatedRequest.Client.ClientId))
-		return s.invalid(gois.TokenErrorsInvalidScope, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidScope, ""), nil
 	}
 
 	if s.validatedRequest.ValidatedResources.Resources.OfflineAccess {
 		s.Logger.Error("Client cannot request a refresh token in client credentials flow", slog.String("clientId", s.validatedRequest.Client.ClientId))
-		return s.invalid(gois.TokenErrorsInvalidScope, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidScope, ""), nil
 	}
 
 	s.Logger.Debug("credentials token request validation success", slog.String("clientId", s.validatedRequest.Client.ClientId))
@@ -370,9 +370,9 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(ctx conte
 	s.Logger.Debug("Start resource owner password token request validation")
 
 	// check if client is authorized for grant type
-	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypePassword) {
+	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), wicket.GrantTypePassword) {
 		s.Logger.Error("Client not authorized for resource owner password flow, check the AllowedGrantTypes setting", slog.String("clientId", s.validatedRequest.Client.ClientId))
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
+		return s.invalid(wicket.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	// check if client is allowed to request scopes
@@ -382,18 +382,18 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(ctx conte
 	}
 
 	// check resource owner credentials
-	userName := parameters.Get(gois.TokenRequestUserName)
-	password := parameters.Get(gois.TokenRequestPassword)
+	userName := parameters.Get(wicket.TokenRequestUserName)
+	password := parameters.Get(wicket.TokenRequestPassword)
 
 	if userName == "" {
 		s.Logger.Error("Username is missing")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if len(userName) > s.Options.InputLengthRestrictions.UserName ||
 		len(password) > s.Options.InputLengthRestrictions.Password {
 		s.Logger.Error("Username or password is too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.validatedRequest.UserName = userName
@@ -408,14 +408,14 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(ctx conte
 
 	if err != nil {
 		s.Logger.Error("User authentication failed", slog.String("error", err.Error()))
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if resourceOwnerContext.Result.Error != nil {
 		// protect against bad validator implementations
-		if errors.Is(resourceOwnerContext.Result.Error, gois.TokenErrorsUnsupportedGrantType) {
+		if errors.Is(resourceOwnerContext.Result.Error, wicket.TokenErrorsUnsupportedGrantType) {
 			s.Logger.Error("Resource owner password credential grant type not supported")
-			return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
+			return s.invalid(wicket.TokenErrorsUnsupportedGrantType, ""), nil
 		}
 
 		desc := "invalid_username_or_password"
@@ -431,16 +431,16 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(ctx conte
 
 	if resourceOwnerContext.Result.Subject == nil {
 		s.Logger.Error("User authentication failed: No principal returned")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// make sure user is enabled
-	isActiveCtx := models_contexts.NewIsActiveContext(resourceOwnerContext.Result.Subject, s.validatedRequest.Client, gois.ProfileIsActiveCallersResourceOwnerValidation)
+	isActiveCtx := models_contexts.NewIsActiveContext(resourceOwnerContext.Result.Subject, s.validatedRequest.Client, wicket.ProfileIsActiveCallersResourceOwnerValidation)
 	s.Profile.IsActive(isActiveCtx)
 
 	if !isActiveCtx.IsActive {
 		s.Logger.Error("User has been disabled", slog.String("subjectId", extensions.GetSubjectIdFromPrincipal(resourceOwnerContext.Result.Subject)))
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	s.validatedRequest.UserName = userName
@@ -454,15 +454,15 @@ func (s *TokenRequestValidator) validateResourceOwnerCredentialRequest(ctx conte
 func (s *TokenRequestValidator) validateRefreshTokenRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start validation of refresh token validation")
 
-	refreshTokenHandle := parameters.Get(gois.TokenRequestRefreshToken)
+	refreshTokenHandle := parameters.Get(wicket.TokenRequestRefreshToken)
 	if refreshTokenHandle == "" {
 		s.Logger.Error("Refresh token is missing")
-		return s.invalid(gois.TokenErrorsInvalidRequest, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidRequest, ""), nil
 	}
 
 	if len(refreshTokenHandle) > s.Options.InputLengthRestrictions.RefreshToken {
 		s.Logger.Error("Refresh token is too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	result := s.RefreshTokenService.ValidateRefreshToken(ctx, refreshTokenHandle, s.validatedRequest.Client)
@@ -470,7 +470,7 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(ctx context.Context,
 	if result.Error != nil {
 		if errors.Is(result.Error, storage.ErrNotFound) {
 			s.Logger.Error("Refresh token validation failed. aborting")
-			return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+			return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 		}
 		s.Logger.Error("Refresh token validation failed. infrastructure error")
 		return nil, result.Error
@@ -488,7 +488,7 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(ctx context.Context,
 		if s.validatedRequest.RequestedResourceGap != "" &&
 			!utils.Contains(s.validatedRequest.RefreshToken.AuthorizedResourceGaps, s.validatedRequest.RequestedResourceGap) {
 			s.Logger.Error("Refresh token validation failed. requested resource gap not authorized")
-			return s.invalid(gois.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request."), nil
+			return s.invalid(wicket.TokenErrorsInvalidTarget, "Resource indicator does not match any resource gap in the original authorize request."), nil
 		}
 	} else {
 		if strings.TrimSpace(s.validatedRequest.RequestedResourceGap) != "" {
@@ -510,15 +510,15 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(ctx context.Context,
 
 	if err != nil {
 		s.Logger.Error("Resource validation failed. aborting", slog.String("error", err.Error()))
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidResourceGaps) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
+			return s.invalid(wicket.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
 		}
 		if len(validatedResources.InvalidScopes) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope."), nil
+			return s.invalid(wicket.TokenErrorsInvalidScope, "Invalid scope."), nil
 		}
 	}
 
@@ -536,25 +536,25 @@ func (s *TokenRequestValidator) validateDeviceCodeRequest(ctx context.Context, p
 	// resource gap not supported for device flow
 	if s.validatedRequest.RequestedResourceGap != "" {
 		s.Logger.Error("Resource indicator not supported for device flow")
-		return s.invalid(gois.TokenErrorsInvalidTarget, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidTarget, ""), nil
 	}
 
 	// check if client is authorized for grant type
-	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeDeviceCode) {
+	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), wicket.GrantTypeDeviceCode) {
 		s.Logger.Error("Client not authorized for device flow")
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
+		return s.invalid(wicket.TokenErrorsUnauthorizedClient, ""), nil
 	}
 
 	// validate device code parameter
-	deviceCode := parameters.Get(gois.TokenRequestDeviceCode)
+	deviceCode := parameters.Get(wicket.TokenRequestDeviceCode)
 	if deviceCode == "" {
 		s.Logger.Error("Device code is missing")
-		return s.invalid(gois.TokenErrorsInvalidRequest, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidRequest, ""), nil
 	}
 
 	if len(deviceCode) > s.Options.InputLengthRestrictions.DeviceCode {
 		s.Logger.Error("Device code is too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	// validate device code
@@ -585,15 +585,15 @@ func (s *TokenRequestValidator) validateDeviceCodeRequest(ctx context.Context, p
 
 	if err != nil {
 		s.Logger.Error("Resource validation failed. aborting", slog.String("error", err.Error()))
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidResourceGaps) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
+			return s.invalid(wicket.TokenErrorsInvalidTarget, "Invalid resource gap."), nil
 		}
 		if len(validatedResources.InvalidScopes) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidScope, "Invalid scope."), nil
+			return s.invalid(wicket.TokenErrorsInvalidScope, "Invalid scope."), nil
 		}
 	}
 
@@ -604,15 +604,15 @@ func (s *TokenRequestValidator) validateDeviceCodeRequest(ctx context.Context, p
 
 func (s *TokenRequestValidator) validateBackchannelAuthenticationRequest(ctx context.Context, parameters url.Values) (*models.TokenRequestValidationResult, error) {
 	s.Logger.Debug("Start validation of CIBA token request")
-	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), gois.GrantTypeBackchannelAuthentication) {
-		return s.invalid(gois.TokenErrorsUnauthorizedClient, ""), nil
+	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), wicket.GrantTypeBackchannelAuthentication) {
+		return s.invalid(wicket.TokenErrorsUnauthorizedClient, ""), nil
 	}
-	requestID := parameters.Get(gois.TokenRequestAuthenticationRequestId)
+	requestID := parameters.Get(wicket.TokenRequestAuthenticationRequestId)
 	if requestID == "" {
-		return s.invalid(gois.TokenErrorsInvalidRequest, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidRequest, ""), nil
 	}
 	if len(requestID) > s.Options.InputLengthRestrictions.AuthenticationRequestId {
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 	validationCtx := &validators_models.BackchannelAuthenticationRequestIdValidationContext{
 		RequestId: requestID,
@@ -622,14 +622,14 @@ func (s *TokenRequestValidator) validateBackchannelAuthenticationRequest(ctx con
 		return nil, err
 	}
 	if validationCtx.Result == nil {
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 	if validationCtx.Result.Error != nil {
 		return validationCtx.Result, nil
 	}
 	if s.validatedRequest.RequestedResourceGap != "" &&
 		!utils.Contains(s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps, s.validatedRequest.RequestedResourceGap) {
-		return s.invalid(gois.TokenErrorsInvalidTarget, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidTarget, ""), nil
 	}
 	if s.validatedRequest.RequestedResourceGap == "" && len(s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps) == 1 {
 		s.validatedRequest.RequestedResourceGap = s.validatedRequest.BackchannelAuthenticationRequest.RequestedResourceGaps[0]
@@ -647,9 +647,9 @@ func (s *TokenRequestValidator) validateBackchannelAuthenticationRequest(ctx con
 	}
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidResourceGaps) > 0 {
-			return s.invalid(gois.TokenErrorsInvalidTarget, ""), nil
+			return s.invalid(wicket.TokenErrorsInvalidTarget, ""), nil
 		}
-		return s.invalid(gois.TokenErrorsInvalidScope, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidScope, ""), nil
 	}
 	s.validatedRequest.ValidatedResources = validatedResources.FilterByResourceGap(s.validatedRequest.RequestedResourceGap)
 	return s.valid(), nil
@@ -661,13 +661,13 @@ func (s *TokenRequestValidator) validateExtensionGrantRequest(ctx context.Contex
 	// check if client is allowed to use grant type
 	if !utils.Contains(s.validatedRequest.Client.AllowedGrantTypes(), s.validatedRequest.GrantType) {
 		s.Logger.Error("Client does not have the custom grant type in the allowed list, therefore requested grant is not allowed", slog.String("clientId", s.validatedRequest.Client.ClientId))
-		return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
+		return s.invalid(wicket.TokenErrorsUnsupportedGrantType, ""), nil
 	}
 
 	// check if a validator is registered for the grant type
 	if !utils.Contains(s.ExtensionGrantValidator.GetAvailableGrantTypes(), s.validatedRequest.GrantType) {
 		s.Logger.Error("No validator is registered for the grant type", slog.String("grantType", s.validatedRequest.GrantType))
-		return s.invalid(gois.TokenErrorsUnsupportedGrantType, ""), nil
+		return s.invalid(wicket.TokenErrorsUnsupportedGrantType, ""), nil
 	}
 
 	// check if client is allowed to request scopes
@@ -681,7 +681,7 @@ func (s *TokenRequestValidator) validateExtensionGrantRequest(ctx context.Contex
 
 	if result == nil {
 		s.Logger.Error("Invalid extension grant")
-		return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 
 	if result.Error != nil {
@@ -691,13 +691,13 @@ func (s *TokenRequestValidator) validateExtensionGrantRequest(ctx context.Contex
 
 	if result.Subject != nil {
 		// make sure user is enabled
-		isActiveCtx := models_contexts.NewIsActiveContext(s.validatedRequest.Subject, s.validatedRequest.Client, gois.ProfileIsActiveCallersExtensionGrantValidation)
+		isActiveCtx := models_contexts.NewIsActiveContext(s.validatedRequest.Subject, s.validatedRequest.Client, wicket.ProfileIsActiveCallersExtensionGrantValidation)
 
 		s.Profile.IsActive(isActiveCtx)
 
 		if !isActiveCtx.IsActive {
 			s.Logger.Error("User has been disabled", slog.String("subjectId", extensions.GetSubjectIdFromPrincipal(result.Subject)))
-			return s.invalid(gois.TokenErrorsInvalidGrant, ""), nil
+			return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 		}
 
 		s.validatedRequest.Subject = result.Subject
@@ -711,7 +711,7 @@ func (s *TokenRequestValidator) validateExtensionGrantRequest(ctx context.Contex
 // todo: do we want to rework the semantics of these ignore params?
 // also seems like other workflows other than CC clients can omit scopes?
 func (s *TokenRequestValidator) validateRequestedScopesAndResources(ctx context.Context, parameters url.Values, ignoreImplicitIdentityScopes bool, ignoreImplicitOfflineAccess bool) error {
-	scopes := parameters.Get(gois.TokenRequestScope)
+	scopes := parameters.Get(wicket.TokenRequestScope)
 	if scopes == "" {
 		s.Logger.Debug("Client provided no scopes - checking allowed scopes list")
 
@@ -738,7 +738,7 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(ctx context.
 
 			if !ignoreImplicitOfflineAccess {
 				if s.validatedRequest.Client.AllowOfflineAccess {
-					clientAllowedScopes = append(clientAllowedScopes, gois.StandardScopesOfflineAccess)
+					clientAllowedScopes = append(clientAllowedScopes, wicket.StandardScopesOfflineAccess)
 				}
 			}
 
@@ -746,19 +746,19 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(ctx context.
 			s.Logger.Debug("Defaulting to", slog.String("scopes", scopes))
 		} else {
 			s.Logger.Error("No allowed scopes configured for client", slog.String("clientId", s.validatedRequest.Client.ClientId))
-			return gois.TokenErrorsInvalidScope
+			return wicket.TokenErrorsInvalidScope
 		}
 	}
 
 	if len(scopes) > s.Options.InputLengthRestrictions.ClientSecret {
 		s.Logger.Error("Scope parameter exceeds max allowed length")
-		return gois.TokenErrorsInvalidScope
+		return wicket.TokenErrorsInvalidScope
 	}
 
 	requestedScopes := utils.ParseScopesString(scopes)
 	if len(requestedScopes) == 0 {
 		s.Logger.Error("No scopes found in request")
-		return gois.TokenErrorsInvalidScope
+		return wicket.TokenErrorsInvalidScope
 	}
 
 	var resourceIndicators []string
@@ -773,7 +773,7 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(ctx context.
 			Scopes:       requestedScopes,
 			ResourceGaps: resourceIndicators,
 			// if the client is passing explicit scopes, we want to exclude the non-isolated resource scenaio from validation
-			IncludeNonIsolatedApiResources: strings.TrimSpace(parameters.Get(gois.TokenRequestScope)) == "",
+			IncludeNonIsolatedApiResources: strings.TrimSpace(parameters.Get(wicket.TokenRequestScope)) == "",
 		},
 	)
 
@@ -784,7 +784,7 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(ctx context.
 
 		if len(resourceValidationResult.InvalidResourceGaps) > 0 {
 			s.Logger.Error("Invalid resource gap")
-			return gois.TokenErrorsInvalidTarget
+			return wicket.TokenErrorsInvalidTarget
 		}
 		if len(resourceValidationResult.InvalidScopes) > 0 {
 			s.Logger.Error("Invalid scopes requested")
@@ -792,7 +792,7 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(ctx context.
 			s.Logger.Error("Invalid scopes for client requested")
 		}
 
-		return gois.TokenErrorsInvalidScope
+		return wicket.TokenErrorsInvalidScope
 	}
 
 	s.validatedRequest.RequestedScopes = requestedScopes
@@ -805,36 +805,36 @@ func (s *TokenRequestValidator) validateRequestedScopesAndResources(ctx context.
 func (s *TokenRequestValidator) validateAuthorizationCodeWithProofKeyParameters(codeVerifier string, authZcode *storage_models.AuthorizationCode) *models.TokenRequestValidationResult {
 	if authZcode.CodeChallenge == "" || authZcode.CodeChallengeMethod == "" {
 		s.Logger.Error("Client is missing code challenge or code challenge method")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(wicket.TokenErrorsInvalidGrant, "")
 	}
 
 	if codeVerifier == "" {
 		s.Logger.Error("Missing code_verifier")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(wicket.TokenErrorsInvalidGrant, "")
 	}
 
 	if len(codeVerifier) < s.Options.InputLengthRestrictions.CodeVerifierMinLength ||
 		len(codeVerifier) > s.Options.InputLengthRestrictions.CodeVerifierMaxLength {
 		s.Logger.Error("code_verifier is too short or too long")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(wicket.TokenErrorsInvalidGrant, "")
 	}
 
-	if !utils.Contains(gois.SupportedCodeChallengeMethods, authZcode.CodeChallengeMethod) {
+	if !utils.Contains(wicket.SupportedCodeChallengeMethods, authZcode.CodeChallengeMethod) {
 		s.Logger.Error("Unsupported code challenge method")
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(wicket.TokenErrorsInvalidGrant, "")
 	}
 
 	if !s.validateCodeVerifierAgainstCodeChallenge(codeVerifier, authZcode.CodeChallenge, authZcode.CodeChallengeMethod) {
 		s.Logger.Error("Transformed code verifier does not match code challenge", slog.String("codeVerifier", codeVerifier), slog.String("codeChallenge", authZcode.CodeChallenge), slog.String("codeChallengeMethod", authZcode.CodeChallengeMethod))
 
-		return s.invalid(gois.TokenErrorsInvalidGrant, "")
+		return s.invalid(wicket.TokenErrorsInvalidGrant, "")
 	}
 
 	return s.valid()
 }
 
 func (s *TokenRequestValidator) validateCodeVerifierAgainstCodeChallenge(codeVerifier, codeChallenge, codeChallengeMethod string) bool {
-	if codeChallengeMethod == gois.CodeChallengeMethodsPlain {
+	if codeChallengeMethod == wicket.CodeChallengeMethodsPlain {
 		return utils.TimeConstantCompare(utils.Sha256(codeVerifier), codeChallenge)
 	}
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth"
 	authevents "github.com/gonewx/wicket/auth/core/events"
 	optspkg "github.com/gonewx/wicket/di/options"
@@ -89,9 +89,9 @@ func (h *RemoteHandler[T]) HandleRequest() (bool, error) {
 		if err != nil {
 			// 保留 HandleRemoteAuthenticate 返回的真实失败原因（例如后端换取 token
 			// 失败、correlation 读取异常等），避免被下面的通用消息掩盖导致无法定位根因。
-			err = fmt.Errorf("Invalid return state, unable to redirect: %w. %w", err, gois.InvalidOperationException)
+			err = fmt.Errorf("Invalid return state, unable to redirect: %w. %w", err, wicket.InvalidOperationException)
 		} else {
-			err = fmt.Errorf("Invalid return state, unable to redirect. %w", gois.InvalidOperationException)
+			err = fmt.Errorf("Invalid return state, unable to redirect. %w", wicket.InvalidOperationException)
 		}
 	} else {
 		if authResult.Handled {
@@ -103,7 +103,7 @@ func (h *RemoteHandler[T]) HandleRequest() (bool, error) {
 				if !authResult.Succeeded() {
 					err = authResult.Failure
 					if err == nil {
-						err = fmt.Errorf("Invalid return state, unable to redirect. %w", gois.InvalidOperationException)
+						err = fmt.Errorf("Invalid return state, unable to redirect. %w", wicket.InvalidOperationException)
 					}
 					properties = authResult.Properties
 				}
@@ -233,7 +233,7 @@ func (h *RemoteHandler[T]) HandleForbidden(properties *auth.Properties) error {
 // generateCorrelationId Produces a cookie containing a nonce used to correlate the current remote authentication request.
 func (h *RemoteHandler[T]) GenerateCorrelationId(properties *auth.Properties) error {
 	if properties == nil {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 
 	bytes, err := utils.CreateRandomKey(32)
@@ -277,7 +277,7 @@ func (h *RemoteHandler[T]) GenerateCorrelationId(properties *auth.Properties) er
 // validateCorrelationId Validates that the current request correlates wit hthe
 func (h *RemoteHandler[T]) ValidateCorrelationId(properties *auth.Properties) (bool, error) {
 	if properties == nil {
-		return false, gois.ArgumentNullException
+		return false, wicket.ArgumentNullException
 	}
 
 	correlationId := properties.Items[CorrelationProperty]

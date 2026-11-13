@@ -42,13 +42,13 @@ func (v *ApiSecretValidator) Validate(req *http.Request) *models.ApiSecretValida
 	v.logger.Debug("Start API validation")
 
 	fail := validators_models.NewApiSecretValidationResult()
-	fail.Error = gois.TokenErrorsInvalidRequest
+	fail.Error = wicket.TokenErrorsInvalidRequest
 
 	parsedSecret, err := v.parser.Parse(req)
 	if err != nil || parsedSecret == nil {
 		v.logger.Error("No API secret found")
 
-		fail.Error = gois.TokenErrorsInvalidRequest
+		fail.Error = wicket.TokenErrorsInvalidRequest
 		return fail
 	}
 

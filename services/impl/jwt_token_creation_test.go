@@ -47,12 +47,12 @@ func TestCreateTokenHeaderKidResolvesThroughValidationKeys(t *testing.T) {
 	creator := NewTokenCreationService(keys, test_common.NewStubClock(), config_options.NewWicketOptions(), nil)
 
 	token := &storage_models.Token{
-		Type:      gois.TokenTypesAccessToken,
+		Type:      wicket.TokenTypesAccessToken,
 		Issuer:    "https://issuer.wicket.test",
 		Audiences: []string{"resource"},
 		Lifetime:  600,
 		Claims: []*claimspkg.Claim{
-			claimspkg.NewClaim(claimspkg.WithClaimType(gois.JwtClaimTypesSubject), claimspkg.WithClaimValue("alice")),
+			claimspkg.NewClaim(claimspkg.WithClaimType(wicket.JwtClaimTypesSubject), claimspkg.WithClaimValue("alice")),
 		},
 	}
 

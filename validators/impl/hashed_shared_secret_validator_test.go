@@ -43,7 +43,7 @@ func TestValid_Single_Secret(t *testing.T) {
 	secret := &models.ParsedSecret{
 		Id:         clientId,
 		Credential: "secret",
-		Type:       gois.ParsedSecretTypesSharedSecret,
+		Type:       wicket.ParsedSecretTypesSharedSecret,
 	}
 
 	result, err := ti.validator.Validate(client.ClientSecrets, secret)
@@ -85,7 +85,7 @@ func TestValid_Multiple_Secrets(t *testing.T) {
 	secret := &models.ParsedSecret{
 		Id:         clientId,
 		Credential: "secret",
-		Type:       gois.ParsedSecretTypesSharedSecret,
+		Type:       wicket.ParsedSecretTypesSharedSecret,
 	}
 
 	result, err := ti.validator.Validate(client.ClientSecrets, secret)
@@ -120,7 +120,7 @@ func TestInvalid_Single_Secret(t *testing.T) {
 	secret := &models.ParsedSecret{
 		Id:         clientId,
 		Credential: "invalid",
-		Type:       gois.ParsedSecretTypesSharedSecret,
+		Type:       wicket.ParsedSecretTypesSharedSecret,
 	}
 
 	result, err := ti.validator.Validate(client.ClientSecrets, secret)
@@ -141,7 +141,7 @@ func TestInvalid_Multiple_Secrets(t *testing.T) {
 	secret := &models.ParsedSecret{
 		Id:         clientId,
 		Credential: "invalid",
-		Type:       gois.ParsedSecretTypesSharedSecret,
+		Type:       wicket.ParsedSecretTypesSharedSecret,
 	}
 
 	result, err := ti.validator.Validate(client.ClientSecrets, secret)
@@ -161,7 +161,7 @@ func TestClient_with_no_Secret_Should_Fail(t *testing.T) {
 
 	secret := &models.ParsedSecret{
 		Id:   clientId,
-		Type: gois.ParsedSecretTypesSharedSecret,
+		Type: wicket.ParsedSecretTypesSharedSecret,
 	}
 
 	result, err := ti.validator.Validate(client.ClientSecrets, secret)
@@ -181,7 +181,7 @@ func TestClient_with_null_Secret_Should_Fail(t *testing.T) {
 
 	secret := &models.ParsedSecret{
 		Id:         clientId,
-		Type:       gois.ParsedSecretTypesSharedSecret,
+		Type:       wicket.ParsedSecretTypesSharedSecret,
 		Credential: "secret",
 	}
 

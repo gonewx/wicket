@@ -84,7 +84,7 @@ func (h *AuthorizeCallbackHandler) result(r *http.Request) (endpointResult, erro
 		// complete, so it fails to the error page and the empty message is
 		// discarded.
 		_ = h.consent.Delete(r.Context(), key)
-		return h.base.errorResult(validation.ValidatedRequest, gois.AuthorizeErrorsInvalidRequest, ""), nil
+		return h.base.errorResult(validation.ValidatedRequest, wicket.AuthorizeErrorsInvalidRequest, ""), nil
 	}
 
 	var answer *messages.ConsentResponse
@@ -112,7 +112,7 @@ func (h *AuthorizeCallbackHandler) result(r *http.Request) (endpointResult, erro
 func (h *AuthorizeCallbackHandler) recoverParameters(r *http.Request) url.Values {
 	values := r.URL.Query()
 	if h.parameters != nil {
-		if storeId := values.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName); storeId != "" {
+		if storeId := values.Get(wicket.AuthorizationParamsStoreMessageStoreIdParameterName); storeId != "" {
 			if message, err := h.parameters.Read(r.Context(), storeId); err == nil && message != nil && message.Data != nil {
 				values = message.Data
 			}

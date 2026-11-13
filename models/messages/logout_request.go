@@ -54,10 +54,10 @@ func NewLogoutMessage(request *validators_models.ValidatedEndSessionRequest) *Lo
 	}
 
 	// optimize params sent to logout page, since we'd like to send them in URL (not as cookie)
-	delete(m.Parameters, gois.EndSessionRequestIdTokenHint)
-	delete(m.Parameters, gois.EndSessionRequestPostLogoutRedirectUri)
-	delete(m.Parameters, gois.EndSessionRequestState)
-	delete(m.Parameters, gois.AuthorizeRequestUiLocales)
+	delete(m.Parameters, wicket.EndSessionRequestIdTokenHint)
+	delete(m.Parameters, wicket.EndSessionRequestPostLogoutRedirectUri)
+	delete(m.Parameters, wicket.EndSessionRequestState)
+	delete(m.Parameters, wicket.AuthorizeRequestUiLocales)
 
 	if request.Client != nil {
 		m.ClientId = request.Client.ClientId
@@ -71,7 +71,7 @@ func NewLogoutMessage(request *validators_models.ValidatedEndSessionRequest) *Lo
 	if request.PostLogOutUri != "" {
 		m.PostLogoutRedirectUri = request.PostLogOutUri
 		if request.State != "" {
-			m.PostLogoutRedirectUri = utils.AddQuery(m.PostLogoutRedirectUri, gois.EndSessionRequestState, request.State)
+			m.PostLogoutRedirectUri = utils.AddQuery(m.PostLogoutRedirectUri, wicket.EndSessionRequestState, request.State)
 		}
 	}
 

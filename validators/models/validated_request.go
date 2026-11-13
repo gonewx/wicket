@@ -21,7 +21,7 @@ type ValidatedRequest struct {
 	Secret              *models.ParsedSecret
 	AccessTokenLifetime int
 	ClientClaims        []*claims.Claim
-	AccessTokenType     gois.AccessTokenType
+	AccessTokenType     wicket.AccessTokenType
 	Subject             *claims.ClaimsPrincipal
 	SessionId           string // empty string for anonymous users
 	Options             *config_options.WicketOptions

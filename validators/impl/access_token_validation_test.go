@@ -70,7 +70,7 @@ func TestValid_Reference_Token(t *testing.T) {
 
 	r.NoError(result.Error)
 	r.Len(result.Claims, 9)
-	r.Equal("roclient", utils.FirstPred(result.Claims, func(c *claims.Claim) bool { return c.Type == gois.JwtClaimTypesClientId }).Value)
+	r.Equal("roclient", utils.FirstPred(result.Claims, func(c *claims.Claim) bool { return c.Type == wicket.JwtClaimTypesClientId }).Value)
 
 	claimTypes := utils.Select(result.Claims, func(c *claims.Claim) string { return c.Type })
 	r.Contains(claimTypes, "iss")
@@ -123,7 +123,7 @@ func TestValid_Reference_Token_with_missing_Scope(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInsufficientScope)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInsufficientScope)
 }
 
 func TestUnknown_Reference_Token(t *testing.T) {
@@ -135,7 +135,7 @@ func TestUnknown_Reference_Token(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }
 
 func TestReference_Token_Too_Long(t *testing.T) {
@@ -149,7 +149,7 @@ func TestReference_Token_Too_Long(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }
 
 func TestExpired_Reference_Token(t *testing.T) {
@@ -180,7 +180,7 @@ func TestExpired_Reference_Token(t *testing.T) {
 	result, err := validator.ValidateAccessToken(context.Background(), handle, "")
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsExpiredToken)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsExpiredToken)
 }
 
 func TestMalformed_JWT_Token(t *testing.T) {
@@ -192,7 +192,7 @@ func TestMalformed_JWT_Token(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }
 
 func TestValid_JWT_Token(t *testing.T) {
@@ -279,7 +279,7 @@ func TestJWT_Token_invalid_Issuer(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }
 
 func TestJWT_Token_Too_Long(t *testing.T) {
@@ -301,7 +301,7 @@ func TestJWT_Token_Too_Long(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	r.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }
 
 func TestValid_AccessToken_but_Client_not_active(t *testing.T) {

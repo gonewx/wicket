@@ -15,7 +15,7 @@ type SigningCredentials struct {
 	Kid       string
 }
 
-func NewSigningCredentials(key SecurityKey, opts ...gois.Option[SigningCredentials]) (*SigningCredentials, error) {
+func NewSigningCredentials(key SecurityKey, opts ...wicket.Option[SigningCredentials]) (*SigningCredentials, error) {
 	credential := &SigningCredentials{Key: key}
 	for _, opt := range opts {
 		opt(credential)
@@ -23,13 +23,13 @@ func NewSigningCredentials(key SecurityKey, opts ...gois.Option[SigningCredentia
 	return credential, nil
 }
 
-func WithAlgorithm(value string) gois.Option[SigningCredentials] {
+func WithAlgorithm(value string) wicket.Option[SigningCredentials] {
 	return func(c *SigningCredentials) {
 		c.Algorithm = value
 	}
 }
 
-func WithKid(value string) gois.Option[SigningCredentials] {
+func WithKid(value string) wicket.Option[SigningCredentials] {
 	return func(c *SigningCredentials) {
 		c.Kid = value
 	}

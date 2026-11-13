@@ -16,13 +16,13 @@ type Resources struct {
 	apiScopes         map[*ApiScope]*ApiScope
 }
 
-func WithResourcesOfflineAccess(offlineAccess bool) gois.Option[Resources] {
+func WithResourcesOfflineAccess(offlineAccess bool) wicket.Option[Resources] {
 	return func(r *Resources) {
 		r.OfflineAccess = offlineAccess
 	}
 }
 
-func WithResourcesIdentityResources(identityResources []*IdentityResource) gois.Option[Resources] {
+func WithResourcesIdentityResources(identityResources []*IdentityResource) wicket.Option[Resources] {
 	return func(r *Resources) {
 		for _, identityResource := range identityResources {
 			r.identityResources[identityResource] = identityResource
@@ -30,7 +30,7 @@ func WithResourcesIdentityResources(identityResources []*IdentityResource) gois.
 	}
 }
 
-func WithResourcesApiResources(apiResources []*ApiResource) gois.Option[Resources] {
+func WithResourcesApiResources(apiResources []*ApiResource) wicket.Option[Resources] {
 	return func(r *Resources) {
 		for _, apiResource := range apiResources {
 			r.apiResources[apiResource] = apiResource
@@ -38,7 +38,7 @@ func WithResourcesApiResources(apiResources []*ApiResource) gois.Option[Resource
 	}
 }
 
-func WithResourcesApiScopes(apiScopes []*ApiScope) gois.Option[Resources] {
+func WithResourcesApiScopes(apiScopes []*ApiScope) wicket.Option[Resources] {
 	return func(r *Resources) {
 		for _, apiScope := range apiScopes {
 			r.apiScopes[apiScope] = apiScope
@@ -46,7 +46,7 @@ func WithResourcesApiScopes(apiScopes []*ApiScope) gois.Option[Resources] {
 	}
 }
 
-func NewResources(opts ...gois.Option[Resources]) *Resources {
+func NewResources(opts ...wicket.Option[Resources]) *Resources {
 	resources := &Resources{
 		OfflineAccess:     false,
 		identityResources: make(map[*IdentityResource]*IdentityResource, 0),
@@ -93,7 +93,7 @@ func (r *Resources) ToScopeNames() []string {
 	names := utils.Select(r.IdentityResources(), func(x *IdentityResource) string { return x.Name })
 	names = append(names, utils.Select(r.ApiScopes(), func(x *ApiScope) string { return x.Name })...)
 	if r.OfflineAccess {
-		names = append(names, gois.StandardScopesOfflineAccess)
+		names = append(names, wicket.StandardScopesOfflineAccess)
 	}
 
 	return names

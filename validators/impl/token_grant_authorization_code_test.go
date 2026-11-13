@@ -32,33 +32,33 @@ func TestTokenRequestValidationAuthorizationCodeInvalid(t *testing.T) {
 			clientId: "codeclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestRedirectUri: {"https://server/cb"},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestRedirectUri: {"https://server/cb"},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"code that does not exist in the store is rejected": {
 			clientId: "codeclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {"invalid"},
-					gois.TokenRequestRedirectUri: {"https://server/cb"},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {"invalid"},
+					wicket.TokenRequestRedirectUri: {"https://server/cb"},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"code exceeding the maximum length is rejected": {
 			clientId: "codeclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {strings.Repeat("x", f.options.InputLengthRestrictions.AuthorizationCode+1)},
-					gois.TokenRequestRedirectUri: {"https://server/cb"},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {strings.Repeat("x", f.options.InputLengthRestrictions.AuthorizationCode+1)},
+					wicket.TokenRequestRedirectUri: {"https://server/cb"},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"code without requested scopes is rejected": {
 			clientId: "codeclient",
@@ -67,12 +67,12 @@ func TestTokenRequestValidationAuthorizationCodeInvalid(t *testing.T) {
 				code.RequestedScopes = nil
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidRequest,
+			wantErr: wicket.TokenErrorsInvalidRequest,
 		},
 		"client without code flow permission is rejected": {
 			clientId: "implicitclient",
@@ -80,12 +80,12 @@ func TestTokenRequestValidationAuthorizationCodeInvalid(t *testing.T) {
 				code := newGrantTestAuthorizationCode("implicitclient", f.now)
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
 				}
 			},
-			wantErr: gois.TokenErrorsUnauthorizedClient,
+			wantErr: wicket.TokenErrorsUnauthorizedClient,
 		},
 		"code issued to a different client is rejected": {
 			clientId: "codeclient_restricted",
@@ -93,12 +93,12 @@ func TestTokenRequestValidationAuthorizationCodeInvalid(t *testing.T) {
 				code := newGrantTestAuthorizationCode("codeclient", f.now)
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"missing redirect_uri is rejected": {
 			clientId: "codeclient",
@@ -106,11 +106,11 @@ func TestTokenRequestValidationAuthorizationCodeInvalid(t *testing.T) {
 				code := newGrantTestAuthorizationCode("codeclient", f.now)
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestGrantType: {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:      {handle},
+					wicket.TokenRequestGrantType: {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:      {handle},
 				}
 			},
-			wantErr: gois.TokenErrorsUnauthorizedClient,
+			wantErr: wicket.TokenErrorsUnauthorizedClient,
 		},
 		"redirect_uri differing from the authorized one is rejected": {
 			clientId: "codeclient",
@@ -119,12 +119,12 @@ func TestTokenRequestValidationAuthorizationCodeInvalid(t *testing.T) {
 				code.RedirectUri = "https://server1/cb"
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {"https://server2/cb"},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {"https://server2/cb"},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"expired code is rejected": {
 			clientId: "codeclient",
@@ -133,12 +133,12 @@ func TestTokenRequestValidationAuthorizationCodeInvalid(t *testing.T) {
 				code.CreationTime = f.now.Add(-301 * time.Second)
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"code owned by a disabled user is rejected": {
 			clientId: "codeclient",
@@ -147,69 +147,69 @@ func TestTokenRequestValidationAuthorizationCodeInvalid(t *testing.T) {
 				code := newGrantTestAuthorizationCode("codeclient", f.now)
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"resource parameter exceeding the maximum length is rejected": {
 			clientId: "codeclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestResourceCodeParameters(t, f)
-				values.Set(gois.TokenRequestResource, "urn:"+strings.Repeat("a", f.options.InputLengthRestrictions.ResourceGapMaxLength))
+				values.Set(wicket.TokenRequestResource, "urn:"+strings.Repeat("a", f.options.InputLengthRestrictions.ResourceGapMaxLength))
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"resource parameter that is not an absolute URI is rejected": {
 			clientId: "codeclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestResourceCodeParameters(t, f)
-				values.Set(gois.TokenRequestResource, "api")
+				values.Set(wicket.TokenRequestResource, "api")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"resource outside the originally authorized set is rejected": {
 			clientId: "codeclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestResourceCodeParameters(t, f)
-				values.Set(gois.TokenRequestResource, "urn:api3")
+				values.Set(wicket.TokenRequestResource, "urn:api3")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"repeated resource parameter is rejected": {
 			clientId: "codeclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestResourceCodeParameters(t, f)
-				values.Add(gois.TokenRequestResource, "urn:api1")
-				values.Add(gois.TokenRequestResource, "urn:api2")
+				values.Add(wicket.TokenRequestResource, "urn:api1")
+				values.Add(wicket.TokenRequestResource, "urn:api2")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"invalid scopes reported by resource validation surface as invalid_scope": {
 			clientId: "codeclient",
 			options:  []tokenGrantOption{withGrantResourceValidator(grantTestFailingResources([]string{"scope1"}, nil))},
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestResourceCodeParameters(t, f)
-				values.Set(gois.TokenRequestResource, "urn:api1")
+				values.Set(wicket.TokenRequestResource, "urn:api1")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidScope,
+			wantErr: wicket.TokenErrorsInvalidScope,
 		},
 		"invalid resources reported by resource validation surface as invalid_target": {
 			clientId: "codeclient",
 			options:  []tokenGrantOption{withGrantResourceValidator(grantTestFailingResources(nil, []string{"urn:api1"}))},
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestResourceCodeParameters(t, f)
-				values.Set(gois.TokenRequestResource, "urn:api1")
+				values.Set(wicket.TokenRequestResource, "urn:api1")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 	}
 
@@ -236,9 +236,9 @@ func TestTokenRequestValidationAuthorizationCodeReplay(t *testing.T) {
 	code := newGrantTestAuthorizationCode("codeclient", f.now)
 	handle := storeGrantTestAuthorizationCode(t, f, code)
 	parameters := url.Values{
-		gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-		gois.TokenRequestCode:        {handle},
-		gois.TokenRequestRedirectUri: {code.RedirectUri},
+		wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+		wicket.TokenRequestCode:        {handle},
+		wicket.TokenRequestRedirectUri: {code.RedirectUri},
 	}
 
 	first, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "codeclient"))
@@ -247,8 +247,8 @@ func TestTokenRequestValidationAuthorizationCodeReplay(t *testing.T) {
 	}
 
 	second, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "codeclient"))
-	if !errors.Is(second.Error, gois.TokenErrorsInvalidGrant) {
-		t.Fatalf("second exchange error = %v, want %v", second.Error, gois.TokenErrorsInvalidGrant)
+	if !errors.Is(second.Error, wicket.TokenErrorsInvalidGrant) {
+		t.Fatalf("second exchange error = %v, want %v", second.Error, wicket.TokenErrorsInvalidGrant)
 	}
 }
 
@@ -264,7 +264,7 @@ func TestTokenRequestValidationAuthorizationCodeValid(t *testing.T) {
 			requestedScopes: []string{"openid"},
 		},
 		"code including offline_access is exchanged": {
-			requestedScopes: []string{"openid", gois.StandardScopesOfflineAccess},
+			requestedScopes: []string{"openid", wicket.StandardScopesOfflineAccess},
 		},
 	}
 
@@ -277,9 +277,9 @@ func TestTokenRequestValidationAuthorizationCodeValid(t *testing.T) {
 			code.RequestedScopes = tt.requestedScopes
 			handle := storeGrantTestAuthorizationCode(t, f, code)
 			parameters := url.Values{
-				gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-				gois.TokenRequestCode:        {handle},
-				gois.TokenRequestRedirectUri: {code.RedirectUri},
+				wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+				wicket.TokenRequestCode:        {handle},
+				wicket.TokenRequestRedirectUri: {code.RedirectUri},
 			}
 
 			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "codeclient"))
@@ -301,8 +301,8 @@ func newGrantTestResourceCodeParameters(t *testing.T, f *tokenGrantFixture) url.
 	code.RequestedResourceGaps = []string{"urn:api1", "urn:api2"}
 	handle := storeGrantTestAuthorizationCode(t, f, code)
 	return url.Values{
-		gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-		gois.TokenRequestCode:        {handle},
-		gois.TokenRequestRedirectUri: {code.RedirectUri},
+		wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+		wicket.TokenRequestCode:        {handle},
+		wicket.TokenRequestRedirectUri: {code.RedirectUri},
 	}
 }

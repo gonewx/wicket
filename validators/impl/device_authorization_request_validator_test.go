@@ -29,7 +29,7 @@ func newDeviceAuthorizationRequestValidatorTests() *DeviceAuthorizationRequestVa
 
 	testClient := storage_models.NewClient()
 	testClient.ClientId = "device_flow"
-	if err := testClient.SetAllowedGrantTypes(gois.GrantTypesDeviceFlow); err != nil {
+	if err := testClient.SetAllowedGrantTypes(wicket.GrantTypesDeviceFlow); err != nil {
 		panic(err)
 	}
 	testClient.AllowedScopes = []string{"openid", "profile", "resource"}
@@ -55,7 +55,7 @@ func TestInvalid_Protocol_Client(t *testing.T) {
 	r := require.New(t)
 
 	tests := newDeviceAuthorizationRequestValidatorTests()
-	tests.testClient.ProtocolType = gois.ProtocolTypesSaml2p
+	tests.testClient.ProtocolType = wicket.ProtocolTypesSaml2p
 
 	validator, err := createDeviceAuthorizationRequestValidator()
 	r.NoError(err)
@@ -66,14 +66,14 @@ func TestInvalid_Protocol_Client(t *testing.T) {
 	result := validator.ValidateRequest(context.Background(), tests.testParameters, clientValidationResult)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.AuthorizeErrorsUnauthorizedClient)
+	r.ErrorIs(result.Error, wicket.AuthorizeErrorsUnauthorizedClient)
 }
 
 func TestInvalid_Grant_Type(t *testing.T) {
 	r := require.New(t)
 
 	tests := newDeviceAuthorizationRequestValidatorTests()
-	err := tests.testClient.SetAllowedGrantTypes(gois.GrantTypesImplicit)
+	err := tests.testClient.SetAllowedGrantTypes(wicket.GrantTypesImplicit)
 	r.NoError(err)
 
 	validator, err := createDeviceAuthorizationRequestValidator()
@@ -85,7 +85,7 @@ func TestInvalid_Grant_Type(t *testing.T) {
 	result := validator.ValidateRequest(context.Background(), tests.testParameters, clientValidationResult)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.AuthorizeErrorsUnauthorizedClient)
+	r.ErrorIs(result.Error, wicket.AuthorizeErrorsUnauthorizedClient)
 }
 
 func TestUnauthorized_Scope(t *testing.T) {
@@ -105,7 +105,7 @@ func TestUnauthorized_Scope(t *testing.T) {
 	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.AuthorizeErrorsInvalidScope)
+	r.ErrorIs(result.Error, wicket.AuthorizeErrorsInvalidScope)
 }
 
 func TestDeviceUnknown_Scope(t *testing.T) {
@@ -125,7 +125,7 @@ func TestDeviceUnknown_Scope(t *testing.T) {
 	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.AuthorizeErrorsInvalidScope)
+	r.ErrorIs(result.Error, wicket.AuthorizeErrorsInvalidScope)
 }
 
 func TestValid_OpenId_Request(t *testing.T) {
@@ -273,5 +273,5 @@ func TestMissing_Scopes_And_Client_Scopes_Empty(t *testing.T) {
 	result := validator.ValidateRequest(context.Background(), parameters, clientValidationResult)
 
 	r.Error(result.Error)
-	r.ErrorIs(result.Error, gois.AuthorizeErrorsInvalidScope)
+	r.ErrorIs(result.Error, wicket.AuthorizeErrorsInvalidScope)
 }

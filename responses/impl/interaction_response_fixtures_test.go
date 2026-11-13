@@ -45,7 +45,7 @@ func fixedClock(at time.Time) *common.StubClock {
 func localSubject(t *testing.T, authTime *time.Time) *claims.ClaimsPrincipal {
 	t.Helper()
 	user := models.NewLocalUser(models.WithLocalUserSubjectId("123"))
-	user.IdentityProvider = gois.LocalIdentityProvider
+	user.IdentityProvider = wicket.LocalIdentityProvider
 	user.AuthenticationTime = authTime
 	principal, err := user.CreatePrincipal()
 	if err != nil {
@@ -90,7 +90,7 @@ func requestedConsentResources() *validators_models.ResourceValidationResult {
 func consentRequest(t *testing.T) *validators_models.ValidatedAuthorizeRequest {
 	t.Helper()
 	req := validators_models.NewValidatedAuthorizeRequest()
-	req.ResponseMode = gois.ResponseModesFragment
+	req.ResponseMode = wicket.ResponseModesFragment
 	req.State = "12345"
 	req.RedirectUri = "https://client.com/callback"
 	req.RequestedScopes = []string{"openid", "read", "write"}

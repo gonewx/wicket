@@ -35,7 +35,7 @@ Wicket 支持多种外部身份提供者（IdP），允许用户通过第三方�
 
 | 属性 | 值 |
 |------|-----|
-| Scheme 名 | `Google`（`gois.GoogleAuthenticationScheme`） |
+| Scheme 名 | `Google`（`wicket.GoogleAuthenticationScheme`） |
 | 显示名 | Google |
 | 协议 | OAuth 2.0 授权码流 |
 | 授权端点 | `https://accounts.google.com/o/oauth2/v2/auth` |
@@ -86,7 +86,7 @@ cfg := godi.GetRequired[*di.ServerConfig](root)
 // （通过 godi Options Configure 机制）
 
 // 如需覆盖默认 Handler：
-cfg.SetAuthenticationHandlerProvider(gois.GoogleAuthenticationScheme, func(p godi.Provider) auth.Handler {
+cfg.SetAuthenticationHandlerProvider(wicket.GoogleAuthenticationScheme, func(p godi.Provider) auth.Handler {
     return google.NewHandler(
         godi.GetRequired[optspkg.OptionsMonitor[*google.Options]](p),
         godi.GetRequired[*slog.Logger](p),
@@ -103,7 +103,7 @@ cfg.SetAuthenticationHandlerProvider(gois.GoogleAuthenticationScheme, func(p god
 
 | 属性 | 值 |
 |------|-----|
-| Scheme 名 | `Facebook`（`gois.FacebookAuthenticationScheme`） |
+| Scheme 名 | `Facebook`（`wicket.FacebookAuthenticationScheme`） |
 | 显示名 | Facebook |
 | 协议 | OAuth 2.0 授权码流 |
 | 授权端点 | `https://www.facebook.com/v11.0/dialog/oauth` |
@@ -163,7 +163,7 @@ opts.SetAppSecret("your-facebook-app-secret")
 
 | 属性 | 值 |
 |------|-----|
-| Scheme 名 | `Bearer`（`gois.JwtBearerAuthenticationScheme`） |
+| Scheme 名 | `Bearer`（`wicket.JwtBearerAuthenticationScheme`） |
 | 协议 | JWT 令牌验证（非 OAuth 授权码流） |
 | 用途 | 验证 API 请求中的 Bearer Token |
 
@@ -189,7 +189,7 @@ opts.SetAppSecret("your-facebook-app-secret")
 ### 集成示例
 
 ```go
-cfg.SetAuthenticationHandlerProvider(gois.JwtBearerAuthenticationScheme, func(p godi.Provider) auth.Handler {
+cfg.SetAuthenticationHandlerProvider(wicket.JwtBearerAuthenticationScheme, func(p godi.Provider) auth.Handler {
     return jwt.NewHandler(
         godi.GetRequired[optspkg.OptionsMonitor[*jwt.Options]](p),
         godi.GetRequired[*slog.Logger](p),

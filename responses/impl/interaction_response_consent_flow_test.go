@@ -42,8 +42,8 @@ func TestHandleConsentRejectsLoginClassPrompt(t *testing.T) {
 	t.Parallel()
 
 	for name, prompt := range map[string]string{
-		"select_account prompt": gois.PromptModesSelectAccount,
-		"login prompt":          gois.PromptModesLogin,
+		"select_account prompt": wicket.PromptModesSelectAccount,
+		"login prompt":          wicket.PromptModesLogin,
 	} {
 		prompt := prompt
 		t.Run(name, func(t *testing.T) {
@@ -75,11 +75,11 @@ func TestHandleConsentShowsPageWhenUnanswered(t *testing.T) {
 	}{
 		"prompt=consent alone requests the page": {
 			requiresConsent: false,
-			prompt:          []string{gois.PromptModesConsent},
+			prompt:          []string{wicket.PromptModesConsent},
 		},
 		"service requirement plus prompt=consent requests the page": {
 			requiresConsent: true,
-			prompt:          []string{gois.PromptModesConsent},
+			prompt:          []string{wicket.PromptModesConsent},
 		},
 	}
 
@@ -148,12 +148,12 @@ func TestHandleConsentRequiredUnderPromptNone(t *testing.T) {
 	consent := common.NewMockConsentService()
 	consent.RequiresConsentResult = true
 	req := consentRequest(t)
-	req.PromptModes = []string{gois.PromptModesNone}
+	req.PromptModes = []string{wicket.PromptModesNone}
 	g := consentGenerator(consent)
 
 	resp := g.HandleConsent(context.Background(), req, nil)
 
-	if !errors.Is(resp.Error, gois.AuthorizeErrorsConsentRequired) {
+	if !errors.Is(resp.Error, wicket.AuthorizeErrorsConsentRequired) {
 		t.Fatalf("Error = %v, want consent_required", resp.Error)
 	}
 	if req.WasConsentShown {
@@ -192,7 +192,7 @@ func TestHandleConsentDeniesUnsatisfactoryGrant(t *testing.T) {
 
 			resp := g.HandleConsent(context.Background(), req, tc.consent)
 
-			if !errors.Is(resp.Error, gois.AuthorizeErrorsAccessDenied) {
+			if !errors.Is(resp.Error, wicket.AuthorizeErrorsAccessDenied) {
 				t.Fatalf("Error = %v, want access_denied", resp.Error)
 			}
 			if !req.WasConsentShown {
@@ -328,9 +328,9 @@ func TestHandleConsentReturnsPageSuppliedError(t *testing.T) {
 		authError messages.AuthorizationError
 		want      error
 	}{
-		"temporarily unavailable": {authError: messages.TemporarilyUnavailable, want: gois.AuthorizeErrorsTemporarilyUnavailable},
-		"login required":          {authError: messages.LoginRequired, want: gois.AuthorizeErrorsLoginRequired},
-		"access denied":           {authError: messages.AccessDenied, want: gois.AuthorizeErrorsAccessDenied},
+		"temporarily unavailable": {authError: messages.TemporarilyUnavailable, want: wicket.AuthorizeErrorsTemporarilyUnavailable},
+		"login required":          {authError: messages.LoginRequired, want: wicket.AuthorizeErrorsLoginRequired},
+		"access denied":           {authError: messages.AccessDenied, want: wicket.AuthorizeErrorsAccessDenied},
 	}
 
 	for name, tc := range cases {

@@ -26,15 +26,15 @@ type UserInteractionOptions struct {
 
 func NewUserInteractionOptions() *UserInteractionOptions {
 	options := &UserInteractionOptions{
-		LogoutIdParameter:                   gois.UIConstantsDefaultRoutePathParamsLogout,
-		ConsentUrl:                          gois.UIConstantsDefaultRoutePathsConsent,
-		ConsentReturnUrlParameter:           gois.UIConstantsDefaultRoutePathParamsConsent,
-		ErrorUrl:                            gois.UIConstantsDefaultRoutePathsError,
-		ErrorIdParameter:                    gois.UIConstantsDefaultRoutePathParamsError,
-		CustomRedirectReturnUrlParameter:    gois.UIConstantsDefaultRoutePathParamsCustom,
-		CookieMessageThreshold:              gois.UIConstantsCookieMessageThreshold,
-		DeviceVerificationUrl:               gois.UIConstantsDefaultRoutePathsDeviceVerification,
-		DeviceVerificationUserCodeParameter: gois.UIConstantsDefaultRoutePathParamsUserCode,
+		LogoutIdParameter:                   wicket.UIConstantsDefaultRoutePathParamsLogout,
+		ConsentUrl:                          wicket.UIConstantsDefaultRoutePathsConsent,
+		ConsentReturnUrlParameter:           wicket.UIConstantsDefaultRoutePathParamsConsent,
+		ErrorUrl:                            wicket.UIConstantsDefaultRoutePathsError,
+		ErrorIdParameter:                    wicket.UIConstantsDefaultRoutePathParamsError,
+		CustomRedirectReturnUrlParameter:    wicket.UIConstantsDefaultRoutePathParamsCustom,
+		CookieMessageThreshold:              wicket.UIConstantsCookieMessageThreshold,
+		DeviceVerificationUrl:               wicket.UIConstantsDefaultRoutePathsDeviceVerification,
+		DeviceVerificationUserCodeParameter: wicket.UIConstantsDefaultRoutePathParamsUserCode,
 	}
 	return options
 }

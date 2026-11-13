@@ -57,13 +57,13 @@ func TestHandlePromptNoneClassifiesCustomLoginStages(t *testing.T) {
 			stage: func(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse {
 				return &responses_models.InteractionResponse{IsLogin: true}
 			},
-			wantErr: gois.AuthorizeErrorsLoginRequired,
+			wantErr: wicket.AuthorizeErrorsLoginRequired,
 		},
 		"custom redirect becomes interaction_required": {
 			stage: func(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse {
 				return &responses_models.InteractionResponse{RedirectUrl: "/custom"}
 			},
-			wantErr: gois.AuthorizeErrorsInteractionRequired,
+			wantErr: wicket.AuthorizeErrorsInteractionRequired,
 		},
 	}
 
@@ -75,7 +75,7 @@ func TestHandlePromptNoneClassifiesCustomLoginStages(t *testing.T) {
 			g.loginHandler = tc.stage
 
 			req := validators_models.NewValidatedAuthorizeRequest()
-			req.PromptModes = []string{gois.PromptModesNone}
+			req.PromptModes = []string{wicket.PromptModesNone}
 
 			resp := g.Handle(context.Background(), req, nil)
 
@@ -101,13 +101,13 @@ func TestHandlePromptNoneClassifiesCustomConsentStage(t *testing.T) {
 	}
 
 	req := validators_models.NewValidatedAuthorizeRequest()
-	req.PromptModes = []string{gois.PromptModesNone}
+	req.PromptModes = []string{wicket.PromptModesNone}
 	req.Subject = localSubject(t, nil)
 	req.Client = storage_models.NewClient()
 
 	resp := g.Handle(context.Background(), req, nil)
 
-	if !errors.Is(resp.Error, gois.AuthorizeErrorsConsentRequired) {
+	if !errors.Is(resp.Error, wicket.AuthorizeErrorsConsentRequired) {
 		t.Fatalf("Error = %v, want consent_required", resp.Error)
 	}
 }

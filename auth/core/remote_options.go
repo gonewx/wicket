@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	cookiespkg "github.com/gonewx/wicket/cookies"
 	"github.com/gonewx/wicket/dp"
 )
@@ -101,7 +101,7 @@ func (ro *RemoteOptions) ValidateByScheme(scheme string) error {
 	}
 
 	if scheme == ro.signInScheme {
-		return fmt.Errorf("The SignInScheme for a remote authentication handler cannot be set to itself.  If it was not explicitly set, the AuthenticationOptions.DefaultSignInScheme or DefaultScheme is used. %w", gois.InvalidOperationException)
+		return fmt.Errorf("The SignInScheme for a remote authentication handler cannot be set to itself.  If it was not explicitly set, the AuthenticationOptions.DefaultSignInScheme or DefaultScheme is used. %w", wicket.InvalidOperationException)
 	}
 
 	return nil
@@ -114,7 +114,7 @@ func (ro *RemoteOptions) Validate() error {
 	}
 
 	if ro.callbackPath == "" {
-		return fmt.Errorf("The CallbackPath option must be provided. %w", gois.ArgumentNullException)
+		return fmt.Errorf("The CallbackPath option must be provided. %w", wicket.ArgumentNullException)
 	}
 
 	return nil

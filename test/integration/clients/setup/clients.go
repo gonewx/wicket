@@ -22,7 +22,7 @@ func GetClients() []*storage_models.Client {
 	secret.Value = utils.Sha256("secret")
 	client.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesClientCredentials); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesClientCredentials); err != nil {
 		panic(err)
 	}
 
@@ -41,7 +41,7 @@ func GetClients() []*storage_models.Client {
 	secret.Value = "foo"
 	clientCnf.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := clientCnf.SetAllowedGrantTypes(gois.GrantTypesClientCredentials); err != nil {
+	if err := clientCnf.SetAllowedGrantTypes(wicket.GrantTypesClientCredentials); err != nil {
 		panic(err)
 	}
 
@@ -58,7 +58,7 @@ func GetClients() []*storage_models.Client {
 	secret.Value = utils.Sha256("secret")
 	clientAndRo.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := clientAndRo.SetAllowedGrantTypes(gois.GrantTypesResourceOwnerPasswordAndClientCredentials); err != nil {
+	if err := clientAndRo.SetAllowedGrantTypes(wicket.GrantTypesResourceOwnerPasswordAndClientCredentials); err != nil {
 		panic(err)
 	}
 
@@ -73,7 +73,7 @@ func GetClients() []*storage_models.Client {
 	secret.Value = utils.Sha256("secret")
 	clientIdentityscopes.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := clientIdentityscopes.SetAllowedGrantTypes(gois.GrantTypesClientCredentials); err != nil {
+	if err := clientIdentityscopes.SetAllowedGrantTypes(wicket.GrantTypesClientCredentials); err != nil {
 		panic(err)
 	}
 
@@ -88,13 +88,13 @@ func GetClients() []*storage_models.Client {
 	secret.Value = utils.Sha256("secret")
 	clientNoDefaultScopes.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := clientNoDefaultScopes.SetAllowedGrantTypes(gois.GrantTypesClientCredentials); err != nil {
+	if err := clientNoDefaultScopes.SetAllowedGrantTypes(wicket.GrantTypesClientCredentials); err != nil {
 		panic(err)
 	}
 
 	clientNoSecret := storage_models.NewClient()
 	clientNoSecret.ClientId = "client.no_secret"
-	if err := clientNoSecret.SetAllowedGrantTypes(gois.GrantTypesClientCredentials); err != nil {
+	if err := clientNoSecret.SetAllowedGrantTypes(wicket.GrantTypesClientCredentials); err != nil {
 		panic(err)
 	}
 	clientNoSecret.RequireClientSecret = false
@@ -110,15 +110,15 @@ func GetClients() []*storage_models.Client {
 	secret.Value = utils.Sha256("secret")
 	roclient.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := roclient.SetAllowedGrantTypes(gois.GrantTypesPassword); err != nil {
+	if err := roclient.SetAllowedGrantTypes(wicket.GrantTypesPassword); err != nil {
 		panic(err)
 	}
-	roclient.RefreshTokenUsage = gois.TokenUsageOneTimeOnly
+	roclient.RefreshTokenUsage = wicket.TokenUsageOneTimeOnly
 	roclient.AllowOfflineAccess = true
 	roclient.AllowedScopes = []string{
-		gois.StandardScopesOpenId,
-		gois.StandardScopesEmail,
-		gois.StandardScopesAddress,
+		wicket.StandardScopesOpenId,
+		wicket.StandardScopesEmail,
+		wicket.StandardScopesAddress,
 		"roles",
 		"api1", "api2", "api4.with.roles",
 	}
@@ -130,18 +130,18 @@ func GetClients() []*storage_models.Client {
 	secret.Value = utils.Sha256("secret")
 	roclientReuse.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := roclientReuse.SetAllowedGrantTypes(gois.GrantTypesPassword); err != nil {
+	if err := roclientReuse.SetAllowedGrantTypes(wicket.GrantTypesPassword); err != nil {
 		panic(err)
 	}
 	roclientReuse.AllowOfflineAccess = true
 	roclientReuse.AllowedScopes = []string{
-		gois.StandardScopesOpenId,
-		gois.StandardScopesEmail,
-		gois.StandardScopesAddress,
+		wicket.StandardScopesOpenId,
+		wicket.StandardScopesEmail,
+		wicket.StandardScopesAddress,
 		"roles",
 		"api1", "api2", "api4.with.roles",
 	}
-	roclientReuse.RefreshTokenUsage = gois.TokenUsageReUse
+	roclientReuse.RefreshTokenUsage = wicket.TokenUsageReUse
 
 	// Console Custom Grant Flow Sample
 	clientCustom := storage_models.NewClient()
@@ -184,7 +184,7 @@ func GetClients() []*storage_models.Client {
 	secret.Value = utils.Sha256("secret")
 	roclientReference.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := roclientReference.SetAllowedGrantTypes(gois.GrantTypesPassword); err != nil {
+	if err := roclientReference.SetAllowedGrantTypes(wicket.GrantTypesPassword); err != nil {
 		panic(err)
 	}
 
@@ -192,7 +192,7 @@ func GetClients() []*storage_models.Client {
 	roclientReference.AllowedScopes = []string{
 		"api1", "api2",
 	}
-	roclientReference.AccessTokenType = gois.AccessTokenTypeReference
+	roclientReference.AccessTokenType = wicket.AccessTokenTypeReference
 
 	certificateBase64Valid := storage_models.NewClient()
 	certificateBase64Valid.ClientName = "Client with Base64 encoded X509 Certificate"
@@ -205,11 +205,11 @@ func GetClients() []*storage_models.Client {
 	}
 
 	secret = storage_models.NewSecret()
-	secret.Type = gois.SecretTypesX509CertificateBase64
+	secret.Type = wicket.SecretTypesX509CertificateBase64
 	secret.Value = base64.StdEncoding.EncodeToString(testcert)
 	certificateBase64Valid.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := certificateBase64Valid.SetAllowedGrantTypes(gois.GrantTypesClientCredentials); err != nil {
+	if err := certificateBase64Valid.SetAllowedGrantTypes(wicket.GrantTypesClientCredentials); err != nil {
 		panic(err)
 	}
 
@@ -219,7 +219,7 @@ func GetClients() []*storage_models.Client {
 
 	implicit := storage_models.NewClient()
 	implicit.ClientId = "implicit"
-	if err := implicit.SetAllowedGrantTypes(gois.GrantTypesImplicit); err != nil {
+	if err := implicit.SetAllowedGrantTypes(wicket.GrantTypesImplicit); err != nil {
 		panic(err)
 	}
 
@@ -232,7 +232,7 @@ func GetClients() []*storage_models.Client {
 
 	implicitAndClientCreds := storage_models.NewClient()
 	implicitAndClientCreds.ClientId = "implicit_and_client_creds"
-	if err := implicitAndClientCreds.SetAllowedGrantTypes(gois.GrantTypesImplicitAndClientCredentials); err != nil {
+	if err := implicitAndClientCreds.SetAllowedGrantTypes(wicket.GrantTypesImplicitAndClientCredentials); err != nil {
 		panic(err)
 	}
 

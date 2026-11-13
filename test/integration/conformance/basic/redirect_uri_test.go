@@ -28,7 +28,7 @@ func newRedirectUriPipeline() *integration_common.WicketPipeline {
 	secret.Value = utils.Sha512("secret")
 	client.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesCode); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesCode); err != nil {
 		panic(err)
 	}
 	client.AllowedScopes = []string{"openid"}

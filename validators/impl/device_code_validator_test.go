@@ -69,7 +69,7 @@ func TestDeviceCode_Missing(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(validation.Result.Error)
-	r.ErrorIs(validation.Result.Error, gois.TokenErrorsInvalidGrant)
+	r.ErrorIs(validation.Result.Error, wicket.TokenErrorsInvalidGrant)
 }
 
 func TestDeviceCode_From_Different_Client(t *testing.T) {
@@ -99,7 +99,7 @@ func TestDeviceCode_From_Different_Client(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(validation.Result.Error)
-	r.ErrorIs(validation.Result.Error, gois.TokenErrorsInvalidGrant)
+	r.ErrorIs(validation.Result.Error, wicket.TokenErrorsInvalidGrant)
 }
 
 func TestExpired_DeviceCode(t *testing.T) {
@@ -132,7 +132,7 @@ func TestExpired_DeviceCode(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(validation.Result.Error)
-	r.ErrorIs(validation.Result.Error, gois.TokenErrorsExpiredToken)
+	r.ErrorIs(validation.Result.Error, wicket.TokenErrorsExpiredToken)
 }
 
 func TestAccess_Denied(t *testing.T) {
@@ -164,7 +164,7 @@ func TestAccess_Denied(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(validation.Result.Error)
-	r.ErrorIs(validation.Result.Error, gois.TokenErrorsAccessDenied)
+	r.ErrorIs(validation.Result.Error, wicket.TokenErrorsAccessDenied)
 }
 
 func TestDeviceCode_Not_Yet_Authorized(t *testing.T) {
@@ -196,7 +196,7 @@ func TestDeviceCode_Not_Yet_Authorized(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(validation.Result.Error)
-	r.ErrorIs(validation.Result.Error, gois.TokenErrorsAuthorizationPending)
+	r.ErrorIs(validation.Result.Error, wicket.TokenErrorsAuthorizationPending)
 }
 
 func TestDeviceCode_Missing_Subject(t *testing.T) {
@@ -228,7 +228,7 @@ func TestDeviceCode_Missing_Subject(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(validation.Result.Error)
-	r.ErrorIs(validation.Result.Error, gois.TokenErrorsAuthorizationPending)
+	r.ErrorIs(validation.Result.Error, wicket.TokenErrorsAuthorizationPending)
 }
 
 func TestUser_Disabled(t *testing.T) {
@@ -258,7 +258,7 @@ func TestUser_Disabled(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(validation.Result.Error)
-	r.ErrorIs(validation.Result.Error, gois.TokenErrorsInvalidGrant)
+	r.ErrorIs(validation.Result.Error, wicket.TokenErrorsInvalidGrant)
 }
 
 func TestDeviceCode_Polling_Too_Fast(t *testing.T) {
@@ -288,7 +288,7 @@ func TestDeviceCode_Polling_Too_Fast(t *testing.T) {
 	r.NoError(err)
 
 	r.Error(validation.Result.Error)
-	r.ErrorIs(validation.Result.Error, gois.TokenErrorsSlowDown)
+	r.ErrorIs(validation.Result.Error, wicket.TokenErrorsSlowDown)
 }
 
 func TestValid_DeviceCode(t *testing.T) {

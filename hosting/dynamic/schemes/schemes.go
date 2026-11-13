@@ -30,7 +30,7 @@ type AuthSchemeProvider struct {
 // registry decorator, the dynamic resolver, and options. A nil inner decorator
 // or a disabled resolver yields pure static pass-through.
 func NewAuthSchemeProvider(
-	inner *gois.Decorator[auth.SchemeProvider],
+	inner *wicket.Decorator[auth.SchemeProvider],
 	dynamicProviders *config_options.DynamicProviderOptions,
 	resolver *dynamicscheme.Resolver,
 	logger *slog.Logger,

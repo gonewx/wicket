@@ -43,7 +43,7 @@ func (v *UserInfoRequestValidator) ValidateRequest(ctx context.Context, accessTo
 	result := validators_models.NewUserInfoRequestValidationResult()
 
 	// the access token needs to be valid and have at least the openid scope
-	tokenResult, err := v.tokenValidator.ValidateAccessToken(ctx, accessToken, gois.StandardScopesOpenId)
+	tokenResult, err := v.tokenValidator.ValidateAccessToken(ctx, accessToken, wicket.StandardScopesOpenId)
 	if err != nil {
 		return nil, err
 	}
@@ -55,18 +55,18 @@ func (v *UserInfoRequestValidator) ValidateRequest(ctx context.Context, accessTo
 
 	// the token must have a one sub claim
 	subClaim := utils.SingleOrDefaultPred(tokenResult.Claims, func(c *claimspkg.Claim) bool {
-		return c.Type == gois.JwtClaimTypesSubject
+		return c.Type == wicket.JwtClaimTypesSubject
 	})
 	if subClaim == nil {
 		v.logger.Error("Token contains no sub claim")
 
-		result.Error = gois.ProtectedResourceErrorsInvalidToken
+		result.Error = wicket.ProtectedResourceErrorsInvalidToken
 		return result, nil
 	}
 
 	// create subject from incoming access token
 	claims := utils.Where(tokenResult.Claims, func(x *claimspkg.Claim) bool {
-		return !utils.Contains(gois.ProtocolClaimsFilter, x.Type)
+		return !utils.Contains(wicket.ProtocolClaimsFilter, x.Type)
 	})
 	subject := claimspkg.NewClaimsPrincipal(
 		claimspkg.WithClaimsPrincipalIdentity(
@@ -78,13 +78,13 @@ func (v *UserInfoRequestValidator) ValidateRequest(ctx context.Context, accessTo
 	)
 
 	// make sure user is still active
-	isActiveCtx := contexts.NewIsActiveContext(subject, tokenResult.Client, gois.ProfileIsActiveCallersUserInfoRequestValidation)
+	isActiveCtx := contexts.NewIsActiveContext(subject, tokenResult.Client, wicket.ProfileIsActiveCallersUserInfoRequestValidation)
 
 	v.profile.IsActive(isActiveCtx)
 	if !isActiveCtx.IsActive {
 		v.logger.Error("User is not active", slog.String("sub", extensions.GetSubjectIdFromPrincipal(subject)))
 
-		result.Error = gois.ProtectedResourceErrorsInvalidToken
+		result.Error = wicket.ProtectedResourceErrorsInvalidToken
 		return result, nil
 	}
 

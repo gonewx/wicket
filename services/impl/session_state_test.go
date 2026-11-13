@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/accessor"
 	"github.com/gonewx/wicket/auth"
 	authcore "github.com/gonewx/wicket/auth/core"
@@ -47,7 +47,7 @@ func principalWithSubject(sub string) *claims.ClaimsPrincipal {
 		claims.WithAuthenticationType("test"),
 		claims.WithClaims([]*claims.Claim{
 			claims.NewClaim(
-				claims.WithClaimType(gois.JwtClaimTypesSubject),
+				claims.WithClaimType(wicket.JwtClaimTypesSubject),
 				claims.WithClaimValue(sub),
 			),
 		}),

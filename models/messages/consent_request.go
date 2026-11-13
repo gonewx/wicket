@@ -34,26 +34,26 @@ type ConsentRequest struct {
 	Subject string
 }
 
-func WithConsentRequestAuthorizationRequest(request *AuthorizationRequest) gois.Option[ConsentRequest] {
+func WithConsentRequestAuthorizationRequest(request *AuthorizationRequest) wicket.Option[ConsentRequest] {
 	return func(r *ConsentRequest) {
 		r.ClientId = request.Client.ClientId
-		r.Nonce = request.Parameters.Get(gois.AuthorizeRequestNonce)
-		r.ScopesRequested = utils.ParseScopesString(request.Parameters.Get(gois.AuthorizeRequestScope))
+		r.Nonce = request.Parameters.Get(wicket.AuthorizeRequestNonce)
+		r.ScopesRequested = utils.ParseScopesString(request.Parameters.Get(wicket.AuthorizeRequestScope))
 	}
 }
 
-func WithConsentRequestParameters(parameters url.Values) gois.Option[ConsentRequest] {
+func WithConsentRequestParameters(parameters url.Values) wicket.Option[ConsentRequest] {
 	return func(r *ConsentRequest) {
-		r.ClientId = parameters.Get(gois.AuthorizeRequestClientId)
-		r.Nonce = parameters.Get(gois.AuthorizeRequestNonce)
-		r.ScopesRequested = utils.ParseScopesString(parameters.Get(gois.AuthorizeRequestScope))
+		r.ClientId = parameters.Get(wicket.AuthorizeRequestClientId)
+		r.Nonce = parameters.Get(wicket.AuthorizeRequestNonce)
+		r.ScopesRequested = utils.ParseScopesString(parameters.Get(wicket.AuthorizeRequestScope))
 	}
 }
 
 // / Initializes a new instance of the <see cref="ConsentRequest"/> class.
 // / <param name="request">The request.</param>
 // / <param name="subject">The subject.</param>
-func NewConsentRequest(subject string, opts ...gois.Option[ConsentRequest]) *ConsentRequest {
+func NewConsentRequest(subject string, opts ...wicket.Option[ConsentRequest]) *ConsentRequest {
 	r := &ConsentRequest{}
 	for _, o := range opts {
 		o(r)

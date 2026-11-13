@@ -27,7 +27,7 @@ func NewNotSupportedResourceOwnerPasswordValidator(logger *slog.Logger) *NotSupp
 // / Validates the resource owner password credential
 func (v *NotSupportedResourceOwnerPasswordValidator) Validate(ctx *validators_contexts.ResourceOwnerPasswordValidationContext) error {
 	ctx.Result = validators_models.NewGrantValidationResult(
-		validators_models.WithGrantValidationResultError(gois.TokenRequestErrorsUnsupportedGrantType, ""),
+		validators_models.WithGrantValidationResultError(wicket.TokenRequestErrorsUnsupportedGrantType, ""),
 	)
 
 	v.logger.Info("Resource owner password credential type not supported. Configure an IResourceOwnerPasswordValidator.")

@@ -78,7 +78,7 @@ func (t *TestUserStore) AutoProvisionUser(provider, userId string, claims []*cla
 		if claim.Type == claimspkg.Name {
 			filtered = append(filtered,
 				claimspkg.NewClaim(
-					claimspkg.WithClaimType(gois.JwtClaimTypesName),
+					claimspkg.WithClaimType(wicket.JwtClaimTypesName),
 					claimspkg.WithClaimValue(claim.Value),
 				),
 			)
@@ -100,35 +100,35 @@ func (t *TestUserStore) AutoProvisionUser(provider, userId string, claims []*cla
 
 	// if no display name was provided, try to construct by first and/or last name
 	if !utils.AnyPred(filtered, func(x *claimspkg.Claim) bool {
-		return x.Type == gois.JwtClaimTypesName
+		return x.Type == wicket.JwtClaimTypesName
 	}) {
 		var first, last string
 		v := utils.FirstOrDefaultPred(filtered, func(x *claimspkg.Claim) bool {
-			return x.Type == gois.JwtClaimTypesGivenName
+			return x.Type == wicket.JwtClaimTypesGivenName
 		})
 		if v != nil {
 			first = v.Value.(string)
 		}
 		v = utils.FirstOrDefaultPred(filtered, func(x *claimspkg.Claim) bool {
-			return x.Type == gois.JwtClaimTypesFamilyName
+			return x.Type == wicket.JwtClaimTypesFamilyName
 		})
 		if v != nil {
 			last = v.Value.(string)
 		}
 		if first != "" && last != "" {
 			filtered = append(filtered, claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesName),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesName),
 				claimspkg.WithClaimValue(first+" "+last),
 			),
 			)
 		} else if first != "" {
 			filtered = append(filtered, claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesName),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesName),
 				claimspkg.WithClaimValue(first),
 			))
 		} else if last != "" {
 			filtered = append(filtered, claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesName),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesName),
 				claimspkg.WithClaimValue(last),
 			))
 		}
@@ -142,7 +142,7 @@ func (t *TestUserStore) AutoProvisionUser(provider, userId string, claims []*cla
 	}
 	// check if a display name is available, otherwise fallback to subject id
 	v := utils.FirstOrDefaultPred(filtered, func(x *claimspkg.Claim) bool {
-		return x.Type == gois.JwtClaimTypesName
+		return x.Type == wicket.JwtClaimTypesName
 	})
 
 	name := ""

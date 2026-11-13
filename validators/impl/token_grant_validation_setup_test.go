@@ -185,7 +185,7 @@ func grantTestSubject(subjectId string) *claimspkg.ClaimsPrincipal {
 		claimspkg.WithAuthenticationType("test"),
 		claimspkg.WithClaims([]*claimspkg.Claim{
 			claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesSubject),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesSubject),
 				claimspkg.WithClaimValue(subjectId),
 			),
 		}),
@@ -280,7 +280,7 @@ func newGrantTestRefreshToken(clientId string, now time.Time) *storage_models.Re
 	token.Subject = grantTestSubject("818727")
 	token.CreationTime = now
 	token.Lifetime = 600
-	token.AuthorizedScopes = []string{"resource", gois.StandardScopesOfflineAccess}
+	token.AuthorizedScopes = []string{"resource", wicket.StandardScopesOfflineAccess}
 	token.SetAccessToken(&storage_models.Token{ClientId: clientId}, "")
 	return token
 }
@@ -311,7 +311,7 @@ func TestAuthorizationCodeInfrastructureFailureSurfacesAsError(t *testing.T) {
 	t.Parallel()
 
 	client := storage_models.NewClient()
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesCode); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesCode); err != nil {
 		t.Fatalf("set grants: %v", err)
 	}
 	options := config_options.NewWicketOptions()
@@ -337,8 +337,8 @@ func TestAuthorizationCodeInfrastructureFailureSurfacesAsError(t *testing.T) {
 		logger,
 	)
 	result, err := validator.ValidateRequest(context.Background(), url.Values{
-		gois.TokenRequestGrantType: {gois.GrantTypeAuthorizationCode},
-		gois.TokenRequestCode:      {"some-code"},
+		wicket.TokenRequestGrantType: {wicket.GrantTypeAuthorizationCode},
+		wicket.TokenRequestCode:      {"some-code"},
 	}, &validators_models.ClientSecretValidationResult{Client: client})
 	if err == nil {
 		t.Fatalf("expected infrastructure error, got result %+v", result)

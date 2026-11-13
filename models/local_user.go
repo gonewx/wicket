@@ -24,12 +24,12 @@ type LocalUser struct {
 	AdditionalClaims      []*claimspkg.Claim
 }
 
-func WithLocalUserSubjectId(subjectId string) gois.Option[LocalUser] {
+func WithLocalUserSubjectId(subjectId string) wicket.Option[LocalUser] {
 	return func(u *LocalUser) {
 		u.SubjectId = subjectId
 	}
 }
-func NewLocalUser(opts ...gois.Option[LocalUser]) *LocalUser {
+func NewLocalUser(opts ...wicket.Option[LocalUser]) *LocalUser {
 	i := &LocalUser{}
 	for _, opt := range opts {
 		opt(i)
@@ -43,27 +43,27 @@ func (u *LocalUser) CreatePrincipal() (*claimspkg.ClaimsPrincipal, error) {
 	}
 
 	claims := make([]*claimspkg.Claim, 0)
-	claims = append(claims, &claimspkg.Claim{Type: gois.JwtClaimTypesSubject, Value: u.SubjectId})
+	claims = append(claims, &claimspkg.Claim{Type: wicket.JwtClaimTypesSubject, Value: u.SubjectId})
 
 	if strings.TrimSpace(u.DisplayName) != "" {
-		claims = append(claims, &claimspkg.Claim{Type: gois.JwtClaimTypesName, Value: u.DisplayName})
+		claims = append(claims, &claimspkg.Claim{Type: wicket.JwtClaimTypesName, Value: u.DisplayName})
 	}
 
 	if strings.TrimSpace(u.IdentityProvider) != "" {
-		claims = append(claims, &claimspkg.Claim{Type: gois.JwtClaimTypesIdentityProvider, Value: u.IdentityProvider})
+		claims = append(claims, &claimspkg.Claim{Type: wicket.JwtClaimTypesIdentityProvider, Value: u.IdentityProvider})
 	}
 
 	if strings.TrimSpace(u.Tenant) != "" {
-		claims = append(claims, &claimspkg.Claim{Type: gois.ClaimTypesTenant, Value: u.Tenant})
+		claims = append(claims, &claimspkg.Claim{Type: wicket.ClaimTypesTenant, Value: u.Tenant})
 	}
 
 	if u.AuthenticationTime != nil {
-		claims = append(claims, &claimspkg.Claim{Type: gois.JwtClaimTypesAuthenticationTime, Value: u.AuthenticationTime.Unix()})
+		claims = append(claims, &claimspkg.Claim{Type: wicket.JwtClaimTypesAuthenticationTime, Value: u.AuthenticationTime.Unix()})
 	}
 
 	if utils.Any(u.AuthenticationMethods) {
 		for _, amr := range u.AuthenticationMethods {
-			claims = append(claims, &claimspkg.Claim{Type: gois.JwtClaimTypesAuthenticationMethod, Value: amr})
+			claims = append(claims, &claimspkg.Claim{Type: wicket.JwtClaimTypesAuthenticationMethod, Value: amr})
 
 		}
 
@@ -75,9 +75,9 @@ func (u *LocalUser) CreatePrincipal() (*claimspkg.ClaimsPrincipal, error) {
 
 	id := claimspkg.NewClaimsIdentity(
 		claimspkg.WithClaims(claims),
-		claimspkg.WithAuthenticationType(gois.WicketAuthenticationType),
-		claimspkg.WithNameClaimType(gois.JwtClaimTypesName),
-		claimspkg.WithRoleClaimType(gois.JwtClaimTypesRole),
+		claimspkg.WithAuthenticationType(wicket.WicketAuthenticationType),
+		claimspkg.WithNameClaimType(wicket.JwtClaimTypesName),
+		claimspkg.WithRoleClaimType(wicket.JwtClaimTypesRole),
 	)
 	return claimspkg.NewClaimsPrincipal(claimspkg.WithClaimsPrincipalIdentity(id)), nil
 }

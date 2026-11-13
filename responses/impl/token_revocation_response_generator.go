@@ -43,14 +43,14 @@ func (g *TokenRevocationResponseGenerator) Handle(ctx context.Context, validatio
 
 	var err error
 	// revoke tokens
-	if validationResult.TokenTypeHint == gois.TokenTypeHintsAccessToken {
+	if validationResult.TokenTypeHint == wicket.TokenTypeHintsAccessToken {
 		g.logger.Debug("Hint was for access token")
 		response.Success, err = g.revokeAccessToken(ctx, validationResult)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		if validationResult.TokenTypeHint == gois.TokenTypeHintsRefreshToken {
+		if validationResult.TokenTypeHint == wicket.TokenTypeHintsRefreshToken {
 			g.logger.Debug("Hint was for refresh token")
 
 			response.Success, err = g.revokeRefreshToken(ctx, validationResult)
@@ -69,9 +69,9 @@ func (g *TokenRevocationResponseGenerator) Handle(ctx context.Context, validatio
 				if err != nil {
 					return nil, err
 				}
-				response.TokenType = gois.TokenTypeHintsRefreshToken
+				response.TokenType = wicket.TokenTypeHintsRefreshToken
 			} else {
-				response.TokenType = gois.TokenTypeHintsAccessToken
+				response.TokenType = wicket.TokenTypeHintsAccessToken
 			}
 		}
 	}

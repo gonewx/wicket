@@ -28,8 +28,8 @@ func endpointClient(t *testing.T) *storage_models.Client {
 	client.RequireConsent = false
 	client.AllowAccessTokensViaBrowser = true
 	client.RedirectUris = []string{knownRedirectUri}
-	client.AllowedScopes = []string{gois.StandardScopesOpenId, "api1"}
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesImplicit); err != nil {
+	client.AllowedScopes = []string{wicket.StandardScopesOpenId, "api1"}
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesImplicit); err != nil {
 		t.Fatalf("grant types: %v", err)
 	}
 	return client
@@ -105,73 +105,73 @@ func TestAuthorizeEndpointErrorPageDispatch(t *testing.T) {
 		"unknown client is unauthorized_client": {
 			request: &integration_common.AuthorizeUrl{
 				ClientId:     "ghost-client",
-				ResponseType: gois.ResponseTypesIdToken,
-				Scope:        gois.StandardScopesOpenId,
+				ResponseType: wicket.ResponseTypesIdToken,
+				Scope:        wicket.StandardScopesOpenId,
 				RedirectUri:  knownRedirectUri,
 				State:        "some-state",
 				Nonce:        "some-nonce",
 			},
-			wantError:    gois.AuthorizeErrorsUnauthorizedClient.Error(),
+			wantError:    wicket.AuthorizeErrorsUnauthorizedClient.Error(),
 			wantClientId: "ghost-client",
 		},
 		"missing client_id is invalid_request with empty client_id": {
 			request: &integration_common.AuthorizeUrl{
 				ClientId:     "",
-				ResponseType: gois.ResponseTypesIdToken,
-				Scope:        gois.StandardScopesOpenId,
+				ResponseType: wicket.ResponseTypesIdToken,
+				Scope:        wicket.StandardScopesOpenId,
 				RedirectUri:  "https://unregistered.example/callback",
 				State:        "some-state",
 				Nonce:        "some-nonce",
 			},
-			wantError:       gois.AuthorizeErrorsInvalidRequest.Error(),
+			wantError:       wicket.AuthorizeErrorsInvalidRequest.Error(),
 			wantClientEmpty: true,
 		},
 		"known client with unregistered redirect is invalid_request": {
 			request: &integration_common.AuthorizeUrl{
 				ClientId:     knownClientId,
-				ResponseType: gois.ResponseTypesIdToken,
-				Scope:        gois.StandardScopesOpenId,
+				ResponseType: wicket.ResponseTypesIdToken,
+				Scope:        wicket.StandardScopesOpenId,
 				RedirectUri:  "https://unregistered.example/callback",
 				State:        "some-state",
 				Nonce:        "some-nonce",
 			},
-			wantError:    gois.AuthorizeErrorsInvalidRequest.Error(),
+			wantError:    wicket.AuthorizeErrorsInvalidRequest.Error(),
 			wantClientId: knownClientId,
 		},
 		"invalid response_type is unsupported_response_type": {
 			request: &integration_common.AuthorizeUrl{
 				ClientId:     knownClientId,
 				ResponseType: "not-a-response-type",
-				Scope:        gois.StandardScopesOpenId,
+				Scope:        wicket.StandardScopesOpenId,
 				RedirectUri:  knownRedirectUri,
 				State:        "some-state",
 				Nonce:        "some-nonce",
 			},
-			wantError:    gois.AuthorizeErrorsUnsupportedResponseType.Error(),
+			wantError:    wicket.AuthorizeErrorsUnsupportedResponseType.Error(),
 			wantClientId: knownClientId,
 		},
 		"missing scope is invalid_request": {
 			request: &integration_common.AuthorizeUrl{
 				ClientId:     knownClientId,
-				ResponseType: gois.ResponseTypesIdToken,
+				ResponseType: wicket.ResponseTypesIdToken,
 				Scope:        "",
 				RedirectUri:  knownRedirectUri,
 				State:        "some-state",
 				Nonce:        "some-nonce",
 			},
-			wantError:    gois.AuthorizeErrorsInvalidRequest.Error(),
+			wantError:    wicket.AuthorizeErrorsInvalidRequest.Error(),
 			wantClientId: knownClientId,
 		},
 		"overlong scope is invalid_request": {
 			request: &integration_common.AuthorizeUrl{
 				ClientId:     knownClientId,
-				ResponseType: gois.ResponseTypesIdToken,
+				ResponseType: wicket.ResponseTypesIdToken,
 				Scope:        strings.Repeat("a", 301),
 				RedirectUri:  knownRedirectUri,
 				State:        "some-state",
 				Nonce:        "some-nonce",
 			},
-			wantError:    gois.AuthorizeErrorsInvalidRequest.Error(),
+			wantError:    wicket.AuthorizeErrorsInvalidRequest.Error(),
 			wantClientId: knownClientId,
 		},
 	} {

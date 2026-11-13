@@ -56,8 +56,8 @@ func (v *BearerTokenUsageValidator) Validate(req *http.Request) (*validators_mod
 func (v *BearerTokenUsageValidator) validateAuthorizationHeader(req *http.Request) *validators_models.BearerTokenUsageValidationResult {
 	header := strings.TrimSpace(req.Header.Get("Authorization"))
 	if header != "" {
-		if strings.HasPrefix(header, gois.AuthenticationSchemesAuthorizationHeaderBearer) {
-			value := strings.TrimSpace(strings.TrimPrefix(header, gois.AuthenticationSchemesAuthorizationHeaderBearer))
+		if strings.HasPrefix(header, wicket.AuthenticationSchemesAuthorizationHeaderBearer) {
+			value := strings.TrimSpace(strings.TrimPrefix(header, wicket.AuthenticationSchemesAuthorizationHeaderBearer))
 			if value != "" {
 				return &validators_models.BearerTokenUsageValidationResult{
 					TokenFound: true,

@@ -38,7 +38,7 @@ func NewEndpointRouter(
 
 func (r *endpointRouter) Find(request *http.Request) (EndpointHandler, error) {
 	if request == nil {
-		return nil, gois.ArgumentNullException
+		return nil, wicket.ArgumentNullException
 	}
 
 	scope := ScopeFrom(request.Context())

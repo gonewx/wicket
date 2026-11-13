@@ -69,7 +69,7 @@ func NewDiscoveryResponseGenerator(
 func (g *DiscoveryResponseGenerator) constructMtlsEndpoint(baseUrl string, issuerUri string, endpoint string) string {
 	// path based
 	if g.options.MutualTls.DomainName == "" {
-		return baseUrl + strings.Replace(endpoint, gois.ProtocolRoutePathsConnectPathPrefix, gois.ProtocolRoutePathsMtlsPathPrefix, -1)
+		return baseUrl + strings.Replace(endpoint, wicket.ProtocolRoutePathsConnectPathPrefix, wicket.ProtocolRoutePathsMtlsPathPrefix, -1)
 	}
 
 	// domain based
@@ -88,7 +88,7 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(ctx context.Context
 	joinUrl := func(path string) string { return baseUrl + "/" + strings.TrimLeft(path, "/") }
 
 	entries := make(map[string]any, 0)
-	entries[gois.DiscoveryIssuer] = issuerUri
+	entries[wicket.DiscoveryIssuer] = issuerUri
 
 	// jwks
 	if g.options.Discovery.ShowKeySet {
@@ -98,66 +98,66 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(ctx context.Context
 		}
 
 		if len(keys) > 0 {
-			entries[gois.DiscoveryJwksUri] = joinUrl(gois.ProtocolRoutePathsDiscoveryWebKeys)
+			entries[wicket.DiscoveryJwksUri] = joinUrl(wicket.ProtocolRoutePathsDiscoveryWebKeys)
 		}
 	}
 
 	// endpoints
 	if g.options.Discovery.ShowEndpoints {
 		if g.options.Endpoints.EnableAuthorizeEndpoint {
-			entries[gois.DiscoveryAuthorizationEndpoint] = joinUrl(gois.ProtocolRoutePathsAuthorize)
+			entries[wicket.DiscoveryAuthorizationEndpoint] = joinUrl(wicket.ProtocolRoutePathsAuthorize)
 		}
 
 		if g.options.Endpoints.EnableTokenEndpoint {
-			entries[gois.DiscoveryTokenEndpoint] = joinUrl(gois.ProtocolRoutePathsToken)
+			entries[wicket.DiscoveryTokenEndpoint] = joinUrl(wicket.ProtocolRoutePathsToken)
 		}
 
 		if g.options.Endpoints.EnableUserInfoEndpoint {
-			entries[gois.DiscoveryUserInfoEndpoint] = joinUrl(gois.ProtocolRoutePathsUserInfo)
+			entries[wicket.DiscoveryUserInfoEndpoint] = joinUrl(wicket.ProtocolRoutePathsUserInfo)
 		}
 
 		if g.options.Endpoints.EnableEndSessionEndpoint {
-			entries[gois.DiscoveryEndSessionEndpoint] = joinUrl(gois.ProtocolRoutePathsEndSession)
+			entries[wicket.DiscoveryEndSessionEndpoint] = joinUrl(wicket.ProtocolRoutePathsEndSession)
 		}
 
 		if g.options.Endpoints.EnableCheckSessionEndpoint {
-			entries[gois.DiscoveryCheckSessionIframe] = joinUrl(gois.ProtocolRoutePathsCheckSession)
+			entries[wicket.DiscoveryCheckSessionIframe] = joinUrl(wicket.ProtocolRoutePathsCheckSession)
 		}
 
 		if g.options.Endpoints.EnableTokenRevocationEndpoint {
-			entries[gois.DiscoveryRevocationEndpoint] = joinUrl(gois.ProtocolRoutePathsRevocation)
+			entries[wicket.DiscoveryRevocationEndpoint] = joinUrl(wicket.ProtocolRoutePathsRevocation)
 		}
 
 		if g.options.Endpoints.EnableIntrospectionEndpoint {
-			entries[gois.DiscoveryIntrospectionEndpoint] = joinUrl(gois.ProtocolRoutePathsIntrospection)
+			entries[wicket.DiscoveryIntrospectionEndpoint] = joinUrl(wicket.ProtocolRoutePathsIntrospection)
 		}
 
 		if g.options.Endpoints.EnableDeviceAuthorizationEndpoint {
-			entries[gois.DiscoveryDeviceAuthorizationEndpoint] = joinUrl(gois.ProtocolRoutePathsDeviceAuthorization)
+			entries[wicket.DiscoveryDeviceAuthorizationEndpoint] = joinUrl(wicket.ProtocolRoutePathsDeviceAuthorization)
 		}
 
 		if g.options.Endpoints.EnableBackchannelAuthenticationEndpoint {
-			entries[gois.DiscoveryBackchannelAuthenticationEndpoint] = joinUrl(gois.ProtocolRoutePathsBackchannelAuthentication)
+			entries[wicket.DiscoveryBackchannelAuthenticationEndpoint] = joinUrl(wicket.ProtocolRoutePathsBackchannelAuthentication)
 		}
 
 		if g.options.MutualTls.Enabled {
 			mtlsEndpoints := make(map[string]string, 0)
 
 			if g.options.Endpoints.EnableTokenEndpoint {
-				mtlsEndpoints[gois.DiscoveryTokenEndpoint] = g.constructMtlsEndpoint(baseUrl, issuerUri, gois.ProtocolRoutePathsToken)
+				mtlsEndpoints[wicket.DiscoveryTokenEndpoint] = g.constructMtlsEndpoint(baseUrl, issuerUri, wicket.ProtocolRoutePathsToken)
 			}
 			if g.options.Endpoints.EnableTokenRevocationEndpoint {
-				mtlsEndpoints[gois.DiscoveryRevocationEndpoint] = g.constructMtlsEndpoint(baseUrl, issuerUri, gois.ProtocolRoutePathsRevocation)
+				mtlsEndpoints[wicket.DiscoveryRevocationEndpoint] = g.constructMtlsEndpoint(baseUrl, issuerUri, wicket.ProtocolRoutePathsRevocation)
 			}
 			if g.options.Endpoints.EnableIntrospectionEndpoint {
-				mtlsEndpoints[gois.DiscoveryIntrospectionEndpoint] = g.constructMtlsEndpoint(baseUrl, issuerUri, gois.ProtocolRoutePathsIntrospection)
+				mtlsEndpoints[wicket.DiscoveryIntrospectionEndpoint] = g.constructMtlsEndpoint(baseUrl, issuerUri, wicket.ProtocolRoutePathsIntrospection)
 			}
 			if g.options.Endpoints.EnableDeviceAuthorizationEndpoint {
-				mtlsEndpoints[gois.DiscoveryDeviceAuthorizationEndpoint] = g.constructMtlsEndpoint(baseUrl, issuerUri, gois.ProtocolRoutePathsDeviceAuthorization)
+				mtlsEndpoints[wicket.DiscoveryDeviceAuthorizationEndpoint] = g.constructMtlsEndpoint(baseUrl, issuerUri, wicket.ProtocolRoutePathsDeviceAuthorization)
 			}
 
 			if len(mtlsEndpoints) > 0 {
-				entries[gois.DiscoveryMtlsEndpointAliases] = mtlsEndpoints
+				entries[wicket.DiscoveryMtlsEndpointAliases] = mtlsEndpoints
 			}
 
 		}
@@ -165,10 +165,10 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(ctx context.Context
 
 	// logout
 	if g.options.Endpoints.EnableEndSessionEndpoint {
-		entries[gois.DiscoveryFrontChannelLogoutSupported] = true
-		entries[gois.DiscoveryFrontChannelLogoutSessionSupported] = true
-		entries[gois.DiscoveryBackchannelLogoutSupported] = true
-		entries[gois.DiscoveryBackchannelLogoutSessionSupported] = true
+		entries[wicket.DiscoveryFrontChannelLogoutSupported] = true
+		entries[wicket.DiscoveryFrontChannelLogoutSessionSupported] = true
+		entries[wicket.DiscoveryBackchannelLogoutSupported] = true
+		entries[wicket.DiscoveryBackchannelLogoutSessionSupported] = true
 	}
 
 	// scopes and claims.
@@ -204,11 +204,11 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(ctx context.Context
 				})
 
 			scopes = append(scopes, apiScopes...)
-			scopes = append(scopes, gois.StandardScopesOfflineAccess)
+			scopes = append(scopes, wicket.StandardScopesOfflineAccess)
 		}
 
 		if len(scopes) > 0 {
-			entries[gois.DiscoveryScopesSupported] = scopes
+			entries[wicket.DiscoveryScopesSupported] = scopes
 		}
 
 		// claims.
@@ -237,58 +237,58 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(ctx context.Context
 					return x.UserClaims
 				})...)
 
-			entries[gois.DiscoveryClaimsSupported] = utils.Distinct(claims)
+			entries[wicket.DiscoveryClaimsSupported] = utils.Distinct(claims)
 		}
 	}
 
 	// grant types
 	if g.options.Discovery.ShowGrantTypes {
 		standardGrantTypes := []string{
-			gois.GrantTypeAuthorizationCode,
-			gois.GrantTypeClientCredentials,
-			gois.GrantTypeRefreshToken,
-			gois.GrantTypeImplicit,
+			wicket.GrantTypeAuthorizationCode,
+			wicket.GrantTypeClientCredentials,
+			wicket.GrantTypeRefreshToken,
+			wicket.GrantTypeImplicit,
 		}
 
 		if _, ok := g.resourceOwnerValidator.(*validators_impl.NotSupportedResourceOwnerPasswordValidator); !ok {
-			standardGrantTypes = append(standardGrantTypes, gois.GrantTypePassword)
+			standardGrantTypes = append(standardGrantTypes, wicket.GrantTypePassword)
 		}
 
 		if g.options.Endpoints.EnableDeviceAuthorizationEndpoint {
-			standardGrantTypes = append(standardGrantTypes, gois.GrantTypeDeviceCode)
+			standardGrantTypes = append(standardGrantTypes, wicket.GrantTypeDeviceCode)
 		}
 
 		if g.options.Endpoints.EnableBackchannelAuthenticationEndpoint {
-			standardGrantTypes = append(standardGrantTypes, gois.GrantTypeBackchannelAuthentication)
+			standardGrantTypes = append(standardGrantTypes, wicket.GrantTypeBackchannelAuthentication)
 		}
 
 		if g.options.Discovery.ShowExtensionGrantTypes {
 			standardGrantTypes = append(standardGrantTypes, g.extensionGrants.GetAvailableGrantTypes()...)
 		}
 
-		entries[gois.DiscoveryGrantTypesSupported] = standardGrantTypes
+		entries[wicket.DiscoveryGrantTypesSupported] = standardGrantTypes
 
 	}
 
 	// response types
 	if g.options.Discovery.ShowResponseTypes {
-		entries[gois.DiscoveryResponseTypesSupported] = gois.SupportedResponseTypes
+		entries[wicket.DiscoveryResponseTypesSupported] = wicket.SupportedResponseTypes
 	}
 
 	// response modes
 	if g.options.Discovery.ShowResponseModes {
-		entries[gois.DiscoveryResponseModesSupported] = gois.SupportedResponseModes
+		entries[wicket.DiscoveryResponseModesSupported] = wicket.SupportedResponseModes
 	}
 
 	// misc
 	if g.options.Discovery.ShowTokenEndpointAuthenticationMethods {
 		types := g.secretParsers.GetAvailableAuthenticationMethods()
 		if g.options.MutualTls.Enabled {
-			types = append(types, gois.EndpointAuthenticationMethodsTlsClientAuth)
-			types = append(types, gois.EndpointAuthenticationMethodsSelfSignedTlsClientAuth)
+			types = append(types, wicket.EndpointAuthenticationMethodsTlsClientAuth)
+			types = append(types, wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth)
 		}
 
-		entries[gois.DiscoveryTokenEndpointAuthenticationMethodsSupported] = types
+		entries[wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported] = types
 	}
 
 	signingCredentials, err := g.keys.GetAllSigningCredentials(ctx)
@@ -301,45 +301,45 @@ func (g *DiscoveryResponseGenerator) CreateDiscoveryDocument(ctx context.Context
 			utils.Select(signingCredentials, func(x *tokens.SigningCredentials) string {
 				return x.Algorithm
 			}))
-		entries[gois.DiscoveryIdTokenSigningAlgorithmsSupported] = signingAlgorithms
+		entries[wicket.DiscoveryIdTokenSigningAlgorithmsSupported] = signingAlgorithms
 	}
 
-	entries[gois.DiscoverySubjectTypesSupported] = []string{"public"}
-	entries[gois.DiscoveryCodeChallengeMethodsSupported] = []string{gois.CodeChallengeMethodsPlain, gois.CodeChallengeMethodsSha256}
+	entries[wicket.DiscoverySubjectTypesSupported] = []string{"public"}
+	entries[wicket.DiscoveryCodeChallengeMethodsSupported] = []string{wicket.CodeChallengeMethodsPlain, wicket.CodeChallengeMethodsSha256}
 
 	if g.options.Endpoints.EnableAuthorizeEndpoint {
-		entries[gois.DiscoveryRequestParameterSupported] = true
+		entries[wicket.DiscoveryRequestParameterSupported] = true
 
-		entries[gois.DiscoveryRequestObjectSigningAlgorithmsSupported] = []string{
-			gois.SecurityAlgorithmsRsaSha256,
-			gois.SecurityAlgorithmsRsaSha384,
-			gois.SecurityAlgorithmsRsaSha512,
-			gois.SecurityAlgorithmsRsaSsaPssSha256,
-			gois.SecurityAlgorithmsRsaSsaPssSha384,
-			gois.SecurityAlgorithmsRsaSsaPssSha512,
-			gois.SecurityAlgorithmsEcdsaSha256,
-			gois.SecurityAlgorithmsEcdsaSha384,
-			gois.SecurityAlgorithmsEcdsaSha512,
-			gois.SecurityAlgorithmsHmacSha256,
-			gois.SecurityAlgorithmsHmacSha384,
-			gois.SecurityAlgorithmsHmacSha512,
+		entries[wicket.DiscoveryRequestObjectSigningAlgorithmsSupported] = []string{
+			wicket.SecurityAlgorithmsRsaSha256,
+			wicket.SecurityAlgorithmsRsaSha384,
+			wicket.SecurityAlgorithmsRsaSha512,
+			wicket.SecurityAlgorithmsRsaSsaPssSha256,
+			wicket.SecurityAlgorithmsRsaSsaPssSha384,
+			wicket.SecurityAlgorithmsRsaSsaPssSha512,
+			wicket.SecurityAlgorithmsEcdsaSha256,
+			wicket.SecurityAlgorithmsEcdsaSha384,
+			wicket.SecurityAlgorithmsEcdsaSha512,
+			wicket.SecurityAlgorithmsHmacSha256,
+			wicket.SecurityAlgorithmsHmacSha384,
+			wicket.SecurityAlgorithmsHmacSha512,
 		}
 
 		if g.options.Endpoints.EnableJwtRequestUri {
-			entries[gois.DiscoveryRequestUriParameterSupported] = true
+			entries[wicket.DiscoveryRequestUriParameterSupported] = true
 		}
 	}
 
-	entries[gois.DiscoveryAuthorizationResponseIssParameterSupported] = true
+	entries[wicket.DiscoveryAuthorizationResponseIssParameterSupported] = true
 
 	if g.options.MutualTls.Enabled {
-		entries[gois.DiscoveryTlsClientCertificateBoundAccessTokens] = true
+		entries[wicket.DiscoveryTlsClientCertificateBoundAccessTokens] = true
 	}
 
 	if g.options.Endpoints.EnableBackchannelAuthenticationEndpoint {
-		entries[gois.DiscoveryBackchannelTokenDeliveryModesSupported] =
+		entries[wicket.DiscoveryBackchannelTokenDeliveryModesSupported] =
 			g.options.BackchannelAuthentication.AllowedDeliveryModes
-		entries[gois.DiscoveryBackchannelUserCodeParameterSupported] = g.options.BackchannelAuthentication.UserCodeParameterSupported
+		entries[wicket.DiscoveryBackchannelUserCodeParameterSupported] = g.options.BackchannelAuthentication.UserCodeParameterSupported
 	}
 
 	// custom entries

@@ -29,7 +29,7 @@ type Token struct {
 	Lifetime        int
 	Type            string
 	ClientId        string
-	AccessTokenType gois.AccessTokenType
+	AccessTokenType wicket.AccessTokenType
 
 	// Description Gets the description the user assigned to the device being authorized.
 	Description string
@@ -45,7 +45,7 @@ type Token struct {
 func (t *Token) SubjectId() string {
 	return utils.SingleOrDefault(
 		utils.Select(
-			utils.Where(t.Claims, func(x *claims.Claim) bool { return x.Type == gois.JwtClaimTypesSubject }),
+			utils.Where(t.Claims, func(x *claims.Claim) bool { return x.Type == wicket.JwtClaimTypesSubject }),
 			func(y *claims.Claim) string {
 				if v, ok := y.Value.(string); ok {
 					return v
@@ -61,7 +61,7 @@ func (t *Token) SubjectId() string {
 func (t *Token) SessionId() string {
 	return utils.SingleOrDefault(
 		utils.Select(
-			utils.Where(t.Claims, func(x *claims.Claim) bool { return x.Type == gois.JwtClaimTypesSessionId }),
+			utils.Where(t.Claims, func(x *claims.Claim) bool { return x.Type == wicket.JwtClaimTypesSessionId }),
 			func(y *claims.Claim) string {
 				if v, ok := y.Value.(string); ok {
 					return v
@@ -76,7 +76,7 @@ func (t *Token) SessionId() string {
 // Scopes Gets the scopes.
 func (t *Token) Scopes() []string {
 	return utils.Select(
-		utils.Where(t.Claims, func(x *claims.Claim) bool { return x.Type == gois.JwtClaimTypesScope }),
+		utils.Where(t.Claims, func(x *claims.Claim) bool { return x.Type == wicket.JwtClaimTypesScope }),
 		func(y *claims.Claim) string {
 			if v, ok := y.Value.(string); ok {
 				return v

@@ -32,20 +32,20 @@ func NewTestResourceOwnerPasswordValidator(err error, desc string) *TestResource
 func (v *TestResourceOwnerPasswordValidator) Validate(ctx *validators_contexts.ResourceOwnerPasswordValidationContext) error {
 	if v.sendError {
 		ctx.Result = validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultError(gois.TokenRequestErrorsInvalidGrant, v.desc),
+			validators_models.WithGrantValidationResultError(wicket.TokenRequestErrorsInvalidGrant, v.desc),
 		)
 		return nil
 	}
 
 	if ctx.UserName == ctx.Password {
 		ctx.Result = validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultSubject(ctx.UserName, "password", time.Now(), nil, gois.LocalIdentityProvider, nil),
+			validators_models.WithGrantValidationResultSubject(ctx.UserName, "password", time.Now(), nil, wicket.LocalIdentityProvider, nil),
 		)
 	}
 
 	if ctx.UserName == "bob_no_password" && ctx.Password == "" {
 		ctx.Result = validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultSubject(ctx.UserName, "password", time.Now(), nil, gois.LocalIdentityProvider, nil),
+			validators_models.WithGrantValidationResultSubject(ctx.UserName, "password", time.Now(), nil, wicket.LocalIdentityProvider, nil),
 		)
 	}
 

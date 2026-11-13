@@ -31,12 +31,12 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"codeclient.pkce", "codeclient"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
-				values.Add(gois.AuthorizeRequestCodeChallengeMethod, gois.CodeChallengeMethodsPlain)
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
+				values.Add(wicket.AuthorizeRequestCodeChallengeMethod, wicket.CodeChallengeMethodsPlain)
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
@@ -50,12 +50,12 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"codeclient.pkce", "codeclient"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
-				values.Add(gois.AuthorizeRequestCodeChallengeMethod, gois.CodeChallengeMethodsSha256)
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
+				values.Add(wicket.AuthorizeRequestCodeChallengeMethod, wicket.CodeChallengeMethodsSha256)
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
@@ -68,11 +68,11 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"codeclient.pkce.plain", "codeclient.plain"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
@@ -85,11 +85,11 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"codeclient.pkce", "codeclient"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
@@ -103,16 +103,16 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"codeclient.pkce"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
 			expected: func(r *require.Assertions, result *validators_models.AuthorizeRequestValidationResult) {
 				r.Error(result.Error)
-				r.ErrorIs(gois.AuthorizeErrorsInvalidRequest, result.Error)
+				r.ErrorIs(wicket.AuthorizeErrorsInvalidRequest, result.Error)
 				r.Equal("code challenge required", result.Description)
 			},
 		},
@@ -121,16 +121,16 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"hybridclient.pkce"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
 			expected: func(r *require.Assertions, result *validators_models.AuthorizeRequestValidationResult) {
 				r.Error(result.Error)
-				r.ErrorIs(gois.AuthorizeErrorsInvalidRequest, result.Error)
+				r.ErrorIs(wicket.AuthorizeErrorsInvalidRequest, result.Error)
 				r.Equal("code challenge required", result.Description)
 			},
 		},
@@ -139,18 +139,18 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"codeclient.pkce", "codeclient.pkce.plain", "codeclient", "codeclient.plain"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
-				values.Add(gois.AuthorizeRequestCodeChallengeMethod, "invalid")
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength))
+				values.Add(wicket.AuthorizeRequestCodeChallengeMethod, "invalid")
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
 			expected: func(r *require.Assertions, result *validators_models.AuthorizeRequestValidationResult) {
 				r.Error(result.Error)
-				r.ErrorIs(gois.AuthorizeErrorsInvalidRequest, result.Error)
+				r.ErrorIs(wicket.AuthorizeErrorsInvalidRequest, result.Error)
 				r.Equal("Transform algorithm not supported", result.Description)
 			},
 		},
@@ -159,18 +159,18 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"codeclient.pkce", "codeclient.pkce.plain", "codeclient", "codeclient.plain"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength-1))
-				values.Add(gois.AuthorizeRequestCodeChallengeMethod, gois.CodeChallengeMethodsPlain)
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMinLength-1))
+				values.Add(wicket.AuthorizeRequestCodeChallengeMethod, wicket.CodeChallengeMethodsPlain)
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
 			expected: func(r *require.Assertions, result *validators_models.AuthorizeRequestValidationResult) {
 				r.Error(result.Error)
-				r.ErrorIs(gois.AuthorizeErrorsInvalidRequest, result.Error)
+				r.ErrorIs(wicket.AuthorizeErrorsInvalidRequest, result.Error)
 			},
 		},
 		{
@@ -178,18 +178,18 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 			clientIds: []string{"codeclient.pkce", "codeclient.pkce.plain", "codeclient", "codeclient.plain"},
 			parameters: func(clientid string) url.Values {
 				values := url.Values{}
-				values.Add(gois.AuthorizeRequestClientId, clientid)
-				values.Add(gois.AuthorizeRequestScope, "openid")
-				values.Add(gois.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMaxLength+1))
-				values.Add(gois.AuthorizeRequestCodeChallengeMethod, gois.CodeChallengeMethodsPlain)
-				values.Add(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-				values.Add(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+				values.Add(wicket.AuthorizeRequestClientId, clientid)
+				values.Add(wicket.AuthorizeRequestScope, "openid")
+				values.Add(wicket.AuthorizeRequestCodeChallenge, strings.Repeat("x", lengths.CodeChallengeMaxLength+1))
+				values.Add(wicket.AuthorizeRequestCodeChallengeMethod, wicket.CodeChallengeMethodsPlain)
+				values.Add(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+				values.Add(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 				return values
 			},
 			expected: func(r *require.Assertions, result *validators_models.AuthorizeRequestValidationResult) {
 				r.Error(result.Error)
-				r.ErrorIs(gois.AuthorizeErrorsInvalidRequest, result.Error)
+				r.ErrorIs(wicket.AuthorizeErrorsInvalidRequest, result.Error)
 			},
 		},
 	}

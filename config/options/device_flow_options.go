@@ -19,7 +19,7 @@ type DeviceFlowOptions struct {
 
 func NewDeviceFlowOptions() *DeviceFlowOptions {
 	return &DeviceFlowOptions{
-		DefaultUserCodeType: gois.UserCodeTypesNumeric,
+		DefaultUserCodeType: wicket.UserCodeTypesNumeric,
 		Interval:            5,
 	}
 }

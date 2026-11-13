@@ -66,7 +66,7 @@ func TestCheckSessionResultform_post_mode_should_add_unsafe_inline_for_csp_level
 
 	test := newCheckSessionResultTests()
 
-	test.options.Csp.Level = gois.CspLevelOne
+	test.options.Csp.Level = wicket.CspLevelOne
 
 	_ = test.subject.Execute(test.writer, test.httpRequest)
 

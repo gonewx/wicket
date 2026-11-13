@@ -4,11 +4,11 @@
 
 package facebook
 
-import gois "github.com/gonewx/wicket"
+import "github.com/gonewx/wicket"
 
 const (
 	// The default value used for Options.AuthenticationScheme
-	AuthenticationScheme = gois.FacebookAuthenticationScheme
+	AuthenticationScheme = wicket.FacebookAuthenticationScheme
 
 	// The default display name for Facebook authentication.
 	DisplayName = "Facebook"

@@ -48,7 +48,7 @@ func (v *TokenRevocationRequestValidator) ValidateRequest(ctx context.Context, p
 	token := parameters.Get("token")
 	if strings.TrimSpace(token) == "" {
 		v.logger.Error("No token found in request")
-		result.Error = gois.TokenErrorsInvalidRequest
+		result.Error = wicket.TokenErrorsInvalidRequest
 		return result, nil
 	}
 
@@ -58,12 +58,12 @@ func (v *TokenRevocationRequestValidator) ValidateRequest(ctx context.Context, p
 	// check token type hint
 	hint := parameters.Get("token_type_hint")
 	if strings.TrimSpace(hint) != "" {
-		if utils.Contains(gois.SupportedTokenTypeHints, hint) {
+		if utils.Contains(wicket.SupportedTokenTypeHints, hint) {
 			v.logger.Debug("Token type hint found in request", slog.String("tokenTypeHint", hint))
 			result.TokenTypeHint = hint
 		} else {
 			v.logger.Error("Invalid token type hint", slog.String("tokenTypeHint", hint))
-			result.Error = gois.RevocationErrorsUnsupportedTokenType
+			result.Error = wicket.RevocationErrorsUnsupportedTokenType
 		}
 	}
 

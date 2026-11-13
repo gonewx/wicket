@@ -37,7 +37,7 @@ func newTokenRevocationRequestValidatorTest() *tokenRevocationRequestValidatorTe
 
 	ti.client.ClientSecrets = []*storage_models.Secret{secret}
 
-	if err := ti.client.SetAllowedGrantTypes(gois.GrantTypesCode); err != nil {
+	if err := ti.client.SetAllowedGrantTypes(wicket.GrantTypesCode); err != nil {
 		panic(err)
 	}
 
@@ -77,7 +77,7 @@ func TestMissing_Token_Valid_Hint(t *testing.T) {
 
 	a.NoError(err)
 	a.Error(result.Error)
-	a.ErrorIs(result.Error, gois.TokenErrorsInvalidRequest)
+	a.ErrorIs(result.Error, wicket.TokenErrorsInvalidRequest)
 }
 
 func TestValid_Token_And_AccessTokenHint(t *testing.T) {
@@ -143,5 +143,5 @@ func TestValid_Token_And_Invalid_Hint(t *testing.T) {
 
 	a.NoError(err)
 	a.Error(result.Error)
-	a.ErrorIs(result.Error, gois.RevocationErrorsUnsupportedTokenType)
+	a.ErrorIs(result.Error, wicket.RevocationErrorsUnsupportedTokenType)
 }

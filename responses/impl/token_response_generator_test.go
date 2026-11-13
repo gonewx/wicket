@@ -67,7 +67,7 @@ func TestRefreshTokenReplayMapsToInvalidGrant(t *testing.T) {
 	client := storage_models.NewClient()
 	client.ClientId = "client"
 	client.RequireClientSecret = false
-	if err := client.SetAllowedGrantTypes([]string{gois.GrantTypeRefreshToken}); err != nil {
+	if err := client.SetAllowedGrantTypes([]string{wicket.GrantTypeRefreshToken}); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
 	clientStore, err := memory.NewMemoryClientStore([]*storage_models.Client{client})
@@ -80,8 +80,8 @@ func TestRefreshTokenReplayMapsToInvalidGrant(t *testing.T) {
 	refreshToken.Subject = claims.NewClaimsPrincipal(
 		claims.WithClaimsPrincipalIdentity(
 			claims.NewClaimsIdentity(
-				claims.WithAuthenticationType(gois.WicketAuthenticationType),
-				claims.WithClaims([]*claims.Claim{claims.NewClaim(claims.WithClaimType(gois.JwtClaimTypesSubject), claims.WithClaimValue("alice"))}),
+				claims.WithAuthenticationType(wicket.WicketAuthenticationType),
+				claims.WithClaims([]*claims.Claim{claims.NewClaim(claims.WithClaimType(wicket.JwtClaimTypesSubject), claims.WithClaimValue("alice"))}),
 			),
 		),
 	)
@@ -90,7 +90,7 @@ func TestRefreshTokenReplayMapsToInvalidGrant(t *testing.T) {
 
 	validated := validators_models.NewValidatedTokenRequest()
 	validated.SetClient(client, nil, "")
-	validated.GrantType = gois.GrantTypeRefreshToken
+	validated.GrantType = wicket.GrantTypeRefreshToken
 	validated.RefreshToken = refreshToken
 	validated.RefreshTokenHandle = "rotated-handle"
 	validated.ValidatedResources = validators_models.NewResourceValidationResult()
@@ -109,8 +109,8 @@ func TestRefreshTokenReplayMapsToInvalidGrant(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error, got response %+v", response)
 	}
-	if !errors.Is(err, gois.TokenErrorsInvalidGrant) {
-		t.Fatalf("error = %v, want wrapped gois.TokenErrorsInvalidGrant", err)
+	if !errors.Is(err, wicket.TokenErrorsInvalidGrant) {
+		t.Fatalf("error = %v, want wrapped wicket.TokenErrorsInvalidGrant", err)
 	}
 	if !errors.Is(err, storage.ErrVersionConflict) {
 		t.Fatalf("error = %v, want wrapped storage.ErrVersionConflict", err)

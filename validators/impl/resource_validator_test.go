@@ -98,8 +98,8 @@ func TestResourceValidatorTable(t *testing.T) {
 			wantInvalidScopes: []string{"orders.read"},
 		},
 		"offline access follows client allowance": {
-			clientScopes:     []string{"orders.read", gois.StandardScopesOfflineAccess},
-			scopes:           []string{"orders.read", gois.StandardScopesOfflineAccess},
+			clientScopes:     []string{"orders.read", wicket.StandardScopesOfflineAccess},
+			scopes:           []string{"orders.read", wicket.StandardScopesOfflineAccess},
 			resources:        []string{resourceOrders},
 			wantSucceeded:    true,
 			wantApiResources: []string{resourceOrders},
@@ -144,7 +144,7 @@ func newResourceValidatorClient(scopes []string) *storage_models.Client {
 	client := storage_models.NewClient()
 	client.ClientId = "client"
 	client.AllowedScopes = scopes
-	client.AllowOfflineAccess = containsString(scopes, gois.StandardScopesOfflineAccess)
+	client.AllowOfflineAccess = containsString(scopes, wicket.StandardScopesOfflineAccess)
 	return client
 }
 

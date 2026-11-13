@@ -18,7 +18,7 @@ type TokenErrorResponse struct {
 
 func NewTokenErrorResponse() *TokenErrorResponse {
 	return &TokenErrorResponse{
-		Error:  gois.TokenErrorsInvalidRequest,
+		Error:  wicket.TokenErrorsInvalidRequest,
 		Custom: make(map[string]any),
 	}
 }

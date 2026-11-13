@@ -34,60 +34,60 @@ func TestTokenRequestValidationPasswordInvalid(t *testing.T) {
 			scope:    "resource",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsUnauthorizedClient,
+			wantErr:  wicket.TokenErrorsUnauthorizedClient,
 		},
 		"unknown scope is rejected": {
 			clientId: "roclient",
 			scope:    "unknown",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"mix of known and unknown scopes is rejected": {
 			clientId: "roclient",
 			scope:    "resource unknown",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"restricted client requesting unpermitted scope is rejected": {
 			clientId: "roclient_restricted",
 			scope:    "resource2",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"restricted client mixing permitted and unpermitted scopes is rejected": {
 			clientId: "roclient_restricted",
 			scope:    "resource resource2",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"missing username and password is rejected": {
 			clientId: "roclient",
 			scope:    "resource",
-			wantErr:  gois.TokenErrorsInvalidGrant,
+			wantErr:  wicket.TokenErrorsInvalidGrant,
 		},
 		"password without username is rejected": {
 			clientId: "roclient",
 			scope:    "resource",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidGrant,
+			wantErr:  wicket.TokenErrorsInvalidGrant,
 		},
 		"wrong password is rejected with a generic description": {
 			clientId: "roclient",
 			scope:    "resource",
 			username: "bob",
 			password: "notbob",
-			wantErr:  gois.TokenErrorsInvalidGrant,
+			wantErr:  wicket.TokenErrorsInvalidGrant,
 			wantDesc: "invalid_username_or_password",
 		},
 		"user with a password sending no password is rejected": {
 			clientId: "roclient",
 			scope:    "resource",
 			username: "bob_with_password",
-			wantErr:  gois.TokenErrorsInvalidGrant,
+			wantErr:  wicket.TokenErrorsInvalidGrant,
 		},
 		"password grant without a configured credential validator is rejected": {
 			clientId: "roclient",
@@ -97,7 +97,7 @@ func TestTokenRequestValidationPasswordInvalid(t *testing.T) {
 			scope:    "resource",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsUnsupportedGrantType,
+			wantErr:  wicket.TokenErrorsUnsupportedGrantType,
 		},
 		"disabled user is rejected": {
 			clientId: "roclient",
@@ -105,7 +105,7 @@ func TestTokenRequestValidationPasswordInvalid(t *testing.T) {
 			scope:    "resource",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidGrant,
+			wantErr:  wicket.TokenErrorsInvalidGrant,
 		},
 		"credential validator error and description are passed through": {
 			clientId: "roclient",
@@ -115,7 +115,7 @@ func TestTokenRequestValidationPasswordInvalid(t *testing.T) {
 			scope:    "resource",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidGrant,
+			wantErr:  wicket.TokenErrorsInvalidGrant,
 			wantDesc: "custom error description",
 		},
 		"invalid scopes reported by resource validation surface as invalid_scope": {
@@ -125,7 +125,7 @@ func TestTokenRequestValidationPasswordInvalid(t *testing.T) {
 			resource: "urn:api1",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"invalid resources reported by resource validation surface as invalid_target": {
 			clientId: "roclient",
@@ -134,7 +134,7 @@ func TestTokenRequestValidationPasswordInvalid(t *testing.T) {
 			resource: "urn:api1",
 			username: "bob",
 			password: "bob",
-			wantErr:  gois.TokenErrorsInvalidTarget,
+			wantErr:  wicket.TokenErrorsInvalidTarget,
 		},
 	}
 
@@ -144,17 +144,17 @@ func TestTokenRequestValidationPasswordInvalid(t *testing.T) {
 
 			f := newTokenGrantFixture(t, tt.options...)
 			parameters := url.Values{
-				gois.TokenRequestGrantType: {gois.GrantTypePassword},
-				gois.TokenRequestScope:     {tt.scope},
+				wicket.TokenRequestGrantType: {wicket.GrantTypePassword},
+				wicket.TokenRequestScope:     {tt.scope},
 			}
 			if tt.username != "" {
-				parameters.Set(gois.TokenRequestUserName, tt.username)
+				parameters.Set(wicket.TokenRequestUserName, tt.username)
 			}
 			if tt.password != "" {
-				parameters.Set(gois.TokenRequestPassword, tt.password)
+				parameters.Set(wicket.TokenRequestPassword, tt.password)
 			}
 			if tt.resource != "" {
-				parameters.Set(gois.TokenRequestResource, tt.resource)
+				parameters.Set(wicket.TokenRequestResource, tt.resource)
 			}
 
 			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
@@ -212,12 +212,12 @@ func TestTokenRequestValidationPasswordValid(t *testing.T) {
 
 			f := newTokenGrantFixture(t)
 			parameters := url.Values{
-				gois.TokenRequestGrantType: {gois.GrantTypePassword},
-				gois.TokenRequestScope:     {tt.scope},
-				gois.TokenRequestUserName:  {tt.username},
+				wicket.TokenRequestGrantType: {wicket.GrantTypePassword},
+				wicket.TokenRequestScope:     {tt.scope},
+				wicket.TokenRequestUserName:  {tt.username},
 			}
 			if tt.password != "" {
-				parameters.Set(gois.TokenRequestPassword, tt.password)
+				parameters.Set(wicket.TokenRequestPassword, tt.password)
 			}
 
 			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))

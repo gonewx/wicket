@@ -57,15 +57,15 @@ func (s *LogoutNotificationService) GetFrontChannelLogoutNotificationsUrls(ctx c
 		q := url.Query()
 
 		// add session id if required
-		if client.ProtocolType == gois.ProtocolTypesOpenIdConnect {
+		if client.ProtocolType == wicket.ProtocolTypesOpenIdConnect {
 			if client.FrontChannelLogoutSessionRequired {
-				q.Set(gois.EndSessionRequestSid, notification.SessionId)
-				q.Set(gois.EndSessionRequestIssuer, s.issuerNameService.GetCurrent())
+				q.Set(wicket.EndSessionRequestSid, notification.SessionId)
+				q.Set(wicket.EndSessionRequestIssuer, s.issuerNameService.GetCurrent())
 				url.RawQuery = q.Encode()
 			}
 		} else {
-			if client.ProtocolType == gois.ProtocolTypesSaml2p {
-				q.Set(gois.ProtocolSignOutLogoutUriParameterName, gois.ProtocolSignOutLogoutUriParameterValue)
+			if client.ProtocolType == wicket.ProtocolTypesSaml2p {
+				q.Set(wicket.ProtocolSignOutLogoutUriParameterName, wicket.ProtocolSignOutLogoutUriParameterValue)
 				url.RawQuery = q.Encode()
 			}
 		}

@@ -38,7 +38,7 @@ func newTokenPipeline() *integration_common.WicketPipeline {
 	secret.Value = utils.Sha256(client_secret)
 	client1.ClientSecrets = []*storage_models.Secret{secret}
 
-	_ = client1.SetAllowedGrantTypes([]string{gois.GrantTypeClientCredentials, gois.GrantTypePassword})
+	_ = client1.SetAllowedGrantTypes([]string{wicket.GrantTypeClientCredentials, wicket.GrantTypePassword})
 
 	client1.AllowedScopes = []string{"api"}
 

@@ -62,24 +62,24 @@ func newRequestObjectFixture(t *testing.T) *requestObjectFixture {
 	client.RedirectUris = []string{"https://client/callback"}
 
 	secretCert := storage_models.NewSecret()
-	secretCert.Type = gois.SecretTypesX509CertificateBase64
+	secretCert.Type = wicket.SecretTypesX509CertificateBase64
 	secretCert.Value = base64.StdEncoding.EncodeToString(certKeyDer)
 
 	secretSymmetric := storage_models.NewSecret()
-	secretSymmetric.Type = gois.SecretTypesJsonWebKey
+	secretSymmetric.Type = wicket.SecretTypesJsonWebKey
 	secretSymmetric.Value = requestObjectSymmetricJwk
 
 	secretRsa := storage_models.NewSecret()
-	secretRsa.Type = gois.SecretTypesJsonWebKey
+	secretRsa.Type = wicket.SecretTypesJsonWebKey
 	secretRsa.Value = string(rsaJwkJson)
 
 	secretCertJwk := storage_models.NewSecret()
-	secretCertJwk.Type = gois.SecretTypesJsonWebKey
+	secretCertJwk.Type = wicket.SecretTypesJsonWebKey
 	secretCertJwk.Value = string(certJwkJson)
 
 	client.ClientSecrets = []*storage_models.Secret{secretCert, secretSymmetric, secretRsa, secretCertJwk}
 
-	require.NoError(t, client.SetAllowedGrantTypes(gois.GrantTypesImplicit))
+	require.NoError(t, client.SetAllowedGrantTypes(wicket.GrantTypesImplicit))
 	client.AllowedScopes = []string{"openid", "profile", "api1", "api2"}
 
 	pipeline.Clients = []*storage_models.Client{client}

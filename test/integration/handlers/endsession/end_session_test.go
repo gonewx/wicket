@@ -29,7 +29,7 @@ import (
 func implicitClient(id string) *storage_models.Client {
 	client := storage_models.NewClient()
 	client.ClientId = id
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesImplicit); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesImplicit); err != nil {
 		panic(err)
 	}
 	client.RequireConsent = false
@@ -73,7 +73,7 @@ func newEndSessionPipeline() *integration_common.WicketPipeline {
 	// Host wiring the cookie-options post-configuration would normally apply:
 	// the logout page path defaults to the host logout route, and server-side
 	// sessions are on so the sign-out iframe carries a session id.
-	pipeline.Options.UserInteraction.LogoutUrl = gois.UIConstantsDefaultRoutePathsLogout
+	pipeline.Options.UserInteraction.LogoutUrl = wicket.UIConstantsDefaultRoutePathsLogout
 	pipeline.Options.ServerSideSessions.Enabled = true
 	// The httptest server speaks plain HTTP, so the session cookie must not be
 	// marked Secure or the client jar will never send it back.
@@ -379,7 +379,7 @@ func TestSignoutCallbackUsesCleanupParameterForNonOidcClient(t *testing.T) {
 	// The non-OIDC protocol type exercises the cleanup-parameter branch.
 	for _, client := range pipeline.Clients {
 		if client.ClientId == "client4" {
-			client.ProtocolType = gois.ProtocolTypesSaml2p
+			client.ProtocolType = wicket.ProtocolTypesSaml2p
 		}
 	}
 

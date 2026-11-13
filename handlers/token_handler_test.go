@@ -43,8 +43,8 @@ func (g *fakeTokenResponseGenerator) Handle(ctx context.Context, result *validat
 }
 
 func newTokenForm() *http.Request {
-	body := url.Values{gois.TokenRequestGrantType: {gois.GrantTypeClientCredentials}}.Encode()
-	req := httptest.NewRequest(http.MethodPost, "https://wicket.test"+gois.ProtocolRoutePathsToken, strings.NewReader(body))
+	body := url.Values{wicket.TokenRequestGrantType: {wicket.GrantTypeClientCredentials}}.Encode()
+	req := httptest.NewRequest(http.MethodPost, "https://wicket.test"+wicket.ProtocolRoutePathsToken, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
 }
@@ -69,27 +69,27 @@ func TestTokenHandlerProcessDispatch(t *testing.T) {
 			request: newTokenForm,
 			clientResult: func() *validators_models.ClientSecretValidationResult {
 				result := validators_models.NewClientSecretValidationResult()
-				result.Error = gois.TokenErrorsInvalidClient
+				result.Error = wicket.TokenErrorsInvalidClient
 				return result
 			}(),
 			wantStatus: http.StatusBadRequest,
-			wantError:  gois.TokenErrorsInvalidClient.Error(),
+			wantError:  wicket.TokenErrorsInvalidClient.Error(),
 		},
 		"nil client result returns invalid_client": {
 			request:      newTokenForm,
 			clientResult: nil,
 			wantStatus:   http.StatusBadRequest,
-			wantError:    gois.TokenErrorsInvalidClient.Error(),
+			wantError:    wicket.TokenErrorsInvalidClient.Error(),
 		},
 		"request validation error returns its standard error": {
 			request:      newTokenForm,
 			clientResult: successClientResult(),
 			requestResult: validators_models.NewTokenRequestValidationResult(
 				validators_models.NewValidatedTokenRequest(),
-				validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsInvalidGrant),
+				validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsInvalidGrant),
 			),
 			wantStatus: http.StatusBadRequest,
-			wantError:  gois.TokenErrorsInvalidGrant.Error(),
+			wantError:  wicket.TokenErrorsInvalidGrant.Error(),
 		},
 		"successful issuance returns bearer token response": {
 			request:       newTokenForm,
@@ -104,13 +104,13 @@ func TestTokenHandlerProcessDispatch(t *testing.T) {
 		},
 		"control byte in form payload returns invalid_request": {
 			request: func() *http.Request {
-				req := httptest.NewRequest(http.MethodPost, "https://wicket.test"+gois.ProtocolRoutePathsToken, strings.NewReader("grant_type=client_credentials&scope=%00"))
+				req := httptest.NewRequest(http.MethodPost, "https://wicket.test"+wicket.ProtocolRoutePathsToken, strings.NewReader("grant_type=client_credentials&scope=%00"))
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 				return req
 			},
 			clientResult: successClientResult(),
 			wantStatus:   http.StatusBadRequest,
-			wantError:    gois.TokenErrorsInvalidRequest.Error(),
+			wantError:    wicket.TokenErrorsInvalidRequest.Error(),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

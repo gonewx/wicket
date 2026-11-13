@@ -81,7 +81,7 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 
 	if strings.Contains(token, ".") {
 		if len(token) > v.options.InputLengthRestrictions.Jwt {
-			result.Error = gois.ProtectedResourceErrorsInvalidToken
+			result.Error = wicket.ProtectedResourceErrorsInvalidToken
 			result.Description = "Token too long"
 			return result, nil
 		}
@@ -97,7 +97,7 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 		if len(token) > v.options.InputLengthRestrictions.TokenHandle {
 			v.logger.Error("token handle too long")
 
-			result.Error = gois.ProtectedResourceErrorsInvalidToken
+			result.Error = wicket.ProtectedResourceErrorsInvalidToken
 			result.Description = "Token handle too long"
 			return result, nil
 		}
@@ -111,21 +111,21 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 
 	// make sure client is still active (if client_id claim is present)
 	clientClaim := utils.FirstOrDefaultPred(result.Claims, func(c *claimspkg.Claim) bool {
-		return c.Type == gois.JwtClaimTypesClientId
+		return c.Type == wicket.JwtClaimTypesClientId
 	})
 
 	if clientClaim != nil {
 		client, err := extensions.FindEnabledClientById(ctx, v.clients, clientClaim.Value.(string))
 		if err != nil || client == nil {
 			v.logger.Error("Client deleted or disabled", slog.String("clientId", clientClaim.Value.(string)))
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 		}
 
 	}
 
 	// make sure user is still active (if sub claim is present)
 	subClaim := utils.FirstOrDefaultPred(result.Claims, func(c *claimspkg.Claim) bool {
-		return c.Type == gois.JwtClaimTypesSubject
+		return c.Type == wicket.JwtClaimTypesSubject
 	})
 
 	if subClaim != nil {
@@ -141,22 +141,22 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 		if result.ReferenceTokenId != "" && len(principal.Identities) > 0 {
 			principal.Identities[0].AddClaim(
 				claims.NewClaim(
-					claims.WithClaimType(gois.JwtClaimTypesReferenceTokenId),
+					claims.WithClaimType(wicket.JwtClaimTypesReferenceTokenId),
 					claims.WithClaimValue(result.ReferenceTokenId),
 				),
 			)
 		}
 
-		isActiveCtx := contexts.NewIsActiveContext(principal, result.Client, gois.ProfileIsActiveCallersAccessTokenValidation)
+		isActiveCtx := contexts.NewIsActiveContext(principal, result.Client, wicket.ProfileIsActiveCallersAccessTokenValidation)
 		v.profile.IsActive(isActiveCtx)
 
 		if !isActiveCtx.IsActive {
 			v.logger.Error("User marked as not active", slog.String("subjectId", subClaim.Value.(string)))
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 		}
 
 		sub := subClaim.Value.(string)
-		sid := principal.FindFirst(gois.JwtClaimTypesSessionId)
+		sid := principal.FindFirst(wicket.JwtClaimTypesSessionId)
 		if sid != nil {
 			subjectId, ok := sid.Value.(string)
 			if !ok {
@@ -176,7 +176,7 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 			}
 			if !sessionResult {
 				v.logger.Error("Server-side session invalid for subject Id and session Id.", slog.String("subjectId", sub), slog.String("sessionId", subjectId))
-				return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
+				return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 			}
 		}
 	}
@@ -184,11 +184,11 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 	// check expected scope(s)
 	if expectedScope != "" {
 		scope := utils.FirstOrDefaultPred(result.Claims, func(c *claimspkg.Claim) bool {
-			return c.Type == gois.JwtClaimTypesScope && c.Value == expectedScope
+			return c.Type == wicket.JwtClaimTypesScope && c.Value == expectedScope
 		})
 		if scope == nil {
 			v.logger.Error("Checking for expected scopefailed", slog.String("expectedScope", expectedScope))
-			return v.invalid(gois.ProtectedResourceErrorsInsufficientScope), nil
+			return v.invalid(wicket.ProtectedResourceErrorsInsufficientScope), nil
 		}
 	}
 
@@ -211,7 +211,7 @@ func (v *TokenValidator) ValidateIdentityToken(ctx context.Context, token string
 
 	if len(token) > v.options.InputLengthRestrictions.Jwt {
 		v.logger.Error("JWT too long")
-		return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
+		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 	}
 
 	if clientId == "" {
@@ -219,14 +219,14 @@ func (v *TokenValidator) ValidateIdentityToken(ctx context.Context, token string
 		clientId, err = v.getClientIdFromJwt(token)
 		if err != nil || clientId == "" {
 			v.logger.Error("No clientId supplied, can't find id in identity token.")
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 		}
 	}
 
 	client, err := extensions.FindEnabledClientById(ctx, v.clients, clientId)
 	if err != nil || client == nil {
 		v.logger.Error("Unknown or disabled client", slog.String("clientId", clientId))
-		return v.invalid(gois.ProtectedResourceErrorsInvalidToken), nil
+		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 	}
 
 	v.logger.Debug("Client found", slog.String("clientId", clientId), slog.String("clientName", client.ClientName))
@@ -315,10 +315,10 @@ func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, vali
 	if err != nil {
 		if errors.Is(err, jwt.TokenExpiredError()) {
 			v.logger.Error("JWT token validation expired error", slog.String("error", err.Error()))
-			return v.invalid(gois.ProtectedResourceErrorsExpiredToken)
+			return v.invalid(wicket.ProtectedResourceErrorsExpiredToken)
 		} else {
 			v.logger.Error("JWT token validation error", slog.String("error", err.Error()))
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
 		}
 	}
 
@@ -330,17 +330,17 @@ func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, vali
 	// load the client that belongs to the client_id claim
 	var client *storage_models.Client
 	var clientId any
-	if err := token.Get(gois.JwtClaimTypesClientId, &clientId); err == nil {
+	if err := token.Get(wicket.JwtClaimTypesClientId, &clientId); err == nil {
 		cid, ok := clientId.(string)
 		if !ok || cid == "" {
 			v.logger.Error("No client id in token")
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
 		}
 
 		client, err = extensions.FindEnabledClientById(ctx, v.clients, cid)
 		if err != nil || client == nil {
 			v.logger.Error("Client deleted or disabled", slog.String("clientId", cid))
-			return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
 		}
 	}
 
@@ -355,7 +355,7 @@ func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, vali
 		if err := token.Get(k, &value); err != nil {
 			continue
 		}
-		if k == gois.JwtClaimTypesScope {
+		if k == wicket.JwtClaimTypesScope {
 			// check the scope format (array vs space delimited string)
 			scopes, err := parseScopes(value)
 			if err != nil {
@@ -449,12 +449,12 @@ func (v *TokenValidator) validateReferenceAccessToken(ctx context.Context, token
 	token, err := v.referenceTokenStore.GetReferenceToken(ctx, tokenHandle)
 	if err != nil || token == nil {
 		v.logger.Error("Invalid reference token")
-		return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
 	}
 
 	if v.clock.Now().After(token.CreationTime.Add(time.Duration(token.Lifetime) * time.Second)) {
 		v.logger.Error("Reference token expired")
-		return v.invalid(gois.ProtectedResourceErrorsExpiredToken)
+		return v.invalid(wicket.ProtectedResourceErrorsExpiredToken)
 	}
 
 	// load the client that is defined in the token
@@ -465,7 +465,7 @@ func (v *TokenValidator) validateReferenceAccessToken(ctx context.Context, token
 
 	if err != nil || client == nil {
 		v.logger.Error("lient deleted or disabled", slog.String("clientId", token.ClientId))
-		return v.invalid(gois.ProtectedResourceErrorsInvalidToken)
+		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
 	}
 
 	result := validators_models.NewTokenValidationResult()
@@ -478,28 +478,28 @@ func (v *TokenValidator) validateReferenceAccessToken(ctx context.Context, token
 func (v *TokenValidator) referenceTokenToClaims(token *storage_models.Token) []*claimspkg.Claim {
 	claims := make([]*claimspkg.Claim, 0)
 	claims = append(claims, &claimspkg.Claim{
-		Type:  gois.JwtClaimTypesIssuer,
+		Type:  wicket.JwtClaimTypesIssuer,
 		Value: token.Issuer,
 	})
 
 	claims = append(claims, &claimspkg.Claim{
-		Type:  gois.JwtClaimTypesNotBefore,
+		Type:  wicket.JwtClaimTypesNotBefore,
 		Value: token.CreationTime.Unix(),
 	})
 
 	claims = append(claims, &claimspkg.Claim{
-		Type:  gois.JwtClaimTypesIssuedAt,
+		Type:  wicket.JwtClaimTypesIssuedAt,
 		Value: token.CreationTime.Unix(),
 	})
 
 	claims = append(claims, &claimspkg.Claim{
-		Type:  gois.JwtClaimTypesExpiration,
+		Type:  wicket.JwtClaimTypesExpiration,
 		Value: token.CreationTime.Add(time.Duration(token.Lifetime) * time.Second).Unix(),
 	})
 
 	for _, aud := range token.Audiences {
 		claims = append(claims, &claimspkg.Claim{
-			Type:  gois.JwtClaimTypesAudience,
+			Type:  wicket.JwtClaimTypesAudience,
 			Value: aud,
 		})
 	}

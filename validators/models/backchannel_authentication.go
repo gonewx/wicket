@@ -52,4 +52,4 @@ func NewBackchannelAuthenticationRequestIdValidationSuccess(request *ValidatedTo
 	return NewTokenRequestValidationResult(request)
 }
 
-var _ = gois.TokenErrorsInvalidGrant
+var _ = wicket.TokenErrorsInvalidGrant

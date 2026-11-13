@@ -29,10 +29,10 @@ func (o *ConfigureInternalCookieOptions) Configure(options *authcookies.Authenti
 }
 
 func (o *ConfigureInternalCookieOptions) ConfigureWithName(name string, options *authcookies.AuthenticationOptions) error {
-	if name == gois.DefaultCookieAuthenticationScheme {
+	if name == wicket.DefaultCookieAuthenticationScheme {
 		options.SlidingExpiration = o.wicket.Authentication.CookieSlidingExpiration
 		options.ExpireTimeSpan = o.wicket.Authentication.CookieLifetime
-		options.Cookie().SetName(gois.DefaultCookieAuthenticationScheme)
+		options.Cookie().SetName(wicket.DefaultCookieAuthenticationScheme)
 		options.Cookie().SetIsEssential(true)
 		options.Cookie().SetSameSite(o.wicket.Authentication.CookieSameSiteMode)
 
@@ -43,8 +43,8 @@ func (o *ConfigureInternalCookieOptions) ConfigureWithName(name string, options 
 		}
 	}
 
-	if name == gois.ExternalCookieAuthenticationScheme {
-		options.Cookie().SetName(gois.ExternalCookieAuthenticationScheme)
+	if name == wicket.ExternalCookieAuthenticationScheme {
+		options.Cookie().SetName(wicket.ExternalCookieAuthenticationScheme)
 		options.Cookie().SetIsEssential(true)
 		// need to set None because iOS 12 safari considers the POST back to the client from the
 		// IdP as not safe, so cookies issued from response (with lax) then should not be honored.

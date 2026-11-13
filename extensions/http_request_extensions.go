@@ -82,7 +82,7 @@ func GetWicketSignoutFrameCallbackUrl(ctx context.Context, userSession services.
 		return "", err
 	}
 
-	signoutIframeUrl := utils.EnsureTrailingSlash(urls.BaseUrl()) + gois.ProtocolRoutePathsEndSessionCallback
+	signoutIframeUrl := utils.EnsureTrailingSlash(urls.BaseUrl()) + wicket.ProtocolRoutePathsEndSessionCallback
 
 	u, err := url.Parse(signoutIframeUrl)
 	if err != nil {
@@ -90,7 +90,7 @@ func GetWicketSignoutFrameCallbackUrl(ctx context.Context, userSession services.
 	}
 
 	q := u.Query()
-	q.Add(gois.UIConstantsDefaultRoutePathParamsEndSessionCallback, id)
+	q.Add(wicket.UIConstantsDefaultRoutePathParamsEndSessionCallback, id)
 
 	u.RawQuery = q.Encode()
 

@@ -115,11 +115,11 @@ func assertParameterCarriage(a *require.Assertions, returnURLValue string, useSt
 	returnURL := parsed.Query()
 
 	if useStore {
-		a.NotEmpty(returnURL.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName))
+		a.NotEmpty(returnURL.Get(wicket.AuthorizationParamsStoreMessageStoreIdParameterName))
 		a.Empty(returnURL.Get("client_id"))
 	} else {
 		a.Equal("client2", returnURL.Get("client_id"))
 		a.Equal("code", returnURL.Get("response_type"))
-		a.Empty(returnURL.Get(gois.AuthorizationParamsStoreMessageStoreIdParameterName))
+		a.Empty(returnURL.Get(wicket.AuthorizationParamsStoreMessageStoreIdParameterName))
 	}
 }

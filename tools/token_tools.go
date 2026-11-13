@@ -38,7 +38,7 @@ func NewTokenTools(
 // IssueJwt Issues a JWT.
 func (t *TokenTools) IssueJwt(ctx context.Context, lifetime int, claims []*claimspkg.Claim) (string, error) {
 	if claims == nil {
-		return "", gois.ArgumentNullException
+		return "", wicket.ArgumentNullException
 	}
 
 	issuer := t.issuerNameService.GetCurrent()
@@ -55,7 +55,7 @@ func (t *TokenTools) IssueJwt(ctx context.Context, lifetime int, claims []*claim
 
 func (t *TokenTools) IssueJwtWithIssuer(ctx context.Context, lifetime int, issuer string, claims []*claimspkg.Claim) (string, error) {
 	if claims == nil {
-		return "", gois.ArgumentNullException
+		return "", wicket.ArgumentNullException
 	}
 
 	token := &storage_models.Token{

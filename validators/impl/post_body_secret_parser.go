@@ -71,7 +71,7 @@ func (p *PostBodySecretParser) Parse(request *http.Request) (*models.ParsedSecre
 		parsedSecret := &models.ParsedSecret{
 			Id:         id,
 			Credential: secret,
-			Type:       gois.ParsedSecretTypesSharedSecret,
+			Type:       wicket.ParsedSecretTypesSharedSecret,
 		}
 
 		return parsedSecret, nil
@@ -81,7 +81,7 @@ func (p *PostBodySecretParser) Parse(request *http.Request) (*models.ParsedSecre
 
 		parsedSecret := &models.ParsedSecret{
 			Id:   id,
-			Type: gois.ParsedSecretTypesNoSecret,
+			Type: wicket.ParsedSecretTypesNoSecret,
 		}
 
 		return parsedSecret, nil
@@ -90,5 +90,5 @@ func (p *PostBodySecretParser) Parse(request *http.Request) (*models.ParsedSecre
 
 // Returns the authentication method name that this parser implements
 func (p *PostBodySecretParser) AuthenticationMethod() string {
-	return gois.EndpointAuthenticationMethodsPostBody
+	return wicket.EndpointAuthenticationMethodsPostBody
 }

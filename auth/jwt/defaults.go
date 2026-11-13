@@ -4,9 +4,9 @@
 
 package jwt
 
-import gois "github.com/gonewx/wicket"
+import "github.com/gonewx/wicket"
 
 const (
 	// The default value used for Options.AuthenticationScheme
-	AuthenticationScheme = gois.JwtBearerAuthenticationScheme
+	AuthenticationScheme = wicket.JwtBearerAuthenticationScheme
 )

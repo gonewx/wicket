@@ -53,8 +53,8 @@ type AuthenticationOptions struct {
 
 func NewAuthenticationOptions() *AuthenticationOptions {
 	return &AuthenticationOptions{
-		CookieLifetime:                 gois.DefaultCookieTimeSpan,
-		CheckSessionCookieName:         gois.DefaultCheckSessionCookieName,
+		CookieLifetime:                 wicket.DefaultCookieTimeSpan,
+		CheckSessionCookieName:         wicket.DefaultCheckSessionCookieName,
 		CheckSessionCookieSameSiteMode: http.SameSiteNoneMode,
 		RequireCspFrameSrcForSignout:   true,
 	}

@@ -20,10 +20,10 @@ const (
 // StoreTokens Stores a set of authentication tokens, after removing any old tokens.
 func StoreTokens(properties *Properties, tokens []*Token) error {
 	if properties == nil {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 	if tokens == nil {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 
 	// Clear old tokens first
@@ -36,7 +36,7 @@ func StoreTokens(properties *Properties, tokens []*Token) error {
 	tokenNames := make([]string, 0)
 	for _, token := range tokens {
 		if token.Name == "" {
-			return fmt.Errorf("Token name cannot be null: %w", gois.ArgumentNullException)
+			return fmt.Errorf("Token name cannot be null: %w", wicket.ArgumentNullException)
 		}
 
 		// REVIEW: should probably check that there are no ; in the token name and throw or encode
@@ -52,10 +52,10 @@ func StoreTokens(properties *Properties, tokens []*Token) error {
 
 func GetTokenValue(properties *Properties, tokenName string) (string, error) {
 	if properties == nil {
-		return "", gois.ArgumentNullException
+		return "", wicket.ArgumentNullException
 	}
 	if tokenName == "" {
-		return "", gois.ArgumentNullException
+		return "", wicket.ArgumentNullException
 	}
 
 	tokenKey := TokenKeyPrefix + tokenName
@@ -74,11 +74,11 @@ func GetTokenValue(properties *Properties, tokenName string) (string, error) {
 
 func GetToken(request *http.Request, response http.ResponseWriter, auth Service, scheme string, tokenName string) (string, error) {
 	if auth == nil {
-		return "", gois.ArgumentNullException
+		return "", wicket.ArgumentNullException
 	}
 
 	if tokenName == "" {
-		return "", gois.ArgumentNullException
+		return "", wicket.ArgumentNullException
 	}
 
 	result, err := auth.Authenticate(request, response, scheme)

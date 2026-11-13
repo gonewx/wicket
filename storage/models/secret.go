@@ -19,6 +19,6 @@ type Secret struct {
 
 func NewSecret() *Secret {
 	return &Secret{
-		Type: gois.SecretTypesSharedSecret,
+		Type: wicket.SecretTypesSharedSecret,
 	}
 }

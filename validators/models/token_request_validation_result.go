@@ -17,26 +17,26 @@ type TokenRequestValidationResult struct {
 	CustomResponse map[string]any
 }
 
-func WithTokenRequestValidationResultCustomResponse(customResponse map[string]any) gois.Option[TokenRequestValidationResult] {
+func WithTokenRequestValidationResultCustomResponse(customResponse map[string]any) wicket.Option[TokenRequestValidationResult] {
 	return func(r *TokenRequestValidationResult) {
 		r.CustomResponse = customResponse
 	}
 }
 
-func WithTokenRequestValidationResultError(err error) gois.Option[TokenRequestValidationResult] {
+func WithTokenRequestValidationResultError(err error) wicket.Option[TokenRequestValidationResult] {
 	return func(r *TokenRequestValidationResult) {
 		r.Error = err
 	}
 }
 
-func WithTokenRequestValidationResultDescription(description string) gois.Option[TokenRequestValidationResult] {
+func WithTokenRequestValidationResultDescription(description string) wicket.Option[TokenRequestValidationResult] {
 	return func(r *TokenRequestValidationResult) {
 		r.Description = description
 	}
 }
 
 // Initializes a new instance
-func NewTokenRequestValidationResult(validatedRequest *ValidatedTokenRequest, opts ...gois.Option[TokenRequestValidationResult]) *TokenRequestValidationResult {
+func NewTokenRequestValidationResult(validatedRequest *ValidatedTokenRequest, opts ...wicket.Option[TokenRequestValidationResult]) *TokenRequestValidationResult {
 	r := &TokenRequestValidationResult{
 		ValidationResult: NewValidationResult(),
 		ValidatedRequest: validatedRequest,

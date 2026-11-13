@@ -89,10 +89,10 @@ func TestAuthorizeCustomRuleValidation(t *testing.T) {
 			}
 
 			values := url.Values{}
-			values.Set(gois.AuthorizeRequestClientId, "codeclient")
-			values.Set(gois.AuthorizeRequestScope, gois.StandardScopesOpenId)
-			values.Set(gois.AuthorizeRequestRedirectUri, "https://server/cb")
-			values.Set(gois.AuthorizeRequestResponseType, gois.ResponseTypesCode)
+			values.Set(wicket.AuthorizeRequestClientId, "codeclient")
+			values.Set(wicket.AuthorizeRequestScope, wicket.StandardScopesOpenId)
+			values.Set(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
+			values.Set(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
 			result := validator.Validate(context.Background(), values, nil)
 			if !errors.Is(result.Error, tt.wantErr) {

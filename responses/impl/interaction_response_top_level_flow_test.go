@@ -59,7 +59,7 @@ func TestHandlePromptNoneTurnsLoginIntoError(t *testing.T) {
 			setup: func(r *validators_models.ValidatedAuthorizeRequest) {
 				r.Subject = localSubject(t, nil)
 				r.Client = storage_models.NewClient()
-				r.AuthenticationContextReferenceClasses = []string{gois.KnownAcrValuesHomeRealm + "some_idp"}
+				r.AuthenticationContextReferenceClasses = []string{wicket.KnownAcrValuesHomeRealm + "some_idp"}
 			},
 		},
 		"session beyond the client sso lifetime": {
@@ -86,13 +86,13 @@ func TestHandlePromptNoneTurnsLoginIntoError(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			req := validators_models.NewValidatedAuthorizeRequest()
-			req.PromptModes = []string{gois.PromptModesNone}
+			req.PromptModes = []string{wicket.PromptModesNone}
 			tc.setup(req)
 			g := buildGenerator(fixedClock(now), common.NewMockConsentService(), common.NewMockProfileService())
 
 			resp := g.Handle(context.Background(), req, nil)
 
-			if !errors.Is(resp.Error, gois.AuthorizeErrorsLoginRequired) {
+			if !errors.Is(resp.Error, wicket.AuthorizeErrorsLoginRequired) {
 				t.Fatalf("Error = %v, want login_required", resp.Error)
 			}
 			if resp.IsLogin {

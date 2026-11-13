@@ -124,44 +124,44 @@ func NewRoot() (*Root, error) {
 		return newServerConfigLogger(godi.GetRequired[*ServerConfig](p), server.DefaultLogger())
 	})(r)
 	r.f_Ptr_Endpoint = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesAuthorize, gois.ProtocolRoutePathsAuthorize, endpointHandler[*handlers.AuthorizeHandler])
+		return newEndpoint(wicket.EndpointNamesAuthorize, wicket.ProtocolRoutePathsAuthorize, endpointHandler[*handlers.AuthorizeHandler])
 	})(r)
 	r.f_Ptr_Endpoint__2 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesAuthorize, gois.ProtocolRoutePathsAuthorizeCallback, endpointHandler[*handlers.AuthorizeCallbackHandler])
+		return newEndpoint(wicket.EndpointNamesAuthorize, wicket.ProtocolRoutePathsAuthorizeCallback, endpointHandler[*handlers.AuthorizeCallbackHandler])
 	})(r)
 	r.f_Ptr_Endpoint__3 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesToken, gois.ProtocolRoutePathsToken, endpointHandler[*handlers.TokenHandler])
+		return newEndpoint(wicket.EndpointNamesToken, wicket.ProtocolRoutePathsToken, endpointHandler[*handlers.TokenHandler])
 	})(r)
 	r.f_Ptr_Endpoint__4 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesDiscovery, gois.ProtocolRoutePathsDiscoveryConfiguration, endpointHandler[*handlers.DiscoveryHandler])
+		return newEndpoint(wicket.EndpointNamesDiscovery, wicket.ProtocolRoutePathsDiscoveryConfiguration, endpointHandler[*handlers.DiscoveryHandler])
 	})(r)
 	r.f_Ptr_Endpoint__5 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesDiscovery, gois.ProtocolRoutePathsDiscoveryWebKeys, endpointHandler[*handlers.DiscoveryKeyHandler])
+		return newEndpoint(wicket.EndpointNamesDiscovery, wicket.ProtocolRoutePathsDiscoveryWebKeys, endpointHandler[*handlers.DiscoveryKeyHandler])
 	})(r)
 	r.f_Ptr_Endpoint__6 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesCheckSession, gois.ProtocolRoutePathsCheckSession, endpointHandler[*handlers.CheckSessionHandler])
+		return newEndpoint(wicket.EndpointNamesCheckSession, wicket.ProtocolRoutePathsCheckSession, endpointHandler[*handlers.CheckSessionHandler])
 	})(r)
 	r.f_Ptr_Endpoint__7 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesBackchannelAuthentication, gois.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
+		return newEndpoint(wicket.EndpointNamesBackchannelAuthentication, wicket.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
 	})(r)
 	r.f_Ptr_Endpoint__8 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesIntrospection, gois.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
+		return newEndpoint(wicket.EndpointNamesIntrospection, wicket.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
 	})(r)
 	r.f_Ptr_Endpoint__9 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesUserInfo, gois.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
+		return newEndpoint(wicket.EndpointNamesUserInfo, wicket.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
 	})(r)
 	r.f_Ptr_Endpoint__10 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesEndSession, gois.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
+		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
 	})(r)
 	r.f_Ptr_Endpoint__11 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(gois.EndpointNamesEndSession, gois.ProtocolRoutePathsEndSessionCallback, endpointHandler[*handlers.EndSessionCallbackHandler])
+		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSessionCallback, endpointHandler[*handlers.EndSessionCallbackHandler])
 	})(r)
 	r.f_DataProtectionProvider = impl.NewDataProtectionProvider()
 	r.f_UnnamedOptionsManager__options_WicketOptions = options2.NewUnnamedOptionsManager[*options.WicketOptions](r.NewOptionsFactory__options_WicketOptions())
 	r.f_ConfigureOptions__auth_Options = (func(p godi.Provider) options2.ConfigureOptions[*auth.Options] {
 		serverConfig := godi.GetRequired[*ServerConfig](p)
 		return options2.NewConfigureNameOptions(options2.DefaultName, func(o *auth.Options) error {
-			o.DefaultScheme = gois.DefaultCookieAuthenticationScheme
+			o.DefaultScheme = wicket.DefaultCookieAuthenticationScheme
 			o.ExternalFailurePath = serverConfig.ExternalFailurePath()
 			return nil
 		})
@@ -236,12 +236,12 @@ func NewRoot() (*Root, error) {
 		)
 	})(r)
 	r.f_ValidateOptions__cookies_AuthenticationOptions = (func(p godi.Provider) options2.ValidateOptions[*cookies.AuthenticationOptions] {
-		return options2.NewValidateOptions(gois.DefaultCookieAuthenticationScheme,
+		return options2.NewValidateOptions(wicket.DefaultCookieAuthenticationScheme,
 			func(o *cookies.AuthenticationOptions) error { return o.Validate() },
 			options2.DefaultValidationFailureMessage)
 	})(r)
 	r.f_ValidateOptions__cookies_AuthenticationOptions__2 = (func(p godi.Provider) options2.ValidateOptions[*cookies.AuthenticationOptions] {
-		return options2.NewValidateOptions(gois.ExternalCookieAuthenticationScheme,
+		return options2.NewValidateOptions(wicket.ExternalCookieAuthenticationScheme,
 			func(o *cookies.AuthenticationOptions) error { return o.Validate() },
 			options2.DefaultValidationFailureMessage)
 	})(r)
@@ -430,9 +430,9 @@ func (r *Root) NewOptionsFactory__auth_Options() options2.OptionsFactory[*auth.O
 	})(r)
 }
 
-func (r *Root) NewPtr_Decorator_auth_SchemeProvider() *gois.Decorator[auth.SchemeProvider] {
-	return (func(p godi.Provider) *gois.Decorator[auth.SchemeProvider] {
-		return gois.NewDecorator[auth.SchemeProvider](godi.GetRequired[*core.SchemeProvider](p))
+func (r *Root) NewPtr_Decorator_auth_SchemeProvider() *wicket.Decorator[auth.SchemeProvider] {
+	return (func(p godi.Provider) *wicket.Decorator[auth.SchemeProvider] {
+		return wicket.NewDecorator[auth.SchemeProvider](godi.GetRequired[*core.SchemeProvider](p))
 	})(r)
 }
 
@@ -504,9 +504,9 @@ func (r *Root) NewOptionsMonitor__jwt_Options() options2.OptionsMonitor[*jwt.Opt
 	})(r)
 }
 
-func (r *Root) NewPtr_Decorator_auth_Service() *gois.Decorator[auth.Service] {
-	return (func(p godi.Provider) *gois.Decorator[auth.Service] {
-		return gois.NewDecorator[auth.Service](godi.GetRequired[*core.Service](p))
+func (r *Root) NewPtr_Decorator_auth_Service() *wicket.Decorator[auth.Service] {
+	return (func(p godi.Provider) *wicket.Decorator[auth.Service] {
+		return wicket.NewDecorator[auth.Service](godi.GetRequired[*core.Service](p))
 	})(r)
 }
 
@@ -514,7 +514,7 @@ func (r *Root) NewService__2() auth.Service {
 	return (func(p godi.Provider) auth.Service {
 		requestFromProvider(p)
 		return server.NewWicketAuthenticationService(
-			godi.GetRequired[*gois.Decorator[auth.Service]](p),
+			godi.GetRequired[*wicket.Decorator[auth.Service]](p),
 			godi.GetRequired[auth.SchemeProvider](p),
 			godi.GetRequired[services.SystemClock](p),
 			godi.GetRequired[services.UserSession](p),
@@ -1034,9 +1034,9 @@ func (r *Root) NewReturnUrlParser() services.ReturnUrlParser {
 	})(r)
 }
 
-func (r *Root) NewHandler_gois_DefaultCookieAuthenticationScheme() auth.Handler {
+func (r *Root) NewHandler_wicket_DefaultCookieAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.DefaultCookieAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.DefaultCookieAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -1045,9 +1045,9 @@ func (r *Root) NewHandler_gois_DefaultCookieAuthenticationScheme() auth.Handler 
 	})(r)
 }
 
-func (r *Root) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handler {
+func (r *Root) NewHandler_wicket_ExternalCookieAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.ExternalCookieAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.ExternalCookieAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -1056,9 +1056,9 @@ func (r *Root) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handler
 	})(r)
 }
 
-func (r *Root) NewHandler_gois_GoogleAuthenticationScheme() auth.Handler {
+func (r *Root) NewHandler_wicket_GoogleAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.GoogleAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.GoogleAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -1071,9 +1071,9 @@ func (r *Root) NewHandler_gois_GoogleAuthenticationScheme() auth.Handler {
 	})(r)
 }
 
-func (r *Root) NewHandler_gois_FacebookAuthenticationScheme() auth.Handler {
+func (r *Root) NewHandler_wicket_FacebookAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.FacebookAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.FacebookAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -1086,9 +1086,9 @@ func (r *Root) NewHandler_gois_FacebookAuthenticationScheme() auth.Handler {
 	})(r)
 }
 
-func (r *Root) NewHandler_gois_JwtBearerAuthenticationScheme() auth.Handler {
+func (r *Root) NewHandler_wicket_JwtBearerAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.JwtBearerAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.JwtBearerAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -1393,7 +1393,7 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewOptionsFactory__options_WicketOptions()
 	case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
 		return r.NewOptionsFactory__auth_Options()
-	case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
+	case reflect.TypeFor[*wicket.Decorator[auth.SchemeProvider]]():
 		return r.NewPtr_Decorator_auth_SchemeProvider()
 	case reflect.TypeFor[auth.SchemeProvider]():
 		return r.NewAuthSchemeProvider()
@@ -1413,7 +1413,7 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewOptionsFactory__jwt_Options()
 	case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 		return r.NewOptionsMonitor__jwt_Options()
-	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
+	case reflect.TypeFor[*wicket.Decorator[auth.Service]]():
 		return r.NewPtr_Decorator_auth_Service()
 	case reflect.TypeFor[auth.Service]():
 		return r.NewService__2()
@@ -1625,7 +1625,7 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[*core.SchemeProvider]():
 		return true
-	case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
+	case reflect.TypeFor[*wicket.Decorator[auth.SchemeProvider]]():
 		return true
 	case reflect.TypeFor[auth.SchemeProvider]():
 		return true
@@ -1669,7 +1669,7 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[*core.Service]():
 		return true
-	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
+	case reflect.TypeFor[*wicket.Decorator[auth.Service]]():
 		return true
 	case reflect.TypeFor[auth.Service]():
 		return true
@@ -1881,15 +1881,15 @@ func (r *Root) IsKeyedService(t reflect.Type, key any) bool {
 	switch t {
 	case reflect.TypeFor[auth.Handler]():
 		switch key {
-		case gois.DefaultCookieAuthenticationScheme:
+		case wicket.DefaultCookieAuthenticationScheme:
 			return true
-		case gois.ExternalCookieAuthenticationScheme:
+		case wicket.ExternalCookieAuthenticationScheme:
 			return true
-		case gois.GoogleAuthenticationScheme:
+		case wicket.GoogleAuthenticationScheme:
 			return true
-		case gois.FacebookAuthenticationScheme:
+		case wicket.FacebookAuthenticationScheme:
 			return true
-		case gois.JwtBearerAuthenticationScheme:
+		case wicket.JwtBearerAuthenticationScheme:
 			return true
 		}
 	}
@@ -1909,16 +1909,16 @@ func (r *Root) GetKeyedService(t reflect.Type, key any) any {
 	switch t {
 	case reflect.TypeFor[auth.Handler]():
 		switch key {
-		case gois.DefaultCookieAuthenticationScheme:
-			return r.NewHandler_gois_DefaultCookieAuthenticationScheme()
-		case gois.ExternalCookieAuthenticationScheme:
-			return r.NewHandler_gois_ExternalCookieAuthenticationScheme()
-		case gois.GoogleAuthenticationScheme:
-			return r.NewHandler_gois_GoogleAuthenticationScheme()
-		case gois.FacebookAuthenticationScheme:
-			return r.NewHandler_gois_FacebookAuthenticationScheme()
-		case gois.JwtBearerAuthenticationScheme:
-			return r.NewHandler_gois_JwtBearerAuthenticationScheme()
+		case wicket.DefaultCookieAuthenticationScheme:
+			return r.NewHandler_wicket_DefaultCookieAuthenticationScheme()
+		case wicket.ExternalCookieAuthenticationScheme:
+			return r.NewHandler_wicket_ExternalCookieAuthenticationScheme()
+		case wicket.GoogleAuthenticationScheme:
+			return r.NewHandler_wicket_GoogleAuthenticationScheme()
+		case wicket.FacebookAuthenticationScheme:
+			return r.NewHandler_wicket_FacebookAuthenticationScheme()
+		case wicket.JwtBearerAuthenticationScheme:
+			return r.NewHandler_wicket_JwtBearerAuthenticationScheme()
 		}
 	}
 	return nil
@@ -2046,7 +2046,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewOptionsFactory__options_WicketOptions()}
 		case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
 			return []any{r.NewOptionsFactory__auth_Options()}
-		case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
+		case reflect.TypeFor[*wicket.Decorator[auth.SchemeProvider]]():
 			return []any{r.NewPtr_Decorator_auth_SchemeProvider()}
 		case reflect.TypeFor[auth.SchemeProvider]():
 			return []any{r.NewAuthSchemeProvider()}
@@ -2066,7 +2066,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewOptionsFactory__jwt_Options()}
 		case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 			return []any{r.NewOptionsMonitor__jwt_Options()}
-		case reflect.TypeFor[*gois.Decorator[auth.Service]]():
+		case reflect.TypeFor[*wicket.Decorator[auth.Service]]():
 			return []any{r.NewPtr_Decorator_auth_Service()}
 		case reflect.TypeFor[auth.Service]():
 			return []any{r.NewService__2()}
@@ -2228,23 +2228,23 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 	if key == godi.AnyKey {
 		switch t {
 		case reflect.TypeFor[auth.Handler]():
-			return []any{r.NewHandler_gois_DefaultCookieAuthenticationScheme(), r.NewHandler_gois_ExternalCookieAuthenticationScheme(), r.NewHandler_gois_GoogleAuthenticationScheme(), r.NewHandler_gois_FacebookAuthenticationScheme(), r.NewHandler_gois_JwtBearerAuthenticationScheme()}
+			return []any{r.NewHandler_wicket_DefaultCookieAuthenticationScheme(), r.NewHandler_wicket_ExternalCookieAuthenticationScheme(), r.NewHandler_wicket_GoogleAuthenticationScheme(), r.NewHandler_wicket_FacebookAuthenticationScheme(), r.NewHandler_wicket_JwtBearerAuthenticationScheme()}
 		}
 		return nil
 	}
 	switch t {
 	case reflect.TypeFor[auth.Handler]():
 		switch key {
-		case gois.DefaultCookieAuthenticationScheme:
-			return []any{r.NewHandler_gois_DefaultCookieAuthenticationScheme()}
-		case gois.ExternalCookieAuthenticationScheme:
-			return []any{r.NewHandler_gois_ExternalCookieAuthenticationScheme()}
-		case gois.GoogleAuthenticationScheme:
-			return []any{r.NewHandler_gois_GoogleAuthenticationScheme()}
-		case gois.FacebookAuthenticationScheme:
-			return []any{r.NewHandler_gois_FacebookAuthenticationScheme()}
-		case gois.JwtBearerAuthenticationScheme:
-			return []any{r.NewHandler_gois_JwtBearerAuthenticationScheme()}
+		case wicket.DefaultCookieAuthenticationScheme:
+			return []any{r.NewHandler_wicket_DefaultCookieAuthenticationScheme()}
+		case wicket.ExternalCookieAuthenticationScheme:
+			return []any{r.NewHandler_wicket_ExternalCookieAuthenticationScheme()}
+		case wicket.GoogleAuthenticationScheme:
+			return []any{r.NewHandler_wicket_GoogleAuthenticationScheme()}
+		case wicket.FacebookAuthenticationScheme:
+			return []any{r.NewHandler_wicket_FacebookAuthenticationScheme()}
+		case wicket.JwtBearerAuthenticationScheme:
+			return []any{r.NewHandler_wicket_JwtBearerAuthenticationScheme()}
 		}
 	}
 	return nil
@@ -2419,7 +2419,7 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewOptionsFactory__options_WicketOptions()
 	case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
 		return s.NewOptionsFactory__auth_Options()
-	case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
+	case reflect.TypeFor[*wicket.Decorator[auth.SchemeProvider]]():
 		return s.NewPtr_Decorator_auth_SchemeProvider()
 	case reflect.TypeFor[auth.SchemeProvider]():
 		return s.NewAuthSchemeProvider()
@@ -2439,7 +2439,7 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewOptionsFactory__jwt_Options()
 	case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 		return s.NewOptionsMonitor__jwt_Options()
-	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
+	case reflect.TypeFor[*wicket.Decorator[auth.Service]]():
 		return s.NewPtr_Decorator_auth_Service()
 	case reflect.TypeFor[auth.Service]():
 		return s.NewService__2()
@@ -2717,7 +2717,7 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
 		return true
-	case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
+	case reflect.TypeFor[*wicket.Decorator[auth.SchemeProvider]]():
 		return true
 	case reflect.TypeFor[auth.SchemeProvider]():
 		return true
@@ -2737,7 +2737,7 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 		return true
-	case reflect.TypeFor[*gois.Decorator[auth.Service]]():
+	case reflect.TypeFor[*wicket.Decorator[auth.Service]]():
 		return true
 	case reflect.TypeFor[auth.Service]():
 		return true
@@ -2914,16 +2914,16 @@ func (s *scope) GetKeyedService(t reflect.Type, key any) any {
 	switch t {
 	case reflect.TypeFor[auth.Handler]():
 		switch key {
-		case gois.DefaultCookieAuthenticationScheme:
-			return s.NewHandler_gois_DefaultCookieAuthenticationScheme()
-		case gois.ExternalCookieAuthenticationScheme:
-			return s.NewHandler_gois_ExternalCookieAuthenticationScheme()
-		case gois.GoogleAuthenticationScheme:
-			return s.NewHandler_gois_GoogleAuthenticationScheme()
-		case gois.FacebookAuthenticationScheme:
-			return s.NewHandler_gois_FacebookAuthenticationScheme()
-		case gois.JwtBearerAuthenticationScheme:
-			return s.NewHandler_gois_JwtBearerAuthenticationScheme()
+		case wicket.DefaultCookieAuthenticationScheme:
+			return s.NewHandler_wicket_DefaultCookieAuthenticationScheme()
+		case wicket.ExternalCookieAuthenticationScheme:
+			return s.NewHandler_wicket_ExternalCookieAuthenticationScheme()
+		case wicket.GoogleAuthenticationScheme:
+			return s.NewHandler_wicket_GoogleAuthenticationScheme()
+		case wicket.FacebookAuthenticationScheme:
+			return s.NewHandler_wicket_FacebookAuthenticationScheme()
+		case wicket.JwtBearerAuthenticationScheme:
+			return s.NewHandler_wicket_JwtBearerAuthenticationScheme()
 		}
 	}
 	return nil
@@ -3051,7 +3051,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewOptionsFactory__options_WicketOptions()}
 		case reflect.TypeFor[options2.OptionsFactory[*auth.Options]]():
 			return []any{s.NewOptionsFactory__auth_Options()}
-		case reflect.TypeFor[*gois.Decorator[auth.SchemeProvider]]():
+		case reflect.TypeFor[*wicket.Decorator[auth.SchemeProvider]]():
 			return []any{s.NewPtr_Decorator_auth_SchemeProvider()}
 		case reflect.TypeFor[auth.SchemeProvider]():
 			return []any{s.NewAuthSchemeProvider()}
@@ -3071,7 +3071,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewOptionsFactory__jwt_Options()}
 		case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 			return []any{s.NewOptionsMonitor__jwt_Options()}
-		case reflect.TypeFor[*gois.Decorator[auth.Service]]():
+		case reflect.TypeFor[*wicket.Decorator[auth.Service]]():
 			return []any{s.NewPtr_Decorator_auth_Service()}
 		case reflect.TypeFor[auth.Service]():
 			return []any{s.NewService__2()}
@@ -3233,23 +3233,23 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 	if key == godi.AnyKey {
 		switch t {
 		case reflect.TypeFor[auth.Handler]():
-			return []any{s.NewHandler_gois_DefaultCookieAuthenticationScheme(), s.NewHandler_gois_ExternalCookieAuthenticationScheme(), s.NewHandler_gois_GoogleAuthenticationScheme(), s.NewHandler_gois_FacebookAuthenticationScheme(), s.NewHandler_gois_JwtBearerAuthenticationScheme()}
+			return []any{s.NewHandler_wicket_DefaultCookieAuthenticationScheme(), s.NewHandler_wicket_ExternalCookieAuthenticationScheme(), s.NewHandler_wicket_GoogleAuthenticationScheme(), s.NewHandler_wicket_FacebookAuthenticationScheme(), s.NewHandler_wicket_JwtBearerAuthenticationScheme()}
 		}
 		return nil
 	}
 	switch t {
 	case reflect.TypeFor[auth.Handler]():
 		switch key {
-		case gois.DefaultCookieAuthenticationScheme:
-			return []any{s.NewHandler_gois_DefaultCookieAuthenticationScheme()}
-		case gois.ExternalCookieAuthenticationScheme:
-			return []any{s.NewHandler_gois_ExternalCookieAuthenticationScheme()}
-		case gois.GoogleAuthenticationScheme:
-			return []any{s.NewHandler_gois_GoogleAuthenticationScheme()}
-		case gois.FacebookAuthenticationScheme:
-			return []any{s.NewHandler_gois_FacebookAuthenticationScheme()}
-		case gois.JwtBearerAuthenticationScheme:
-			return []any{s.NewHandler_gois_JwtBearerAuthenticationScheme()}
+		case wicket.DefaultCookieAuthenticationScheme:
+			return []any{s.NewHandler_wicket_DefaultCookieAuthenticationScheme()}
+		case wicket.ExternalCookieAuthenticationScheme:
+			return []any{s.NewHandler_wicket_ExternalCookieAuthenticationScheme()}
+		case wicket.GoogleAuthenticationScheme:
+			return []any{s.NewHandler_wicket_GoogleAuthenticationScheme()}
+		case wicket.FacebookAuthenticationScheme:
+			return []any{s.NewHandler_wicket_FacebookAuthenticationScheme()}
+		case wicket.JwtBearerAuthenticationScheme:
+			return []any{s.NewHandler_wicket_JwtBearerAuthenticationScheme()}
 		}
 	}
 	return nil
@@ -3383,9 +3383,9 @@ func (s *scope) NewOptionsFactory__auth_Options() options2.OptionsFactory[*auth.
 	})(s)
 }
 
-func (s *scope) NewPtr_Decorator_auth_SchemeProvider() *gois.Decorator[auth.SchemeProvider] {
-	return (func(p godi.Provider) *gois.Decorator[auth.SchemeProvider] {
-		return gois.NewDecorator[auth.SchemeProvider](godi.GetRequired[*core.SchemeProvider](p))
+func (s *scope) NewPtr_Decorator_auth_SchemeProvider() *wicket.Decorator[auth.SchemeProvider] {
+	return (func(p godi.Provider) *wicket.Decorator[auth.SchemeProvider] {
+		return wicket.NewDecorator[auth.SchemeProvider](godi.GetRequired[*core.SchemeProvider](p))
 	})(s)
 }
 
@@ -3457,9 +3457,9 @@ func (s *scope) NewOptionsMonitor__jwt_Options() options2.OptionsMonitor[*jwt.Op
 	})(s)
 }
 
-func (s *scope) NewPtr_Decorator_auth_Service() *gois.Decorator[auth.Service] {
-	return (func(p godi.Provider) *gois.Decorator[auth.Service] {
-		return gois.NewDecorator[auth.Service](godi.GetRequired[*core.Service](p))
+func (s *scope) NewPtr_Decorator_auth_Service() *wicket.Decorator[auth.Service] {
+	return (func(p godi.Provider) *wicket.Decorator[auth.Service] {
+		return wicket.NewDecorator[auth.Service](godi.GetRequired[*core.Service](p))
 	})(s)
 }
 
@@ -3467,7 +3467,7 @@ func (s *scope) NewService__2() auth.Service {
 	return (func(p godi.Provider) auth.Service {
 		requestFromProvider(p)
 		return server.NewWicketAuthenticationService(
-			godi.GetRequired[*gois.Decorator[auth.Service]](p),
+			godi.GetRequired[*wicket.Decorator[auth.Service]](p),
 			godi.GetRequired[auth.SchemeProvider](p),
 			godi.GetRequired[services.SystemClock](p),
 			godi.GetRequired[services.UserSession](p),
@@ -3987,9 +3987,9 @@ func (s *scope) NewReturnUrlParser() services.ReturnUrlParser {
 	})(s)
 }
 
-func (s *scope) NewHandler_gois_DefaultCookieAuthenticationScheme() auth.Handler {
+func (s *scope) NewHandler_wicket_DefaultCookieAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.DefaultCookieAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.DefaultCookieAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -3998,9 +3998,9 @@ func (s *scope) NewHandler_gois_DefaultCookieAuthenticationScheme() auth.Handler
 	})(s)
 }
 
-func (s *scope) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handler {
+func (s *scope) NewHandler_wicket_ExternalCookieAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.ExternalCookieAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.ExternalCookieAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -4009,9 +4009,9 @@ func (s *scope) NewHandler_gois_ExternalCookieAuthenticationScheme() auth.Handle
 	})(s)
 }
 
-func (s *scope) NewHandler_gois_GoogleAuthenticationScheme() auth.Handler {
+func (s *scope) NewHandler_wicket_GoogleAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.GoogleAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.GoogleAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -4024,9 +4024,9 @@ func (s *scope) NewHandler_gois_GoogleAuthenticationScheme() auth.Handler {
 	})(s)
 }
 
-func (s *scope) NewHandler_gois_FacebookAuthenticationScheme() auth.Handler {
+func (s *scope) NewHandler_wicket_FacebookAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.FacebookAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.FacebookAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}
@@ -4039,9 +4039,9 @@ func (s *scope) NewHandler_gois_FacebookAuthenticationScheme() auth.Handler {
 	})(s)
 }
 
-func (s *scope) NewHandler_gois_JwtBearerAuthenticationScheme() auth.Handler {
+func (s *scope) NewHandler_wicket_JwtBearerAuthenticationScheme() auth.Handler {
 	return (func(p godi.Provider) auth.Handler {
-		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(gois.JwtBearerAuthenticationScheme); provider != nil {
+		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.JwtBearerAuthenticationScheme); provider != nil {
 			if h := provider(p); h != nil {
 				return h
 			}

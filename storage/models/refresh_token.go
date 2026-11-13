@@ -78,7 +78,7 @@ func (t *RefreshToken) SubjectId() string {
 		return ""
 	}
 
-	first := t.Subject.FindFirst(gois.JwtClaimTypesSubject)
+	first := t.Subject.FindFirst(wicket.JwtClaimTypesSubject)
 	if first == nil {
 		return ""
 	}

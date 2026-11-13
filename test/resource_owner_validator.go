@@ -40,7 +40,7 @@ func (v *TestUserResourceOwnerPasswordValidator) Validate(ctx *validators_contex
 	}
 
 	ctx.Result = validators_models.NewGrantValidationResult(
-		validators_models.WithGrantValidationResultSubject(subject, "password", now, nil, gois.LocalIdentityProvider, nil),
+		validators_models.WithGrantValidationResultSubject(subject, "password", now, nil, wicket.LocalIdentityProvider, nil),
 	)
 	return nil
 }

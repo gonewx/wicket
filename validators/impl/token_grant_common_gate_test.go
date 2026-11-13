@@ -27,9 +27,9 @@ func TestTokenRequestValidationRejectsNilArguments(t *testing.T) {
 		"valid authorization code parameters with nil client validation result": {
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {"handle"},
-					gois.TokenRequestRedirectUri: {"https://server/cb"},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {"handle"},
+					wicket.TokenRequestRedirectUri: {"https://server/cb"},
 				}
 			},
 		},
@@ -65,21 +65,21 @@ func TestTokenRequestValidationGrantTypeAndProtocolGate(t *testing.T) {
 				code := newGrantTestAuthorizationCode("codeclient", f.now)
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestGrantType:   {"unknown"},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestGrantType:   {"unknown"},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
 				}
 			},
-			wantErr: gois.TokenErrorsUnsupportedGrantType,
+			wantErr: wicket.TokenErrorsUnsupportedGrantType,
 		},
 		"client with non OpenID Connect protocol type is rejected": {
 			clientId: "client.cred.saml2p-gap",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType: {gois.GrantTypeClientCredentials},
+					wicket.TokenRequestGrantType: {wicket.GrantTypeClientCredentials},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidClient,
+			wantErr: wicket.TokenErrorsInvalidClient,
 		},
 		"missing grant type is rejected": {
 			clientId: "codeclient",
@@ -87,11 +87,11 @@ func TestTokenRequestValidationGrantTypeAndProtocolGate(t *testing.T) {
 				code := newGrantTestAuthorizationCode("codeclient", f.now)
 				handle := storeGrantTestAuthorizationCode(t, f, code)
 				return url.Values{
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
 				}
 			},
-			wantErr: gois.TokenErrorsUnsupportedGrantType,
+			wantErr: wicket.TokenErrorsUnsupportedGrantType,
 		},
 	}
 

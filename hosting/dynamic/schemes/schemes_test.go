@@ -88,8 +88,8 @@ func enabledResolver(t *testing.T, providers ...*dynamicscheme.Provider) *dynami
 	return dynamicscheme.NewResolver(store, fixedClock{time.Unix(1_700_000_000, 0)}, true, time.Minute)
 }
 
-func decorate(inner auth.SchemeProvider) *gois.Decorator[auth.SchemeProvider] {
-	return gois.NewDecorator[auth.SchemeProvider](inner)
+func decorate(inner auth.SchemeProvider) *wicket.Decorator[auth.SchemeProvider] {
+	return wicket.NewDecorator[auth.SchemeProvider](inner)
 }
 
 func dynProvider(scheme string, enabled bool) *dynamicscheme.Provider {

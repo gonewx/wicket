@@ -22,7 +22,7 @@ import (
 func CreateJwtPayload(token *storage_models.Token, options *config_options.WicketOptions, clock services.SystemClock, logger *slog.Logger) (jwt.Token, error) {
 
 	payload := jwt.New()
-	if err := payload.Set(gois.JwtClaimTypesIssuer, token.Issuer); err != nil {
+	if err := payload.Set(wicket.JwtClaimTypesIssuer, token.Issuer); err != nil {
 		return nil, err
 	}
 
@@ -30,13 +30,13 @@ func CreateJwtPayload(token *storage_models.Token, options *config_options.Wicke
 	now := clock.Now().Unix()
 	exp := now + int64(token.Lifetime)
 
-	if err := payload.Set(gois.JwtClaimTypesNotBefore, now); err != nil {
+	if err := payload.Set(wicket.JwtClaimTypesNotBefore, now); err != nil {
 		return nil, err
 	}
-	if err := payload.Set(gois.JwtClaimTypesIssuedAt, now); err != nil {
+	if err := payload.Set(wicket.JwtClaimTypesIssuedAt, now); err != nil {
 		return nil, err
 	}
-	if err := payload.Set(gois.JwtClaimTypesExpiration, exp); err != nil {
+	if err := payload.Set(wicket.JwtClaimTypesExpiration, exp); err != nil {
 		return nil, err
 	}
 
@@ -44,11 +44,11 @@ func CreateJwtPayload(token *storage_models.Token, options *config_options.Wicke
 	count := len(token.Audiences)
 	if count > 0 {
 		if count == 1 {
-			if err := payload.Set(gois.JwtClaimTypesAudience, token.Audiences[0]); err != nil {
+			if err := payload.Set(wicket.JwtClaimTypesAudience, token.Audiences[0]); err != nil {
 				return nil, err
 			}
 		} else {
-			if err := payload.Set(gois.JwtClaimTypesAudience, token.Audiences); err != nil {
+			if err := payload.Set(wicket.JwtClaimTypesAudience, token.Audiences); err != nil {
 				return nil, err
 			}
 		}
@@ -61,32 +61,32 @@ func CreateJwtPayload(token *storage_models.Token, options *config_options.Wicke
 		if err != nil {
 			return nil, err
 		}
-		if err := payload.Set(gois.JwtClaimTypesConfirmation, confirmation); err != nil {
+		if err := payload.Set(wicket.JwtClaimTypesConfirmation, confirmation); err != nil {
 			return nil, err
 		}
 	}
 
 	// scope claims.
-	scopeClaims := utils.Where(token.Claims, func(x *claimspkg.Claim) bool { return x.Type == gois.JwtClaimTypesScope })
+	scopeClaims := utils.Where(token.Claims, func(x *claimspkg.Claim) bool { return x.Type == wicket.JwtClaimTypesScope })
 	if len(scopeClaims) > 0 {
 		scopeValues := utils.Select(scopeClaims, func(x *claimspkg.Claim) string { return x.Value.(string) })
 
 		if options.EmitScopesAsSpaceDelimitedStringInJwt {
-			if err := payload.Set(gois.JwtClaimTypesScope, strings.Join(scopeValues, " ")); err != nil {
+			if err := payload.Set(wicket.JwtClaimTypesScope, strings.Join(scopeValues, " ")); err != nil {
 				return nil, err
 			}
 		} else {
-			if err := payload.Set(gois.JwtClaimTypesScope, scopeValues); err != nil {
+			if err := payload.Set(wicket.JwtClaimTypesScope, scopeValues); err != nil {
 				return nil, err
 			}
 		}
 	}
 
 	// amr claims.
-	amrClaims := utils.Where(token.Claims, func(x *claimspkg.Claim) bool { return x.Type == gois.JwtClaimTypesAuthenticationMethod })
+	amrClaims := utils.Where(token.Claims, func(x *claimspkg.Claim) bool { return x.Type == wicket.JwtClaimTypesAuthenticationMethod })
 	if len(amrClaims) > 0 {
 		amrValues := utils.Distinct(utils.Select(amrClaims, func(x *claimspkg.Claim) string { return x.Value.(string) }))
-		if err := payload.Set(gois.JwtClaimTypesAuthenticationMethod, amrValues); err != nil {
+		if err := payload.Set(wicket.JwtClaimTypesAuthenticationMethod, amrValues); err != nil {
 			return nil, err
 		}
 	}
@@ -94,7 +94,7 @@ func CreateJwtPayload(token *storage_models.Token, options *config_options.Wicke
 	simpleClaimTypes := utils.Distinct(
 		utils.Select(
 			utils.Where(token.Claims, func(c *claimspkg.Claim) bool {
-				return c.Type != gois.JwtClaimTypesAuthenticationMethod && c.Type != gois.JwtClaimTypesScope
+				return c.Type != wicket.JwtClaimTypesAuthenticationMethod && c.Type != wicket.JwtClaimTypesScope
 			}), func(c *claimspkg.Claim) string { return c.Type },
 		))
 

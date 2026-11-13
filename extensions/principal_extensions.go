@@ -11,23 +11,23 @@ import (
 	claimspkg "github.com/gonewx/wicket/claims"
 )
 
-func GetAuthenticationTime(principal gois.Principal) time.Time {
+func GetAuthenticationTime(principal wicket.Principal) time.Time {
 	return time.Unix(GetAuthenticationTimeEpochFromPrincipal(principal), 0)
 }
 
-func GetAuthenticationTimeEpochFromPrincipal(principal gois.Principal) int64 {
+func GetAuthenticationTimeEpochFromPrincipal(principal wicket.Principal) int64 {
 	if principal == nil {
 		return 0
 	}
 	return GetAuthenticationTimeEpochFromIdentity(principal.Identity())
 }
 
-func GetAuthenticationTimeEpochFromIdentity(identity gois.Identity) int64 {
+func GetAuthenticationTimeEpochFromIdentity(identity wicket.Identity) int64 {
 	if identity == nil {
 		return 0
 	}
 	i := identity.(*claimspkg.ClaimsIdentity)
-	claim := i.FindFirst(gois.JwtClaimTypesAuthenticationTime)
+	claim := i.FindFirst(wicket.JwtClaimTypesAuthenticationTime)
 
 	if claim == nil {
 		return 0
@@ -44,38 +44,38 @@ func GetAuthenticationTimeEpochFromIdentity(identity gois.Identity) int64 {
 	}
 }
 
-func GetSubjectIdFromPrincipal(principal gois.Principal) string {
+func GetSubjectIdFromPrincipal(principal wicket.Principal) string {
 	if principal == nil {
 		return ""
 	}
 	return GetSubjectIdFromIdentity(principal.Identity())
 }
 
-func GetSubjectIdFromIdentity(identity gois.Identity) string {
+func GetSubjectIdFromIdentity(identity wicket.Identity) string {
 	if identity == nil {
 		return ""
 	}
 	i := identity.(*claimspkg.ClaimsIdentity)
-	claim := i.FindFirst(gois.JwtClaimTypesSubject)
+	claim := i.FindFirst(wicket.JwtClaimTypesSubject)
 	if claim == nil {
 		return ""
 	}
 	return claim.Value.(string)
 }
 
-func GetIdentityProviderFromPrincipal(principal gois.Principal) string {
+func GetIdentityProviderFromPrincipal(principal wicket.Principal) string {
 	if principal == nil {
 		return ""
 	}
 	return GetIdentityProviderFromIdentity(principal.Identity())
 }
 
-func GetIdentityProviderFromIdentity(identity gois.Identity) string {
+func GetIdentityProviderFromIdentity(identity wicket.Identity) string {
 	if identity == nil {
 		return ""
 	}
 	i := identity.(*claimspkg.ClaimsIdentity)
-	claim := i.FindFirst(gois.JwtClaimTypesIdentityProvider)
+	claim := i.FindFirst(wicket.JwtClaimTypesIdentityProvider)
 
 	if claim == nil {
 		return ""
@@ -88,22 +88,22 @@ func GetIdentityProviderFromIdentity(identity gois.Identity) string {
 	}
 }
 
-func ClaimsPrincipalIsAuthenticated(p gois.Principal) bool {
+func ClaimsPrincipalIsAuthenticated(p wicket.Principal) bool {
 	return p != nil && p.Identity() != nil && p.Identity().IsAuthenticated()
 }
 
-func GetAuthenticationMethodsByPrincipal(principal gois.Principal) []*claimspkg.Claim {
+func GetAuthenticationMethodsByPrincipal(principal wicket.Principal) []*claimspkg.Claim {
 	return GetAuthenticationMethodsByIdentity(principal.Identity())
 }
 
-func GetAuthenticationMethodsByIdentity(identity gois.Identity) []*claimspkg.Claim {
+func GetAuthenticationMethodsByIdentity(identity wicket.Identity) []*claimspkg.Claim {
 	id := identity.(*claimspkg.ClaimsIdentity)
-	return id.FindAll(gois.JwtClaimTypesAuthenticationMethod)
+	return id.FindAll(wicket.JwtClaimTypesAuthenticationMethod)
 }
 
-func GetAuthenticationMethodByIdentity(identity gois.Identity) string {
+func GetAuthenticationMethodByIdentity(identity wicket.Identity) string {
 	id := identity.(*claimspkg.ClaimsIdentity)
-	claim := id.FindFirst(gois.JwtClaimTypesAuthenticationMethod)
+	claim := id.FindFirst(wicket.JwtClaimTypesAuthenticationMethod)
 
 	if claim == nil {
 		return ""
@@ -113,7 +113,7 @@ func GetAuthenticationMethodByIdentity(identity gois.Identity) string {
 }
 
 func GetTenantIdFromPrincipal(p *claimspkg.ClaimsPrincipal) string {
-	cp := p.FindFirst(gois.ClaimTypesTenant)
+	cp := p.FindFirst(wicket.ClaimTypesTenant)
 	if cp == nil {
 		return ""
 	}
@@ -131,7 +131,7 @@ func GetDisplayNameFromPrincipal(p *claimspkg.ClaimsPrincipal) string {
 		return name
 	}
 
-	sub := p.FindFirst(gois.JwtClaimTypesSubject)
+	sub := p.FindFirst(wicket.JwtClaimTypesSubject)
 	if sub != nil {
 		return sub.Value.(string)
 	}

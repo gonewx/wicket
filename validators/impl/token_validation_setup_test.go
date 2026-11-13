@@ -110,17 +110,17 @@ func createDefaultTokenCreator(options *config_options.WicketOptions) services.T
 // JWT signer.
 func createAccessToken(client *storage_models.Client, subjectId string, lifetime int, scopes []string) *storage_models.Token {
 	tokenClaims := []*claimspkg.Claim{
-		claimspkg.NewClaim(claimspkg.WithClaimType(gois.JwtClaimTypesClientId), claimspkg.WithClaimValue(client.ClientId)),
-		claimspkg.NewClaim(claimspkg.WithClaimType(gois.JwtClaimTypesSubject), claimspkg.WithClaimValue(subjectId)),
+		claimspkg.NewClaim(claimspkg.WithClaimType(wicket.JwtClaimTypesClientId), claimspkg.WithClaimValue(client.ClientId)),
+		claimspkg.NewClaim(claimspkg.WithClaimType(wicket.JwtClaimTypesSubject), claimspkg.WithClaimValue(subjectId)),
 	}
 	for _, scope := range scopes {
 		tokenClaims = append(tokenClaims, claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesScope),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesScope),
 			claimspkg.WithClaimValue(scope),
 		))
 	}
 	return &storage_models.Token{
-		Type:         gois.TokenTypesAccessToken,
+		Type:         wicket.TokenTypesAccessToken,
 		Issuer:       tokenTestIssuer,
 		Audiences:    []string{client.ClientId},
 		CreationTime: tokenTestNow,
@@ -142,14 +142,14 @@ func createAccessTokenLong(client *storage_models.Client, subjectId string, life
 // requesting client, as OpenID Connect requires.
 func createIdentityToken(clientId string, subjectId string) *storage_models.Token {
 	return &storage_models.Token{
-		Type:         gois.TokenTypesIdentityToken,
+		Type:         wicket.TokenTypesIdentityToken,
 		Issuer:       tokenTestIssuer,
 		Audiences:    []string{clientId},
 		CreationTime: tokenTestNow,
 		Lifetime:     600,
 		ClientId:     clientId,
 		Claims: []*claimspkg.Claim{
-			claimspkg.NewClaim(claimspkg.WithClaimType(gois.JwtClaimTypesSubject), claimspkg.WithClaimValue(subjectId)),
+			claimspkg.NewClaim(claimspkg.WithClaimType(wicket.JwtClaimTypesSubject), claimspkg.WithClaimValue(subjectId)),
 		},
 	}
 }

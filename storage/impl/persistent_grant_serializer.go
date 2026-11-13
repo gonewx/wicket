@@ -13,13 +13,13 @@ import (
 	"github.com/gonewx/wicket/dp"
 )
 
-func WithPersistentGrantOptions(options *config_options.PersistentGrantOptions) gois.Option[PersistentGrantSerializer] {
+func WithPersistentGrantOptions(options *config_options.PersistentGrantOptions) wicket.Option[PersistentGrantSerializer] {
 	return func(s *PersistentGrantSerializer) {
 		s.options = options
 	}
 }
 
-func WithPersistentGrantDataProtector(dataProtector dp.DataProtectionProvider) gois.Option[PersistentGrantSerializer] {
+func WithPersistentGrantDataProtector(dataProtector dp.DataProtectionProvider) wicket.Option[PersistentGrantSerializer] {
 	return func(s *PersistentGrantSerializer) {
 		s.protector = dataProtector.Create("PersistentGrantSerializer")
 	}
@@ -36,7 +36,7 @@ type PersistentGrantSerializer struct {
 	protector dp.DataProtector
 }
 
-func NewPersistentGrantSerializer(opts ...gois.Option[PersistentGrantSerializer]) *PersistentGrantSerializer {
+func NewPersistentGrantSerializer(opts ...wicket.Option[PersistentGrantSerializer]) *PersistentGrantSerializer {
 	s := &PersistentGrantSerializer{}
 	for _, opt := range opts {
 		opt(s)

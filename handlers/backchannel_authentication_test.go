@@ -59,12 +59,12 @@ func TestBackchannelAuthenticationHandlerProcessTable(t *testing.T) {
 		"client authentication failure writes standard error": {
 			clientResult: func() *validators_models.ClientSecretValidationResult {
 				result := validators_models.NewClientSecretValidationResult()
-				result.Error = gois.TokenErrorsInvalidClient
+				result.Error = wicket.TokenErrorsInvalidClient
 				return result
 			}(),
 			requestResult: successValidation,
 			wantStatus:    http.StatusBadRequest,
-			wantError:     gois.TokenErrorsInvalidClient,
+			wantError:     wicket.TokenErrorsInvalidClient,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

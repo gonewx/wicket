@@ -90,7 +90,7 @@ func (v *ResourceValidator) ValidateRequestedResources(ctx context.Context, requ
 			result.InvalidScopes = appendDistinct(result.InvalidScopes, parsedScope.RawValue)
 			continue
 		}
-		if scopeName == gois.StandardScopesOfflineAccess {
+		if scopeName == wicket.StandardScopesOfflineAccess {
 			if request.Client == nil || request.Client.AllowOfflineAccess {
 				validScopeNames = appendDistinct(validScopeNames, scopeName)
 				continue
@@ -172,7 +172,7 @@ func (v *ResourceValidator) ValidateRequestedResources(ctx context.Context, requ
 	}
 
 	result.Resources = storage_models.NewResources(
-		storage_models.WithResourcesOfflineAccess(contains(validScopeNames, gois.StandardScopesOfflineAccess)),
+		storage_models.WithResourcesOfflineAccess(contains(validScopeNames, wicket.StandardScopesOfflineAccess)),
 		storage_models.WithResourcesIdentityResources(identityResourcesToKeep),
 		storage_models.WithResourcesApiResources(selectedApiResources),
 		storage_models.WithResourcesApiScopes(apiScopesToKeep),
@@ -200,7 +200,7 @@ func clientAllowsScope(client *storage_models.Client, scope string) bool {
 	if client == nil {
 		return true
 	}
-	if scope == gois.StandardScopesOfflineAccess && client.AllowOfflineAccess {
+	if scope == wicket.StandardScopesOfflineAccess && client.AllowOfflineAccess {
 		return true
 	}
 	return utils.Contains(client.AllowedScopes, scope)

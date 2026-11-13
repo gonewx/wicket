@@ -118,7 +118,7 @@ func TestEndSessionCallbackResultfsuccess_should_add_unsafe_inline_for_csp_level
 
 	test := newEndSessionCallbackResultTests()
 	test.validationResult.Error = nil
-	test.options.Csp.Level = gois.CspLevelOne
+	test.options.Csp.Level = wicket.CspLevelOne
 
 	request := httptest.NewRequest(http.MethodGet, "https://server", nil)
 

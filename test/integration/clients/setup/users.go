@@ -18,31 +18,31 @@ func GetUsers() []*test.TestUser {
 	user1.Password = "alice"
 	user1.Claims = []*claimspkg.Claim{
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesName), claimspkg.WithClaimValue("Alice Smith"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesName), claimspkg.WithClaimValue("Alice Smith"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesGivenName), claimspkg.WithClaimValue("Alice"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesGivenName), claimspkg.WithClaimValue("Alice"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesFamilyName), claimspkg.WithClaimValue("Smith"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesFamilyName), claimspkg.WithClaimValue("Smith"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesEmail), claimspkg.WithClaimValue("AliceSmith@email.com"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesEmail), claimspkg.WithClaimValue("AliceSmith@email.com"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesEmailVerified), claimspkg.WithClaimValue(true),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesEmailVerified), claimspkg.WithClaimValue(true),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesRole), claimspkg.WithClaimValue("Admin"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesRole), claimspkg.WithClaimValue("Admin"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesRole), claimspkg.WithClaimValue("Geek"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesRole), claimspkg.WithClaimValue("Geek"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesWebSite), claimspkg.WithClaimValue("http://alice.com"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesWebSite), claimspkg.WithClaimValue("http://alice.com"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesAddress), claimspkg.WithClaimValue("{ 'street_address': 'One Hacker Way', 'locality': 'Heidelberg', 'postal_code': 69118, 'country': 'Germany' }"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesAddress), claimspkg.WithClaimValue("{ 'street_address': 'One Hacker Way', 'locality': 'Heidelberg', 'postal_code': 69118, 'country': 'Germany' }"),
 		),
 	}
 
@@ -52,31 +52,31 @@ func GetUsers() []*test.TestUser {
 	user2.Password = "bob"
 	user2.Claims = []*claimspkg.Claim{
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesName), claimspkg.WithClaimValue("Bob Smith"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesName), claimspkg.WithClaimValue("Bob Smith"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesGivenName), claimspkg.WithClaimValue("Bob"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesGivenName), claimspkg.WithClaimValue("Bob"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesFamilyName), claimspkg.WithClaimValue("Smith"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesFamilyName), claimspkg.WithClaimValue("Smith"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesEmail), claimspkg.WithClaimValue("BobSmith@email.com"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesEmail), claimspkg.WithClaimValue("BobSmith@email.com"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesEmailVerified), claimspkg.WithClaimValue(true),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesEmailVerified), claimspkg.WithClaimValue(true),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesRole), claimspkg.WithClaimValue("Developer"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesRole), claimspkg.WithClaimValue("Developer"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesRole), claimspkg.WithClaimValue("Geek"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesRole), claimspkg.WithClaimValue("Geek"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesWebSite), claimspkg.WithClaimValue("http://bob.com"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesWebSite), claimspkg.WithClaimValue("http://bob.com"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesAddress), claimspkg.WithClaimValue("{ 'street_address': 'One Hacker Way', 'locality': 'Heidelberg', 'postal_code': 69118, 'country': 'Germany' }"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesAddress), claimspkg.WithClaimValue("{ 'street_address': 'One Hacker Way', 'locality': 'Heidelberg', 'postal_code': 69118, 'country': 'Germany' }"),
 		),
 	}
 
@@ -85,31 +85,31 @@ func GetUsers() []*test.TestUser {
 	user3.Username = "bob_no_password"
 	user3.Claims = []*claimspkg.Claim{
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesName), claimspkg.WithClaimValue("Bob Smith"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesName), claimspkg.WithClaimValue("Bob Smith"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesGivenName), claimspkg.WithClaimValue("Bob"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesGivenName), claimspkg.WithClaimValue("Bob"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesFamilyName), claimspkg.WithClaimValue("Smith"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesFamilyName), claimspkg.WithClaimValue("Smith"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesEmail), claimspkg.WithClaimValue("BobSmith@email.com"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesEmail), claimspkg.WithClaimValue("BobSmith@email.com"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesEmailVerified), claimspkg.WithClaimValue(true),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesEmailVerified), claimspkg.WithClaimValue(true),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesRole), claimspkg.WithClaimValue("Developer"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesRole), claimspkg.WithClaimValue("Developer"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesRole), claimspkg.WithClaimValue("Geek"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesRole), claimspkg.WithClaimValue("Geek"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesWebSite), claimspkg.WithClaimValue("http://bob.com"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesWebSite), claimspkg.WithClaimValue("http://bob.com"),
 		),
 		claimspkg.NewClaim(
-			claimspkg.WithClaimType(gois.JwtClaimTypesAddress), claimspkg.WithClaimValue("{ 'street_address': 'One Hacker Way', 'locality': 'Heidelberg', 'postal_code': 69118, 'country': 'Germany' }"),
+			claimspkg.WithClaimType(wicket.JwtClaimTypesAddress), claimspkg.WithClaimValue("{ 'street_address': 'One Hacker Way', 'locality': 'Heidelberg', 'postal_code': 69118, 'country': 'Germany' }"),
 		),
 	}
 

@@ -49,7 +49,7 @@ func (v *DeviceCodeValidator) Validate(ctx context.Context, validation *validato
 		v.logger.Error("Invalid device code")
 		validation.Result = validators_models.NewTokenRequestValidationResult(
 			validation.Request,
-			validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsInvalidGrant),
+			validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsInvalidGrant),
 		)
 		return nil
 	}
@@ -59,7 +59,7 @@ func (v *DeviceCodeValidator) Validate(ctx context.Context, validation *validato
 		v.logger.Error("Client 0 is trying to use a device code from client 1", slog.String("client0", validation.Request.Client.ClientId), slog.String("client1", deviceCode.ClientId))
 		validation.Result = validators_models.NewTokenRequestValidationResult(
 			validation.Request,
-			validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsInvalidGrant),
+			validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsInvalidGrant),
 		)
 		return nil
 	}
@@ -70,7 +70,7 @@ func (v *DeviceCodeValidator) Validate(ctx context.Context, validation *validato
 		v.logger.Error("Client is polling too fast", slog.String("client", deviceCode.ClientId))
 		validation.Result = validators_models.NewTokenRequestValidationResult(
 			validation.Request,
-			validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsSlowDown),
+			validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsSlowDown),
 		)
 		return nil
 	}
@@ -80,7 +80,7 @@ func (v *DeviceCodeValidator) Validate(ctx context.Context, validation *validato
 		v.logger.Error("Expired device code")
 		validation.Result = validators_models.NewTokenRequestValidationResult(
 			validation.Request,
-			validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsExpiredToken),
+			validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsExpiredToken),
 		)
 		return nil
 	}
@@ -90,7 +90,7 @@ func (v *DeviceCodeValidator) Validate(ctx context.Context, validation *validato
 		v.logger.Error("No scopes authorized for device authorization. Access denied")
 		validation.Result = validators_models.NewTokenRequestValidationResult(
 			validation.Request,
-			validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsAccessDenied),
+			validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsAccessDenied),
 		)
 		return nil
 	}
@@ -99,20 +99,20 @@ func (v *DeviceCodeValidator) Validate(ctx context.Context, validation *validato
 	if !deviceCode.IsAuthorized || deviceCode.Subject == nil {
 		validation.Result = validators_models.NewTokenRequestValidationResult(
 			validation.Request,
-			validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsAuthorizationPending),
+			validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsAuthorizationPending),
 		)
 		return nil
 	}
 
 	// make sure user is enabled
-	isActiveCtx := models_contexts.NewIsActiveContext(deviceCode.Subject, validation.Request.Client, gois.ProfileIsActiveCallersDeviceCodeValidation)
+	isActiveCtx := models_contexts.NewIsActiveContext(deviceCode.Subject, validation.Request.Client, wicket.ProfileIsActiveCallersDeviceCodeValidation)
 
 	v.profile.IsActive(isActiveCtx)
 	if !isActiveCtx.IsActive {
 		v.logger.Error("User has been disabled:", slog.String("subjectId", extensions.GetSubjectIdFromPrincipal(deviceCode.Subject)))
 		validation.Result = validators_models.NewTokenRequestValidationResult(
 			validation.Request,
-			validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsInvalidGrant),
+			validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsInvalidGrant),
 		)
 		return nil
 	}
@@ -126,7 +126,7 @@ func (v *DeviceCodeValidator) Validate(ctx context.Context, validation *validato
 		v.logger.Error("Error removing device code", slog.String("err", err.Error()))
 		validation.Result = validators_models.NewTokenRequestValidationResult(
 			validation.Request,
-			validators_models.WithTokenRequestValidationResultError(gois.TokenErrorsInvalidGrant),
+			validators_models.WithTokenRequestValidationResultError(wicket.TokenErrorsInvalidGrant),
 		)
 		return nil
 	}

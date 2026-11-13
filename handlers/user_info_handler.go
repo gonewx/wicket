@@ -51,10 +51,10 @@ func (h *UserInfoHandler) Process(w http.ResponseWriter, r *http.Request) error 
 
 	usage, err := h.bearerValidator.Validate(r)
 	if err != nil {
-		return results.NewProtectedResourceErrorResult(gois.ProtectedResourceErrorsInvalidRequest, "").Execute(w, r)
+		return results.NewProtectedResourceErrorResult(wicket.ProtectedResourceErrorsInvalidRequest, "").Execute(w, r)
 	}
 	if usage == nil || !usage.TokenFound {
-		return results.NewProtectedResourceErrorResult(gois.ProtectedResourceErrorsInvalidToken, "").Execute(w, r)
+		return results.NewProtectedResourceErrorResult(wicket.ProtectedResourceErrorsInvalidToken, "").Execute(w, r)
 	}
 
 	validationResult, err := h.requestValidator.ValidateRequest(r.Context(), usage.Token)

@@ -28,7 +28,7 @@ func newUserInfoPipeline() *integration_common.WicketPipeline {
 	secret := storage_models.NewSecret()
 	secret.Value = utils.Sha256("secret")
 	client.ClientSecrets = []*storage_models.Secret{secret}
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesPassword); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesPassword); err != nil {
 		panic(err)
 	}
 	client.AllowedScopes = []string{"openid"}

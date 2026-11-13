@@ -46,7 +46,7 @@ func (p *SecretParser) Parse(request *http.Request) (*models.ParsedSecret, error
 
 			bestSecret = parsedSecret
 
-			if parsedSecret.Type != gois.ParsedSecretTypesNoSecret {
+			if parsedSecret.Type != wicket.ParsedSecretTypesNoSecret {
 				break
 			}
 		}

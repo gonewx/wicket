@@ -102,7 +102,7 @@ func TestCreateAccessTokenSessionBinding(t *testing.T) {
 			token, err := svc.CreateAccessToken(context.Background(), accessTokenRequest(nil, tc.sessionId))
 
 			require.NoError(t, err)
-			sidClaims := claimsOfType(token.Claims, gois.JwtClaimTypesSessionId)
+			sidClaims := claimsOfType(token.Claims, wicket.JwtClaimTypesSessionId)
 			if tc.wantSidSet {
 				require.Len(t, sidClaims, 1)
 				require.Equal(t, tc.sessionId, sidClaims[0].Value)
@@ -124,7 +124,7 @@ func TestCreateAccessTokenSessionIdSingleClaim(t *testing.T) {
 		claimspkg.WithAuthenticationType("test"),
 		claimspkg.WithClaims([]*claimspkg.Claim{
 			claimspkg.NewClaim(
-				claimspkg.WithClaimType(gois.JwtClaimTypesSessionId),
+				claimspkg.WithClaimType(wicket.JwtClaimTypesSessionId),
 				claimspkg.WithClaimValue("carried-over-session"),
 			),
 		}),
@@ -135,7 +135,7 @@ func TestCreateAccessTokenSessionIdSingleClaim(t *testing.T) {
 	token, err := svc.CreateAccessToken(context.Background(), request)
 
 	require.NoError(t, err)
-	sidClaims := claimsOfType(token.Claims, gois.JwtClaimTypesSessionId)
+	sidClaims := claimsOfType(token.Claims, wicket.JwtClaimTypesSessionId)
 	require.Len(t, sidClaims, 1)
 	require.Equal(t, "session-123", sidClaims[0].Value)
 }
@@ -153,12 +153,12 @@ func TestCreateSecurityTokenJwtIdAssembly(t *testing.T) {
 		presetJwtId  string
 		wantJwtId    bool
 	}{
-		"identity without opt-in":                {tokenType: gois.TokenTypesIdentityToken, includeJwtId: false, wantJwtId: false},
-		"access without opt-in":                  {tokenType: gois.TokenTypesAccessToken, includeJwtId: false, wantJwtId: false},
-		"identity with opt-in":                   {tokenType: gois.TokenTypesIdentityToken, includeJwtId: true, wantJwtId: false},
-		"access with opt-in":                     {tokenType: gois.TokenTypesAccessToken, includeJwtId: true, wantJwtId: true},
-		"legacy-versioned access without opt-in": {tokenType: gois.TokenTypesAccessToken, includeJwtId: false, version: 1, wantJwtId: false},
-		"access with opt-in replaces preset id":  {tokenType: gois.TokenTypesAccessToken, includeJwtId: true, presetJwtId: presetJwtId, wantJwtId: true},
+		"identity without opt-in":                {tokenType: wicket.TokenTypesIdentityToken, includeJwtId: false, wantJwtId: false},
+		"access without opt-in":                  {tokenType: wicket.TokenTypesAccessToken, includeJwtId: false, wantJwtId: false},
+		"identity with opt-in":                   {tokenType: wicket.TokenTypesIdentityToken, includeJwtId: true, wantJwtId: false},
+		"access with opt-in":                     {tokenType: wicket.TokenTypesAccessToken, includeJwtId: true, wantJwtId: true},
+		"legacy-versioned access without opt-in": {tokenType: wicket.TokenTypesAccessToken, includeJwtId: false, version: 1, wantJwtId: false},
+		"access with opt-in replaces preset id":  {tokenType: wicket.TokenTypesAccessToken, includeJwtId: true, presetJwtId: presetJwtId, wantJwtId: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			capture := &capturingTokenCreation{}
@@ -167,7 +167,7 @@ func TestCreateSecurityTokenJwtIdAssembly(t *testing.T) {
 			token := &storage_models.Token{Type: tc.tokenType, IncludeJwtId: tc.includeJwtId, Version: tc.version}
 			if tc.presetJwtId != "" {
 				token.Claims = append(token.Claims, claimspkg.NewClaim(
-					claimspkg.WithClaimType(gois.JwtClaimTypesJwtId),
+					claimspkg.WithClaimType(wicket.JwtClaimTypesJwtId),
 					claimspkg.WithClaimValue(tc.presetJwtId),
 				))
 			}
@@ -175,7 +175,7 @@ func TestCreateSecurityTokenJwtIdAssembly(t *testing.T) {
 			_, err := svc.CreateSecurityToken(context.Background(), token)
 			require.NoError(t, err)
 
-			jwtIdClaims := claimsOfType(capture.captured.Claims, gois.JwtClaimTypesJwtId)
+			jwtIdClaims := claimsOfType(capture.captured.Claims, wicket.JwtClaimTypesJwtId)
 			if tc.wantJwtId {
 				require.Len(t, jwtIdClaims, 1)
 				require.NotEmpty(t, jwtIdClaims[0].Value)

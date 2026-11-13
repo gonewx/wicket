@@ -171,15 +171,15 @@ func (ar *AuthorizeResult) renderAuthorizeResponse(w http.ResponseWriter, r *htt
 	req := ar.Response.Request
 
 	if req == nil {
-		return gois.ArgumentNullException
+		return wicket.ArgumentNullException
 	}
 
-	if req.ResponseMode == gois.ResponseModesQuery || req.ResponseMode == gois.ResponseModesFragment {
+	if req.ResponseMode == wicket.ResponseModesQuery || req.ResponseMode == wicket.ResponseModesFragment {
 		HttpRespSetNoCache(w)
 		redirectUri := ar.buildRedirectUri()
 		http.Redirect(w, r, redirectUri, http.StatusFound)
 	} else {
-		if req.ResponseMode == gois.ResponseModesFormPost {
+		if req.ResponseMode == wicket.ResponseModesFormPost {
 			HttpRespSetNoCache(w)
 			// the hash matches the inline submit script embedded in formPostHtml below
 			AddScriptCspHeaders(w, ar.options.Csp, "sha256-orD0/VhH8hLqrLxKHD/HUEMdwqX6/0ve7c5hspX5VJ8=")
@@ -189,7 +189,7 @@ func (ar *AuthorizeResult) renderAuthorizeResponse(w http.ResponseWriter, r *htt
 			}
 
 		} else {
-			return gois.InvalidOperationException
+			return wicket.InvalidOperationException
 		}
 	}
 
@@ -247,7 +247,7 @@ func (ar *AuthorizeResult) buildRedirectUri() string {
 
 	query := ar.ToQueryValues(ar.options).Encode()
 
-	if ar.Response.Request.ResponseMode == gois.ResponseModesQuery {
+	if ar.Response.Request.ResponseMode == wicket.ResponseModesQuery {
 		uri = utils.AddQueryString(uri, query)
 	} else {
 		uri = utils.AddHashFragment(uri, query)
@@ -262,12 +262,12 @@ func (ar *AuthorizeResult) buildRedirectUri() string {
 }
 
 func isSafeError(err error) bool {
-	if errors.Is(err, gois.AuthorizeErrorsAccessDenied) ||
-		errors.Is(err, gois.AuthorizeErrorsAccountSelectionRequired) ||
-		errors.Is(err, gois.AuthorizeErrorsLoginRequired) ||
-		errors.Is(err, gois.AuthorizeErrorsConsentRequired) ||
-		errors.Is(err, gois.AuthorizeErrorsInteractionRequired) ||
-		errors.Is(err, gois.AuthorizeErrorsTemporarilyUnavailable) {
+	if errors.Is(err, wicket.AuthorizeErrorsAccessDenied) ||
+		errors.Is(err, wicket.AuthorizeErrorsAccountSelectionRequired) ||
+		errors.Is(err, wicket.AuthorizeErrorsLoginRequired) ||
+		errors.Is(err, wicket.AuthorizeErrorsConsentRequired) ||
+		errors.Is(err, wicket.AuthorizeErrorsInteractionRequired) ||
+		errors.Is(err, wicket.AuthorizeErrorsTemporarilyUnavailable) {
 		return true
 	}
 

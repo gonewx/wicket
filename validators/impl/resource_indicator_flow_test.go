@@ -34,29 +34,29 @@ func TestAuthorizeRequestValidatorResourceIndicatorTable(t *testing.T) {
 		wantApiResources []string
 	}{
 		"code flow binds requested resource": {
-			grantTypes:       gois.GrantTypesCode,
-			responseType:     gois.ResponseTypesCode,
+			grantTypes:       wicket.GrantTypesCode,
+			responseType:     wicket.ResponseTypesCode,
 			resources:        []string{resourceOrders},
 			wantApiResources: []string{resourceOrders},
 		},
 		"malformed resource returns invalid target": {
-			grantTypes:   gois.GrantTypesCode,
-			responseType: gois.ResponseTypesCode,
+			grantTypes:   wicket.GrantTypesCode,
+			responseType: wicket.ResponseTypesCode,
 			resources:    []string{resourceOrders + "#frag"},
-			wantErr:      gois.AuthorizeErrorsInvalidTarget,
+			wantErr:      wicket.AuthorizeErrorsInvalidTarget,
 		},
 		"empty resource returns invalid target": {
-			grantTypes:   gois.GrantTypesCode,
-			responseType: gois.ResponseTypesCode,
+			grantTypes:   wicket.GrantTypesCode,
+			responseType: wicket.ResponseTypesCode,
 			resources:    []string{""},
-			wantErr:      gois.AuthorizeErrorsInvalidTarget,
+			wantErr:      wicket.AuthorizeErrorsInvalidTarget,
 		},
 		"implicit token response with resource remains rejected": {
-			grantTypes:   gois.GrantTypesImplicit,
-			responseType: gois.ResponseTypesToken,
+			grantTypes:   wicket.GrantTypesImplicit,
+			responseType: wicket.ResponseTypesToken,
 			allowBrowser: true,
 			resources:    []string{resourceOrders},
-			wantErr:      gois.AuthorizeErrorsInvalidTarget,
+			wantErr:      wicket.AuthorizeErrorsInvalidTarget,
 		},
 	}
 
@@ -67,13 +67,13 @@ func TestAuthorizeRequestValidatorResourceIndicatorTable(t *testing.T) {
 			validator, client := newResourceAuthorizeValidator(t, tt.grantTypes)
 			client.AllowAccessTokensViaBrowser = tt.allowBrowser
 			values := url.Values{
-				gois.AuthorizeRequestClientId:     {client.ClientId},
-				gois.AuthorizeRequestRedirectUri:  {client.RedirectUris[0]},
-				gois.AuthorizeRequestResponseType: {tt.responseType},
-				gois.AuthorizeRequestScope:        {"orders.read"},
+				wicket.AuthorizeRequestClientId:     {client.ClientId},
+				wicket.AuthorizeRequestRedirectUri:  {client.RedirectUris[0]},
+				wicket.AuthorizeRequestResponseType: {tt.responseType},
+				wicket.AuthorizeRequestScope:        {"orders.read"},
 			}
 			for _, resource := range tt.resources {
-				values.Add(gois.AuthorizeRequestResource, resource)
+				values.Add(wicket.AuthorizeRequestResource, resource)
 			}
 
 			result := validator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous())
@@ -119,10 +119,10 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 					t.Fatalf("store code: %v", err)
 				}
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
-					gois.TokenRequestResource:    {resourceOrders},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestResource:    {resourceOrders},
 				}
 			},
 			wantRequested:    resourceOrders,
@@ -136,19 +136,19 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 				code.CreationTime = ctx.clock.now
 				code.Lifetime = 300
 				code.RedirectUri = "https://client.example.com/callback"
-				code.RequestedScopes = []string{"orders.read", "common.read", gois.StandardScopesOfflineAccess}
+				code.RequestedScopes = []string{"orders.read", "common.read", wicket.StandardScopesOfflineAccess}
 				code.RequestedResourceGaps = []string{resourceOrders}
 				handle := "resource-code"
 				if err := ctx.authorizationCodes.StoreAuthorizationCode(context.Background(), handle, code); err != nil {
 					t.Fatalf("store code: %v", err)
 				}
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
 				}
 			},
-			wantEffective:    []string{"common.read", gois.StandardScopesOfflineAccess},
+			wantEffective:    []string{"common.read", wicket.StandardScopesOfflineAccess},
 			wantApiResources: []string{resourceCommon},
 		},
 		"authorization code rejects resource outside original grant": {
@@ -165,13 +165,13 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 					t.Fatalf("store code: %v", err)
 				}
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
-					gois.TokenRequestResource:    {resourcePayments},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestResource:    {resourcePayments},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"authorization code rejects resource when original grant had none": {
 			setup: func(t *testing.T, ctx *resourceTokenValidatorContext) url.Values {
@@ -186,43 +186,43 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 					t.Fatalf("store code: %v", err)
 				}
 				return url.Values{
-					gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-					gois.TokenRequestCode:        {handle},
-					gois.TokenRequestRedirectUri: {code.RedirectUri},
-					gois.TokenRequestResource:    {resourceOrders},
+					wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+					wicket.TokenRequestCode:        {handle},
+					wicket.TokenRequestRedirectUri: {code.RedirectUri},
+					wicket.TokenRequestResource:    {resourceOrders},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"token endpoint rejects multiple resources": {
 			setup: func(t *testing.T, ctx *resourceTokenValidatorContext) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType: {gois.GrantTypeClientCredentials},
-					gois.TokenRequestScope:     {"orders.read"},
-					gois.TokenRequestResource:  {resourceOrders, resourcePayments},
+					wicket.TokenRequestGrantType: {wicket.GrantTypeClientCredentials},
+					wicket.TokenRequestScope:     {"orders.read"},
+					wicket.TokenRequestResource:  {resourceOrders, resourcePayments},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"token endpoint rejects empty resource": {
 			setup: func(t *testing.T, ctx *resourceTokenValidatorContext) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType: {gois.GrantTypeClientCredentials},
-					gois.TokenRequestScope:     {"orders.read"},
-					gois.TokenRequestResource:  {""},
+					wicket.TokenRequestGrantType: {wicket.GrantTypeClientCredentials},
+					wicket.TokenRequestScope:     {"orders.read"},
+					wicket.TokenRequestResource:  {""},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"device code rejects explicit resource": {
 			setup: func(t *testing.T, ctx *resourceTokenValidatorContext) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType:  {gois.GrantTypeDeviceCode},
-					gois.TokenRequestDeviceCode: {"device"},
-					gois.TokenRequestResource:   {resourceOrders},
+					wicket.TokenRequestGrantType:  {wicket.GrantTypeDeviceCode},
+					wicket.TokenRequestDeviceCode: {"device"},
+					wicket.TokenRequestResource:   {resourceOrders},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"refresh token accepts authorized resource subset": {
 			setup: func(t *testing.T, ctx *resourceTokenValidatorContext) url.Values {
@@ -234,9 +234,9 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 					t.Fatalf("store refresh token: %v", err)
 				}
 				return url.Values{
-					gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-					gois.TokenRequestRefreshToken: {handle},
-					gois.TokenRequestResource:     {resourcePayments},
+					wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+					wicket.TokenRequestRefreshToken: {handle},
+					wicket.TokenRequestResource:     {resourcePayments},
 				}
 			},
 			wantRequested:     resourcePayments,
@@ -254,12 +254,12 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 					t.Fatalf("store refresh token: %v", err)
 				}
 				return url.Values{
-					gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-					gois.TokenRequestRefreshToken: {handle},
-					gois.TokenRequestResource:     {resourceOrders},
+					wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+					wicket.TokenRequestRefreshToken: {handle},
+					wicket.TokenRequestResource:     {resourceOrders},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"CIBA grant reuses saved requested resources": {
 			setup: func(t *testing.T, ctx *resourceTokenValidatorContext) url.Values {
@@ -275,8 +275,8 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 					t.Fatalf("store CIBA request: %v", err)
 				}
 				return url.Values{
-					gois.TokenRequestGrantType:               {gois.GrantTypeBackchannelAuthentication},
-					gois.TokenRequestAuthenticationRequestId: {state.RequestId},
+					wicket.TokenRequestGrantType:               {wicket.GrantTypeBackchannelAuthentication},
+					wicket.TokenRequestAuthenticationRequestId: {state.RequestId},
 				}
 			},
 			wantRequested:    resourceOrders,
@@ -298,12 +298,12 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 					t.Fatalf("store CIBA request: %v", err)
 				}
 				return url.Values{
-					gois.TokenRequestGrantType:               {gois.GrantTypeBackchannelAuthentication},
-					gois.TokenRequestAuthenticationRequestId: {state.RequestId},
-					gois.TokenRequestResource:                {resourceOrders},
+					wicket.TokenRequestGrantType:               {wicket.GrantTypeBackchannelAuthentication},
+					wicket.TokenRequestAuthenticationRequestId: {state.RequestId},
+					wicket.TokenRequestResource:                {resourceOrders},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 	}
 
@@ -358,14 +358,14 @@ func TestBackchannelAuthenticationRequestValidatorStoresRequestedResources(t *te
 		slog.Default(),
 	)
 	client := newResourceTokenClient(t)
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesBackchannelAuthentication); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesBackchannelAuthentication); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
 
 	result := validator.Validate(context.Background(), url.Values{
-		gois.BackchannelAuthenticationRequestScope:     {"orders.read"},
-		gois.BackchannelAuthenticationRequestResource:  {resourceOrders},
-		gois.BackchannelAuthenticationRequestLoginHint: {"alice"},
+		wicket.BackchannelAuthenticationRequestScope:     {"orders.read"},
+		wicket.BackchannelAuthenticationRequestResource:  {resourceOrders},
+		wicket.BackchannelAuthenticationRequestLoginHint: {"alice"},
 	}, client)
 	if result.Error != nil {
 		t.Fatalf("Validate error: %v", result.Error)
@@ -391,17 +391,17 @@ func TestBackchannelAuthenticationRequestValidatorRejectsEmptyResource(t *testin
 		slog.Default(),
 	)
 	client := newResourceTokenClient(t)
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesBackchannelAuthentication); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesBackchannelAuthentication); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
 
 	result := validator.Validate(context.Background(), url.Values{
-		gois.BackchannelAuthenticationRequestScope:     {"orders.read"},
-		gois.BackchannelAuthenticationRequestResource:  {""},
-		gois.BackchannelAuthenticationRequestLoginHint: {"alice"},
+		wicket.BackchannelAuthenticationRequestScope:     {"orders.read"},
+		wicket.BackchannelAuthenticationRequestResource:  {""},
+		wicket.BackchannelAuthenticationRequestLoginHint: {"alice"},
 	}, client)
-	if !errors.Is(result.Error, gois.TokenErrorsInvalidTarget) {
-		t.Fatalf("Validate error = %v, want %v", result.Error, gois.TokenErrorsInvalidTarget)
+	if !errors.Is(result.Error, wicket.TokenErrorsInvalidTarget) {
+		t.Fatalf("Validate error = %v, want %v", result.Error, wicket.TokenErrorsInvalidTarget)
 	}
 }
 
@@ -452,10 +452,10 @@ func newResourceTokenValidatorContext(t *testing.T) *resourceTokenValidatorConte
 	clock := &cibaTestClock{now: time.Date(2026, 7, 8, 9, 0, 0, 0, time.UTC)}
 	client := newResourceTokenClient(t)
 	if err := client.SetAllowedGrantTypes([]string{
-		gois.GrantTypeAuthorizationCode,
-		gois.GrantTypeClientCredentials,
-		gois.GrantTypeRefreshToken,
-		gois.GrantTypeBackchannelAuthentication,
+		wicket.GrantTypeAuthorizationCode,
+		wicket.GrantTypeClientCredentials,
+		wicket.GrantTypeRefreshToken,
+		wicket.GrantTypeBackchannelAuthentication,
 	}); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
@@ -502,6 +502,6 @@ func newResourceTokenClient(t *testing.T) *storage_models.Client {
 	client.RequireClientSecret = false
 	client.RequirePkce = false
 	client.AllowOfflineAccess = true
-	client.AllowedScopes = []string{"orders.read", "payments.read", "common.read", gois.StandardScopesOfflineAccess}
+	client.AllowedScopes = []string{"orders.read", "payments.read", "common.read", wicket.StandardScopesOfflineAccess}
 	return client
 }

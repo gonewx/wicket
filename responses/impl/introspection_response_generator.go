@@ -51,7 +51,7 @@ func (g *IntrospectionResponseGenerator) Handle(ctx context.Context, validationR
 
 	// get all claims. (without scopes)
 	response = utils.ToClaimsMap(utils.Where(validationResult.Claims, func(c *claims.Claim) bool {
-		return c.Type != gois.JwtClaimTypesScope
+		return c.Type != wicket.JwtClaimTypesScope
 	}))
 
 	// add active flag
@@ -60,7 +60,7 @@ func (g *IntrospectionResponseGenerator) Handle(ctx context.Context, validationR
 	// calculate scopes the caller is allowed to see
 	allowedScopes := validationResult.Api.Scopes
 	scopes := utils.Select(
-		utils.Where(validationResult.Claims, func(c *claims.Claim) bool { return c.Type == gois.JwtClaimTypesScope }),
+		utils.Where(validationResult.Claims, func(c *claims.Claim) bool { return c.Type == wicket.JwtClaimTypesScope }),
 		func(x *claims.Claim) string {
 			if value, ok := x.Value.(string); ok {
 				return value
@@ -80,7 +80,7 @@ func (g *IntrospectionResponseGenerator) Handle(ctx context.Context, validationR
 func (g *IntrospectionResponseGenerator) areExpectedScopesPresent(validationResult *validators_models.IntrospectionRequestValidationResult) bool {
 	apiScopes := validationResult.Api.Scopes
 	tokenScopes := utils.Where(validationResult.Claims, func(c *claims.Claim) bool {
-		return c.Type == gois.JwtClaimTypesScope
+		return c.Type == wicket.JwtClaimTypesScope
 	})
 
 	tokenScopesThatMatchApi := utils.Where(tokenScopes, func(c *claims.Claim) bool {

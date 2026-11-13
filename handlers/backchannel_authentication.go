@@ -22,11 +22,11 @@ func NewBackchannelAuthenticationHandler(clientValidator validators.ClientSecret
 
 func (h *BackchannelAuthenticationHandler) Process(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
-		return results.NewBadRequestResult(gois.TokenErrorsInvalidRequest, "").Execute(w, r)
+		return results.NewBadRequestResult(wicket.TokenErrorsInvalidRequest, "").Execute(w, r)
 	}
 	clientResult := h.clientValidator.Validate(r)
 	if clientResult == nil || clientResult.Error != nil {
-		err := gois.TokenErrorsInvalidClient
+		err := wicket.TokenErrorsInvalidClient
 		if clientResult != nil && clientResult.Error != nil {
 			err = clientResult.Error
 		}

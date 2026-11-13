@@ -72,17 +72,17 @@ func NewTokenResponseGeneratorWithBackchannelRequests(
 // Processes the response.
 func (g *TokenResponseGenerator) Handle(ctx context.Context, request *validators_models.TokenRequestValidationResult) (*responses_models.TokenResponse, error) {
 	switch request.ValidatedRequest.GrantType {
-	case gois.GrantTypeClientCredentials:
+	case wicket.GrantTypeClientCredentials:
 		return g.handleClientCredentialsRequest(ctx, request)
-	case gois.GrantTypePassword:
+	case wicket.GrantTypePassword:
 		return g.handlePasswordRequest(ctx, request)
-	case gois.GrantTypeAuthorizationCode:
+	case wicket.GrantTypeAuthorizationCode:
 		return g.handleAuthorizationCodeRequest(ctx, request)
-	case gois.GrantTypeRefreshToken:
+	case wicket.GrantTypeRefreshToken:
 		return g.handleRefreshTokenRequest(ctx, request)
-	case gois.GrantTypeDeviceCode:
+	case wicket.GrantTypeDeviceCode:
 		return g.handleDeviceCodeRequest(ctx, request)
-	case gois.GrantTypeBackchannelAuthentication:
+	case wicket.GrantTypeBackchannelAuthentication:
 		return g.handleBackchannelAuthenticationRequest(ctx, request)
 	default:
 		return g.handleExtensionGrant(ctx, request)
@@ -208,7 +208,7 @@ func (g *TokenResponseGenerator) handleRefreshTokenRequest(ctx context.Context, 
 	)
 	if err != nil {
 		if errors.Is(err, storage.ErrVersionConflict) {
-			return nil, fmt.Errorf("%w: %w", gois.TokenErrorsInvalidGrant, err)
+			return nil, fmt.Errorf("%w: %w", wicket.TokenErrorsInvalidGrant, err)
 		}
 		return nil, err
 	}
@@ -438,7 +438,7 @@ func selectedResourceGaps(value string) []string {
 }
 
 func (g *TokenResponseGenerator) CreateIdTokenFromRefreshTokenRequest(ctx context.Context, request *validators_models.ValidatedTokenRequest, newAccessToken string) (string, error) {
-	if utils.Contains(request.RefreshToken.AuthorizedScopes, gois.StandardScopesOpenId) {
+	if utils.Contains(request.RefreshToken.AuthorizedScopes, wicket.StandardScopesOpenId) {
 		tokenRequest := &responses_models.TokenCreationRequest{
 			Subject:            request.RefreshToken.Subject,
 			ValidatedResources: request.ValidatedResources,

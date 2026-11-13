@@ -60,7 +60,7 @@ func clientValidationTestClients() []*storage_models.Client {
 	v, _ := key.Thumbprint(crypto.MD5)
 
 	secret = storage_models.NewSecret()
-	secret.Type = gois.SecretTypesX509CertificateThumbprint
+	secret.Type = wicket.SecretTypesX509CertificateThumbprint
 	secret.Value = string(v)
 
 	certificateValid.ClientSecrets = []*storage_models.Secret{secret}
@@ -71,7 +71,7 @@ func clientValidationTestClients() []*storage_models.Client {
 	certificateInvalid.Enabled = true
 
 	secret = storage_models.NewSecret()
-	secret.Type = gois.SecretTypesX509CertificateThumbprint
+	secret.Type = wicket.SecretTypesX509CertificateThumbprint
 	secret.Value = "invalid"
 
 	certificateInvalid.ClientSecrets = []*storage_models.Secret{secret}
@@ -84,7 +84,7 @@ func clientValidationTestClients() []*storage_models.Client {
 	cert, _ := test_common.Load()
 
 	secret = storage_models.NewSecret()
-	secret.Type = gois.SecretTypesX509CertificateBase64
+	secret.Type = wicket.SecretTypesX509CertificateBase64
 	secret.Value = base64.StdEncoding.EncodeToString(cert)
 
 	certificateBase64Valid.ClientSecrets = []*storage_models.Secret{secret}
@@ -95,7 +95,7 @@ func clientValidationTestClients() []*storage_models.Client {
 	certificateBase64Invalid.Enabled = true
 
 	secret = storage_models.NewSecret()
-	secret.Type = gois.SecretTypesX509CertificateBase64
+	secret.Type = wicket.SecretTypesX509CertificateBase64
 	secret.Value = "invalid"
 
 	certificateBase64Invalid.ClientSecrets = []*storage_models.Secret{secret}
@@ -180,12 +180,12 @@ func clientValidationTestClients() []*storage_models.Client {
 	secret1 = storage_models.NewSecret()
 	secret1.Value = "CN=invalid"
 	secret1.Description = "mtls.test"
-	secret1.Type = gois.SecretTypesX509CertificateName
+	secret1.Type = wicket.SecretTypesX509CertificateName
 
 	secret2 = storage_models.NewSecret()
 	secret2.Value = "invalid"
 	secret2.Description = "mtls.test"
-	secret2.Type = gois.SecretTypesX509CertificateThumbprint
+	secret2.Type = wicket.SecretTypesX509CertificateThumbprint
 
 	mtlsClientInvalid.ClientSecrets = []*storage_models.Secret{
 		secret1,
@@ -200,12 +200,12 @@ func clientValidationTestClients() []*storage_models.Client {
 	secret1 = storage_models.NewSecret()
 	secret1.Value = "CN=identityserver_testing"
 	secret1.Description = "mtls.test"
-	secret1.Type = gois.SecretTypesX509CertificateName
+	secret1.Type = wicket.SecretTypesX509CertificateName
 
 	secret2 = storage_models.NewSecret()
 	secret2.Value = "4B5FE072C7AD8A9B5DCFDD1A20608BB54DE0954F"
 	secret2.Description = "mtls.test"
-	secret2.Type = gois.SecretTypesX509CertificateThumbprint
+	secret2.Type = wicket.SecretTypesX509CertificateThumbprint
 
 	mtlsClientValid.ClientSecrets = []*storage_models.Secret{
 		secret1,

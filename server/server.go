@@ -39,14 +39,14 @@ type Server struct {
 	provider godi.Provider
 }
 
-func WithLogger(logger *slog.Logger) gois.Option[Server] {
+func WithLogger(logger *slog.Logger) wicket.Option[Server] {
 	return func(s *Server) {
 		s.Logger = logger
 	}
 }
 
 // From: IdentityServer4/src/IdentityServer/Configuration/IdentityServerApplicationBuilderExtensions.cs
-func DefaultServer(p godi.Provider, opts ...gois.Option[Server]) (*Server, error) {
+func DefaultServer(p godi.Provider, opts ...wicket.Option[Server]) (*Server, error) {
 	if p == nil {
 		return nil, fmt.Errorf("wicket provider is required")
 	}

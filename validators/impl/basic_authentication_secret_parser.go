@@ -79,7 +79,7 @@ func (p *BasicAuthenticationSecretParser) Parse(request *http.Request) (*models.
 		parsedSecret := &models.ParsedSecret{
 			Id:         p.Decode(clientId),
 			Credential: p.Decode(secret),
-			Type:       gois.ParsedSecretTypesSharedSecret,
+			Type:       wicket.ParsedSecretTypesSharedSecret,
 		}
 
 		return parsedSecret, nil
@@ -89,7 +89,7 @@ func (p *BasicAuthenticationSecretParser) Parse(request *http.Request) (*models.
 
 		parsedSecret := &models.ParsedSecret{
 			Id:   p.Decode(clientId),
-			Type: gois.ParsedSecretTypesNoSecret,
+			Type: wicket.ParsedSecretTypesNoSecret,
 		}
 
 		return parsedSecret, nil
@@ -98,7 +98,7 @@ func (p *BasicAuthenticationSecretParser) Parse(request *http.Request) (*models.
 
 // Returns the authentication method name that this parser implements
 func (p *BasicAuthenticationSecretParser) AuthenticationMethod() string {
-	return gois.EndpointAuthenticationMethodsBasicAuthentication
+	return wicket.EndpointAuthenticationMethodsBasicAuthentication
 }
 
 // RFC6749 says individual values must be application/x-www-form-urlencoded

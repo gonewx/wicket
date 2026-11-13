@@ -30,17 +30,17 @@ func TestTokenRequestValidationDeviceFlowInvalid(t *testing.T) {
 	}{
 		"missing device_code parameter is rejected": {
 			clientId: "device_flow",
-			wantErr:  gois.TokenErrorsInvalidRequest,
+			wantErr:  wicket.TokenErrorsInvalidRequest,
 		},
 		"device_code exceeding the maximum length is rejected": {
 			clientId:   "device_flow",
 			deviceCode: "over-limit",
-			wantErr:    gois.TokenErrorsInvalidGrant,
+			wantErr:    wicket.TokenErrorsInvalidGrant,
 		},
 		"client without device flow permission is rejected": {
 			clientId:   "codeclient",
 			deviceCode: "device",
-			wantErr:    gois.TokenErrorsUnauthorizedClient,
+			wantErr:    wicket.TokenErrorsUnauthorizedClient,
 		},
 		"device code verification failure is surfaced": {
 			clientId:   "device_flow",
@@ -52,13 +52,13 @@ func TestTokenRequestValidationDeviceFlowInvalid(t *testing.T) {
 			clientId:   "device_flow",
 			deviceCode: "device",
 			resource:   "api",
-			wantErr:    gois.TokenErrorsInvalidTarget,
+			wantErr:    wicket.TokenErrorsInvalidTarget,
 		},
 		"well-formed resource parameter is still rejected": {
 			clientId:   "device_flow",
 			deviceCode: "device",
 			resource:   "urn:api1",
-			wantErr:    gois.TokenErrorsInvalidTarget,
+			wantErr:    wicket.TokenErrorsInvalidTarget,
 		},
 	}
 
@@ -68,17 +68,17 @@ func TestTokenRequestValidationDeviceFlowInvalid(t *testing.T) {
 
 			f := newTokenGrantFixture(t, tt.options...)
 			parameters := url.Values{
-				gois.TokenRequestGrantType: {gois.GrantTypeDeviceCode},
+				wicket.TokenRequestGrantType: {wicket.GrantTypeDeviceCode},
 			}
 			if tt.deviceCode != "" {
 				deviceCode := tt.deviceCode
 				if deviceCode == "over-limit" {
 					deviceCode = strings.Repeat("x", f.options.InputLengthRestrictions.DeviceCode+1)
 				}
-				parameters.Set(gois.TokenRequestDeviceCode, deviceCode)
+				parameters.Set(wicket.TokenRequestDeviceCode, deviceCode)
 			}
 			if tt.resource != "" {
-				parameters.Set(gois.TokenRequestResource, tt.resource)
+				parameters.Set(wicket.TokenRequestResource, tt.resource)
 			}
 
 			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
@@ -110,8 +110,8 @@ func TestTokenRequestValidationDeviceFlowValid(t *testing.T) {
 
 	f := newTokenGrantFixture(t, withGrantDeviceCodeValidator(deviceCodes))
 	parameters := url.Values{
-		gois.TokenRequestGrantType:  {gois.GrantTypeDeviceCode},
-		gois.TokenRequestDeviceCode: {"device"},
+		wicket.TokenRequestGrantType:  {wicket.GrantTypeDeviceCode},
+		wicket.TokenRequestDeviceCode: {"device"},
 	}
 
 	result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "device_flow"))

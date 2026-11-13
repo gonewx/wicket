@@ -102,7 +102,7 @@ func TestIntrospectionHandlerDispatch(t *testing.T) {
 			request: newIntrospectionForm("token=abc"),
 			apiResult: func() *validators_models.ApiSecretValidationResult {
 				result := validators_models.NewApiSecretValidationResult()
-				result.Error = gois.TokenErrorsInvalidRequest
+				result.Error = wicket.TokenErrorsInvalidRequest
 				return result
 			}(),
 			wantStatus: http.StatusUnauthorized,
@@ -112,7 +112,7 @@ func TestIntrospectionHandlerDispatch(t *testing.T) {
 			apiResult: okApi,
 			requestResult: func() *validators_models.IntrospectionRequestValidationResult {
 				result := validators_models.NewIntrospectionRequestValidationResult()
-				result.Error = gois.TokenErrorsInvalidRequest
+				result.Error = wicket.TokenErrorsInvalidRequest
 				return result
 			}(),
 			wantStatus: http.StatusBadRequest,
@@ -200,7 +200,7 @@ func TestUserInfoHandlerDispatch(t *testing.T) {
 	t.Run("invalid token returns 401", func(t *testing.T) {
 		t.Parallel()
 		invalid := validators_models.NewUserInfoRequestValidationResult()
-		invalid.Error = gois.ProtectedResourceErrorsInvalidToken
+		invalid.Error = wicket.ProtectedResourceErrorsInvalidToken
 		handler := newUserInfoHandlerUnderTest(invalid, nil)
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodGet, "https://wicket.test/connect/userinfo", nil)
@@ -216,7 +216,7 @@ func TestUserInfoHandlerDispatch(t *testing.T) {
 	t.Run("insufficient scope returns 403", func(t *testing.T) {
 		t.Parallel()
 		forbidden := validators_models.NewUserInfoRequestValidationResult()
-		forbidden.Error = gois.ProtectedResourceErrorsInsufficientScope
+		forbidden.Error = wicket.ProtectedResourceErrorsInsufficientScope
 		handler := newUserInfoHandlerUnderTest(forbidden, nil)
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodGet, "https://wicket.test/connect/userinfo", nil)

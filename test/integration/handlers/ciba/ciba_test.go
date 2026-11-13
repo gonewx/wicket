@@ -49,7 +49,7 @@ func newCibaPipeline(userValidator *capturingUserValidator) *integration_common.
 
 	client1 := storage_models.NewClient()
 	client1.ClientId = "client1"
-	if err := client1.SetAllowedGrantTypes(gois.GrantTypesBackchannelAuthentication); err != nil {
+	if err := client1.SetAllowedGrantTypes(wicket.GrantTypesBackchannelAuthentication); err != nil {
 		panic(err)
 	}
 	secret := storage_models.NewSecret()

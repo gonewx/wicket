@@ -37,7 +37,7 @@ func (v *ExtensionGrantValidator) Validate(request *validators_models.ValidatedT
 	if validator == nil {
 		v.logger.Error("No validator found for grant type")
 		return validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultError(gois.TokenRequestErrorsUnsupportedGrantType, ""),
+			validators_models.WithGrantValidationResultError(wicket.TokenRequestErrorsUnsupportedGrantType, ""),
 		)
 	}
 
@@ -50,7 +50,7 @@ func (v *ExtensionGrantValidator) Validate(request *validators_models.ValidatedT
 	if err != nil {
 		v.logger.Error("Grant validation error", slog.String("message", err.Error()))
 		return validators_models.NewGrantValidationResult(
-			validators_models.WithGrantValidationResultError(gois.TokenRequestErrorsInvalidGrant, ""),
+			validators_models.WithGrantValidationResultError(wicket.TokenRequestErrorsInvalidGrant, ""),
 		)
 
 	}

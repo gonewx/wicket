@@ -46,13 +46,13 @@ func TestCIBABackchannelAuthenticationPollRequestE2E(t *testing.T) {
 
 	fixture := newCIBAE2EFixture(t)
 	form := url.Values{
-		gois.AuthorizeRequestClientId:                        {fixture.client.ClientId},
-		gois.BackchannelAuthenticationRequestScope:           {gois.StandardScopesOpenId + " api"},
-		gois.BackchannelAuthenticationRequestResource:        {"https://resources.example.com/api"},
-		gois.BackchannelAuthenticationRequestLoginHint:       {"alice"},
-		gois.BackchannelAuthenticationRequestBindingMessage:  {"Transfer 100 USD"},
-		gois.BackchannelAuthenticationRequestUserCode:        {"123456"},
-		gois.BackchannelAuthenticationRequestRequestedExpiry: {"120"},
+		wicket.AuthorizeRequestClientId:                        {fixture.client.ClientId},
+		wicket.BackchannelAuthenticationRequestScope:           {wicket.StandardScopesOpenId + " api"},
+		wicket.BackchannelAuthenticationRequestResource:        {"https://resources.example.com/api"},
+		wicket.BackchannelAuthenticationRequestLoginHint:       {"alice"},
+		wicket.BackchannelAuthenticationRequestBindingMessage:  {"Transfer 100 USD"},
+		wicket.BackchannelAuthenticationRequestUserCode:        {"123456"},
+		wicket.BackchannelAuthenticationRequestRequestedExpiry: {"120"},
 	}
 
 	rec, body := postCIBAE2E(t, fixture.handler, form)
@@ -87,7 +87,7 @@ func TestCIBABackchannelAuthenticationPollRequestE2E(t *testing.T) {
 	if stored.SubjectId != "alice" || stored.Subject == nil {
 		t.Fatalf("stored subject = (%q, %#v), want alice subject", stored.SubjectId, stored.Subject)
 	}
-	if !reflect.DeepEqual(stored.RequestedScopes, []string{gois.StandardScopesOpenId, "api"}) {
+	if !reflect.DeepEqual(stored.RequestedScopes, []string{wicket.StandardScopesOpenId, "api"}) {
 		t.Fatalf("stored scopes = %#v", stored.RequestedScopes)
 	}
 	if !reflect.DeepEqual(stored.RequestedResourceGaps, []string{"https://resources.example.com/api"}) {
@@ -116,25 +116,25 @@ func TestCIBABackchannelAuthenticationErrorsE2E(t *testing.T) {
 	}{
 		"missing client id": {
 			form: url.Values{
-				gois.BackchannelAuthenticationRequestScope:     {gois.StandardScopesOpenId},
-				gois.BackchannelAuthenticationRequestLoginHint: {"alice"},
+				wicket.BackchannelAuthenticationRequestScope:     {wicket.StandardScopesOpenId},
+				wicket.BackchannelAuthenticationRequestLoginHint: {"alice"},
 			},
-			wantError: gois.TokenErrorsInvalidRequest,
+			wantError: wicket.TokenErrorsInvalidRequest,
 		},
 		"missing user hint": {
 			form: url.Values{
-				gois.AuthorizeRequestClientId:                  {"ciba-client"},
-				gois.BackchannelAuthenticationRequestScope:     {gois.StandardScopesOpenId},
-				gois.BackchannelAuthenticationRequestLoginHint: {""},
+				wicket.AuthorizeRequestClientId:                  {"ciba-client"},
+				wicket.BackchannelAuthenticationRequestScope:     {wicket.StandardScopesOpenId},
+				wicket.BackchannelAuthenticationRequestLoginHint: {""},
 			},
-			wantError: gois.TokenErrorsInvalidRequest,
+			wantError: wicket.TokenErrorsInvalidRequest,
 		},
 		"missing scope": {
 			form: url.Values{
-				gois.AuthorizeRequestClientId:                  {"ciba-client"},
-				gois.BackchannelAuthenticationRequestLoginHint: {"alice"},
+				wicket.AuthorizeRequestClientId:                  {"ciba-client"},
+				wicket.BackchannelAuthenticationRequestLoginHint: {"alice"},
 			},
-			wantError: gois.TokenErrorsInvalidScope,
+			wantError: wicket.TokenErrorsInvalidScope,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -210,9 +210,9 @@ func newCIBAE2EClient(t *testing.T) *storage_models.Client {
 	client := storage_models.NewClient()
 	client.ClientId = "ciba-client"
 	client.RequireClientSecret = false
-	client.AllowedScopes = []string{gois.StandardScopesOpenId, "api"}
+	client.AllowedScopes = []string{wicket.StandardScopesOpenId, "api"}
 	client.PollingInterval = &pollInterval
-	if err := client.SetAllowedGrantTypes(gois.GrantTypesBackchannelAuthentication); err != nil {
+	if err := client.SetAllowedGrantTypes(wicket.GrantTypesBackchannelAuthentication); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
 	return client
@@ -220,7 +220,7 @@ func newCIBAE2EClient(t *testing.T) *storage_models.Client {
 
 func newCIBAE2EIdentityResource() *storage_models.IdentityResource {
 	resource := storage_models.NewIdentityResource()
-	resource.Name = gois.StandardScopesOpenId
+	resource.Name = wicket.StandardScopesOpenId
 	return resource
 }
 

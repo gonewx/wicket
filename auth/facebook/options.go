@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/auth/oauth"
 	oauthcore "github.com/gonewx/wicket/auth/oauth/core"
 	claimspkg "github.com/gonewx/wicket/claims"
@@ -63,11 +63,11 @@ func (*Options) New() *Options {
 // Validate Check that the options are valid.  Should throw an exception if things are not ok.
 func (o *Options) Validate() error {
 	if strings.TrimSpace(o.AppId()) == "" {
-		return fmt.Errorf("Exception_OptionMustBeProvided : AppId : %w", gois.ArgumentNullException)
+		return fmt.Errorf("Exception_OptionMustBeProvided : AppId : %w", wicket.ArgumentNullException)
 	}
 
 	if strings.TrimSpace(o.AppSecret()) == "" {
-		return fmt.Errorf("Exception_OptionMustBeProvided : AppSecret : %w", gois.ArgumentNullException)
+		return fmt.Errorf("Exception_OptionMustBeProvided : AppSecret : %w", wicket.ArgumentNullException)
 	}
 
 	return o.Options.Validate()

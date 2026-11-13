@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 	cookiespkg "github.com/gonewx/wicket/cookies"
 )
 
@@ -18,7 +18,7 @@ type RequestPathBaseBuilder struct {
 	AdditionalPath string
 }
 
-func NewRequestPathBaseBuilder(opts ...gois.Option[RequestPathBaseBuilder]) *RequestPathBaseBuilder {
+func NewRequestPathBaseBuilder(opts ...wicket.Option[RequestPathBaseBuilder]) *RequestPathBaseBuilder {
 	b := &RequestPathBaseBuilder{}
 	b.BaseBuilder = cookiespkg.NewBaseBuilder()
 
@@ -29,7 +29,7 @@ func NewRequestPathBaseBuilder(opts ...gois.Option[RequestPathBaseBuilder]) *Req
 	return b
 }
 
-func NewBuilderByRequestPathBaseBuilder(opts ...gois.Option[RequestPathBaseBuilder]) *RequestPathBaseBuilder {
+func NewBuilderByRequestPathBaseBuilder(opts ...wicket.Option[RequestPathBaseBuilder]) *RequestPathBaseBuilder {
 	b := NewRequestPathBaseBuilder(opts...)
 
 	return b

@@ -47,7 +47,7 @@ func TestToken_without_sub_should_fail(t *testing.T) {
 	result, _ := validator.ValidateRequest(context.Background(), "token")
 
 	a.Error(result.Error)
-	a.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	a.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }
 
 func TestActive_user_should_succeed(t *testing.T) {
@@ -98,5 +98,5 @@ func TestUserInfoRequestValidatorInactive_user_should_fail(t *testing.T) {
 	result, _ := validator.ValidateRequest(context.Background(), "token")
 
 	a.Error(result.Error)
-	a.ErrorIs(result.Error, gois.ProtectedResourceErrorsInvalidToken)
+	a.ErrorIs(result.Error, wicket.ProtectedResourceErrorsInvalidToken)
 }

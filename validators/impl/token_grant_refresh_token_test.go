@@ -29,78 +29,78 @@ func TestTokenRequestValidationRefreshTokenInvalid(t *testing.T) {
 			clientId: "roclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-					gois.TokenRequestRefreshToken: {"nonexistent"},
+					wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+					wicket.TokenRequestRefreshToken: {"nonexistent"},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"handle exceeding the maximum length is rejected": {
 			clientId: "roclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				return url.Values{
-					gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-					gois.TokenRequestRefreshToken: {strings.Repeat("x", f.options.InputLengthRestrictions.RefreshToken+1)},
+					wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+					wicket.TokenRequestRefreshToken: {strings.Repeat("x", f.options.InputLengthRestrictions.RefreshToken+1)},
 				}
 			},
-			wantErr: gois.TokenErrorsInvalidGrant,
+			wantErr: wicket.TokenErrorsInvalidGrant,
 		},
 		"resource parameter exceeding the maximum length is rejected": {
 			clientId: "roclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestScopedRefreshParameters(t, f)
-				values.Set(gois.TokenRequestResource, "urn:"+strings.Repeat("a", f.options.InputLengthRestrictions.ResourceGapMaxLength))
+				values.Set(wicket.TokenRequestResource, "urn:"+strings.Repeat("a", f.options.InputLengthRestrictions.ResourceGapMaxLength))
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"resource parameter that is not an absolute URI is rejected": {
 			clientId: "roclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestScopedRefreshParameters(t, f)
-				values.Set(gois.TokenRequestResource, "api")
+				values.Set(wicket.TokenRequestResource, "api")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"repeated resource parameter is rejected": {
 			clientId: "roclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestScopedRefreshParameters(t, f)
-				values.Add(gois.TokenRequestResource, "urn:api1")
-				values.Add(gois.TokenRequestResource, "urn:api2")
+				values.Add(wicket.TokenRequestResource, "urn:api1")
+				values.Add(wicket.TokenRequestResource, "urn:api2")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"invalid scopes reported by resource validation surface as invalid_scope": {
 			clientId: "roclient",
 			options:  []tokenGrantOption{withGrantResourceValidator(grantTestFailingResources([]string{"scope1"}, nil))},
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestAuthorizedResourceRefreshParameters(t, f)
-				values.Set(gois.TokenRequestResource, "urn:api1")
+				values.Set(wicket.TokenRequestResource, "urn:api1")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidScope,
+			wantErr: wicket.TokenErrorsInvalidScope,
 		},
 		"invalid resources reported by resource validation surface as invalid_target": {
 			clientId: "roclient",
 			options:  []tokenGrantOption{withGrantResourceValidator(grantTestFailingResources(nil, []string{"urn:api1"}))},
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestAuthorizedResourceRefreshParameters(t, f)
-				values.Set(gois.TokenRequestResource, "urn:api1")
+				values.Set(wicket.TokenRequestResource, "urn:api1")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"resource outside the originally authorized set is rejected": {
 			clientId: "roclient",
 			parameters: func(t *testing.T, f *tokenGrantFixture) url.Values {
 				values := newGrantTestAuthorizedResourceRefreshParameters(t, f)
-				values.Set(gois.TokenRequestResource, "urn:api3")
+				values.Set(wicket.TokenRequestResource, "urn:api3")
 				return values
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 	}
 
@@ -141,8 +141,8 @@ func TestTokenRequestValidationRefreshTokenValid(t *testing.T) {
 			token := newGrantTestRefreshToken(tt.clientId, f.now)
 			handle := storeGrantTestRefreshToken(t, f, token)
 			parameters := url.Values{
-				gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-				gois.TokenRequestRefreshToken: {handle},
+				wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+				wicket.TokenRequestRefreshToken: {handle},
 			}
 
 			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))
@@ -163,8 +163,8 @@ func newGrantTestScopedRefreshParameters(t *testing.T, f *tokenGrantFixture) url
 	token.AuthorizedScopes = []string{"scope1"}
 	handle := storeGrantTestRefreshToken(t, f, token)
 	return url.Values{
-		gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-		gois.TokenRequestRefreshToken: {handle},
+		wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+		wicket.TokenRequestRefreshToken: {handle},
 	}
 }
 
@@ -180,7 +180,7 @@ func newGrantTestAuthorizedResourceRefreshParameters(t *testing.T, f *tokenGrant
 	token.AuthorizedResourceGaps = []string{"urn:api1", "urn:api2"}
 	handle := storeGrantTestRefreshToken(t, f, token)
 	return url.Values{
-		gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-		gois.TokenRequestRefreshToken: {handle},
+		wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+		wicket.TokenRequestRefreshToken: {handle},
 	}
 }

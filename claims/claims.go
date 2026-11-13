@@ -6,7 +6,7 @@ package claims
 import (
 	"encoding/json"
 
-	gois "github.com/gonewx/wicket"
+	"github.com/gonewx/wicket"
 )
 
 const DefaultIssuer = "LOCAL AUTHORITY"
@@ -278,7 +278,7 @@ func (p *ClaimsPrincipal) Claims() []*Claim {
 	return claims
 }
 
-func (p *ClaimsPrincipal) Identity() gois.Identity {
+func (p *ClaimsPrincipal) Identity() wicket.Identity {
 	if p == nil || len(p.Identities) == 0 {
 		return nil
 	}

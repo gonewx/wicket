@@ -71,15 +71,15 @@ func (v *DeviceAuthorizationRequestValidator) validateClient(request *models.Val
 	request.SetClient(clientValidationResult.Client, clientValidationResult.Secret, "")
 
 	// check if client protocol type is oidc
-	if request.Client.ProtocolType != gois.ProtocolTypesOpenIdConnect {
+	if request.Client.ProtocolType != wicket.ProtocolTypesOpenIdConnect {
 		v.Logger.Error("Invalid protocol type for OIDC authorize endpoint", slog.String("protocolType", request.Client.ProtocolType), slog.Any("request", request))
-		return v.invalid(request, gois.AuthorizeErrorsUnauthorizedClient, "Invalid protocol")
+		return v.invalid(request, wicket.AuthorizeErrorsUnauthorizedClient, "Invalid protocol")
 	}
 
 	// check if client allows device flow
-	if !utils.Contains(request.Client.AllowedGrantTypes(), gois.GrantTypeDeviceCode) {
+	if !utils.Contains(request.Client.AllowedGrantTypes(), wicket.GrantTypeDeviceCode) {
 		v.Logger.Error("Client does not allow device flow", slog.Any("request", request))
-		return v.invalid(request, gois.AuthorizeErrorsUnauthorizedClient, "Client does not allow device flow")
+		return v.invalid(request, wicket.AuthorizeErrorsUnauthorizedClient, "Client does not allow device flow")
 	}
 
 	return v.valid(request)
@@ -87,32 +87,32 @@ func (v *DeviceAuthorizationRequestValidator) validateClient(request *models.Val
 
 func (v *DeviceAuthorizationRequestValidator) validateScope(ctx context.Context, request *models.ValidatedDeviceAuthorizationRequest) *models.DeviceAuthorizationRequestValidationResult {
 	// scope must be present
-	scope := request.Raw.Get(gois.AuthorizeRequestScope)
+	scope := request.Raw.Get(wicket.AuthorizeRequestScope)
 	if scope == "" {
 		v.Logger.Debug("Client provided no scopes - checking allowed scopes list")
 
 		if len(request.Client.AllowedScopes) > 0 {
 			clientAllowedScopes := request.Client.AllowedScopes
 			if request.Client.AllowOfflineAccess {
-				clientAllowedScopes = append(clientAllowedScopes, gois.StandardScopesOfflineAccess)
+				clientAllowedScopes = append(clientAllowedScopes, wicket.StandardScopesOfflineAccess)
 			}
 			scope = strings.Join(clientAllowedScopes, " ")
 
 			v.Logger.Debug("Defaulting to: ", slog.String("scopes", scope))
 		} else {
 			v.Logger.Error("No allowed scopes configured for client", slog.Any("request", request))
-			return v.invalid(request, gois.AuthorizeErrorsInvalidScope, "")
+			return v.invalid(request, wicket.AuthorizeErrorsInvalidScope, "")
 		}
 	}
 
 	if len(scope) > v.Options.InputLengthRestrictions.Scope {
 		v.Logger.Error("Scope too long", slog.Any("request", request))
-		return v.invalid(request, gois.AuthorizeErrorsInvalidRequest, "Invalid scope")
+		return v.invalid(request, wicket.AuthorizeErrorsInvalidRequest, "Invalid scope")
 	}
 
 	request.RequestedScopes = utils.Distinct(strings.Split(scope, " "))
 
-	if utils.Contains(request.RequestedScopes, gois.StandardScopesOpenId) {
+	if utils.Contains(request.RequestedScopes, wicket.StandardScopesOpenId) {
 		request.IsOpenIdRequest = true
 	}
 
@@ -131,15 +131,15 @@ func (v *DeviceAuthorizationRequestValidator) validateScope(ctx context.Context,
 
 	if !validatedResources.Succeeded() {
 		if len(validatedResources.InvalidScopes) > 0 {
-			return v.invalid(request, gois.AuthorizeErrorsInvalidScope, "Invalid scope")
+			return v.invalid(request, wicket.AuthorizeErrorsInvalidScope, "Invalid scope")
 		}
 
-		return v.invalid(request, gois.AuthorizeErrorsUnauthorizedClient, "Invalid scope")
+		return v.invalid(request, wicket.AuthorizeErrorsUnauthorizedClient, "Invalid scope")
 	}
 
 	if len(validatedResources.Resources.IdentityResources()) > 0 && !request.IsOpenIdRequest {
 		v.Logger.Error("Identity related scope requests, but no openid scope", slog.Any("request", request))
-		return v.invalid(request, gois.AuthorizeErrorsInvalidScope, "")
+		return v.invalid(request, wicket.AuthorizeErrorsInvalidScope, "")
 	}
 
 	request.ValidatedResources = validatedResources

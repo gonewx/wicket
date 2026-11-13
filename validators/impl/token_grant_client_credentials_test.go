@@ -28,37 +28,37 @@ func TestTokenRequestValidationClientCredentialsInvalid(t *testing.T) {
 		"client without client credentials permission is rejected": {
 			clientId: "roclient",
 			scope:    "resource",
-			wantErr:  gois.TokenErrorsUnauthorizedClient,
+			wantErr:  wicket.TokenErrorsUnauthorizedClient,
 		},
 		"unknown scope is rejected": {
 			clientId: "client",
 			scope:    "unknown",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"mix of known and unknown scopes is rejected": {
 			clientId: "client",
 			scope:    "resource unknown",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"restricted client requesting unpermitted scope is rejected": {
 			clientId: "client_restricted",
 			scope:    "resource2",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"restricted client mixing permitted and unpermitted scopes is rejected": {
 			clientId: "client_restricted",
 			scope:    "resource resource2",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"explicit identity scope is rejected": {
 			clientId: "client",
 			scope:    "openid",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"offline_access scope is rejected": {
 			clientId: "client",
 			scope:    "resource offline_access",
-			wantErr:  gois.TokenErrorsInvalidScope,
+			wantErr:  wicket.TokenErrorsInvalidScope,
 		},
 		"resource parameter exceeding the maximum length is rejected": {
 			clientId: "client",
@@ -66,19 +66,19 @@ func TestTokenRequestValidationClientCredentialsInvalid(t *testing.T) {
 			resources: func(f *tokenGrantFixture) []string {
 				return []string{"urn:" + strings.Repeat("a", f.options.InputLengthRestrictions.ResourceGapMaxLength)}
 			},
-			wantErr: gois.TokenErrorsInvalidTarget,
+			wantErr: wicket.TokenErrorsInvalidTarget,
 		},
 		"resource parameter that is not an absolute URI is rejected": {
 			clientId:  "client",
 			scope:     "scope1",
 			resources: func(f *tokenGrantFixture) []string { return []string{"api"} },
-			wantErr:   gois.TokenErrorsInvalidTarget,
+			wantErr:   wicket.TokenErrorsInvalidTarget,
 		},
 		"repeated resource parameter is rejected": {
 			clientId:  "client",
 			scope:     "scope1",
 			resources: func(f *tokenGrantFixture) []string { return []string{"urn:api1", "urn:api2"} },
-			wantErr:   gois.TokenErrorsInvalidTarget,
+			wantErr:   wicket.TokenErrorsInvalidTarget,
 		},
 	}
 
@@ -88,12 +88,12 @@ func TestTokenRequestValidationClientCredentialsInvalid(t *testing.T) {
 
 			f := newTokenGrantFixture(t)
 			parameters := url.Values{
-				gois.TokenRequestGrantType: {gois.GrantTypeClientCredentials},
-				gois.TokenRequestScope:     {tt.scope},
+				wicket.TokenRequestGrantType: {wicket.GrantTypeClientCredentials},
+				wicket.TokenRequestScope:     {tt.scope},
 			}
 			if tt.resources != nil {
 				for _, resource := range tt.resources(f) {
-					parameters.Add(gois.TokenRequestResource, resource)
+					parameters.Add(wicket.TokenRequestResource, resource)
 				}
 			}
 
@@ -114,7 +114,7 @@ func TestTokenRequestValidationClientCredentialsWithoutScopeFiltersIdentityScope
 
 	f := newTokenGrantFixture(t)
 	parameters := url.Values{
-		gois.TokenRequestGrantType: {gois.GrantTypeClientCredentials},
+		wicket.TokenRequestGrantType: {wicket.GrantTypeClientCredentials},
 	}
 
 	result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "client"))
@@ -165,10 +165,10 @@ func TestTokenRequestValidationClientCredentialsValid(t *testing.T) {
 
 			f := newTokenGrantFixture(t)
 			parameters := url.Values{
-				gois.TokenRequestGrantType: {gois.GrantTypeClientCredentials},
+				wicket.TokenRequestGrantType: {wicket.GrantTypeClientCredentials},
 			}
 			if tt.scope != "" {
-				parameters.Set(gois.TokenRequestScope, tt.scope)
+				parameters.Set(wicket.TokenRequestScope, tt.scope)
 			}
 
 			result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, tt.clientId))

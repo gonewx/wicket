@@ -64,7 +64,7 @@ func TestResourceIndicatorAuthorizationCodeRefreshFlowE2E(t *testing.T) {
 	t.Parallel()
 
 	fixture := newResourceIndicatorE2EFixture(t)
-	authorizeResult := fixture.validateAuthorize(t, gois.ResponseTypesCode, []string{resourceIndicatorOrders, resourceIndicatorPayments})
+	authorizeResult := fixture.validateAuthorize(t, wicket.ResponseTypesCode, []string{resourceIndicatorOrders, resourceIndicatorPayments})
 	if authorizeResult.Error != nil {
 		t.Fatalf("authorize error = %v", authorizeResult.Error)
 	}
@@ -79,7 +79,7 @@ func TestResourceIndicatorAuthorizationCodeRefreshFlowE2E(t *testing.T) {
 	if err != nil {
 		t.Fatalf("authorization code token response: %v", err)
 	}
-	assertSameStrings(t, strings.Fields(tokenResponse.Scope), []string{"orders.read", gois.StandardScopesOfflineAccess})
+	assertSameStrings(t, strings.Fields(tokenResponse.Scope), []string{"orders.read", wicket.StandardScopesOfflineAccess})
 	assertLastAccessTokenAudience(t, fixture.recorder, []string{resourceIndicatorOrders})
 	if tokenResponse.RefreshToken == "" {
 		t.Fatal("missing refresh token")
@@ -111,7 +111,7 @@ func TestResourceIndicatorAuthorizationCodeRefreshFlowE2E(t *testing.T) {
 	if refreshResponse.RefreshToken != tokenResponse.RefreshToken {
 		t.Fatalf("refresh handle = %q, want %q", refreshResponse.RefreshToken, tokenResponse.RefreshToken)
 	}
-	assertSameStrings(t, strings.Fields(refreshResponse.Scope), []string{"payments.read", gois.StandardScopesOfflineAccess})
+	assertSameStrings(t, strings.Fields(refreshResponse.Scope), []string{"payments.read", wicket.StandardScopesOfflineAccess})
 	assertLastAccessTokenAudience(t, fixture.recorder, []string{resourceIndicatorPayments})
 
 	updatedRefreshToken, err := fixture.refreshTokens.GetRefreshToken(context.Background(), refreshResponse.RefreshToken)
@@ -132,33 +132,33 @@ func TestResourceIndicatorInvalidTargetsE2E(t *testing.T) {
 	tests := map[string]func(t *testing.T){
 		"authorization endpoint rejects fragmented resource": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
-			result := fixture.validateAuthorize(t, gois.ResponseTypesCode, []string{resourceIndicatorOrders + "#fragment"})
-			if !errors.Is(result.Error, gois.AuthorizeErrorsInvalidTarget) {
-				t.Fatalf("authorize error = %v, want %v", result.Error, gois.AuthorizeErrorsInvalidTarget)
+			result := fixture.validateAuthorize(t, wicket.ResponseTypesCode, []string{resourceIndicatorOrders + "#fragment"})
+			if !errors.Is(result.Error, wicket.AuthorizeErrorsInvalidTarget) {
+				t.Fatalf("authorize error = %v, want %v", result.Error, wicket.AuthorizeErrorsInvalidTarget)
 			}
 		},
 		"authorization endpoint rejects empty resource": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
-			result := fixture.validateAuthorize(t, gois.ResponseTypesCode, []string{""})
-			if !errors.Is(result.Error, gois.AuthorizeErrorsInvalidTarget) {
-				t.Fatalf("authorize error = %v, want %v", result.Error, gois.AuthorizeErrorsInvalidTarget)
+			result := fixture.validateAuthorize(t, wicket.ResponseTypesCode, []string{""})
+			if !errors.Is(result.Error, wicket.AuthorizeErrorsInvalidTarget) {
+				t.Fatalf("authorize error = %v, want %v", result.Error, wicket.AuthorizeErrorsInvalidTarget)
 			}
 		},
 		"authorization code exchange rejects resource outside grant": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
-			authorizeResult := fixture.validateAuthorize(t, gois.ResponseTypesCode, []string{resourceIndicatorOrders})
+			authorizeResult := fixture.validateAuthorize(t, wicket.ResponseTypesCode, []string{resourceIndicatorOrders})
 			if authorizeResult.Error != nil {
 				t.Fatalf("authorize error = %v", authorizeResult.Error)
 			}
 			codeHandle := fixture.storeAuthorizationCode(t, authorizeResult.ValidatedRequest)
 			result := fixture.validateAuthorizationCodeToken(t, codeHandle, resourceIndicatorPayments)
-			if !errors.Is(result.Error, gois.TokenErrorsInvalidTarget) {
-				t.Fatalf("token error = %v, want %v", result.Error, gois.TokenErrorsInvalidTarget)
+			if !errors.Is(result.Error, wicket.TokenErrorsInvalidTarget) {
+				t.Fatalf("token error = %v, want %v", result.Error, wicket.TokenErrorsInvalidTarget)
 			}
 		},
 		"refresh token exchange rejects resource when original authorization had none": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
-			authorizeResult := fixture.validateAuthorize(t, gois.ResponseTypesCode, nil)
+			authorizeResult := fixture.validateAuthorize(t, wicket.ResponseTypesCode, nil)
 			if authorizeResult.Error != nil {
 				t.Fatalf("authorize error = %v", authorizeResult.Error)
 			}
@@ -172,45 +172,45 @@ func TestResourceIndicatorInvalidTargetsE2E(t *testing.T) {
 				t.Fatalf("authorization code token response: %v", err)
 			}
 			result := fixture.validateRefreshToken(t, tokenResponse.RefreshToken, resourceIndicatorOrders)
-			if !errors.Is(result.Error, gois.TokenErrorsInvalidTarget) {
-				t.Fatalf("refresh token error = %v, want %v", result.Error, gois.TokenErrorsInvalidTarget)
+			if !errors.Is(result.Error, wicket.TokenErrorsInvalidTarget) {
+				t.Fatalf("refresh token error = %v, want %v", result.Error, wicket.TokenErrorsInvalidTarget)
 			}
 		},
 		"token endpoint rejects multiple resource parameters": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
 			result, err := fixture.tokenValidator.ValidateRequest(context.Background(), url.Values{
-				gois.TokenRequestGrantType: {gois.GrantTypeAuthorizationCode},
-				gois.TokenRequestResource:  {resourceIndicatorOrders, resourceIndicatorPayments},
+				wicket.TokenRequestGrantType: {wicket.GrantTypeAuthorizationCode},
+				wicket.TokenRequestResource:  {resourceIndicatorOrders, resourceIndicatorPayments},
 			}, &validators_models.ClientSecretValidationResult{Client: fixture.client})
 			if err != nil {
 				t.Fatalf("validate token request: %v", err)
 			}
-			if !errors.Is(result.Error, gois.TokenErrorsInvalidTarget) {
-				t.Fatalf("token error = %v, want %v", result.Error, gois.TokenErrorsInvalidTarget)
+			if !errors.Is(result.Error, wicket.TokenErrorsInvalidTarget) {
+				t.Fatalf("token error = %v, want %v", result.Error, wicket.TokenErrorsInvalidTarget)
 			}
 		},
 		"token endpoint rejects empty resource": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
 			result, err := fixture.tokenValidator.ValidateRequest(context.Background(), url.Values{
-				gois.TokenRequestGrantType: {gois.GrantTypeAuthorizationCode},
-				gois.TokenRequestResource:  {""},
+				wicket.TokenRequestGrantType: {wicket.GrantTypeAuthorizationCode},
+				wicket.TokenRequestResource:  {""},
 			}, &validators_models.ClientSecretValidationResult{Client: fixture.client})
 			if err != nil {
 				t.Fatalf("validate token request: %v", err)
 			}
-			if !errors.Is(result.Error, gois.TokenErrorsInvalidTarget) {
-				t.Fatalf("token error = %v, want %v", result.Error, gois.TokenErrorsInvalidTarget)
+			if !errors.Is(result.Error, wicket.TokenErrorsInvalidTarget) {
+				t.Fatalf("token error = %v, want %v", result.Error, wicket.TokenErrorsInvalidTarget)
 			}
 		},
 		"implicit token response rejects resource": func(t *testing.T) {
 			fixture := newResourceIndicatorE2EFixture(t)
 			fixture.client.AllowAccessTokensViaBrowser = true
-			if err := fixture.client.SetAllowedGrantTypes(gois.GrantTypesImplicit); err != nil {
+			if err := fixture.client.SetAllowedGrantTypes(wicket.GrantTypesImplicit); err != nil {
 				t.Fatalf("set grant types: %v", err)
 			}
-			result := fixture.validateAuthorize(t, gois.ResponseTypesToken, []string{resourceIndicatorOrders})
-			if !errors.Is(result.Error, gois.AuthorizeErrorsInvalidTarget) {
-				t.Fatalf("authorize error = %v, want %v", result.Error, gois.AuthorizeErrorsInvalidTarget)
+			result := fixture.validateAuthorize(t, wicket.ResponseTypesToken, []string{resourceIndicatorOrders})
+			if !errors.Is(result.Error, wicket.AuthorizeErrorsInvalidTarget) {
+				t.Fatalf("authorize error = %v, want %v", result.Error, wicket.AuthorizeErrorsInvalidTarget)
 			}
 		},
 	}
@@ -312,8 +312,8 @@ func newResourceIndicatorClient(t *testing.T) *storage_models.Client {
 	client.RequirePkce = false
 	client.RedirectUris = []string{"https://client.example.com/callback"}
 	client.AllowOfflineAccess = true
-	client.AllowedScopes = []string{"orders.read", "payments.read", gois.StandardScopesOfflineAccess}
-	if err := client.SetAllowedGrantTypes([]string{gois.GrantTypeAuthorizationCode, gois.GrantTypeRefreshToken}); err != nil {
+	client.AllowedScopes = []string{"orders.read", "payments.read", wicket.StandardScopesOfflineAccess}
+	if err := client.SetAllowedGrantTypes([]string{wicket.GrantTypeAuthorizationCode, wicket.GrantTypeRefreshToken}); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
 	return client
@@ -346,13 +346,13 @@ func (f *resourceIndicatorE2EFixture) validateAuthorize(t *testing.T, responseTy
 	t.Helper()
 
 	values := url.Values{
-		gois.AuthorizeRequestClientId:     {f.client.ClientId},
-		gois.AuthorizeRequestRedirectUri:  {f.client.RedirectUris[0]},
-		gois.AuthorizeRequestResponseType: {responseType},
-		gois.AuthorizeRequestScope:        {"orders.read payments.read " + gois.StandardScopesOfflineAccess},
+		wicket.AuthorizeRequestClientId:     {f.client.ClientId},
+		wicket.AuthorizeRequestRedirectUri:  {f.client.RedirectUris[0]},
+		wicket.AuthorizeRequestResponseType: {responseType},
+		wicket.AuthorizeRequestScope:        {"orders.read payments.read " + wicket.StandardScopesOfflineAccess},
 	}
 	for _, resource := range resources {
-		values.Add(gois.AuthorizeRequestResource, resource)
+		values.Add(wicket.AuthorizeRequestResource, resource)
 	}
 	return f.authorizeValidator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous())
 }
@@ -379,12 +379,12 @@ func (f *resourceIndicatorE2EFixture) validateAuthorizationCodeToken(t *testing.
 	t.Helper()
 
 	values := url.Values{
-		gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-		gois.TokenRequestCode:        {codeHandle},
-		gois.TokenRequestRedirectUri: {f.client.RedirectUris[0]},
+		wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+		wicket.TokenRequestCode:        {codeHandle},
+		wicket.TokenRequestRedirectUri: {f.client.RedirectUris[0]},
 	}
 	if resource != "" {
-		values.Set(gois.TokenRequestResource, resource)
+		values.Set(wicket.TokenRequestResource, resource)
 	}
 	result, err := f.tokenValidator.ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: f.client})
 	if err != nil {
@@ -397,11 +397,11 @@ func (f *resourceIndicatorE2EFixture) validateRefreshToken(t *testing.T, refresh
 	t.Helper()
 
 	values := url.Values{
-		gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-		gois.TokenRequestRefreshToken: {refreshHandle},
+		wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+		wicket.TokenRequestRefreshToken: {refreshHandle},
 	}
 	if resource != "" {
-		values.Set(gois.TokenRequestResource, resource)
+		values.Set(wicket.TokenRequestResource, resource)
 	}
 	result, err := f.tokenValidator.ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: f.client})
 	if err != nil {
@@ -415,7 +415,7 @@ func assertLastAccessTokenAudience(t *testing.T, recorder *resourceIndicatorToke
 
 	for i := len(recorder.tokens) - 1; i >= 0; i-- {
 		token := recorder.tokens[i]
-		if token.Type == gois.TokenTypesAccessToken {
+		if token.Type == wicket.TokenTypesAccessToken {
 			assertSameStrings(t, token.Audiences, want)
 			return
 		}

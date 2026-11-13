@@ -47,7 +47,7 @@ func TestNo_resource_indicator_on_code_exchange_should_succeed(t *testing.T) {
 func TestNo_resource_indicator_on_authz_endpoint_should_succeed(t *testing.T) {
 	t.Parallel()
 
-	result := validateAuthorize(t, gois.ResponseTypesCode, nil)
+	result := validateAuthorize(t, wicket.ResponseTypesCode, nil)
 	if result.Error != nil {
 		t.Fatalf("authorize error = %v", result.Error)
 	}
@@ -107,9 +107,9 @@ func TestResource_indicator_without_offline_access_should_succeed(t *testing.T) 
 func TestIplicit_flow_with_resource_indicator_should_fail(t *testing.T) {
 	t.Parallel()
 
-	result := validateAuthorize(t, gois.ResponseTypesToken, []string{resourceOrders})
-	if !errors.Is(result.Error, gois.AuthorizeErrorsInvalidTarget) {
-		t.Fatalf("authorize error = %v, want %v", result.Error, gois.AuthorizeErrorsInvalidTarget)
+	result := validateAuthorize(t, wicket.ResponseTypesToken, []string{resourceOrders})
+	if !errors.Is(result.Error, wicket.AuthorizeErrorsInvalidTarget) {
+		t.Fatalf("authorize error = %v, want %v", result.Error, wicket.AuthorizeErrorsInvalidTarget)
 	}
 }
 
@@ -119,12 +119,12 @@ func validateAuthorize(t *testing.T, responseType string, resources []string) *v
 	options := config_options.NewWicketOptions()
 	options.Endpoints.EnableCheckSessionEndpoint = false
 	client := resourceClient(t)
-	if responseType == gois.ResponseTypesToken {
+	if responseType == wicket.ResponseTypesToken {
 		client.AllowAccessTokensViaBrowser = true
-		if err := client.SetAllowedGrantTypes(gois.GrantTypesImplicit); err != nil {
+		if err := client.SetAllowedGrantTypes(wicket.GrantTypesImplicit); err != nil {
 			t.Fatalf("set grant types: %v", err)
 		}
-	} else if err := client.SetAllowedGrantTypes(gois.GrantTypesCode); err != nil {
+	} else if err := client.SetAllowedGrantTypes(wicket.GrantTypesCode); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}
 	clientStore, err := memory.NewMemoryClientStore([]*storage_models.Client{client})
@@ -145,13 +145,13 @@ func validateAuthorize(t *testing.T, responseType string, resources []string) *v
 		validators_impl.NewCustomAuthorizeRequestValidator(),
 	)
 	values := url.Values{
-		gois.AuthorizeRequestClientId:     {client.ClientId},
-		gois.AuthorizeRequestRedirectUri:  {client.RedirectUris[0]},
-		gois.AuthorizeRequestResponseType: {responseType},
-		gois.AuthorizeRequestScope:        {"orders.read"},
+		wicket.AuthorizeRequestClientId:     {client.ClientId},
+		wicket.AuthorizeRequestRedirectUri:  {client.RedirectUris[0]},
+		wicket.AuthorizeRequestResponseType: {responseType},
+		wicket.AuthorizeRequestScope:        {"orders.read"},
 	}
 	for _, resource := range resources {
-		values.Add(gois.AuthorizeRequestResource, resource)
+		values.Add(wicket.AuthorizeRequestResource, resource)
 	}
 	return validator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous())
 }
@@ -175,12 +175,12 @@ func validateCodeExchange(t *testing.T, authorizeResources []string, tokenResour
 		t.Fatalf("store code: %v", err)
 	}
 	values := url.Values{
-		gois.TokenRequestGrantType:   {gois.GrantTypeAuthorizationCode},
-		gois.TokenRequestCode:        {handle},
-		gois.TokenRequestRedirectUri: {code.RedirectUri},
+		wicket.TokenRequestGrantType:   {wicket.GrantTypeAuthorizationCode},
+		wicket.TokenRequestCode:        {handle},
+		wicket.TokenRequestRedirectUri: {code.RedirectUri},
 	}
 	if tokenResource != "" {
-		values.Set(gois.TokenRequestResource, tokenResource)
+		values.Set(wicket.TokenRequestResource, tokenResource)
 	}
 	result, err := tokenValidator(t, client, codeStore, refreshStore, clock).ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: client})
 	if err != nil {
@@ -204,11 +204,11 @@ func validateRefreshExchange(t *testing.T, authorizedResources []string, tokenRe
 		t.Fatalf("store refresh token: %v", err)
 	}
 	values := url.Values{
-		gois.TokenRequestGrantType:    {gois.GrantTypeRefreshToken},
-		gois.TokenRequestRefreshToken: {handle},
+		wicket.TokenRequestGrantType:    {wicket.GrantTypeRefreshToken},
+		wicket.TokenRequestRefreshToken: {handle},
 	}
 	if tokenResource != "" {
-		values.Set(gois.TokenRequestResource, tokenResource)
+		values.Set(wicket.TokenRequestResource, tokenResource)
 	}
 	result, err := tokenValidator(t, client, codeStore, refreshStore, clock).ValidateRequest(context.Background(), values, &validators_models.ClientSecretValidationResult{Client: client})
 	if err != nil {
@@ -260,10 +260,10 @@ func resourceClient(t *testing.T) *storage_models.Client {
 	client.RequirePkce = false
 	client.RedirectUris = []string{"https://client.example.com/callback"}
 	client.AllowOfflineAccess = true
-	client.AllowedScopes = []string{"orders.read", "payments.read", gois.StandardScopesOfflineAccess}
+	client.AllowedScopes = []string{"orders.read", "payments.read", wicket.StandardScopesOfflineAccess}
 	if err := client.SetAllowedGrantTypes([]string{
-		gois.GrantTypeAuthorizationCode,
-		gois.GrantTypeRefreshToken,
+		wicket.GrantTypeAuthorizationCode,
+		wicket.GrantTypeRefreshToken,
 	}); err != nil {
 		t.Fatalf("set grant types: %v", err)
 	}

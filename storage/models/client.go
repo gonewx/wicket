@@ -49,10 +49,10 @@ type Client struct {
 	AbsoluteRefreshTokenLifetime          int
 	SlidingRefreshTokenLifetime           int
 	ConsentLifetime                       *int
-	RefreshTokenUsage                     gois.TokenUsage
+	RefreshTokenUsage                     wicket.TokenUsage
 	UpdateAccessTokenClaimsOnRefresh      bool
-	RefreshTokenExpiration                gois.TokenExpiration
-	AccessTokenType                       gois.AccessTokenType
+	RefreshTokenExpiration                wicket.TokenExpiration
+	AccessTokenType                       wicket.AccessTokenType
 	EnableLocalLogin                      bool
 	IdentityProviderRestrictions          []string
 	IncludeJwtId                          bool
@@ -77,7 +77,7 @@ type Client struct {
 func NewClient() *Client {
 	return &Client{
 		Enabled:                           true,
-		ProtocolType:                      gois.ProtocolTypesOpenIdConnect,
+		ProtocolType:                      wicket.ProtocolTypesOpenIdConnect,
 		RequireClientSecret:               true,
 		AllowRememberConsent:              true,
 		RequirePkce:                       true,
@@ -88,9 +88,9 @@ func NewClient() *Client {
 		AuthorizationCodeLifetime:         300,
 		AbsoluteRefreshTokenLifetime:      2592000,
 		SlidingRefreshTokenLifetime:       1296000,
-		RefreshTokenUsage:                 gois.TokenUsageOneTimeOnly,
-		RefreshTokenExpiration:            gois.TokenExpirationAbsolute,
-		AccessTokenType:                   gois.AccessTokenTypeJwt,
+		RefreshTokenUsage:                 wicket.TokenUsageOneTimeOnly,
+		RefreshTokenExpiration:            wicket.TokenExpirationAbsolute,
+		AccessTokenType:                   wicket.AccessTokenTypeJwt,
 		EnableLocalLogin:                  true,
 		IncludeJwtId:                      true,
 		ClientClaimsPrefix:                "client_",
@@ -145,17 +145,17 @@ func validateGrantTypes(grantTypes []string) error {
 	}
 
 	// would allow response_type downgrade attack from code to token
-	err := disallowGrantTypeCombination(gois.GrantTypeImplicit, gois.GrantTypeAuthorizationCode, grantTypes)
+	err := disallowGrantTypeCombination(wicket.GrantTypeImplicit, wicket.GrantTypeAuthorizationCode, grantTypes)
 	if err != nil {
 		return err
 	}
 
-	err = disallowGrantTypeCombination(gois.GrantTypeImplicit, gois.GrantTypeHybrid, grantTypes)
+	err = disallowGrantTypeCombination(wicket.GrantTypeImplicit, wicket.GrantTypeHybrid, grantTypes)
 	if err != nil {
 		return err
 	}
 
-	err = disallowGrantTypeCombination(gois.GrantTypeAuthorizationCode, gois.GrantTypeHybrid, grantTypes)
+	err = disallowGrantTypeCombination(wicket.GrantTypeAuthorizationCode, wicket.GrantTypeHybrid, grantTypes)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func disallowGrantTypeCombination(value1, value2 string, grantTypes []string) er
 func (c *Client) GetKeys() jwk.Set {
 	set := jwk.NewSet()
 	secrets := utils.Where(c.ClientSecrets, func(secret *Secret) bool {
-		return secret.Type == gois.SecretTypesX509CertificateBase64
+		return secret.Type == wicket.SecretTypesX509CertificateBase64
 	})
 	keys := utils.Select(secrets, func(s *Secret) jwk.Key {
 		data, err := base64.StdEncoding.DecodeString(s.Value)
@@ -197,7 +197,7 @@ func (c *Client) GetKeys() jwk.Set {
 	}
 
 	secrets = utils.Where(c.ClientSecrets, func(secret *Secret) bool {
-		return secret.Type == gois.SecretTypesJsonWebKey
+		return secret.Type == wicket.SecretTypesJsonWebKey
 	})
 	keys = utils.Select(secrets, func(s *Secret) jwk.Key {
 		key, err := jwk.ParseKey([]byte(s.Value))
@@ -221,5 +221,5 @@ func (c *Client) IsImplicitOnly() bool {
 	return c != nil &&
 		c.AllowedGrantTypes() != nil &&
 		len(c.AllowedGrantTypes()) == 1 &&
-		c.AllowedGrantTypes()[0] == gois.GrantTypeImplicit
+		c.AllowedGrantTypes()[0] == wicket.GrantTypeImplicit
 }

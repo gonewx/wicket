@@ -35,7 +35,7 @@ func TestBackchannelAuthenticationDiscoveryMetadata(t *testing.T) {
 	t.Parallel()
 
 	identity := storage_models.NewIdentityResource()
-	identity.Name = gois.StandardScopesOpenId
+	identity.Name = wicket.StandardScopesOpenId
 	resources, err := memory.NewMemoryResourcesStore([]*storage_models.IdentityResource{identity}, nil, nil)
 	if err != nil {
 		t.Fatalf("resource store: %v", err)
@@ -54,16 +54,16 @@ func TestBackchannelAuthenticationDiscoveryMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create discovery: %v", err)
 	}
-	if got := doc[gois.DiscoveryBackchannelAuthenticationEndpoint]; got != "https://wicket.test/connect/ciba" {
+	if got := doc[wicket.DiscoveryBackchannelAuthenticationEndpoint]; got != "https://wicket.test/connect/ciba" {
 		t.Fatalf("backchannel endpoint = %v", got)
 	}
-	if !containsString(doc[gois.DiscoveryGrantTypesSupported].([]string), gois.GrantTypeBackchannelAuthentication) {
-		t.Fatalf("grant types missing %q: %#v", gois.GrantTypeBackchannelAuthentication, doc[gois.DiscoveryGrantTypesSupported])
+	if !containsString(doc[wicket.DiscoveryGrantTypesSupported].([]string), wicket.GrantTypeBackchannelAuthentication) {
+		t.Fatalf("grant types missing %q: %#v", wicket.GrantTypeBackchannelAuthentication, doc[wicket.DiscoveryGrantTypesSupported])
 	}
-	if got := doc[gois.DiscoveryBackchannelTokenDeliveryModesSupported].([]string); len(got) != 1 || got[0] != gois.BackchannelTokenDeliveryModesPoll {
+	if got := doc[wicket.DiscoveryBackchannelTokenDeliveryModesSupported].([]string); len(got) != 1 || got[0] != wicket.BackchannelTokenDeliveryModesPoll {
 		t.Fatalf("delivery modes = %#v", got)
 	}
-	if got := doc[gois.DiscoveryBackchannelUserCodeParameterSupported]; got != true {
+	if got := doc[wicket.DiscoveryBackchannelUserCodeParameterSupported]; got != true {
 		t.Fatalf("user code metadata = %#v", got)
 	}
 }

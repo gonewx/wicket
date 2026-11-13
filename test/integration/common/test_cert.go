@@ -133,7 +133,7 @@ func (c *TestCert) LoadSigningCredentialsFromRaw(raw string, alg jwa.SignatureAl
 		return nil, err
 	}
 
-	opts := []gois.Option[tokens.SigningCredentials]{tokens.WithAlgorithm(alg.String())}
+	opts := []wicket.Option[tokens.SigningCredentials]{tokens.WithAlgorithm(alg.String())}
 	if kid, ok := key.KeyID(); ok && kid != "" {
 		opts = append(opts, tokens.WithKid(kid))
 	}

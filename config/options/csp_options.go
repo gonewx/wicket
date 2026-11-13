@@ -8,13 +8,13 @@ import "github.com/gonewx/wicket"
 
 // CspOptions Options for Content Security Policy
 type CspOptions struct {
-	Level               gois.CspLevel
+	Level               wicket.CspLevel
 	AddDeprecatedHeader bool
 }
 
 func NewCspOptions() *CspOptions {
 	return &CspOptions{
-		Level:               gois.CspLevelTwo,
+		Level:               wicket.CspLevelTwo,
 		AddDeprecatedHeader: true,
 	}
 }

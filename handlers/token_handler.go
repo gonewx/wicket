@@ -45,19 +45,19 @@ func NewTokenHandler(
 
 func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 	if err := r.ParseForm(); err != nil {
-		return results.NewBadRequestResult(gois.TokenErrorsInvalidRequest, "").Execute(w, r)
+		return results.NewBadRequestResult(wicket.TokenErrorsInvalidRequest, "").Execute(w, r)
 	}
 	// Reject bodies whose parameters carry a control byte the form reader accepts
 	// but downstream token handling must not process. This is the token
 	// endpoint's parse defense against a malformed form payload.
 	if formHasControlBytes(r.Form) {
-		return results.NewBadRequestResult(gois.TokenErrorsInvalidRequest, "").Execute(w, r)
+		return results.NewBadRequestResult(wicket.TokenErrorsInvalidRequest, "").Execute(w, r)
 	}
 
 	clientResult := h.clientValidator.Validate(r)
 	if clientResult == nil || clientResult.Error != nil {
 		response := responses_models.NewTokenErrorResponse()
-		response.Error = gois.TokenErrorsInvalidClient
+		response.Error = wicket.TokenErrorsInvalidClient
 		if clientResult != nil && clientResult.Error != nil {
 			response.Error = clientResult.Error
 			response.ErrorDescription = clientResult.Description
@@ -116,13 +116,13 @@ func formHasControlBytes(values url.Values) bool {
 // as an infrastructure fault.
 func asTokenProtocolError(err error) error {
 	for _, candidate := range []error{
-		gois.TokenErrorsInvalidRequest,
-		gois.TokenErrorsInvalidClient,
-		gois.TokenErrorsInvalidGrant,
-		gois.TokenErrorsUnauthorizedClient,
-		gois.TokenErrorsUnsupportedGrantType,
-		gois.TokenErrorsInvalidScope,
-		gois.TokenErrorsInvalidTarget,
+		wicket.TokenErrorsInvalidRequest,
+		wicket.TokenErrorsInvalidClient,
+		wicket.TokenErrorsInvalidGrant,
+		wicket.TokenErrorsUnauthorizedClient,
+		wicket.TokenErrorsUnsupportedGrantType,
+		wicket.TokenErrorsInvalidScope,
+		wicket.TokenErrorsInvalidTarget,
 	} {
 		if errors.Is(err, candidate) {
 			return candidate
