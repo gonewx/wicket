@@ -67,6 +67,7 @@ type Root struct {
 	f_Ptr_Endpoint__9                                        *hosting.Endpoint
 	f_Ptr_Endpoint__10                                       *hosting.Endpoint
 	f_Ptr_Endpoint__11                                       *hosting.Endpoint
+	f_Ptr_Endpoint__12                                       *hosting.Endpoint
 	f_DataProtectionProvider                                 dp.DataProtectionProvider
 	f_UnnamedOptionsManager__options_WicketOptions           options2.Options[*options.WicketOptions]
 	f_UnnamedOptionsManager__auth_Options                    options2.Options[*auth.Options]
@@ -145,15 +146,18 @@ func NewRoot() (*Root, error) {
 		return newEndpoint(wicket.EndpointNamesBackchannelAuthentication, wicket.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
 	})(r)
 	r.f_Ptr_Endpoint__8 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesIntrospection, wicket.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
+		return newEndpoint(wicket.EndpointNamesRevocation, wicket.ProtocolRoutePathsRevocation, endpointHandler[*handlers.TokenRevocationHandler])
 	})(r)
 	r.f_Ptr_Endpoint__9 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesUserInfo, wicket.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
+		return newEndpoint(wicket.EndpointNamesIntrospection, wicket.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
 	})(r)
 	r.f_Ptr_Endpoint__10 = (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
+		return newEndpoint(wicket.EndpointNamesUserInfo, wicket.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
 	})(r)
 	r.f_Ptr_Endpoint__11 = (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
+	})(r)
+	r.f_Ptr_Endpoint__12 = (func(p godi.Provider) *hosting.Endpoint {
 		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSessionCallback, endpointHandler[*handlers.EndSessionCallbackHandler])
 	})(r)
 	r.f_DataProtectionProvider = impl.NewDataProtectionProvider()
@@ -379,6 +383,10 @@ func (r *Root) NewPtr_CheckSessionHandler() *handlers.CheckSessionHandler {
 
 func (r *Root) NewPtr_BackchannelAuthenticationHandler() *handlers.BackchannelAuthenticationHandler {
 	return (newBackchannelAuthenticationHandlerFromProvider)(r)
+}
+
+func (r *Root) NewPtr_TokenRevocationHandler() *handlers.TokenRevocationHandler {
+	return (newTokenRevocationHandlerFromProvider)(r)
 }
 
 func (r *Root) NewPtr_IntrospectionHandler() *handlers.IntrospectionHandler {
@@ -1129,6 +1137,8 @@ func (r *Root) Ptr_Endpoint__10() *hosting.Endpoint { return r.f_Ptr_Endpoint__1
 
 func (r *Root) Ptr_Endpoint__11() *hosting.Endpoint { return r.f_Ptr_Endpoint__11 }
 
+func (r *Root) Ptr_Endpoint__12() *hosting.Endpoint { return r.f_Ptr_Endpoint__12 }
+
 func (r *Root) DataProtectionProvider() dp.DataProtectionProvider { return r.f_DataProtectionProvider }
 
 func (r *Root) UnnamedOptionsManager__options_WicketOptions() options2.Options[*options.WicketOptions] {
@@ -1284,7 +1294,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*slog.Logger]():
 		return r.f_Ptr_Logger
 	case reflect.TypeFor[*hosting.Endpoint]():
-		return r.f_Ptr_Endpoint__11
+		return r.f_Ptr_Endpoint__12
 	case reflect.TypeFor[dp.DataProtectionProvider]():
 		return r.f_DataProtectionProvider
 	case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
@@ -1379,6 +1389,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewPtr_CheckSessionHandler()
 	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
 		return r.NewPtr_BackchannelAuthenticationHandler()
+	case reflect.TypeFor[*handlers.TokenRevocationHandler]():
+		return r.NewPtr_TokenRevocationHandler()
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return r.NewPtr_IntrospectionHandler()
 	case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -1602,6 +1614,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[*handlers.CheckSessionHandler]():
 		return true
 	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
+		return true
+	case reflect.TypeFor[*handlers.TokenRevocationHandler]():
 		return true
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return true
@@ -1937,7 +1951,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*slog.Logger]():
 			return []any{r.f_Ptr_Logger}
 		case reflect.TypeFor[*hosting.Endpoint]():
-			return []any{r.f_Ptr_Endpoint, r.f_Ptr_Endpoint__2, r.f_Ptr_Endpoint__3, r.f_Ptr_Endpoint__4, r.f_Ptr_Endpoint__5, r.f_Ptr_Endpoint__6, r.f_Ptr_Endpoint__7, r.f_Ptr_Endpoint__8, r.f_Ptr_Endpoint__9, r.f_Ptr_Endpoint__10, r.f_Ptr_Endpoint__11}
+			return []any{r.f_Ptr_Endpoint, r.f_Ptr_Endpoint__2, r.f_Ptr_Endpoint__3, r.f_Ptr_Endpoint__4, r.f_Ptr_Endpoint__5, r.f_Ptr_Endpoint__6, r.f_Ptr_Endpoint__7, r.f_Ptr_Endpoint__8, r.f_Ptr_Endpoint__9, r.f_Ptr_Endpoint__10, r.f_Ptr_Endpoint__11, r.f_Ptr_Endpoint__12}
 		case reflect.TypeFor[dp.DataProtectionProvider]():
 			return []any{r.f_DataProtectionProvider}
 		case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
@@ -2032,6 +2046,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewPtr_CheckSessionHandler()}
 		case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
 			return []any{r.NewPtr_BackchannelAuthenticationHandler()}
+		case reflect.TypeFor[*handlers.TokenRevocationHandler]():
+			return []any{r.NewPtr_TokenRevocationHandler()}
 		case reflect.TypeFor[*handlers.IntrospectionHandler]():
 			return []any{r.NewPtr_IntrospectionHandler()}
 		case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -2310,7 +2326,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*slog.Logger]():
 		return s.root.f_Ptr_Logger
 	case reflect.TypeFor[*hosting.Endpoint]():
-		return s.root.f_Ptr_Endpoint__11
+		return s.root.f_Ptr_Endpoint__12
 	case reflect.TypeFor[dp.DataProtectionProvider]():
 		return s.root.f_DataProtectionProvider
 	case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
@@ -2405,6 +2421,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewPtr_CheckSessionHandler()
 	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
 		return s.NewPtr_BackchannelAuthenticationHandler()
+	case reflect.TypeFor[*handlers.TokenRevocationHandler]():
+		return s.NewPtr_TokenRevocationHandler()
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return s.NewPtr_IntrospectionHandler()
 	case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -2703,6 +2721,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
 		return true
+	case reflect.TypeFor[*handlers.TokenRevocationHandler]():
+		return true
 	case reflect.TypeFor[*handlers.IntrospectionHandler]():
 		return true
 	case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -2942,7 +2962,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*slog.Logger]():
 			return []any{s.root.f_Ptr_Logger}
 		case reflect.TypeFor[*hosting.Endpoint]():
-			return []any{s.root.f_Ptr_Endpoint, s.root.f_Ptr_Endpoint__2, s.root.f_Ptr_Endpoint__3, s.root.f_Ptr_Endpoint__4, s.root.f_Ptr_Endpoint__5, s.root.f_Ptr_Endpoint__6, s.root.f_Ptr_Endpoint__7, s.root.f_Ptr_Endpoint__8, s.root.f_Ptr_Endpoint__9, s.root.f_Ptr_Endpoint__10, s.root.f_Ptr_Endpoint__11}
+			return []any{s.root.f_Ptr_Endpoint, s.root.f_Ptr_Endpoint__2, s.root.f_Ptr_Endpoint__3, s.root.f_Ptr_Endpoint__4, s.root.f_Ptr_Endpoint__5, s.root.f_Ptr_Endpoint__6, s.root.f_Ptr_Endpoint__7, s.root.f_Ptr_Endpoint__8, s.root.f_Ptr_Endpoint__9, s.root.f_Ptr_Endpoint__10, s.root.f_Ptr_Endpoint__11, s.root.f_Ptr_Endpoint__12}
 		case reflect.TypeFor[dp.DataProtectionProvider]():
 			return []any{s.root.f_DataProtectionProvider}
 		case reflect.TypeFor[options2.Options[*options.WicketOptions]]():
@@ -3037,6 +3057,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewPtr_CheckSessionHandler()}
 		case reflect.TypeFor[*handlers.BackchannelAuthenticationHandler]():
 			return []any{s.NewPtr_BackchannelAuthenticationHandler()}
+		case reflect.TypeFor[*handlers.TokenRevocationHandler]():
+			return []any{s.NewPtr_TokenRevocationHandler()}
 		case reflect.TypeFor[*handlers.IntrospectionHandler]():
 			return []any{s.NewPtr_IntrospectionHandler()}
 		case reflect.TypeFor[*handlers.UserInfoHandler]():
@@ -3332,6 +3354,10 @@ func (s *scope) NewPtr_CheckSessionHandler() *handlers.CheckSessionHandler {
 
 func (s *scope) NewPtr_BackchannelAuthenticationHandler() *handlers.BackchannelAuthenticationHandler {
 	return (newBackchannelAuthenticationHandlerFromProvider)(s)
+}
+
+func (s *scope) NewPtr_TokenRevocationHandler() *handlers.TokenRevocationHandler {
+	return (newTokenRevocationHandlerFromProvider)(s)
 }
 
 func (s *scope) NewPtr_IntrospectionHandler() *handlers.IntrospectionHandler {
@@ -4081,6 +4107,8 @@ func (s *scope) Ptr_Endpoint__9() *hosting.Endpoint { return s.root.f_Ptr_Endpoi
 func (s *scope) Ptr_Endpoint__10() *hosting.Endpoint { return s.root.f_Ptr_Endpoint__10 }
 
 func (s *scope) Ptr_Endpoint__11() *hosting.Endpoint { return s.root.f_Ptr_Endpoint__11 }
+
+func (s *scope) Ptr_Endpoint__12() *hosting.Endpoint { return s.root.f_Ptr_Endpoint__12 }
 
 func (s *scope) DataProtectionProvider() dp.DataProtectionProvider {
 	return s.root.f_DataProtectionProvider

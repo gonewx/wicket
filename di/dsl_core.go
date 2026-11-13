@@ -102,6 +102,9 @@ func registerCore() {
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
 		return newEndpoint(wicket.EndpointNamesBackchannelAuthentication, wicket.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
 	})
+	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesRevocation, wicket.ProtocolRoutePathsRevocation, endpointHandler[*handlers.TokenRevocationHandler])
+	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L116 (Add + Singleton route metadata)
 	godi.AddSingletonFactory[*hosting.Endpoint](&r, func(p godi.Provider) *hosting.Endpoint {
 		return newEndpoint(wicket.EndpointNamesIntrospection, wicket.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
@@ -131,6 +134,7 @@ func registerCore() {
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L137 (AddTransient<T>)
 	godi.AddTransientFactory[*handlers.CheckSessionHandler](&r, newCheckSessionHandlerFromProvider)
 	godi.AddTransientFactory[*handlers.BackchannelAuthenticationHandler](&r, newBackchannelAuthenticationHandlerFromProvider)
+	godi.AddTransientFactory[*handlers.TokenRevocationHandler](&r, newTokenRevocationHandlerFromProvider)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L137 (AddTransient<T>)
 	godi.AddTransientFactory[*handlers.IntrospectionHandler](&r, newIntrospectionHandlerFromProvider)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L137 (AddTransient<T>)

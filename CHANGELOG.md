@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Token revocation endpoint (RFC 7009) at `POST /connect/revocation`, handled by `handlers.TokenRevocationHandler` and registered through the composition root. Clients authenticate as at the token endpoint. A failed client authentication answers `invalid_client`: 401 with a `WWW-Authenticate` challenge (`Basic realm="wicket"` for Basic) when the request carries an `Authorization` header, 400 otherwise. A missing token or an empty body answers 400 `invalid_request`, and a `token_type_hint` other than `access_token` / `refresh_token` answers 400 `unsupported_token_type`. Unknown tokens, already revoked tokens and tokens of another client answer 200 with an empty body and no-cache headers; another client's token is left untouched. Revoking a refresh token also revokes the reference access tokens of the same subject and client. Parameters are read from the request body only.
+- `results.ClientAuthenticationErrorResult` writes the `invalid_client` answer with its headers set before the status code.
+- Discovery: `revocation_endpoint` is advertised again in the default assembly now that the route is registered.
+
+### Fixed
+
+- Token revocation: a refresh token submitted without `token_type_hint` was not revoked, because a miss in the reference token store was reported as success and the refresh token store was never consulted. A miss in either store is reported as not found again, so the no-hint path reaches the refresh token store. `TokenRevocationResponse.Success` now means the token was found (false for a miss, with no error); the endpoint answers 200 either way.
+
 ## [0.2.1] - 2026-11-12
 
 ### Changed

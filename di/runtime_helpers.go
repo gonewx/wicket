@@ -135,6 +135,15 @@ func newIntrospectionHandlerFromProvider(p godi.Provider) *handlers.Introspectio
 	)
 }
 
+func newTokenRevocationHandlerFromProvider(p godi.Provider) *handlers.TokenRevocationHandler {
+	return handlers.NewTokenRevocationHandler(
+		godi.GetRequired[validators.ClientSecretValidator](p),
+		godi.GetRequired[validators.TokenRevocationRequestValidator](p),
+		godi.GetRequired[responses.TokenRevocationResponseGenerator](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
+}
+
 func newUserInfoHandlerFromProvider(p godi.Provider) *handlers.UserInfoHandler {
 	return handlers.NewUserInfoHandler(
 		godi.GetRequired[*validators_impl.BearerTokenUsageValidator](p),
