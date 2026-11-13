@@ -597,6 +597,8 @@ func (s *TokenRequestValidator) validateDeviceCodeRequest(ctx context.Context, p
 		}
 	}
 
+	s.validatedRequest.ValidatedResources = validatedResources.FilterByResourceGap(s.validatedRequest.RequestedResourceGap)
+
 	s.Logger.Debug("Validation of device code token request success")
 
 	return s.valid(), nil

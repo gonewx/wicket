@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -117,5 +118,35 @@ func TestTokenRequestValidationDeviceFlowValid(t *testing.T) {
 	result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "device_flow"))
 	if result.Error != nil {
 		t.Fatalf("unexpected error: %v (description %q)", result.Error, result.Description)
+	}
+}
+
+// TestTokenRequestValidationDeviceFlowCarriesAuthorizedScopes verifies that a
+// successful device code exchange hands the validated scopes on, so the token
+// response and the issued tokens carry the scopes the user authorized.
+func TestTokenRequestValidationDeviceFlowCarriesAuthorizedScopes(t *testing.T) {
+	t.Parallel()
+
+	deviceCodes := validators_mock.NewTestDeviceCodeValidator(false)
+	deviceCodes.DeviceCodeResult.ClientId = "device_flow"
+	deviceCodes.DeviceCodeResult.IsAuthorized = true
+	deviceCodes.DeviceCodeResult.Subject = grantTestSubject("818727")
+	deviceCodes.DeviceCodeResult.AuthorizedScopes = []string{"openid", "resource"}
+	deviceCodes.DeviceCodeResult.CreationTime = grantValidationTestNow
+	deviceCodes.DeviceCodeResult.Lifetime = 300
+
+	f := newTokenGrantFixture(t, withGrantDeviceCodeValidator(deviceCodes))
+	parameters := url.Values{
+		wicket.TokenRequestGrantType:  {wicket.GrantTypeDeviceCode},
+		wicket.TokenRequestDeviceCode: {"device"},
+	}
+
+	result, _ := f.validator.ValidateRequest(context.Background(), parameters, grantTestSecretResult(t, "device_flow"))
+	if result.Error != nil {
+		t.Fatalf("unexpected error: %v (description %q)", result.Error, result.Description)
+	}
+	got := result.ValidatedRequest.ValidatedResources.RawScopeValues()
+	if len(got) != 2 || !slices.Contains(got, "openid") || !slices.Contains(got, "resource") {
+		t.Fatalf("validated scopes = %v, want [openid resource] in any order", got)
 	}
 }
