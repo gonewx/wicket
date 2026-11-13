@@ -260,6 +260,7 @@ func TestDeviceAuthorizationProtocolErrors(t *testing.T) {
 	t.Run("identity scope without openid is invalid_scope", func(t *testing.T) {
 		got := call(t, pipeline, integration_common.DeviceAuthorization, deviceCall{form: url.Values{"client_id": {deviceClient}, "client_secret": {secret}, "scope": {"profile"}}})
 		requireJsonError(t, got, http.StatusBadRequest, "invalid_scope")
+		requireNoCache(t, got)
 	})
 }
 

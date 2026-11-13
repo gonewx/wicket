@@ -228,6 +228,9 @@ func RunDeviceFlowStoreSuite(t *testing.T, newStore func() storage.DeviceFlowSto
 			t.Fatalf("FindByDeviceCode after update: %v", err)
 		}
 		for name, got := range map[string]*models.DeviceCode{"FindByUserCode": byUser, "FindByDeviceCode": byDevice} {
+			if got == nil {
+				t.Fatalf("%s: no record after update", name)
+			}
 			if !got.IsAuthorized {
 				t.Fatalf("%s: IsAuthorized = false after update", name)
 			}
