@@ -24,6 +24,7 @@ func NewDeviceAuthorizationResult(
 
 func (dar *DeviceAuthorizationResult) Execute(w http.ResponseWriter, r *http.Request) error {
 	HttpRespSetNoCache(w)
+	w.Header().Set("Content-Type", "application/json")
 
 	dto := make(map[string]interface{})
 
@@ -31,7 +32,9 @@ func (dar *DeviceAuthorizationResult) Execute(w http.ResponseWriter, r *http.Req
 	dto["device_code"] = dar.Response.DeviceCode
 	dto["user_code"] = dar.Response.UserCode
 	dto["verification_uri"] = dar.Response.VerificationUri
-	dto["verification_uri_complete"] = dar.Response.VerificationUriComplete
+	if dar.Response.VerificationUriComplete != "" {
+		dto["verification_uri_complete"] = dar.Response.VerificationUriComplete
+	}
 	dto["expires_in"] = dar.Response.DeviceCodeLifetime
 	dto["interval"] = dar.Response.Interval
 
