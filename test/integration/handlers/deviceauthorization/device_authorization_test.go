@@ -427,6 +427,14 @@ func TestDeviceFlowInteractionServiceAgainstTheStore(t *testing.T) {
 		require.ErrorIs(t, service.Approve(context.Background(), userCode, user, "", []string{"openid"}), services.ErrDeviceFlowUserCodeAlreadyHandled)
 	})
 
+	t.Run("handled and then expired user code reports expiry", func(t *testing.T) {
+		device := authorizeDevice(t, pipeline, shortLivedClient, "openid api1")
+		userCode := device.json("user_code").String()
+		require.NoError(t, service.Deny(context.Background(), userCode))
+		time.Sleep(1500 * time.Millisecond)
+		require.ErrorIs(t, service.Deny(context.Background(), userCode), services.ErrDeviceFlowUserCodeExpired)
+	})
+
 	t.Run("approval of a scope that was not requested", func(t *testing.T) {
 		device := authorizeDevice(t, pipeline, deviceClient, "openid api1")
 		require.ErrorIs(t, service.Approve(context.Background(), device.json("user_code").String(), user, "", []string{"openid", "profile"}), services.ErrDeviceFlowInvalidApproval)
