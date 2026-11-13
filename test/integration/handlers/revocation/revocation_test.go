@@ -92,6 +92,14 @@ func (f *revocationFixture) storeReferenceToken(t *testing.T, clientId string) s
 	f.handles++
 	// A handle carries no dot: the token validator reads a dotted value as a JWT.
 	handle := fmt.Sprintf("reference-%s-%d", strings.ReplaceAll(clientId, ".", "-"), f.handles)
+	f.storeReferenceTokenUnder(t, clientId, handle)
+	return handle
+}
+
+// storeReferenceTokenUnder places a reference access token for bob issued to
+// clientId under the given handle.
+func (f *revocationFixture) storeReferenceTokenUnder(t *testing.T, clientId string, handle string) {
+	t.Helper()
 	token := &storage_models.Token{
 		Issuer:          f.TestServer.URL,
 		Audiences:       []string{"api1"},
@@ -107,7 +115,6 @@ func (f *revocationFixture) storeReferenceToken(t *testing.T, clientId string) s
 		},
 	}
 	require.NoError(t, f.referenceTokens.StoreReferenceToken(context.Background(), handle, token))
-	return handle
 }
 
 type tokenPair struct {
@@ -396,17 +403,193 @@ func TestRevocationAcrossClientsIsSilent(t *testing.T) {
 }
 
 // The token endpoint issues JWT access tokens, which carry no server-side
-// state the revocation endpoint can remove: revoking one answers 200 and the
-// token stays active. Update this test together with that behavior.
+// state the revocation endpoint can remove: the endpoint refuses one with 400
+// unsupported_token_type and the token stays valid until it expires. Update
+// this test together with that behavior.
 func TestRevocationKnownLimitationJwtAccessTokenStaysActive(t *testing.T) {
 	pipeline := newRevocationPipeline()
 	tokens := issueTokens(t, pipeline, clientA)
 	require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
 	require.True(t, introspectActive(t, pipeline, tokens.jwt))
 
-	requireRevocationOk(t, revokeAs(t, pipeline, clientA, tokens.jwt, wicket.TokenTypeHintsAccessToken))
+	answer := revokeAs(t, pipeline, clientA, tokens.jwt, wicket.TokenTypeHintsAccessToken)
+	requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
 
 	require.True(t, introspectActive(t, pipeline, tokens.jwt))
+}
+
+// The hint plays no part in refusing a JWT access token: without a hint, and
+// with a hint naming a refresh token, the answer is the same.
+func TestRevocationRejectsJwtAccessTokenWhateverTheHint(t *testing.T) {
+	pipeline := newRevocationPipeline()
+
+	for name, hint := range map[string]string{
+		"without hint":            "",
+		"with refresh_token hint": wicket.TokenTypeHintsRefreshToken,
+	} {
+		t.Run(name, func(t *testing.T) {
+			tokens := issueTokens(t, pipeline, clientA)
+			require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
+			require.True(t, introspectActive(t, pipeline, tokens.jwt))
+
+			answer := revokeAs(t, pipeline, clientA, tokens.jwt, hint)
+			requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
+
+			require.True(t, introspectActive(t, pipeline, tokens.jwt))
+		})
+	}
+}
+
+// Another client's JWT access token gets the same answer as the client's own:
+// the answer does not tell whose token it is.
+func TestRevocationRejectsAnotherClientsJwtAccessToken(t *testing.T) {
+	pipeline := newRevocationPipeline()
+
+	for name, hint := range map[string]string{
+		"with access_token hint": wicket.TokenTypeHintsAccessToken,
+		"without hint":           "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			tokens := issueTokens(t, pipeline, clientA)
+			require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
+
+			answer := revokeAs(t, pipeline, clientB, tokens.jwt, hint)
+			requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
+
+			require.True(t, introspectActive(t, pipeline, tokens.jwt))
+		})
+	}
+}
+
+// A dotted value that is not a valid JWT access token is refused like a valid
+// one: the endpoint does not verify what it is handed.
+func TestRevocationRejectsInvalidJwtShapedTokens(t *testing.T) {
+	pipeline := newRevocationPipeline()
+
+	t.Run("JWT with a broken signature", func(t *testing.T) {
+		tokens := issueTokens(t, pipeline, clientA)
+		segments := strings.Split(tokens.jwt, ".")
+		require.Len(t, segments, 3, "token endpoint must issue a compact JWT")
+		require.NotEmpty(t, segments[2])
+		replacement := "A"
+		if strings.HasPrefix(segments[2], "A") {
+			replacement = "B"
+		}
+		segments[2] = replacement + segments[2][1:]
+		broken := strings.Join(segments, ".")
+		require.NotEqual(t, tokens.jwt, broken)
+		require.False(t, introspectActive(t, pipeline, broken), "a JWT with a broken signature must not be active")
+
+		answer := revokeAs(t, pipeline, clientA, broken, wicket.TokenTypeHintsAccessToken)
+		requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
+	})
+
+	t.Run("made-up dotted value", func(t *testing.T) {
+		for _, hint := range []string{"", wicket.TokenTypeHintsAccessToken, wicket.TokenTypeHintsRefreshToken} {
+			answer := revokeAs(t, pipeline, clientA, "aaa.bbb.ccc", hint)
+			requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
+		}
+	})
+}
+
+func TestRevocationJwtAccessTokenWithUnsupportedHint(t *testing.T) {
+	pipeline := newRevocationPipeline()
+	tokens := issueTokens(t, pipeline, clientA)
+	require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
+
+	answer := revokeAs(t, pipeline, clientA, tokens.jwt, "id_token")
+	requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
+
+	require.True(t, introspectActive(t, pipeline, tokens.jwt))
+}
+
+// A refused JWT access token and an unsupported hint share an error code, and
+// a client must not be able to tell which of the two it ran into.
+func TestRevocationJwtRejectionMatchesUnsupportedHintAnswer(t *testing.T) {
+	pipeline := newRevocationPipeline()
+	tokens := issueTokens(t, pipeline, clientA)
+	require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
+
+	byForm := revokeAs(t, pipeline, clientA, tokens.jwt, wicket.TokenTypeHintsAccessToken)
+	byHint := revokeAs(t, pipeline, clientA, "anything", "id_token")
+
+	requireRevocationError(t, byHint, http.StatusBadRequest, "unsupported_token_type")
+	require.Equal(t, byHint.status, byForm.status)
+	require.Equal(t, byHint.body, byForm.body)
+	// Date is the server's clock at each answer, not part of either answer.
+	byForm.header.Del("Date")
+	byHint.header.Del("Date")
+	require.Equal(t, byHint.header, byForm.header)
+}
+
+func TestRevocationJwtAccessTokenWithHeaderCredentials(t *testing.T) {
+	pipeline := newRevocationPipeline()
+	tokens := issueTokens(t, pipeline, clientA)
+	require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
+
+	answer := revoke(t, pipeline, revocationCall{form: url.Values{"token": {tokens.jwt}}, basicClient: clientA, basicSecret: secret})
+
+	requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
+	require.Empty(t, answer.header.Get("WWW-Authenticate"))
+}
+
+// A request that fails client authentication is answered invalid_client
+// whatever the form of its token, so the endpoint cannot be probed without
+// credentials.
+func TestRevocationClientAuthenticationPrecedesJwtRejection(t *testing.T) {
+	pipeline := newRevocationPipeline()
+	tokens := issueTokens(t, pipeline, clientA)
+	require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
+
+	t.Run("wrong secret in Basic header is 401", func(t *testing.T) {
+		answer := revoke(t, pipeline, revocationCall{form: url.Values{"token": {tokens.jwt}}, basicClient: clientA, basicSecret: "wrong"})
+		requireRevocationError(t, answer, http.StatusUnauthorized, "invalid_client")
+		require.Equal(t, `Basic realm="wicket"`, answer.header.Get("WWW-Authenticate"))
+	})
+
+	t.Run("no credentials is 400", func(t *testing.T) {
+		answer := revoke(t, pipeline, revocationCall{form: url.Values{"token": {tokens.jwt}}})
+		requireRevocationError(t, answer, http.StatusBadRequest, "invalid_client")
+	})
+}
+
+func TestRevocationJwtRejectionHasNoSideEffects(t *testing.T) {
+	pipeline := newRevocationPipeline()
+	tokens := issueTokens(t, pipeline, clientA)
+	require.Contains(t, tokens.jwt, ".", "token endpoint must issue a JWT access token")
+
+	for _, hint := range []string{"", wicket.TokenTypeHintsAccessToken, wicket.TokenTypeHintsRefreshToken} {
+		answer := revokeAs(t, pipeline, clientA, tokens.jwt, hint)
+		requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
+	}
+
+	require.True(t, introspectActive(t, pipeline, tokens.reference), "a refused request must not touch the reference token")
+	requireRefreshUsable(t, pipeline, clientA, tokens.refresh)
+}
+
+// A reference token store accepts any handle a host writes, but a handle with
+// a dot never passed access token validation, which reads a dotted value as a
+// JWT. This pins the matching limitation of the revocation endpoint: such a
+// handle is refused and stays in the store, so the host can only remove it
+// from the store directly. Update this test together with that behavior.
+func TestRevocationKnownLimitationDottedReferenceHandleCannotBeRevoked(t *testing.T) {
+	pipeline := newRevocationPipeline()
+	handle := "host.written.handle"
+	require.Contains(t, handle, ".")
+	pipeline.storeReferenceTokenUnder(t, clientA, handle)
+	stored, err := pipeline.referenceTokens.GetReferenceToken(context.Background(), handle)
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+
+	for _, hint := range []string{wicket.TokenTypeHintsAccessToken, ""} {
+		answer := revokeAs(t, pipeline, clientA, handle, hint)
+		requireRevocationError(t, answer, http.StatusBadRequest, "unsupported_token_type")
+	}
+
+	stored, err = pipeline.referenceTokens.GetReferenceToken(context.Background(), handle)
+	require.NoError(t, err, "the handle must still be in the store")
+	require.NotNil(t, stored)
+	require.Equal(t, clientA, stored.ClientId)
 }
 
 // The generator does not search the other token type when the hint names the
@@ -447,4 +630,106 @@ func TestDiscoveryAdvertisesRevocationEndpoint(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.StatusCode)
 
 	require.Equal(t, pipeline.TestServer.URL+"/connect/revocation", gjson.GetBytes(body, "revocation_endpoint").String())
+}
+
+func discoveryDocument(t *testing.T, pipeline *integration_common.WicketPipeline) string {
+	t.Helper()
+	response, err := pipeline.BackChannelClient.Get(pipeline.TestServer.URL + integration_common.DiscoveryEndpoint)
+	require.NoError(t, err)
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	_ = response.Body.Close()
+	require.Equal(t, http.StatusOK, response.StatusCode, "discovery: %s", body)
+	return string(body)
+}
+
+func requireRevocationNotFound(t *testing.T, answer revocationAnswer) {
+	t.Helper()
+	require.Equal(t, http.StatusNotFound, answer.status, "revocation: %s", answer.body)
+	require.Empty(t, answer.body)
+	require.Empty(t, answer.header.Values("WWW-Authenticate"))
+}
+
+func TestRevocationSwitchedOff(t *testing.T) {
+	pipeline := newRevocationPipeline()
+	pipeline.Options.Endpoints.EnableTokenRevocationEndpoint = false
+
+	t.Run("a valid request is not found and revokes nothing", func(t *testing.T) {
+		tokens := issueTokens(t, pipeline, clientA)
+
+		requireRevocationNotFound(t, revokeAs(t, pipeline, clientA, tokens.refresh, wicket.TokenTypeHintsRefreshToken))
+		requireRevocationNotFound(t, revoke(t, pipeline, revocationCall{form: url.Values{"token": {tokens.refresh}}, basicClient: clientA, basicSecret: secret}))
+
+		require.True(t, introspectActive(t, pipeline, tokens.reference))
+		requireRefreshUsable(t, pipeline, clientA, tokens.refresh)
+	})
+
+	t.Run("GET is not found", func(t *testing.T) {
+		response, err := pipeline.BackChannelClient.Get(pipeline.TestServer.URL + integration_common.RevocationEndpoint)
+		require.NoError(t, err)
+		body, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
+		_ = response.Body.Close()
+		require.Equal(t, http.StatusNotFound, response.StatusCode)
+		require.Empty(t, body)
+	})
+
+	t.Run("JSON body is not found", func(t *testing.T) {
+		answer := revoke(t, pipeline, revocationCall{contentType: "application/json", basicClient: clientA, basicSecret: secret})
+		requireRevocationNotFound(t, answer)
+	})
+
+	t.Run("no credentials is not found", func(t *testing.T) {
+		answer := revoke(t, pipeline, revocationCall{form: url.Values{"token": {"anything"}}})
+		requireRevocationNotFound(t, answer)
+	})
+
+	t.Run("wrong secret in Basic header is not found", func(t *testing.T) {
+		answer := revoke(t, pipeline, revocationCall{form: url.Values{"token": {"anything"}}, basicClient: clientA, basicSecret: "wrong"})
+		requireRevocationNotFound(t, answer)
+	})
+
+	t.Run("discovery does not advertise the endpoint", func(t *testing.T) {
+		document := discoveryDocument(t, pipeline.WicketPipeline)
+		require.False(t, gjson.Get(document, "revocation_endpoint").Exists(), "discovery: %s", document)
+	})
+}
+
+// Known limitation, to be fixed in the discovery filter: the filter keeps a
+// host's custom entry by where its value points and does not look at the
+// endpoint switch. With the revocation endpoint switched off, a custom
+// revocation_endpoint entry pointing back at this server's revocation route
+// therefore stays in the document although the route answers 404. Update this
+// test together with the filter.
+func TestRevocationKnownLimitationSwitchedOffCustomEntryIsStillAdvertised(t *testing.T) {
+	for name, entry := range map[string]func(pipeline *revocationFixture) string{
+		"relative path": func(*revocationFixture) string { return "~/connect/revocation" },
+		"absolute URL": func(pipeline *revocationFixture) string {
+			return pipeline.TestServer.URL + "/connect/revocation"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pipeline := newRevocationPipeline()
+			pipeline.Options.Endpoints.EnableTokenRevocationEndpoint = false
+			pipeline.Options.Discovery.CustomEntries["revocation_endpoint"] = entry(pipeline)
+
+			document := discoveryDocument(t, pipeline.WicketPipeline)
+			advertised := gjson.Get(document, "revocation_endpoint")
+			require.True(t, advertised.Exists(), "discovery: %s", document)
+			require.Equal(t, pipeline.TestServer.URL+"/connect/revocation", advertised.String())
+
+			tokens := issueTokens(t, pipeline, clientA)
+			form := url.Values{
+				"client_id":       {clientA},
+				"client_secret":   {secret},
+				"token":           {tokens.refresh},
+				"token_type_hint": {wicket.TokenTypeHintsRefreshToken},
+			}
+			response, err := pipeline.BackChannelClient.PostForm(advertised.String(), form)
+			require.NoError(t, err)
+			_ = response.Body.Close()
+			require.Equal(t, http.StatusNotFound, response.StatusCode)
+			requireRefreshUsable(t, pipeline, clientA, tokens.refresh)
+		})
+	}
 }

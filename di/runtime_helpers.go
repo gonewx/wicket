@@ -141,6 +141,7 @@ func newTokenRevocationHandlerFromProvider(p godi.Provider) *handlers.TokenRevoc
 		godi.GetRequired[validators.ClientSecretValidator](p),
 		godi.GetRequired[validators.TokenRevocationRequestValidator](p),
 		godi.GetRequired[responses.TokenRevocationResponseGenerator](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
 }

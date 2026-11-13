@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gonewx/wicket"
+	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/responses"
@@ -22,11 +23,13 @@ import (
 const basicChallenge = `Basic realm="wicket"`
 
 // TokenRevocationHandler serves RFC 7009 token revocation for authenticated
-// clients.
+// clients. It revokes refresh tokens and reference access tokens; a JWT
+// access token carries no server-side state and is refused.
 type TokenRevocationHandler struct {
 	clientValidator  validators.ClientSecretValidator
 	requestValidator validators.TokenRevocationRequestValidator
 	generator        responses.TokenRevocationResponseGenerator
+	options          *config_options.WicketOptions
 	logger           *slog.Logger
 }
 
@@ -34,17 +37,24 @@ func NewTokenRevocationHandler(
 	clientValidator validators.ClientSecretValidator,
 	requestValidator validators.TokenRevocationRequestValidator,
 	generator responses.TokenRevocationResponseGenerator,
+	options *config_options.WicketOptions,
 	logger *slog.Logger,
 ) *TokenRevocationHandler {
 	return &TokenRevocationHandler{
 		clientValidator:  clientValidator,
 		requestValidator: requestValidator,
 		generator:        generator,
+		options:          options,
 		logger:           logger,
 	}
 }
 
 func (h *TokenRevocationHandler) Process(w http.ResponseWriter, r *http.Request) error {
+	// A switched-off endpoint answers as if it did not exist, whatever the
+	// request looks like, and before anything of the request is read.
+	if !h.options.Endpoints.EnableTokenRevocationEndpoint {
+		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
+	}
 	if r.Method != http.MethodPost {
 		return results.NewStatusCodeResult(http.StatusMethodNotAllowed).Execute(w, r)
 	}
@@ -74,6 +84,22 @@ func (h *TokenRevocationHandler) Process(w http.ResponseWriter, r *http.Request)
 	}
 	if validation.Error != nil {
 		return results.NewTokenRevocationErrorResult(validation.Error).Execute(w, r)
+	}
+
+	// A JWT access token cannot be revoked here, so it is refused rather than
+	// answered with a 200 that would promise it is no longer usable (RFC 7009
+	// §2.2.1). The test for the JWT form is the same one access token
+	// validation uses to tell a JWT from a reference handle; see
+	// ValidateAccessToken in validators/impl/token_validator.go. It looks at
+	// the form only: the token is not parsed and the hint plays no part, so
+	// the answer does not depend on whose token it is or whether it is valid.
+	if strings.Contains(validation.Token, ".") {
+		h.debug("revocation request rejected",
+			slog.String("clientId", clientResult.Client.ClientId),
+			slog.String("tokenTypeHint", validation.TokenTypeHint),
+			slog.String("error", wicket.RevocationErrorsUnsupportedTokenType.Error()),
+		)
+		return results.NewTokenRevocationErrorResult(wicket.RevocationErrorsUnsupportedTokenType).Execute(w, r)
 	}
 
 	response, err := h.generator.Handle(r.Context(), validation)
