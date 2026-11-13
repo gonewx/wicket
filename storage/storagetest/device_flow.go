@@ -200,7 +200,7 @@ func RunDeviceFlowStoreSuite(t *testing.T, newStore func() storage.DeviceFlowSto
 	// #section-3.5. The user's decision is written under the user code while
 	// the device polls with the device code, so the replaced record must be
 	// what both lookups return.
-	cfg.mayCase(t, "UpdateVisibleByDeviceCode", func(t *testing.T) {
+	mustCase(t, "UpdateVisibleByDeviceCode", func(t *testing.T) {
 		t.Parallel()
 		store := newStore()
 		initial := newDeviceCode("client-a")

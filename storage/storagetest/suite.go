@@ -16,7 +16,7 @@ import (
 // SuiteVersion identifies the contract version this suite verifies. A
 // compliant adapter exposes ConformsTo() string returning this value; a host
 // compares adapter.ConformsTo() to SuiteVersion at assembly time.
-const SuiteVersion = "1.0.0"
+const SuiteVersion = "1.1.0"
 
 // Option configures a suite run.
 type Option func(*options)

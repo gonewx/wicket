@@ -94,8 +94,8 @@ func (c credentialCarrier) ConformsTo() string { return c.version }
 func TestGrantStoreConformanceSuiteVersionAndCredentialE2E(t *testing.T) {
 	t.Parallel()
 
-	if storagetest.SuiteVersion != "1.0.0" {
-		t.Fatalf("SuiteVersion = %q, want %q", storagetest.SuiteVersion, "1.0.0")
+	if storagetest.SuiteVersion != "1.1.0" {
+		t.Fatalf("SuiteVersion = %q, want %q", storagetest.SuiteVersion, "1.1.0")
 	}
 
 	// A credentialed adapter whose version matches runs the full suite,
