@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-12
+
+### Fixed
+
+- Discovery: the configuration document now advertises only what the running assembly can serve. Endpoint URLs under the server's base URL are kept only when a route is registered for them, so `revocation_endpoint` and `device_authorization_endpoint` (no handlers yet, previously answering 404) are no longer advertised, and `device_code` is dropped from `grant_types_supported` together with the device authorization endpoint. `backchannel_logout_supported` / `backchannel_logout_session_supported` are advertised only when the back-channel logout service reports that it delivers notifications (the default service does not). `authorization_response_iss_parameter_supported` follows `EmitIssuerIdentificationResponseParameter`. With `MutualTls.Enabled` but no tls client authentication parser registered, the mutual TLS entries are withheld and a warning is logged. Host `CustomEntries` are not filtered. Once a missing capability is implemented and registered, its advertisement returns without further changes.
+- Tests: an assembly-level guard checks the default and the all-switches-on assemblies: every advertised endpoint must route to a handler (not 404), every capability advertised as `true` must map to implementation evidence, and the advertised grant types and authentication methods must agree with the assembly.
+- Docs: README and API contracts describe device authorization, token revocation and back-channel logout delivery as not yet available, and document the discovery filtering rules.
+
+[0.2.1]: https://github.com/gonewx/wicket/releases/tag/v0.2.1
+
 ## [0.2.0] - 2026-11-12
 
 ### Changed
