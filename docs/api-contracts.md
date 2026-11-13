@@ -145,7 +145,7 @@ client_id=<client_id>
 - 只接受 `POST`（其他方法 405）与 `application/x-www-form-urlencoded` 请求体（其他内容类型 415）。参数只从请求体读取，查询串不生效；请求体无法按表单解析时返回 400 `invalid_request`。
 - 客户端认证与令牌端点相同：经 DI 注册的 secret parser 解析凭据（默认含 `client_secret_basic`、`client_secret_post`），不要求密钥的公共客户端（`RequireClientSecret=false`）只需在请求体中带 `client_id`。认证失败返回 `{"error":"invalid_client"}`：请求带 `Authorization` 头时为 **401** 并带 `WWW-Authenticate`，否则为 **400**，与撤销端点一致。
 - 客户端不允许 device_code 授权类型时返回 400 `unauthorized_client`；scope 无效、身份 scope 缺少 `openid`，或未传 `scope` 且客户端没有 `AllowedScopes` 时返回 400 `invalid_scope`；`scope` 超长返回 400 `invalid_request`。这些错误的响应体只含 `error`，`Content-Type: application/json`，并带禁止缓存的头。未传 `scope` 时默认取客户端全部 `AllowedScopes`（`AllowOfflineAccess=true` 时追加 `offline_access`）。
-- 成功响应为 200、`application/json`、禁止缓存（示例假设宿主已把 `DeviceFlow.Interval` 设为 5；默认值为 0，见下文已知限制）：
+- 成功响应为 200、`application/json`、禁止缓存：
 
 ```json
 {
@@ -158,7 +158,7 @@ client_id=<client_id>
 }
 ```
 
-  `expires_in` 取客户端的 `DeviceCodeLifetime`，`interval` 取 `DeviceFlow.Interval`。`verification_uri` 取 `UserInteraction.DeviceVerificationUrl`（相对路径时拼上服务器 base URL）；`DeviceVerificationUserCodeParameter` 为空时不输出 `verification_uri_complete`。
+  `expires_in` 取客户端的 `DeviceCodeLifetime`，`interval` 取 `DeviceFlow.Interval`（默认 5）。`verification_uri` 取 `UserInteraction.DeviceVerificationUrl`（相对路径时拼上服务器 base URL）；`DeviceVerificationUserCodeParameter` 为空时不输出 `verification_uri_complete`。
 - 设备随后在令牌端点轮询：
 
 ```
@@ -197,7 +197,6 @@ err = interaction.Deny(ctx, userCode)
 
 #### 已知限制
 
-- 默认配置下 `DeviceFlow.Interval` 为 0：响应中的 `interval` 为 0，客户端未设 `PollingInterval` 时不会返回 `slow_down`。宿主应显式设置 `DeviceFlow.Interval`（例如 5 秒）。
 - 宣告的 `interval` 取 `DeviceFlow.Interval`，而节流优先取客户端的 `PollingInterval`，两者可能不一致。
 - user code 默认为 9 位数字，由 `math/rand` 生成；wicket 不对 user code 的尝试次数限速（RFC 8628 §5.1），限速由宿主验证页面负责。
 - `verification_uri_complete` 中的 user code 未做 URL 编码。
