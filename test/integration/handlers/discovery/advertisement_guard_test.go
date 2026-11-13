@@ -163,6 +163,9 @@ func TestDiscoveryAdvertisementMatchesTheAssembly(t *testing.T) {
 			t.Run("advertised lists agree with the assembly", func(t *testing.T) {
 				assertListsConsistent(t, guard)
 			})
+			t.Run("every registered route is advertised", func(t *testing.T) {
+				assertRegisteredRoutesAdvertised(t, guard)
+			})
 		})
 	}
 }
@@ -255,5 +258,35 @@ func assertListsConsistent(t *testing.T, guard *advertisementGuard) {
 			require.Containsf(t, available, name, "%s advertises %s which no registered secret parser provides",
 				wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported, name)
 		}
+	}
+}
+
+// unadvertisedRoutes are registered routes that no discovery key describes:
+// the discovery document itself and the interaction callbacks.
+var unadvertisedRoutes = []string{
+	wicket.ProtocolRoutePathsDiscoveryConfiguration,
+	"/" + wicket.ProtocolRoutePathsAuthorizeCallback,
+	"/" + wicket.ProtocolRoutePathsEndSessionCallback,
+}
+
+func assertRegisteredRoutesAdvertised(t *testing.T, guard *advertisementGuard) {
+	t.Helper()
+
+	advertisedUrls := map[string]struct{}{}
+	for _, value := range guard.document {
+		if raw, ok := value.(string); ok {
+			advertisedUrls[raw] = struct{}{}
+		}
+	}
+
+	endpoints := godi.GetServices[*hosting.Endpoint](guard.pipeline.Root)
+	require.NotEmpty(t, endpoints)
+	for _, endpoint := range endpoints {
+		if slices.ContainsFunc(unadvertisedRoutes, func(path string) bool { return strings.EqualFold(path, endpoint.Path) }) {
+			continue
+		}
+		want := guard.pipeline.TestServer.URL + endpoint.Path
+		_, ok := advertisedUrls[want]
+		require.Truef(t, ok, "registered route %s (%s) is not advertised as %s", endpoint.Name, endpoint.Path, want)
 	}
 }

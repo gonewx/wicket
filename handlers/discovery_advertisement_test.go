@@ -6,10 +6,15 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -187,7 +192,7 @@ func TestFilterDiscoveryAdvertisement(t *testing.T) {
 			wantWarnings: 1,
 		},
 		{
-			name:      "mutual TLS with a tls parser keeps aliases of advertised endpoints",
+			name:      "mutual TLS with only the tls_client_auth parser",
 			mutualTls: true,
 			configure: func(o *config_options.WicketOptions) { o.MutualTls.Enabled = true },
 			assembly: func(a discoveryAssembly) discoveryAssembly {
@@ -195,12 +200,31 @@ func TestFilterDiscoveryAdvertisement(t *testing.T) {
 				return a
 			},
 			present: []string{wicket.DiscoveryTlsClientCertificateBoundAccessTokens},
-			values: map[string]any{
-				wicket.DiscoveryMtlsEndpointAliases: map[string]string{
-					wicket.DiscoveryTokenEndpoint:         advertisementUrl(wicket.ProtocolRoutePathsMtlsToken),
-					wicket.DiscoveryIntrospectionEndpoint: advertisementUrl(wicket.ProtocolRoutePathsMtlsIntrospection),
-				},
+			authMethods: []string{
+				wicket.EndpointAuthenticationMethodsBasicAuthentication,
+				wicket.EndpointAuthenticationMethodsPostBody,
+				wicket.EndpointAuthenticationMethodsTlsClientAuth,
 			},
+			wantWarnings: 1,
+		},
+		{
+			name:      "mutual TLS path aliases pointing at unregistered routes",
+			mutualTls: true,
+			configure: func(o *config_options.WicketOptions) { o.MutualTls.Enabled = true },
+			assembly: func(a discoveryAssembly) discoveryAssembly {
+				a.authenticationMethods = append(a.authenticationMethods,
+					wicket.EndpointAuthenticationMethodsTlsClientAuth,
+					wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
+				)
+				return a
+			},
+			edit: func(d map[string]any) {
+				aliases := d[wicket.DiscoveryMtlsEndpointAliases].(map[string]string)
+				// the generator's path form appends the route without a separator
+				aliases[wicket.DiscoveryTokenEndpoint] = advertisementBaseUrl + wicket.ProtocolRoutePathsMtlsToken
+			},
+			present: []string{wicket.DiscoveryTlsClientCertificateBoundAccessTokens},
+			absent:  []string{wicket.DiscoveryMtlsEndpointAliases},
 			authMethods: []string{
 				wicket.EndpointAuthenticationMethodsBasicAuthentication,
 				wicket.EndpointAuthenticationMethodsPostBody,
@@ -208,6 +232,35 @@ func TestFilterDiscoveryAdvertisement(t *testing.T) {
 				wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
 			},
 			wantWarnings: 1,
+		},
+		{
+			name:      "mutual TLS keeps routed aliases of advertised endpoints",
+			mutualTls: true,
+			assembly: func(a discoveryAssembly) discoveryAssembly {
+				a.authenticationMethods = append(a.authenticationMethods, wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth)
+				a.endpointPaths = append(a.endpointPaths,
+					"/"+wicket.ProtocolRoutePathsMtlsIntrospection,
+					"/"+wicket.ProtocolRoutePathsMtlsRevocation,
+					"/"+wicket.ProtocolRoutePathsMtlsDeviceAuthorization,
+				)
+				return a
+			},
+			edit: func(d map[string]any) {
+				aliases := d[wicket.DiscoveryMtlsEndpointAliases].(map[string]string)
+				// sub-domain form: another host, judged by its primary endpoint only
+				aliases[wicket.DiscoveryTokenEndpoint] = "https://mtls.wicket.test/" + wicket.ProtocolRoutePathsToken
+			},
+			values: map[string]any{
+				wicket.DiscoveryMtlsEndpointAliases: map[string]string{
+					wicket.DiscoveryTokenEndpoint:         "https://mtls.wicket.test/" + wicket.ProtocolRoutePathsToken,
+					wicket.DiscoveryIntrospectionEndpoint: advertisementUrl(wicket.ProtocolRoutePathsMtlsIntrospection),
+				},
+			},
+			authMethods: []string{
+				wicket.EndpointAuthenticationMethodsBasicAuthentication,
+				wicket.EndpointAuthenticationMethodsPostBody,
+				wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
+			},
 		},
 		{
 			name:      "mutual TLS aliases dropped once every primary endpoint is gone",
@@ -288,6 +341,22 @@ func TestFilterDiscoveryAdvertisement(t *testing.T) {
 				}
 			},
 			absent: []string{wicket.DiscoveryRevocationEndpoint},
+		},
+		{
+			name: "custom entries equal to the generated values stay filtered",
+			configure: func(o *config_options.WicketOptions) {
+				o.Discovery.ExpandRelativePathsInCustomEntries = true
+				o.Discovery.CustomEntries = map[string]any{
+					wicket.DiscoveryRevocationEndpoint:          advertisementUrl(wicket.ProtocolRoutePathsRevocation),
+					wicket.DiscoveryDeviceAuthorizationEndpoint: "~/" + wicket.ProtocolRoutePathsDeviceAuthorization,
+					wicket.DiscoveryBackchannelLogoutSupported:  true,
+				}
+			},
+			absent: []string{
+				wicket.DiscoveryRevocationEndpoint,
+				wicket.DiscoveryDeviceAuthorizationEndpoint,
+				wicket.DiscoveryBackchannelLogoutSupported,
+			},
 		},
 		{
 			name: "external endpoint URL is kept",
@@ -428,4 +497,52 @@ func equalJson(t *testing.T, got any, want any) bool {
 		t.Fatalf("marshal %v: %v", want, err)
 	}
 	return bytes.Equal(left, right)
+}
+
+// TestGeneratedDiscoveryKeysCoverTheDiscoveryConstants keeps the generated key
+// name space in step with the wicket.Discovery* constants.
+func TestGeneratedDiscoveryKeysCoverTheDiscoveryConstants(t *testing.T) {
+	t.Parallel()
+
+	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "constants.go"), nil, 0)
+	if err != nil {
+		t.Fatalf("parse constants.go: %v", err)
+	}
+	want := map[string]struct{}{}
+	for _, decl := range file.Decls {
+		general, ok := decl.(*ast.GenDecl)
+		if !ok || general.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range general.Specs {
+			value := spec.(*ast.ValueSpec)
+			for i, name := range value.Names {
+				if !strings.HasPrefix(name.Name, "Discovery") || i >= len(value.Values) {
+					continue
+				}
+				literal, ok := value.Values[i].(*ast.BasicLit)
+				if !ok || literal.Kind != token.STRING {
+					t.Fatalf("%s is not a string literal constant", name.Name)
+				}
+				unquoted, err := strconv.Unquote(literal.Value)
+				if err != nil {
+					t.Fatalf("unquote %s: %v", name.Name, err)
+				}
+				want[unquoted] = struct{}{}
+			}
+		}
+	}
+	if len(want) == 0 {
+		t.Fatal("no Discovery constants found in constants.go")
+	}
+	for key := range want {
+		if _, ok := generatedDiscoveryKeys[key]; !ok {
+			t.Errorf("generatedDiscoveryKeys misses %q", key)
+		}
+	}
+	for key := range generatedDiscoveryKeys {
+		if _, ok := want[key]; !ok {
+			t.Errorf("generatedDiscoveryKeys holds %q which is not a Discovery constant", key)
+		}
+	}
 }

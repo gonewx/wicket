@@ -30,6 +30,12 @@ type DiscoveryHandler struct {
 	logger    *slog.Logger
 }
 
+// NewDiscoveryHandler builds the discovery handler from the generator and the
+// facts of the running assembly: the registered endpoint route paths, the
+// back-channel logout service and the secret parsers. A nil endpointPaths
+// means no route is registered, so every endpoint URL under the base URL is
+// withdrawn from the document; regular use goes through the composition root,
+// which supplies the registered routes.
 func NewDiscoveryHandler(
 	generator responses.DiscoveryResponseGenerator,
 	urls services.ServerUrls,

@@ -64,9 +64,12 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | `grant_types_supported` 中的 `device_code` | `device_authorization_endpoint` 仍在文档中 |
 | `backchannel_logout_supported` / `backchannel_logout_session_supported` | `BackchannelLogoutService` 实现了 `DeliversBackChannelLogout() bool` 且返回 `true`。Back-Channel Logout 发送**尚未提供**（默认实现不发送通知），因此默认不宣告 |
 | `authorization_response_iss_parameter_supported` | `EmitIssuerIdentificationResponseParameter` 为 `true` |
-| `tls_client_auth` / `self_signed_tls_client_auth`、`tls_client_certificate_bound_access_tokens`、`mtls_endpoint_aliases` | 注册了 tls 类客户端认证解析器；alias 条目只在对应主端点仍被宣告时保留。`MutualTls.Enabled=true` 但条件不满足时，这些键被移除并记一条 `slog` Warn |
+| `tls_client_auth` / `self_signed_tls_client_auth` | 逐个判定：该方法在已注册解析器的 `GetAvailableAuthenticationMethods()` 中 |
+| `tls_client_certificate_bound_access_tokens`、`mtls_endpoint_aliases` | 至少注册了一种 tls 类客户端认证解析器。alias 条目逐条判定：对应主端点仍被宣告，且位于 base URL 下的 alias 路径已注册为端点路由（其他主机上的 alias 只看主端点）；删空后整个键移除 |
 
-令牌撤销端点（`revocation_endpoint`）与设备授权端点（`device_authorization_endpoint`）**尚未提供**，因此不出现在文档中。`frontchannel_logout_*` 有真实实现，照常输出。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤；与生成键同名的自定义条目会被生成值覆盖，并照常过滤。
+令牌撤销端点（`revocation_endpoint`）与设备授权端点（`device_authorization_endpoint`）**尚未提供**，因此不出现在文档中。`frontchannel_logout_*` 有真实实现，照常输出。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤；与生成键同名的自定义条目会被生成值覆盖，并照常过滤。生成键指 `wicket.Discovery*` 常量定义的键名：落在这个键名空间里的键一律按生成键过滤，即使自定义值与生成值相同，宿主也无法借此重新宣告被撤下的能力。
+
+`MutualTls.Enabled=true` 且有任何 mTLS 相关值（上表最后两行）被移除时，每生成一次文档记一条 `slog` Warn。
 
 ## 客户端认证方式
 

@@ -5,7 +5,6 @@ package handlers
 
 import (
 	"log/slog"
-	"reflect"
 	"slices"
 	"strings"
 
@@ -53,6 +52,12 @@ func (a discoveryAssembly) hasTlsClientAuthentication() bool {
 	return slices.ContainsFunc(a.authenticationMethods, isTlsAuthenticationMethod)
 }
 
+// unregisteredTlsMethod reports whether method is a tls client authentication
+// method without a registered parser providing it.
+func (a discoveryAssembly) unregisteredTlsMethod(method string) bool {
+	return isTlsAuthenticationMethod(method) && !slices.Contains(a.authenticationMethods, method)
+}
+
 func isTlsAuthenticationMethod(method string) bool {
 	return method == wicket.EndpointAuthenticationMethodsTlsClientAuth ||
 		method == wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth
@@ -60,7 +65,8 @@ func isTlsAuthenticationMethod(method string) bool {
 
 // filterDiscoveryAdvertisement removes the entries of a generated discovery
 // document that the running assembly cannot serve. Entries produced by the
-// host's custom entries are left untouched.
+// host's custom entries under keys outside the generated key name space are
+// left untouched.
 func filterDiscoveryAdvertisement(
 	document map[string]any,
 	baseUrl string,
@@ -105,12 +111,12 @@ func filterDiscoveryAdvertisement(
 		filter.remove(wicket.DiscoveryAuthorizationResponseIssParameterSupported)
 	}
 
-	// mutual TLS needs a registered tls client authentication parser.
-	mtlsRemoved := false
+	// mutual TLS: each tls method needs its own registered parser; the
+	// remaining mutual TLS entries need at least one of them.
+	mtlsRemoved := filter.removeListValues(wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported, assembly.unregisteredTlsMethod)
 	if assembly.hasTlsClientAuthentication() {
-		mtlsRemoved = filter.pruneMtlsAliases()
+		mtlsRemoved = filter.pruneMtlsAliases(assembly) || mtlsRemoved
 	} else {
-		mtlsRemoved = filter.removeListValues(wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported, isTlsAuthenticationMethod)
 		mtlsRemoved = filter.remove(wicket.DiscoveryTlsClientCertificateBoundAccessTokens) || mtlsRemoved
 		mtlsRemoved = filter.remove(wicket.DiscoveryMtlsEndpointAliases) || mtlsRemoved
 	}
@@ -118,6 +124,67 @@ func filterDiscoveryAdvertisement(
 		logger.Warn("Mutual TLS is enabled but the current assembly cannot serve all of it; the unservable mutual TLS entries are not advertised in discovery.",
 			slog.Bool("tls_client_authentication_registered", assembly.hasTlsClientAuthentication()))
 	}
+}
+
+// generatedDiscoveryKeys is the key name space of the wicket.Discovery*
+// constants, the names the generator writes. When a custom entry shares one
+// of these names the generator keeps its own value, so such a key is always
+// treated as generated. The set only tells where a value comes from; it does
+// not decide whether anything can be served.
+var generatedDiscoveryKeys = map[string]struct{}{
+	wicket.DiscoveryIssuer:                                                    {},
+	wicket.DiscoveryDisplayValuesSupported:                                    {},
+	wicket.DiscoveryAcrValuesSupported:                                        {},
+	wicket.DiscoveryIdTokenEncryptionAlgorithmsSupported:                      {},
+	wicket.DiscoveryIdTokenEncryptionEncValuesSupported:                       {},
+	wicket.DiscoveryIdTokenSigningAlgorithmsSupported:                         {},
+	wicket.DiscoveryOpPolicyUri:                                               {},
+	wicket.DiscoveryOpTosUri:                                                  {},
+	wicket.DiscoveryRequestObjectEncryptionAlgorithmsSupported:                {},
+	wicket.DiscoveryRequestObjectEncryptionEncValuesSupported:                 {},
+	wicket.DiscoveryRequestObjectSigningAlgorithmsSupported:                   {},
+	wicket.DiscoveryRequestParameterSupported:                                 {},
+	wicket.DiscoveryRequestUriParameterSupported:                              {},
+	wicket.DiscoveryRequireRequestUriRegistration:                             {},
+	wicket.DiscoveryServiceDocumentation:                                      {},
+	wicket.DiscoveryTokenEndpointAuthSigningAlgorithmsSupported:               {},
+	wicket.DiscoveryUILocalesSupported:                                        {},
+	wicket.DiscoveryUserInfoEncryptionAlgorithmsSupported:                     {},
+	wicket.DiscoveryUserInfoEncryptionEncValuesSupported:                      {},
+	wicket.DiscoveryUserInfoSigningAlgorithmsSupported:                        {},
+	wicket.DiscoveryTlsClientCertificateBoundAccessTokens:                     {},
+	wicket.DiscoveryAuthorizationResponseIssParameterSupported:                {},
+	wicket.DiscoveryBackchannelTokenDeliveryModesSupported:                    {},
+	wicket.DiscoveryBackchannelAuthenticationEndpoint:                         {},
+	wicket.DiscoveryClaimTypesSupported:                                       {},
+	wicket.DiscoveryBackchannelAuthenticationRequestSigningAlgValuesSupported: {},
+	wicket.DiscoveryClaimsParameterSupported:                                  {},
+	wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported:               {},
+	wicket.DiscoveryAuthorizationEndpoint:                                     {},
+	wicket.DiscoveryDeviceAuthorizationEndpoint:                               {},
+	wicket.DiscoveryTokenEndpoint:                                             {},
+	wicket.DiscoveryUserInfoEndpoint:                                          {},
+	wicket.DiscoveryIntrospectionEndpoint:                                     {},
+	wicket.DiscoveryRevocationEndpoint:                                        {},
+	wicket.DiscoveryDiscoveryEndpoint:                                         {},
+	wicket.DiscoveryJwksUri:                                                   {},
+	wicket.DiscoveryEndSessionEndpoint:                                        {},
+	wicket.DiscoveryCheckSessionIframe:                                        {},
+	wicket.DiscoveryRegistrationEndpoint:                                      {},
+	wicket.DiscoveryMtlsEndpointAliases:                                       {},
+	wicket.DiscoveryFrontChannelLogoutSupported:                               {},
+	wicket.DiscoveryFrontChannelLogoutSessionSupported:                        {},
+	wicket.DiscoveryBackchannelLogoutSupported:                                {},
+	wicket.DiscoveryBackchannelLogoutSessionSupported:                         {},
+	wicket.DiscoveryGrantTypesSupported:                                       {},
+	wicket.DiscoveryCodeChallengeMethodsSupported:                             {},
+	wicket.DiscoveryScopesSupported:                                           {},
+	wicket.DiscoverySubjectTypesSupported:                                     {},
+	wicket.DiscoveryResponseModesSupported:                                    {},
+	wicket.DiscoveryResponseTypesSupported:                                    {},
+	wicket.DiscoveryClaimsSupported:                                           {},
+	wicket.DiscoveryClaimsLocalesSupported:                                    {},
+	wicket.DiscoveryBackchannelUserCodeParameterSupported:                     {},
 }
 
 func isEndpointKey(key string) bool {
@@ -145,22 +212,16 @@ func (f *discoveryFilter) localPath(raw string) (string, bool) {
 }
 
 // isHostEntry reports whether the document value of key was produced by the
-// host's custom entries rather than by the generator.
+// host's custom entries rather than by the generator: the key is a custom
+// entry and lies outside the generated key name space. A custom entry named
+// like a generated key never overrides the generated value, so it is filtered
+// like any generated entry and cannot re-advertise a withdrawn capability.
 func (f *discoveryFilter) isHostEntry(key string) bool {
-	custom, ok := f.options.Discovery.CustomEntries[key]
-	if !ok {
+	if _, ok := f.options.Discovery.CustomEntries[key]; !ok {
 		return false
 	}
-	value := f.document[key]
-	if reflect.DeepEqual(value, custom) {
-		return true
-	}
-	if text, ok := custom.(string); ok && f.options.Discovery.ExpandRelativePathsInCustomEntries {
-		if rest, ok := strings.CutPrefix(text, "~/"); ok {
-			return reflect.DeepEqual(value, f.baseUrl+"/"+strings.TrimLeft(rest, "/"))
-		}
-	}
-	return false
+	_, generated := generatedDiscoveryKeys[key]
+	return !generated
 }
 
 func (f *discoveryFilter) remove(key string) bool {
@@ -189,8 +250,9 @@ func (f *discoveryFilter) removeListValues(key string, drop func(string) bool) b
 }
 
 // pruneMtlsAliases keeps only the aliases whose primary endpoint is still
-// advertised and drops the aliases entry once it is empty.
-func (f *discoveryFilter) pruneMtlsAliases() bool {
+// advertised and, for an alias under baseUrl, whose path is a registered
+// route. It drops the aliases entry once it is empty.
+func (f *discoveryFilter) pruneMtlsAliases(assembly discoveryAssembly) bool {
 	key := wicket.DiscoveryMtlsEndpointAliases
 	if f.isHostEntry(key) {
 		return false
@@ -199,7 +261,7 @@ func (f *discoveryFilter) pruneMtlsAliases() bool {
 	case map[string]string:
 		kept := make(map[string]string, len(aliases))
 		for name, value := range aliases {
-			if _, ok := f.document[name]; ok {
+			if f.keepMtlsAlias(assembly, name, value) {
 				kept[name] = value
 			}
 		}
@@ -207,7 +269,7 @@ func (f *discoveryFilter) pruneMtlsAliases() bool {
 	case map[string]any:
 		kept := make(map[string]any, len(aliases))
 		for name, value := range aliases {
-			if _, ok := f.document[name]; ok {
+			if f.keepMtlsAlias(assembly, name, value) {
 				kept[name] = value
 			}
 		}
@@ -215,6 +277,34 @@ func (f *discoveryFilter) pruneMtlsAliases() bool {
 	default:
 		return false
 	}
+}
+
+func (f *discoveryFilter) keepMtlsAlias(assembly discoveryAssembly, name string, value any) bool {
+	if _, ok := f.document[name]; !ok {
+		return false
+	}
+	raw, ok := value.(string)
+	if !ok {
+		return true
+	}
+	path, local := f.aliasPath(raw)
+	return !local || assembly.hasEndpointPath(path)
+}
+
+// aliasPath returns the route path of an alias URL that starts with baseUrl.
+// The path form of an alias is built by appending the route to baseUrl, so
+// the separating slash may be missing; any URL starting with baseUrl is
+// therefore read as local. Aliases on another host (domain or sub-domain
+// form) are not local.
+func (f *discoveryFilter) aliasPath(raw string) (string, bool) {
+	rest, ok := strings.CutPrefix(raw, f.baseUrl)
+	if !ok {
+		return "", false
+	}
+	if i := strings.IndexAny(rest, "?#"); i >= 0 {
+		rest = rest[:i]
+	}
+	return utils.EnsureLeadingSlash(rest), true
 }
 
 func (f *discoveryFilter) replaceAliases(key string, before int, after int, kept any) bool {
