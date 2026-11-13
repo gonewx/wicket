@@ -87,11 +87,19 @@ func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
 }
 
 func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler {
+	endpoints := godi.GetServices[*hosting.Endpoint](p)
+	endpointPaths := make([]string, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		endpointPaths = append(endpointPaths, endpoint.Path)
+	}
 	return handlers.NewDiscoveryHandler(
 		godi.GetRequired[responses.DiscoveryResponseGenerator](p),
 		godi.GetRequired[services.ServerUrls](p),
 		godi.GetRequired[services.IssuerNameService](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
+		endpointPaths,
+		godi.GetRequired[services.BackchannelLogoutService](p),
+		godi.GetRequired[validators.SecretsListParser](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
 }

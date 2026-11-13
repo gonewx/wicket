@@ -60,6 +60,7 @@ func TestDiscoveryHandlerDispatch(t *testing.T) {
 		&fakeServerUrls{base: "https://wicket.test"},
 		&fakeIssuerNameService{issuer: "https://wicket.test"},
 		options,
+		nil, nil, nil,
 		quietLogger(),
 	)
 
@@ -100,6 +101,7 @@ func TestDiscoveryHandlerDispatch(t *testing.T) {
 			&fakeServerUrls{base: "https://wicket.test"},
 			&fakeIssuerNameService{issuer: "https://wicket.test"},
 			disabled,
+			nil, nil, nil,
 			quietLogger(),
 		)
 		recorder := httptest.NewRecorder()

@@ -7,19 +7,26 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/responses"
 	"github.com/gonewx/wicket/services"
+	"github.com/gonewx/wicket/validators"
 )
 
-// DiscoveryHandler serves the OpenID Provider configuration document.
+// DiscoveryHandler serves the OpenID Provider configuration document. The
+// generated document is filtered against the running assembly: endpoint URLs
+// without a registered route, back-channel logout without a delivering
+// service, and mutual TLS without a tls client authentication parser are not
+// advertised.
 type DiscoveryHandler struct {
 	generator responses.DiscoveryResponseGenerator
 	urls      services.ServerUrls
 	issuer    services.IssuerNameService
 	options   *config_options.WicketOptions
+	assembly  discoveryAssembly
 	logger    *slog.Logger
 }
 
@@ -28,13 +35,24 @@ func NewDiscoveryHandler(
 	urls services.ServerUrls,
 	issuer services.IssuerNameService,
 	options *config_options.WicketOptions,
+	endpointPaths []string,
+	backChannelLogout services.BackchannelLogoutService,
+	secretParsers validators.SecretsListParser,
 	logger *slog.Logger,
 ) *DiscoveryHandler {
+	assembly := discoveryAssembly{
+		endpointPaths:     slices.Clone(endpointPaths),
+		backChannelLogout: backChannelLogout,
+	}
+	if secretParsers != nil {
+		assembly.authenticationMethods = secretParsers.GetAvailableAuthenticationMethods()
+	}
 	return &DiscoveryHandler{
 		generator: generator,
 		urls:      urls,
 		issuer:    issuer,
 		options:   options,
+		assembly:  assembly,
 		logger:    logger,
 	}
 }
@@ -47,10 +65,12 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
 	}
 
-	document, err := h.generator.CreateDiscoveryDocument(r.Context(), h.urls.BaseUrl(), h.issuer.GetCurrent())
+	baseUrl := h.urls.BaseUrl()
+	document, err := h.generator.CreateDiscoveryDocument(r.Context(), baseUrl, h.issuer.GetCurrent())
 	if err != nil {
 		return fmt.Errorf("create discovery document: %w", err)
 	}
+	filterDiscoveryAdvertisement(document, baseUrl, h.options, h.assembly, h.logger)
 
 	return results.NewDiscoveryDocumentResult(document, h.options.Discovery.ResponseCacheInterval).Execute(w, r)
 }

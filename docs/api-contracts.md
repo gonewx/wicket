@@ -20,7 +20,7 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | Check Session | `/connect/checksession` | GET | `CheckSessionHandler` | 会话状态 iframe |
 | CIBA | `/connect/ciba` | POST | `BackchannelAuthenticationHandler` | 后端通道认证 |
 
-> 常量中还定义了 `Revocation`（`/connect/revocation`）、`DeviceAuthorization`（`/connect/deviceauthorization`）与 mTLS 路径（`/connect/mtls/*`），端点注册随 handler 落地逐步启用。
+> 常量中还定义了 `Revocation`（`/connect/revocation`）、`DeviceAuthorization`（`/connect/deviceauthorization`）与 mTLS 路径（`/connect/mtls/*`），但这些端点**尚未提供**：没有注册路由，discovery 也不宣告。端点注册随 handler 落地逐步启用，届时 discovery 自动恢复对应宣告。
 
 ## 支持的授权类型（Grant Types）
 
@@ -29,7 +29,7 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | `authorization_code` | 授权码流（含 PKCE） |
 | `refresh_token` | 刷新令牌 |
 | `client_credentials` | 客户端凭据 |
-| `urn:ietf:params:oauth:grant-type:device_code` | 设备授权流 |
+| `urn:ietf:params:oauth:grant-type:device_code` | 设备授权流：**尚未提供**。设备授权端点未注册，discovery 的 `grant_types_supported` 不宣告该类型 |
 | `urn:openid:params:grant-type:ciba` | CIBA 后端通道 |
 | 扩展授权 | 通过 `ExtensionGrantValidator` 接口扩展 |
 
@@ -55,6 +55,18 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 - `scopes_supported` / `response_types_supported` / `grant_types_supported`
 - `token_endpoint_auth_methods_supported`
 - `code_challenge_methods_supported`（S256、plain）
+
+**按装配事实过滤**：`DiscoveryHandler` 在输出前按当前装配实际可服务的能力过滤生成的文档，不只看配置开关：
+
+| 宣告 | 输出条件 |
+|------|----------|
+| `*_endpoint`、`check_session_iframe`、`jwks_uri`（位于本服务 base URL 下） | 路径已注册为端点路由。指向外部主机的 URL 原样保留 |
+| `grant_types_supported` 中的 `device_code` | `device_authorization_endpoint` 仍在文档中 |
+| `backchannel_logout_supported` / `backchannel_logout_session_supported` | `BackchannelLogoutService` 实现了 `DeliversBackChannelLogout() bool` 且返回 `true`。Back-Channel Logout 发送**尚未提供**（默认实现不发送通知），因此默认不宣告 |
+| `authorization_response_iss_parameter_supported` | `EmitIssuerIdentificationResponseParameter` 为 `true` |
+| `tls_client_auth` / `self_signed_tls_client_auth`、`tls_client_certificate_bound_access_tokens`、`mtls_endpoint_aliases` | 注册了 tls 类客户端认证解析器；alias 条目只在对应主端点仍被宣告时保留。`MutualTls.Enabled=true` 但条件不满足时，这些键被移除并记一条 `slog` Warn |
+
+令牌撤销端点（`revocation_endpoint`）与设备授权端点（`device_authorization_endpoint`）**尚未提供**，因此不出现在文档中。`frontchannel_logout_*` 有真实实现，照常输出。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤；与生成键同名的自定义条目会被生成值覆盖，并照常过滤。
 
 ## 客户端认证方式
 
