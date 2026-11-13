@@ -13,6 +13,7 @@ import (
 
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/claims"
+	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/models/messages"
@@ -26,12 +27,22 @@ import (
 // from an interactive login or consent page. It recovers the original
 // parameters, replays them through the shared pipeline together with any stored
 // consent answer, and consumes that answer once it has been applied.
+//
+// A handler that holds options enforces Endpoints.EnableAuthorizeEndpoint, the
+// switch it shares with the authorize endpoint: while the switch is off it
+// answers 404 to every request and leaves any stored consent answer untouched.
+// A handler without options does not look at the switch and always serves.
 type AuthorizeCallbackHandler struct {
 	base       authorizeBaseHandler
 	consent    storage.ConsentMessageStore
 	parameters storage.AuthorizationParametersMessageStore
+	options    *config_options.WicketOptions
 }
 
+// NewAuthorizeCallbackHandler builds an authorize callback handler that holds
+// no options. It does not enforce Endpoints.EnableAuthorizeEndpoint and serves
+// whatever the switch says; use NewAuthorizeCallbackHandlerWithOptions for a
+// handler that honors the switch.
 func NewAuthorizeCallbackHandler(
 	validator validators.AuthorizeRequestValidator,
 	interaction responses.AuthorizeInteractionResponseGenerator,
@@ -39,6 +50,23 @@ func NewAuthorizeCallbackHandler(
 	session services.UserSession,
 	consent storage.ConsentMessageStore,
 	parameters storage.AuthorizationParametersMessageStore,
+	logger *slog.Logger,
+) *AuthorizeCallbackHandler {
+	return NewAuthorizeCallbackHandlerWithOptions(validator, interaction, generator, session, consent, parameters, nil, logger)
+}
+
+// NewAuthorizeCallbackHandlerWithOptions builds an authorize callback handler
+// that holds options and enforces Endpoints.EnableAuthorizeEndpoint: while the
+// switch is off the handler answers 404 to every request. The switch is read on
+// each request. Nil options leave the endpoint on.
+func NewAuthorizeCallbackHandlerWithOptions(
+	validator validators.AuthorizeRequestValidator,
+	interaction responses.AuthorizeInteractionResponseGenerator,
+	generator responses.AuthorizeResponseGenerator,
+	session services.UserSession,
+	consent storage.ConsentMessageStore,
+	parameters storage.AuthorizationParametersMessageStore,
+	options *config_options.WicketOptions,
 	logger *slog.Logger,
 ) *AuthorizeCallbackHandler {
 	return &AuthorizeCallbackHandler{
@@ -51,10 +79,16 @@ func NewAuthorizeCallbackHandler(
 		},
 		consent:    consent,
 		parameters: parameters,
+		options:    options,
 	}
 }
 
 func (h *AuthorizeCallbackHandler) Process(w http.ResponseWriter, r *http.Request) error {
+	// A switched-off endpoint answers as if it did not exist, whatever the
+	// request looks like, and before anything of the request is read.
+	if h.options != nil && !h.options.Endpoints.EnableAuthorizeEndpoint {
+		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
+	}
 	if r.Method != http.MethodGet {
 		return results.NewStatusCodeResult(http.StatusMethodNotAllowed).Execute(w, r)
 	}

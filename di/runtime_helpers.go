@@ -56,33 +56,36 @@ func responseFromProvider(p godi.Provider) http.ResponseWriter {
 }
 
 func newAuthorizeHandlerFromProvider(p godi.Provider) *handlers.AuthorizeHandler {
-	return handlers.NewAuthorizeHandler(
+	return handlers.NewAuthorizeHandlerWithOptions(
 		godi.GetRequired[validators.AuthorizeRequestValidator](p),
 		godi.GetRequired[responses.AuthorizeInteractionResponseGenerator](p),
 		godi.GetRequired[responses.AuthorizeResponseGenerator](p),
 		godi.GetRequired[services.UserSession](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
 }
 
 func newAuthorizeCallbackHandlerFromProvider(p godi.Provider) *handlers.AuthorizeCallbackHandler {
 	parameters, _ := godi.Get[storage.AuthorizationParametersMessageStore](p)
-	return handlers.NewAuthorizeCallbackHandler(
+	return handlers.NewAuthorizeCallbackHandlerWithOptions(
 		godi.GetRequired[validators.AuthorizeRequestValidator](p),
 		godi.GetRequired[responses.AuthorizeInteractionResponseGenerator](p),
 		godi.GetRequired[responses.AuthorizeResponseGenerator](p),
 		godi.GetRequired[services.UserSession](p),
 		godi.GetRequired[storage.ConsentMessageStore](p),
 		parameters,
+		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
 }
 
 func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
-	return handlers.NewTokenHandler(
+	return handlers.NewTokenHandlerWithOptions(
 		godi.GetRequired[validators.ClientSecretValidator](p),
 		godi.GetRequired[validators.TokenRequestValidator](p),
 		godi.GetRequired[responses.TokenResponseGenerator](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
 }
@@ -121,17 +124,19 @@ func newCheckSessionHandlerFromProvider(p godi.Provider) *handlers.CheckSessionH
 }
 
 func newBackchannelAuthenticationHandlerFromProvider(p godi.Provider) *handlers.BackchannelAuthenticationHandler {
-	return handlers.NewBackchannelAuthenticationHandler(
+	return handlers.NewBackchannelAuthenticationHandlerWithOptions(
 		godi.GetRequired[validators.ClientSecretValidator](p),
 		godi.GetRequired[validators.BackchannelAuthenticationRequestValidator](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
 	)
 }
 
 func newIntrospectionHandlerFromProvider(p godi.Provider) *handlers.IntrospectionHandler {
-	return handlers.NewIntrospectionHandler(
+	return handlers.NewIntrospectionHandlerWithOptions(
 		godi.GetRequired[validators.ApiSecretValidator](p),
 		godi.GetRequired[validators.IntrospectionRequestValidator](p),
 		godi.GetRequired[responses.IntrospectionResponseGenerator](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
 }

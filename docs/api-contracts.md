@@ -22,7 +22,26 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | Check Session | `/connect/checksession` | GET | `CheckSessionHandler` | 会话状态 iframe |
 | CIBA | `/connect/ciba` | POST | `BackchannelAuthenticationHandler` | 后端通道认证 |
 
-端点开关（`Endpoints.Enable*`）关闭后的行为分两类。Discovery 与 Discovery JWKS（`EnableDiscoveryEndpoint`）、UserInfo（`EnableUserInfoEndpoint`）、End Session 与 End Session Callback（`EnableEndSessionEndpoint`）、Check Session（`EnableCheckSessionEndpoint`）、Revocation（`EnableTokenRevocationEndpoint`）、Device Authorization（`EnableDeviceAuthorizationEndpoint`）的 handler 检查开关，关闭时返回 404：Revocation 与 Device Authorization 对任何请求都返回 404；其余几个先检查请求方法，不允许的方法仍返回 405，End Session 对 POST 还先检查内容类型（415）与表单解析（400）。Authorize、Authorize Callback、Token、Introspection、CIBA 的 handler 不检查开关：`EnableAuthorizeEndpoint`、`EnableTokenEndpoint`、`EnableIntrospectionEndpoint`、`EnableBackchannelAuthenticationEndpoint` 只影响 discovery 文档的宣告，关闭后这些路由照常提供服务。
+**端点开关（`Endpoints.Enable*`）**：全部已注册端点的 handler 都检查各自的开关，关闭时返回 404（空响应体）；默认值均为 `true`。
+
+| 开关 | 端点 |
+|------|------|
+| `EnableAuthorizeEndpoint` | Authorize 与 Authorize Callback（两条路由共用一个开关） |
+| `EnableTokenEndpoint` | Token |
+| `EnableIntrospectionEndpoint` | Introspection |
+| `EnableBackchannelAuthenticationEndpoint` | CIBA |
+| `EnableTokenRevocationEndpoint` | Revocation |
+| `EnableDeviceAuthorizationEndpoint` | Device Authorization |
+| `EnableDiscoveryEndpoint` | Discovery 与 Discovery JWKS |
+| `EnableUserInfoEndpoint` | UserInfo |
+| `EnableEndSessionEndpoint` | End Session 与 End Session Callback |
+| `EnableCheckSessionEndpoint` | Check Session |
+
+- **检查顺序有两种，并存**。Authorize、Authorize Callback、Token、Introspection、CIBA、Revocation、Device Authorization 先检查开关：关闭时对任何请求（不论方法、内容类型、凭据）都返回 404，且不读取请求。Discovery、Discovery JWKS、UserInfo、End Session、End Session Callback、Check Session 先检查请求方法：不允许的方法仍返回 405，End Session 对 POST 还先检查内容类型（415）与表单解析（400）。
+- **被关闭的端点由 wicket 回答 404**，请求不会交给宿主的下一个 handler；宿主不能靠关闭开关让自己的 handler 接管同一路径。
+- **开关只管自己的端点，不联动**。例如关闭 token 端点后，授权端点、设备授权端点、CIBA 端点仍可发起，但签发出的授权码、device code、`auth_req_id` 无处兑换；关闭 authorize 后，进行中的登录 / 同意流程回到 callback 时得到 404。
+- **开关由经组合根装配的 handler 执行**。以 `handlers.NewAuthorizeHandler`、`handlers.NewAuthorizeCallbackHandler`、`handlers.NewTokenHandler`、`handlers.NewIntrospectionHandler`、`handlers.NewBackchannelAuthenticationHandler` 这五个既有构造函数直接构造的 handler 不持有 options、不执行开关，开关设为 `false` 时仍照常服务；需要自建的 handler 执行开关时，改用接收 options 的 `handlers.NewAuthorizeHandlerWithOptions`、`handlers.NewAuthorizeCallbackHandlerWithOptions`、`handlers.NewTokenHandlerWithOptions`、`handlers.NewIntrospectionHandlerWithOptions`、`handlers.NewBackchannelAuthenticationHandlerWithOptions`。
+- 开关关闭时 discovery 文档的变化见下文"Discovery 文档结构"一节"按装配事实过滤"的说明。
 
 > 常量中还定义了 mTLS 路径（`/connect/mtls/*`），但这些端点**尚未提供**：没有注册路由，discovery 也不宣告。端点注册随 handler 落地逐步启用，届时 discovery 自动恢复对应宣告。
 
@@ -71,7 +90,7 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | `tls_client_auth` / `self_signed_tls_client_auth` | 逐个判定：该方法在已注册解析器的 `GetAvailableAuthenticationMethods()` 中 |
 | `tls_client_certificate_bound_access_tokens`、`mtls_endpoint_aliases` | 至少注册了一种 tls 类客户端认证解析器。alias 条目逐条判定：对应主端点仍被宣告，且路径形态（未配置 `MutualTls.DomainName`）的 alias 路径已注册为端点路由（配置了 `DomainName` 的 domain / sub-domain 形态位于其他主机，只看主端点）；删空后整个键移除 |
 
-令牌撤销端点与设备授权端点已注册，`revocation_endpoint`、`device_authorization_endpoint` 以及 `grant_types_supported` 中的 `device_code` 在默认装配下照常输出；`EnableDeviceAuthorizationEndpoint=false` 时后两者不输出；`EnableTokenRevocationEndpoint=false` 时 generator 不输出 `revocation_endpoint`，宿主未配置同名自定义条目时文档中没有该键。`frontchannel_logout_*` 照常输出（不开启 server-side sessions 时 front-channel 通知不会发生，见下文 Back-Channel Logout 的已知限制）。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤，但键名与生成键相同的除外。生成键指 generator 会写入文档的键，其中多数按开关写入：开关打开时 generator 丢弃同名自定义值；开关关闭时 generator 不写该键，同名自定义值会进入文档。两种情况下，这些键下的值一律按上表过滤（列表值无论是 `[]string` 还是从配置解码出的 `[]any` 都逐项判定）。上表按装配事实判定，端点开关不是过滤条件。被过滤撤下的能力，宿主无法借生成键名重新宣告：就端点而言，路径未注册为端点路由时，同名自定义值若指向本服务 base URL 下的该路径（包括宿主在 wicket 端点路由之外自行提供的路径），或不是绝对 URL，照样被撤下，即使自定义值与生成值相同。开关关闭而路由仍已注册时则不被撤下：`EnableTokenRevocationEndpoint=false` 时 generator 不写入 `revocation_endpoint`，端点对任何请求返回 404；宿主此时若以同名自定义条目写入指向本服务撤销路由的值，或任何外部绝对 URL，该值会出现在 discovery 文档中。其中指回本服务撤销路由的情形是已知限制：文档宣告了一个返回 404 的端点，开关关闭时，宿主不应以该键指回本服务的撤销路由。宿主自有的能力请用 generator 从不写入的键名宣告（例如 `registration_endpoint`），这类键只可能来自宿主，原样保留。
+令牌撤销端点与设备授权端点已注册，`revocation_endpoint`、`device_authorization_endpoint` 以及 `grant_types_supported` 中的 `device_code` 在默认装配下照常输出；`EnableDeviceAuthorizationEndpoint=false` 时后两者不输出；`EnableTokenRevocationEndpoint=false` 时 generator 不输出 `revocation_endpoint`，宿主未配置同名自定义条目时文档中没有该键。授权、令牌、内省、CIBA 四个端点的开关同理，关闭时 generator 不输出下列键，宿主未配置同名自定义条目时文档中没有这些键：`EnableAuthorizeEndpoint=false` 时为 `authorization_endpoint`、`request_parameter_supported`、`request_object_signing_alg_values_supported`，以及 `EnableJwtRequestUri=true` 时才有的 `request_uri_parameter_supported`；`EnableTokenEndpoint=false` 时为 `token_endpoint`；`EnableIntrospectionEndpoint=false` 时为 `introspection_endpoint`；`EnableBackchannelAuthenticationEndpoint=false` 时为 `backchannel_authentication_endpoint`、`backchannel_token_delivery_modes_supported`、`backchannel_user_code_parameter_supported`，以及 `grant_types_supported` 中的 `urn:openid:params:grant-type:ciba`。authorize 或 token 端点关闭后，`response_types_supported`、`response_modes_supported`、`grant_types_supported`、`token_endpoint_auth_methods_supported` 等仍照常输出。`frontchannel_logout_*` 照常输出（不开启 server-side sessions 时 front-channel 通知不会发生，见下文 Back-Channel Logout 的已知限制）。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤，但键名与生成键相同的除外。生成键指 generator 会写入文档的键，其中多数按开关写入：开关打开时 generator 丢弃同名自定义值；开关关闭时 generator 不写该键，同名自定义值会进入文档。两种情况下，这些键下的值一律按上表过滤（列表值无论是 `[]string` 还是从配置解码出的 `[]any` 都逐项判定）。上表按装配事实判定，端点开关不是过滤条件。被过滤撤下的能力，宿主无法借生成键名重新宣告：就端点而言，路径未注册为端点路由时，同名自定义值若指向本服务 base URL 下的该路径（包括宿主在 wicket 端点路由之外自行提供的路径），或不是绝对 URL，照样被撤下，即使自定义值与生成值相同。开关关闭而路由仍已注册时则不被撤下：`EnableTokenRevocationEndpoint=false` 时 generator 不写入 `revocation_endpoint`，端点对任何请求返回 404；宿主此时若以同名自定义条目写入指向本服务撤销路由的值，或任何外部绝对 URL，该值会出现在 discovery 文档中。其中指回本服务撤销路由的情形是已知限制：文档宣告了一个返回 404 的端点，开关关闭时，宿主不应以该键指回本服务的撤销路由。同一已知限制也适用于 `authorization_endpoint`、`token_endpoint`、`introspection_endpoint`、`backchannel_authentication_endpoint`：对应开关关闭而宿主以同名自定义条目指回本服务的对应路由时，条目仍出现在文档中，而该端点返回 404；开关关闭时，宿主不应以这些键指回本服务路由。`request_parameter_supported`、`request_object_signing_alg_values_supported`（authorize 关闭时）与 `backchannel_token_delivery_modes_supported`、`backchannel_user_code_parameter_supported`（CIBA 关闭时）的同名自定义值同样会进入文档。宿主自有的能力请用 generator 从不写入的键名宣告（例如 `registration_endpoint`），这类键只可能来自宿主，原样保留。
 
 `MutualTls.Enabled=true` 且有任何 mTLS 相关值（上表最后两行）被移除时，每生成一次文档记一条 `slog` Warn。
 
@@ -98,6 +117,8 @@ grant_type=authorization_code
 &client_secret=<secret>
 &code_verifier=<pkce_verifier>
 ```
+
+- `EnableTokenEndpoint=false` 时，端点对任何请求都返回 404，discovery 不宣告 `token_endpoint`（generator 不写入该键；宿主以同名自定义条目写入的情形见上文"Discovery 文档结构"一节"按装配事实过滤"的说明）。默认为 `true`。开关的检查顺序、不联动与直接构造 handler 的情形见上文"端点列表"之后关于端点开关的说明。
 
 ### 令牌响应
 
@@ -143,7 +164,7 @@ client_id=<client_id>
 &scope=openid%20api1%20offline_access
 ```
 
-- `EnableDeviceAuthorizationEndpoint=false` 时，端点对任何请求都返回 404，discovery 不宣告 `device_authorization_endpoint`，`grant_types_supported` 也不含 `device_code`。默认为 `true`。关闭开关前已签发的 device code 在过期前仍可在令牌端点兑换。
+- `EnableDeviceAuthorizationEndpoint=false` 时，端点对任何请求都返回 404，discovery 不宣告 `device_authorization_endpoint`，`grant_types_supported` 也不含 `device_code`。默认为 `true`。关闭开关前已签发的 device code 在过期前仍可在令牌端点兑换，前提是令牌端点的开关（`EnableTokenEndpoint`）打开；令牌端点关闭时无处兑换。
 - 只接受 `POST`（其他方法 405）与 `application/x-www-form-urlencoded` 请求体（其他内容类型 415）。参数只从请求体读取，查询串不生效；请求体无法按表单解析时返回 400 `invalid_request`。
 - 客户端认证与令牌端点相同：经 DI 注册的 secret parser 解析凭据（默认含 `client_secret_basic`、`client_secret_post`），不要求密钥的公共客户端（`RequireClientSecret=false`）只需在请求体中带 `client_id`。认证失败返回 `{"error":"invalid_client"}`：请求带 `Authorization` 头时为 **401** 并带 `WWW-Authenticate`，否则为 **400**，与撤销端点一致。
 - 客户端不允许 device_code 授权类型时返回 400 `unauthorized_client`；scope 无效、身份 scope 缺少 `openid`，或未传 `scope` 且客户端没有 `AllowedScopes` 时返回 400 `invalid_scope`；`scope` 超长返回 400 `invalid_request`。这些错误的响应体只含 `error`，`Content-Type: application/json`，并带禁止缓存的头。未传 `scope` 时默认取客户端全部 `AllowedScopes`（`AllowOfflineAccess=true` 时追加 `offline_access`）。
