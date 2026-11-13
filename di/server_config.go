@@ -11,6 +11,7 @@ import (
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/keymgmt"
+	"github.com/gonewx/wicket/replay"
 	"github.com/gonewx/wicket/services"
 	services_impl "github.com/gonewx/wicket/services/impl"
 	sessionpkg "github.com/gonewx/wicket/session"
@@ -56,6 +57,12 @@ type ServerConfig struct {
 	backchannelAuthenticationNotificationHttpClient *http.Client
 
 	externalFailurePath string
+
+	// Replay registry seam, see replay_registry.go. The seam is required
+	// exactly when replayDependentFeatures is non-empty.
+	replayRegistryProvider              func() replay.Registry
+	allowInMemoryReplayRegistryFallback bool
+	replayDependentFeatures             []string
 }
 
 func NewServerConfig() *ServerConfig {
@@ -102,6 +109,7 @@ func (c *ServerConfig) AllowInMemoryFallback() {
 
 func (c *ServerConfig) Freeze() {
 	c.frozen = true
+	c.requireReplayRegistrySeam()
 	if c.allowInMemoryFallback {
 		return
 	}
