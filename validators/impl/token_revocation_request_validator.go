@@ -67,7 +67,7 @@ func (v *TokenRevocationRequestValidator) ValidateRequest(ctx context.Context, p
 		}
 	}
 
-	v.logger.Debug("ValidateRequestAsync result", slog.Any("validateRequestResult", result))
+	v.logger.Debug("ValidateRequestAsync result", slog.String("clientId", client.ClientId), slog.String("tokenTypeHint", result.TokenTypeHint), slog.Any("error", result.Error))
 
 	return result, nil
 }

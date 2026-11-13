@@ -800,6 +800,92 @@ func TestTokenRevocationHandlerJwtRejectionLogDoesNotCarryTheToken(t *testing.T)
 	}
 }
 
+// With the request validator the endpoint is assembled with behind the
+// handler, nothing a revocation request logs at debug level carries the token,
+// the client secret posted with it or the client's stored secret.
+func TestTokenRevocationHandlerRequestLogCarriesNoCredentials(t *testing.T) {
+	t.Parallel()
+
+	const (
+		handle       = "5f0c2a9e7b1d4c38a6e0f4927d3b8c15"
+		postedSecret = "posted-client-secret"
+		storedSecret = "c3RvcmVkLWhhc2hlZC1jbGllbnQtc2VjcmV0"
+	)
+
+	formats := map[string]func(io.Writer, *slog.HandlerOptions) slog.Handler{
+		"json": func(w io.Writer, opts *slog.HandlerOptions) slog.Handler { return slog.NewJSONHandler(w, opts) },
+		"text": func(w io.Writer, opts *slog.HandlerOptions) slog.Handler { return slog.NewTextHandler(w, opts) },
+	}
+	cases := []struct {
+		name       string
+		token      string
+		hint       string
+		wantStatus int
+	}{
+		{name: "handle without hint", token: handle, wantStatus: http.StatusOK},
+		{name: "handle with access token hint", token: handle, hint: wicket.TokenTypeHintsAccessToken, wantStatus: http.StatusOK},
+		{name: "handle with refresh token hint", token: handle, hint: wicket.TokenTypeHintsRefreshToken, wantStatus: http.StatusOK},
+		{name: "handle with unsupported hint", token: handle, hint: "bogus", wantStatus: http.StatusBadRequest},
+		{name: "JWT form", token: jwtShapedToken, hint: wicket.TokenTypeHintsAccessToken, wantStatus: http.StatusBadRequest},
+	}
+
+	for formatName, newHandler := range formats {
+		for _, tc := range cases {
+			t.Run(formatName+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				var logs bytes.Buffer
+				logger := slog.New(newHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+				secret := storage_models.NewSecret()
+				secret.Value = storedSecret
+				clientResult := authenticatedRevocationClient()
+				clientResult.Client.ClientSecrets = []*storage_models.Secret{secret}
+
+				handler := NewTokenRevocationHandler(
+					&fakeClientSecretValidator{result: clientResult},
+					validators_impl.NewTokenRevocationRequestValidator(logger),
+					&fakeRevocationResponseGenerator{response: &responses_models.TokenRevocationResponse{Success: true}},
+					config_options.NewWicketOptions(),
+					logger,
+				)
+
+				form := url.Values{}
+				form.Set("token", tc.token)
+				form.Set("client_id", clientResult.Client.ClientId)
+				form.Set("client_secret", postedSecret)
+				if tc.hint != "" {
+					form.Set("token_type_hint", tc.hint)
+				}
+
+				recorder := httptest.NewRecorder()
+				if err := handler.Process(recorder, revocationRequest(http.MethodPost, "", form.Encode())); err != nil {
+					t.Fatalf("Process error = %v", err)
+				}
+				if recorder.Code != tc.wantStatus {
+					t.Fatalf("status = %d, want %d", recorder.Code, tc.wantStatus)
+				}
+
+				// The validator's own record shows the request went through it.
+				for _, want := range []string{"ValidateRequestAsync result", clientResult.Client.ClientId} {
+					if !strings.Contains(logs.String(), want) {
+						t.Fatalf("log = %q, want it to hold %q", logs.String(), want)
+					}
+				}
+				forbidden := []string{tc.token, postedSecret, storedSecret, "ClientSecrets"}
+				if segments := strings.Split(tc.token, "."); len(segments) > 1 {
+					forbidden = append(forbidden, segments...)
+				}
+				for _, fragment := range forbidden {
+					if strings.Contains(logs.String(), fragment) {
+						t.Errorf("log carries %q: %s", fragment, logs.String())
+					}
+				}
+			})
+		}
+	}
+}
+
 var errValidationKeysUnavailable = errors.New("validation keys unavailable")
 
 // recordingValidationKeys counts how often access token validation asks for
