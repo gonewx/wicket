@@ -234,6 +234,25 @@ func TestFilterDiscoveryAdvertisement(t *testing.T) {
 			wantWarnings: 1,
 		},
 		{
+			name:      "mutual TLS domain aliases sharing the base URL prefix",
+			mutualTls: true,
+			configure: func(o *config_options.WicketOptions) { o.MutualTls.DomainName = "wicket.test:8443" },
+			assembly: func(a discoveryAssembly) discoveryAssembly {
+				a.authenticationMethods = append(a.authenticationMethods, wicket.EndpointAuthenticationMethodsTlsClientAuth)
+				return a
+			},
+			edit: func(d map[string]any) {
+				d[wicket.DiscoveryMtlsEndpointAliases] = map[string]string{
+					wicket.DiscoveryTokenEndpoint: advertisementBaseUrl + ":8443/" + wicket.ProtocolRoutePathsToken,
+				}
+			},
+			values: map[string]any{
+				wicket.DiscoveryMtlsEndpointAliases: map[string]string{
+					wicket.DiscoveryTokenEndpoint: advertisementBaseUrl + ":8443/" + wicket.ProtocolRoutePathsToken,
+				},
+			},
+		},
+		{
 			name:      "mutual TLS keeps routed aliases of advertised endpoints",
 			mutualTls: true,
 			assembly: func(a discoveryAssembly) discoveryAssembly {

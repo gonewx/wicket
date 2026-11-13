@@ -291,12 +291,15 @@ func (f *discoveryFilter) keepMtlsAlias(assembly discoveryAssembly, name string,
 	return !local || assembly.hasEndpointPath(path)
 }
 
-// aliasPath returns the route path of an alias URL that starts with baseUrl.
-// The path form of an alias is built by appending the route to baseUrl, so
-// the separating slash may be missing; any URL starting with baseUrl is
-// therefore read as local. Aliases on another host (domain or sub-domain
-// form) are not local.
+// aliasPath returns the route path of a path-form alias URL. With a mutual
+// TLS domain name configured the aliases live on another host (domain or
+// sub-domain form) and are not local. Otherwise the alias is built by
+// appending the route to baseUrl, where the separating slash may be missing,
+// so any URL starting with baseUrl is read as local.
 func (f *discoveryFilter) aliasPath(raw string) (string, bool) {
+	if f.options.MutualTls.DomainName != "" {
+		return "", false
+	}
 	rest, ok := strings.CutPrefix(raw, f.baseUrl)
 	if !ok {
 		return "", false
