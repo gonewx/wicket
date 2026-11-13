@@ -913,6 +913,17 @@ func (r *Root) NewInteractionService() services.InteractionService {
 	})(r)
 }
 
+func (r *Root) NewDeviceFlowInteractionService() services.DeviceFlowInteractionService {
+	return (func(p godi.Provider) services.DeviceFlowInteractionService {
+		return impl.NewDeviceFlowInteractionService(
+			godi.GetRequired[services.DeviceFlowCodeService](p),
+			godi.GetRequired[storage.ClientStore](p),
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[*slog.Logger](p),
+		)
+	})(r)
+}
+
 func (r *Root) NewSessionCoordinationService() services.SessionCoordinationService {
 	return (func(p godi.Provider) services.SessionCoordinationService {
 		opts := godi.GetRequired[*options.WicketOptions](p)
@@ -1541,6 +1552,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewTokenService()
 	case reflect.TypeFor[services.InteractionService]():
 		return r.NewInteractionService()
+	case reflect.TypeFor[services.DeviceFlowInteractionService]():
+		return r.NewDeviceFlowInteractionService()
 	case reflect.TypeFor[services.SessionCoordinationService]():
 		return r.NewSessionCoordinationService()
 	case reflect.TypeFor[*tools.TokenTools]():
@@ -1836,6 +1849,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[services.TokenService]():
 		return true
 	case reflect.TypeFor[services.InteractionService]():
+		return true
+	case reflect.TypeFor[services.DeviceFlowInteractionService]():
 		return true
 	case reflect.TypeFor[session.Store]():
 		return true
@@ -2198,6 +2213,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewTokenService()}
 		case reflect.TypeFor[services.InteractionService]():
 			return []any{r.NewInteractionService()}
+		case reflect.TypeFor[services.DeviceFlowInteractionService]():
+			return []any{r.NewDeviceFlowInteractionService()}
 		case reflect.TypeFor[services.SessionCoordinationService]():
 			return []any{r.NewSessionCoordinationService()}
 		case reflect.TypeFor[*tools.TokenTools]():
@@ -2573,6 +2590,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewTokenService()
 	case reflect.TypeFor[services.InteractionService]():
 		return s.NewInteractionService()
+	case reflect.TypeFor[services.DeviceFlowInteractionService]():
+		return s.NewDeviceFlowInteractionService()
 	case reflect.TypeFor[services.SessionCoordinationService]():
 		return s.NewSessionCoordinationService()
 	case reflect.TypeFor[*tools.TokenTools]():
@@ -2872,6 +2891,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[services.TokenService]():
 		return true
 	case reflect.TypeFor[services.InteractionService]():
+		return true
+	case reflect.TypeFor[services.DeviceFlowInteractionService]():
 		return true
 	case reflect.TypeFor[services.SessionCoordinationService]():
 		return true
@@ -3209,6 +3230,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewTokenService()}
 		case reflect.TypeFor[services.InteractionService]():
 			return []any{s.NewInteractionService()}
+		case reflect.TypeFor[services.DeviceFlowInteractionService]():
+			return []any{s.NewDeviceFlowInteractionService()}
 		case reflect.TypeFor[services.SessionCoordinationService]():
 			return []any{s.NewSessionCoordinationService()}
 		case reflect.TypeFor[*tools.TokenTools]():
@@ -3880,6 +3903,17 @@ func (s *scope) NewInteractionService() services.InteractionService {
 			godi.GetRequired[*impl.ReturnUrlParser](p),
 			godi.GetRequired[services.ServerUrls](p),
 			godi.GetRequired[storage.MessageStore[contexts.LogoutNotificationContext]](p),
+		)
+	})(s)
+}
+
+func (s *scope) NewDeviceFlowInteractionService() services.DeviceFlowInteractionService {
+	return (func(p godi.Provider) services.DeviceFlowInteractionService {
+		return impl.NewDeviceFlowInteractionService(
+			godi.GetRequired[services.DeviceFlowCodeService](p),
+			godi.GetRequired[storage.ClientStore](p),
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[*slog.Logger](p),
 		)
 	})(s)
 }

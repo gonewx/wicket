@@ -162,6 +162,14 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[storage.MessageStore[models_contexts.LogoutNotificationContext]](p),
 		)
 	})
+	godi.AddTransientFactory[services.DeviceFlowInteractionService](&r, func(p godi.Provider) services.DeviceFlowInteractionService {
+		return services_impl.NewDeviceFlowInteractionService(
+			godi.GetRequired[services.DeviceFlowCodeService](p),
+			godi.GetRequired[storage.ClientStore](p),
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[*slog.Logger](p),
+		)
+	})
 	godi.AddSingleton[sessionpkg.Store, lazySessionStore](&r)
 	godi.AddTransientFactory[services.SessionCoordinationService](&r, func(p godi.Provider) services.SessionCoordinationService {
 		opts := godi.GetRequired[*config_options.WicketOptions](p)
