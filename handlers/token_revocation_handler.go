@@ -58,7 +58,7 @@ func (h *TokenRevocationHandler) Process(w http.ResponseWriter, r *http.Request)
 	clientResult := h.clientValidator.Validate(r)
 	if clientResult == nil || clientResult.Error != nil || clientResult.Client == nil {
 		h.debug("revocation client authentication failed")
-		challenge, _ := authorizationChallenge(r)
+		challenge := authorizationChallenge(r)
 		return results.NewClientAuthenticationErrorResult(challenge).Execute(w, r)
 	}
 
@@ -100,14 +100,14 @@ func (h *TokenRevocationHandler) debug(msg string, args ...any) {
 	}
 }
 
-// authorizationChallenge reports whether the request carries an Authorization
-// header and, if so, the WWW-Authenticate challenge answering it: the header's
-// scheme name, or the Basic challenge for Basic and for a scheme that cannot
-// be read.
-func authorizationChallenge(r *http.Request) (string, bool) {
+// authorizationChallenge returns the WWW-Authenticate challenge answering the
+// request's Authorization header: the header's scheme name, or the Basic
+// challenge for Basic and for a scheme that cannot be read. It returns "" when
+// the request carries no Authorization header.
+func authorizationChallenge(r *http.Request) string {
 	values, present := r.Header["Authorization"]
 	if !present {
-		return "", false
+		return ""
 	}
 
 	scheme := ""
@@ -117,9 +117,9 @@ func authorizationChallenge(r *http.Request) (string, bool) {
 		}
 	}
 	if scheme == "" || !isHttpToken(scheme) || strings.EqualFold(scheme, "Basic") {
-		return basicChallenge, true
+		return basicChallenge
 	}
-	return scheme, true
+	return scheme
 }
 
 // isHttpToken reports whether s is an RFC 9110 §5.6.2 token, the form an

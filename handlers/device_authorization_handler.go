@@ -74,7 +74,7 @@ func (h *DeviceAuthorizationHandler) Process(w http.ResponseWriter, r *http.Requ
 	clientResult := h.clientValidator.Validate(r)
 	if clientResult == nil || clientResult.Error != nil || clientResult.Client == nil {
 		h.debug("device authorization client authentication failed")
-		challenge, _ := authorizationChallenge(r)
+		challenge := authorizationChallenge(r)
 		return results.NewClientAuthenticationErrorResult(challenge).Execute(w, r)
 	}
 	clientId := clientResult.Client.ClientId
