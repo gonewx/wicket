@@ -83,13 +83,13 @@ func (g *TokenRevocationResponseGenerator) revokeAccessToken(ctx context.Context
 	token, err := g.referenceTokenStore.GetReferenceToken(ctx, validationResult.Token)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			// Nothing to revoke: RFC 7009 revocations are idempotent.
-			return true, nil
+			// Miss: the token is not in this store.
+			return false, nil
 		}
 		return false, err
 	}
 	if token == nil {
-		return true, nil
+		return false, nil
 	}
 
 	if token.ClientId == validationResult.Client.ClientId {
@@ -109,13 +109,13 @@ func (g *TokenRevocationResponseGenerator) revokeRefreshToken(ctx context.Contex
 	token, err := g.refreshTokenStore.GetRefreshToken(ctx, validationResult.Token)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			// Nothing to revoke: RFC 7009 revocations are idempotent.
-			return true, nil
+			// Miss: the token is not in this store.
+			return false, nil
 		}
 		return false, err
 	}
 	if token == nil {
-		return true, nil
+		return false, nil
 	}
 
 	if token.ClientId == validationResult.Client.ClientId {

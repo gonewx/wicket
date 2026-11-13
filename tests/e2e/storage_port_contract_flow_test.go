@@ -272,9 +272,12 @@ func TestRefreshTokenValidationFlowE2E(t *testing.T) {
 	})
 }
 
-// TestTokenRevocationIdempotencyE2E pins RFC 7009 idempotent revocation: a
-// token that is not present revokes successfully, and a present token is
-// removed from its store.
+// TestTokenRevocationIdempotencyE2E pins the revocation generator's store
+// merge points: a token that is not present is a miss without an error
+// (Success is false; the HTTP layer still answers 200 per RFC 7009), a
+// present token is removed from its store, a request without a type hint
+// falls through to the refresh token store, and an infrastructure failure
+// surfaces as an error.
 func TestTokenRevocationIdempotencyE2E(t *testing.T) {
 	t.Parallel()
 
@@ -292,25 +295,88 @@ func TestTokenRevocationIdempotencyE2E(t *testing.T) {
 		return result
 	}
 
-	t.Run("missing access token revokes idempotently", func(t *testing.T) {
+	t.Run("missing access token is a miss without error", func(t *testing.T) {
 		t.Parallel()
 		response, err := generator.Handle(context.Background(), newResult("missing", wicket.TokenTypeHintsAccessToken))
 		if err != nil {
 			t.Fatalf("revoke missing access token: %v", err)
 		}
-		if !response.Success {
-			t.Fatal("revoke missing access token reported failure")
+		if response.Success {
+			t.Fatal("revoke missing access token reported a hit")
 		}
 	})
 
-	t.Run("missing refresh token revokes idempotently", func(t *testing.T) {
+	t.Run("missing refresh token is a miss without error", func(t *testing.T) {
 		t.Parallel()
 		response, err := generator.Handle(context.Background(), newResult("missing", wicket.TokenTypeHintsRefreshToken))
 		if err != nil {
 			t.Fatalf("revoke missing refresh token: %v", err)
 		}
+		if response.Success {
+			t.Fatal("revoke missing refresh token reported a hit")
+		}
+	})
+
+	t.Run("missing token without hint is a miss without error", func(t *testing.T) {
+		t.Parallel()
+		isolated := responses_impl.NewTokenRevocationResponseGenerator(storage_impl.NewReferenceTokenStore(), storage_impl.NewRefreshTokenStore(), logger)
+		response, err := isolated.Handle(context.Background(), newResult("missing", ""))
+		if err != nil {
+			t.Fatalf("revoke missing token without hint: %v", err)
+		}
+		if response.Success {
+			t.Fatal("revoke missing token without hint reported a hit")
+		}
+	})
+
+	t.Run("refresh token without hint is removed with its reference tokens", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		references := storage_impl.NewReferenceTokenStore()
+		refreshes := storage_impl.NewRefreshTokenStore()
+		isolated := responses_impl.NewTokenRevocationResponseGenerator(references, refreshes, logger)
+
+		subjectClaim := claimspkg.NewClaim(claimspkg.WithClaimType(wicket.JwtClaimTypesSubject), claimspkg.WithClaimValue("alice"))
+		refresh := storage_models.NewRefreshToken()
+		refresh.ClientId = client.ClientId
+		refresh.CreationTime = time.Date(2026, 7, 8, 8, 0, 0, 0, time.UTC)
+		refresh.Lifetime = 3600
+		refresh.Subject = claimspkg.NewClaimsPrincipal(claimspkg.WithClaimsPrincipalIdentity(claimspkg.NewClaimsIdentity(claimspkg.WithClaims([]*claimspkg.Claim{subjectClaim}))))
+		if err := refreshes.StoreRefreshToken(ctx, "refresh-target", refresh); err != nil {
+			t.Fatalf("store refresh token: %v", err)
+		}
+		reference := &storage_models.Token{CreationTime: refresh.CreationTime, Lifetime: 3600, ClientId: client.ClientId, Claims: []*claimspkg.Claim{subjectClaim}}
+		if err := references.StoreReferenceToken(ctx, "reference-sibling", reference); err != nil {
+			t.Fatalf("store reference token: %v", err)
+		}
+
+		response, err := isolated.Handle(ctx, newResult("refresh-target", ""))
+		if err != nil {
+			t.Fatalf("revoke refresh token without hint: %v", err)
+		}
 		if !response.Success {
-			t.Fatal("revoke missing refresh token reported failure")
+			t.Fatal("revoke refresh token without hint reported a miss")
+		}
+		if _, err := refreshes.GetRefreshToken(ctx, "refresh-target"); !errors.Is(err, storage.ErrNotFound) {
+			t.Fatalf("refresh token still present, err = %v", err)
+		}
+		if _, err := references.GetReferenceToken(ctx, "reference-sibling"); !errors.Is(err, storage.ErrNotFound) {
+			t.Fatalf("reference token of the same subject and client still present, err = %v", err)
+		}
+	})
+
+	t.Run("store failure surfaces as an error", func(t *testing.T) {
+		t.Parallel()
+		failure := errors.New("store unavailable")
+		failing := responses_impl.NewTokenRevocationResponseGenerator(
+			&failingReferenceTokenStore{ReferenceTokenStore: storage_impl.NewReferenceTokenStore(), err: failure},
+			storage_impl.NewRefreshTokenStore(),
+			logger,
+		)
+		for _, hint := range []string{"", wicket.TokenTypeHintsAccessToken} {
+			if _, err := failing.Handle(context.Background(), newResult("any", hint)); !errors.Is(err, failure) {
+				t.Fatalf("hint %q: Handle error = %v, want %v", hint, err, failure)
+			}
 		}
 	})
 
@@ -332,6 +398,16 @@ func TestTokenRevocationIdempotencyE2E(t *testing.T) {
 			t.Fatalf("revoked token still present, err = %v", err)
 		}
 	})
+}
+
+// failingReferenceTokenStore reports an infrastructure failure on every read.
+type failingReferenceTokenStore struct {
+	storage.ReferenceTokenStore
+	err error
+}
+
+func (s *failingReferenceTokenStore) GetReferenceToken(context.Context, string) (*storage_models.Token, error) {
+	return nil, s.err
 }
 
 // TestRemoveExpiredReclaimsStoreFamiliesE2E exercises the reclamation entry on
