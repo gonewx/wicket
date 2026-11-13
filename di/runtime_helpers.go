@@ -144,6 +144,17 @@ func newTokenRevocationHandlerFromProvider(p godi.Provider) *handlers.TokenRevoc
 	)
 }
 
+func newDeviceAuthorizationHandlerFromProvider(p godi.Provider) *handlers.DeviceAuthorizationHandler {
+	return handlers.NewDeviceAuthorizationHandler(
+		godi.GetRequired[validators.ClientSecretValidator](p),
+		godi.GetRequired[validators.DeviceAuthorizationRequestValidator](p),
+		godi.GetRequired[responses.DeviceAuthorizationResponseGenerator](p),
+		godi.GetRequired[services.ServerUrls](p),
+		godi.GetRequired[*config_options.WicketOptions](p),
+		godi.GetRequired[*slog.Logger](p),
+	)
+}
+
 func newUserInfoHandlerFromProvider(p godi.Provider) *handlers.UserInfoHandler {
 	return handlers.NewUserInfoHandler(
 		godi.GetRequired[*validators_impl.BearerTokenUsageValidator](p),
