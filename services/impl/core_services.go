@@ -591,6 +591,11 @@ func (s *TokenService) CreateAccessToken(ctx context.Context, request *responses
 	if request.ValidatedRequest != nil {
 		token.Issuer = request.ValidatedRequest.IssuerName
 		token.Lifetime = request.ValidatedRequest.AccessTokenLifetime
+		// The token names its client and the form that client is configured
+		// to receive, so the serialization step can tell a self-contained
+		// token from one kept server side.
+		token.ClientId = request.ValidatedRequest.ClientId
+		token.AccessTokenType = request.ValidatedRequest.AccessTokenType
 	}
 	return token, nil
 }
@@ -686,7 +691,79 @@ func (s *TokenService) CreateSecurityToken(ctx context.Context, token *storage_m
 			),
 		)
 	}
+	// Only an access token is ever handed out by reference; every other token
+	// kind is a signed JWT whatever its access token type says.
+	if token.Type == wicket.TokenTypesAccessToken && token.AccessTokenType == wicket.AccessTokenTypeReference {
+		return s.createReferenceToken(ctx, token)
+	}
 	return s.tokenCreation.CreateToken(ctx, token)
+}
+
+// Fixed texts of the errors the reference token path reports. A handle is a
+// credential and a store may echo the key it was given in its own error, so
+// none of these texts varies with what a store returned.
+const (
+	referenceTokenMissingClientMessage   = "create security token: reference token names no client"
+	referenceTokenMissingStoreMessage    = "create security token: reference token store is not available"
+	referenceTokenDuplicateHandleMessage = "create security token: reference token handle already exists"
+	referenceTokenStoreFailureMessage    = "create security token: reference token store write failed"
+)
+
+// referenceTokenStoreError reports a failed reference token write. Its text is
+// fixed, while the store's own error stays reachable through errors.Is and
+// errors.As.
+type referenceTokenStoreError struct {
+	message string
+	cause   error
+}
+
+func (e *referenceTokenStoreError) Error() string { return e.message }
+
+func (e *referenceTokenStoreError) Unwrap() error { return e.cause }
+
+// createReferenceToken keeps the token server side under a freshly generated
+// opaque handle and returns that handle. It fails closed: no handle is
+// returned unless the store accepted the record, and no signed token is
+// issued in its place.
+func (s *TokenService) createReferenceToken(ctx context.Context, token *storage_models.Token) (string, error) {
+	// Validation finds the owning client through this field; a record
+	// without it could never be used.
+	if token.ClientId == "" {
+		return "", errors.New(referenceTokenMissingClientMessage)
+	}
+	if s.reference == nil {
+		return "", errors.New(referenceTokenMissingStoreMessage)
+	}
+	handle, err := NewHandleGenerationService().Generate()
+	if err != nil {
+		return "", fmt.Errorf("create security token: generate reference token handle: %w", err)
+	}
+	if handle == "" {
+		return "", errors.New("create security token: generate reference token handle: empty handle")
+	}
+	// The store receives its own copy: the caller keeps using its model after
+	// this call, and a store is free to retain what it is given.
+	stored := *token
+	stored.Claims = append([]*claims.Claim(nil), token.Claims...)
+	stored.Audiences = append([]string(nil), token.Audiences...)
+	stored.AllowedSigningAlgorithms = append([]string(nil), token.AllowedSigningAlgorithms...)
+	if err := s.reference.StoreReferenceToken(ctx, handle, &stored); err != nil {
+		message, category := referenceTokenStoreFailureMessage, "store_failure"
+		if errors.Is(err, storage.ErrDuplicateHandle) {
+			message, category = referenceTokenDuplicateHandleMessage, "duplicate_handle"
+		}
+		if s.logger != nil {
+			// Neither the handle nor the store's error text is logged; the
+			// store reports the detailed cause on its own side.
+			s.logger.Error("Reference token could not be stored",
+				slog.String("clientId", token.ClientId),
+				slog.String("category", category),
+				slog.String("errorType", fmt.Sprintf("%T", err)),
+			)
+		}
+		return "", &referenceTokenStoreError{message: message, cause: err}
+	}
+	return handle, nil
 }
 
 type RefreshTokenService struct {

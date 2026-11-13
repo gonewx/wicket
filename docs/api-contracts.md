@@ -132,6 +132,11 @@ grant_type=authorization_code
 }
 ```
 
+- `access_token` 的形态由 client 的 `AccessTokenType` 决定，取值为 `wicket.AccessTokenTypeJwt`（默认）或 `wicket.AccessTokenTypeReference`。取 Jwt 时是自包含的 JWT；取 Reference 时是由 64 个大写十六进制字符组成的不透明句柄（不含 `.`），令牌本身写入 `ReferenceTokenStore`。两种形态下 `token_type`、`expires_in`、`scope`、`refresh_token` 的规则相同，`id_token` 恒为 JWT。授权端点在 `response_type` 含 `token` 时签发的 access token 同样随该配置为句柄。
+- 句柄可经内省查询（有效时 `active=true`）、可用于 userinfo、可由所属 client 在撤销端点立即撤销；撤销 refresh token 时，同一用户、同一 client 的全部句柄一并失效（范围按用户与 client 计，含该用户在同一 client 下其他登录取得的句柄）。refresh 换发每次签发新句柄，不撤销此前签发的句柄。资源侧不能在本地验证句柄，须改用内省；`auth/jwt` 的 bearer 认证方案只接受 JWT，不接受句柄。
+- refresh 换发默认复用随 refresh token 保存的 access token 模型，形态取自该 refresh token 签发时的 client 配置。因此升级到本版本之前、或 client 改为 Reference 之前签发的 refresh token，在整条 refresh 链上持续换得 JWT（不可撤销），直到用户重新登录；可撤销这些 refresh token 或等其过期，也可对该 client 开启 `UpdateAccessTokenClaimsOnRefresh`，使每次换发按当前配置重新装配。两种做法都不追溯已签发的 JWT。client 改回 Jwt 时同理，已入库的句柄在过期或被撤销前继续有效。
+- 签发句柄时 `ReferenceTokenStore` 写入失败则不签发任何令牌（不退回 JWT），端点按基础设施错误返回非 200 与固定文本；store 的错误文本不进入响应与 wicket 日志，wicket 只记录 client id、故障分类与错误类型，具体原因须由宿主的 store 自行记录（其错误文本与日志不应包含句柄或记录内容）。access token 入库后同一请求的后续步骤失败时，已入库的记录不回滚，其句柄从未交出。
+
 ### 令牌撤销（Revocation Endpoint，RFC 7009）
 
 ```
@@ -148,7 +153,7 @@ token=<refresh_token_or_reference_access_token>
 - 客户端认证与令牌端点相同：经 DI 注册的 secret parser 解析凭据（默认含 `client_secret_basic`、`client_secret_post`），不要求密钥的公共客户端（`RequireClientSecret=false`）只凭 `client_id` 即可撤销自己的令牌。认证先于参数校验执行，认证失败一律返回 `{"error":"invalid_client"}`（`application/json`）：请求带 `Authorization` 头时为 **401**，并带 `WWW-Authenticate`（Basic 方案为 `Basic realm="wicket"`，其他方案回写方案名）；未带该头（凭据在请求体或缺失）时为 **400**。例外：请求体无法按表单解析时，在认证之前即返回 400 `invalid_request`。
 - 认证通过后 `token` 缺失：400 `invalid_request`。请求体为空时，只有凭据放在 `Authorization` 头中才返回 400 `invalid_request`；未带该头时请求体中没有凭据，按上一条返回 400 `invalid_client`。
 - `token_type_hint` 只接受 `access_token`、`refresh_token`，其他值返回 400 `unsupported_token_type`。这是对 RFC 7009 §2.2 的已知偏离（该节规定服务端忽略无效的 hint 值），为与现有请求校验器保持兼容而保留。`unsupported_token_type` 还有第二个来源：JWT 形态的令牌，见下条。
-- 撤销 refresh token 时，同一用户、同一客户端的 reference access token 一并失效；撤销 reference access token 后，内省返回 `active=false`。注意：令牌端点目前只签发 JWT access token，没有生产路径写入 reference token store，只有宿主自行写入 store 的令牌才是 reference token。JWT access token 无服务端状态，不能撤销：提交 JWT 形态的令牌返回 400 `unsupported_token_type`，不触碰任何令牌 store，该令牌在过期前仍然有效。判定方式：令牌字符串含 `.` 即视为 JWT 形态，与 access token 校验区分 JWT 与 reference 句柄的规则相同；不验证签名，不看 `token_type_hint`；因此其他客户端的、已过期的、伪造的含 `.` 字符串同样得到 400。对无效、伪造、过期的含 `.` 字符串返回 400，是对 RFC 7009 §2.2 的已知偏离（该节规定客户端提交无效令牌时返回 200），范围仅限含 `.` 的字符串。由此带来一条限制：句柄不得含 `.`。宿主自行写入 store 的 refresh 或 reference 句柄若含 `.`，在撤销端点得到 400，无法经此端点撤销；默认装配生成的句柄不含 `.`，不受影响。
+- 撤销 refresh token 时，同一用户、同一客户端的 reference access token 一并失效；撤销 reference access token 后，内省返回 `active=false`。reference access token 指配置了 `AccessTokenType=Reference` 的 client 取得的句柄（见上文"令牌响应"），以及宿主自行写入 store 的令牌；默认形态的 client 取得的是 JWT。JWT access token 无服务端状态，不能撤销：提交 JWT 形态的令牌返回 400 `unsupported_token_type`，不触碰任何令牌 store，该令牌在过期前仍然有效。判定方式：令牌字符串含 `.` 即视为 JWT 形态，与 access token 校验区分 JWT 与 reference 句柄的规则相同；不验证签名，不看 `token_type_hint`；因此其他客户端的、已过期的、伪造的含 `.` 字符串同样得到 400。对无效、伪造、过期的含 `.` 字符串返回 400，是对 RFC 7009 §2.2 的已知偏离（该节规定客户端提交无效令牌时返回 200），范围仅限含 `.` 的字符串。由此带来一条限制：句柄不得含 `.`。宿主自行写入 store 的 refresh 或 reference 句柄若含 `.`，在撤销端点得到 400，无法经此端点撤销；默认装配生成的句柄不含 `.`，不受影响。
 - 以下查找规则只适用于不含 `.` 的令牌。不带 `token_type_hint` 时，先按 reference access token 查找，未找到再按 refresh token 查找。带 hint 时只在该类型中查找：hint 与令牌实际类型不符时不撤销（已知限制，RFC 7009 §2.1 要求扩展到其他类型）。
 - 成功响应为 200、空响应体，带 `Cache-Control: no-store` 等禁止缓存的头。不含 `.` 的未知令牌、已撤销令牌、属于其他客户端的令牌同样返回 200；属于其他客户端的令牌静默不撤销。
 - 请求校验与撤销阶段的存储故障等基础设施错误不按协议错误处理，由中间件统一写出。客户端认证阶段读取客户端存储失败时，按认证失败返回 `invalid_client`。
