@@ -30,6 +30,8 @@ func TestEndpointsRejectUnsupportedHttpMethods(t *testing.T) {
 		"introspection rejects PUT":          {path: integration_common.IntrospectionEndpoint, method: http.MethodPut},
 		"revocation rejects GET":             {path: integration_common.RevocationEndpoint, method: http.MethodGet},
 		"revocation rejects PUT":             {path: integration_common.RevocationEndpoint, method: http.MethodPut},
+		"deviceauthorization rejects GET":    {path: integration_common.DeviceAuthorization, method: http.MethodGet},
+		"deviceauthorization rejects PUT":    {path: integration_common.DeviceAuthorization, method: http.MethodPut},
 		"endsession rejects DELETE":          {path: integration_common.EndSessionEndpoint, method: http.MethodDelete},
 		"userinfo rejects PATCH":             {path: integration_common.UserInfoEndpoint, method: http.MethodPatch},
 		"endsession callback rejects DELETE": {path: integration_common.EndSessionCallbackEndpoint, method: http.MethodDelete},
