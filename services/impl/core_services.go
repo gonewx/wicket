@@ -173,6 +173,10 @@ type UserSession struct {
 	cookieName      string
 	cookieSecure    bool
 	cookieSameSite  http.SameSite
+	// restoreDone records that this request-scoped instance already tried to
+	// restore its session from the session cookie, or no longer may (after a
+	// session was created or removed in this request).
+	restoreDone bool
 }
 
 func NewUserSession(
@@ -320,10 +324,62 @@ func (s *UserSession) RemoveSessionIdCookie() error {
 	}
 	s.session = ""
 	s.clients = nil
+	s.restoreDone = true
 	return nil
 }
 
+// restore lazily recovers the session referenced by the session cookie of the
+// current request, at most once per instance. The recovered session is adopted
+// only when the request carries an authenticated user whose subject is the
+// session's subject; otherwise the request is treated as having no session and
+// the cookie is cleared. A store failure is logged and the request is treated
+// as having no session too, but the cookie is kept for a later request; the
+// request does not fail.
+func (s *UserSession) restore() {
+	if s.session != "" || s.restoreDone {
+		return
+	}
+	s.restoreDone = true
+	if !s.enabled || s.store == nil || s.accessor == nil {
+		return
+	}
+	request := s.accessor.Request()
+	if request == nil {
+		return
+	}
+	sessionID := s.readSessionCookie()
+	if sessionID == "" {
+		return
+	}
+
+	rec, err := s.store.GetSession(request.Context(), sessionID)
+	if err != nil {
+		if errors.Is(err, sessionpkg.ErrSessionNotFound) {
+			s.clearSessionCookie()
+			return
+		}
+		if s.logger != nil {
+			s.logger.Warn("restore session: cannot load session", slog.String("error", err.Error()))
+		}
+		return
+	}
+	if rec == nil || (s.clock != nil && rec.IsExpired(s.clock.Now())) {
+		s.clearSessionCookie()
+		return
+	}
+
+	subjectId := extensions.GetSubjectIdFromPrincipal(s.GetUser())
+	if subjectId == "" || subjectId != rec.SubjectID {
+		s.clearSessionCookie()
+		return
+	}
+
+	s.session = rec.SessionID
+	s.clients = append([]string(nil), rec.ClientIDs...)
+}
+
 func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
+	s.restoreDone = true
 	s.user = principal
 	sessionId, err := utils.CreateUniqueId(32, utils.Hex)
 	if err != nil {
@@ -357,9 +413,13 @@ func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.Cla
 	return s.session, nil
 }
 
-func (s *UserSession) GetSessionId() string { return s.session }
+func (s *UserSession) GetSessionId() string {
+	s.restore()
+	return s.session
+}
 
 func (s *UserSession) GetClientList() ([]string, error) {
+	s.restore()
 	return append([]string(nil), s.clients...), nil
 }
 
@@ -397,6 +457,7 @@ func (s *UserSession) GetUser() *claims.ClaimsPrincipal {
 }
 
 func (s *UserSession) AddClientId(ctx context.Context, clientId string) error {
+	s.restore()
 	if !utils.Contains(s.clients, clientId) {
 		s.clients = append(s.clients, clientId)
 	}
@@ -550,6 +611,12 @@ func (s *TokenService) CreateIdentityToken(ctx context.Context, request *respons
 	}
 	appendClaim(wicket.JwtClaimTypesNonce, request.Nonce)
 	appendClaim(wicket.JwtClaimTypesStateHash, request.StateHash)
+	// An identity token issued within a user session names that session
+	// (OIDC Front-Channel and Back-Channel Logout: sid), so a relying party can
+	// match a later logout notification to it. Anonymous requests carry none.
+	if request.ValidatedRequest != nil {
+		appendClaim(wicket.JwtClaimTypesSessionId, request.ValidatedRequest.SessionId)
+	}
 	if request.AccessTokenToHash != "" || request.AuthorizationCodeToHash != "" {
 		algorithm, err := s.identitySigningAlgorithm(ctx, request)
 		if err != nil {
@@ -868,17 +935,4 @@ func (s *InteractionService) GrantConsent(ctx context.Context, request *messages
 
 func (s *InteractionService) DenyAuthorization(ctx context.Context, request *messages.AuthorizationRequest, subject string) error {
 	return s.consent.DenyAuthorization(request, subject)
-}
-
-type BackchannelLogoutService struct {
-	notifications services.LogoutNotificationService
-	client        services.BackChannelLogoutHttpClient
-}
-
-func NewBackchannelLogoutService(notifications services.LogoutNotificationService, client services.BackChannelLogoutHttpClient, logger *slog.Logger) *BackchannelLogoutService {
-	return &BackchannelLogoutService{notifications: notifications, client: client}
-}
-
-func (s *BackchannelLogoutService) SendLogoutNotificationsAsync(ctx *contexts.LogoutNotificationContext) error {
-	return nil
 }

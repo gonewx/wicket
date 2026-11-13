@@ -12,6 +12,7 @@ import (
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/handlers"
 	"github.com/gonewx/wicket/hosting"
+	models_contexts "github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/responses"
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/storage"
@@ -177,6 +178,9 @@ func newEndSessionHandlerFromProvider(p godi.Provider) *handlers.EndSessionHandl
 func newEndSessionCallbackHandlerFromProvider(p godi.Provider) *handlers.EndSessionCallbackHandler {
 	return handlers.NewEndSessionCallbackHandler(
 		godi.GetRequired[validators.EndSessionRequestValidator](p),
+		godi.GetRequired[services.BackchannelLogoutService](p),
+		godi.GetRequired[storage.MessageStore[models_contexts.LogoutNotificationContext]](p),
+		godi.GetRequired[services.SystemClock](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)

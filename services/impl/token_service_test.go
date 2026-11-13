@@ -220,3 +220,47 @@ func TestCreateTokenIssuerAndLifetimeAssembly(t *testing.T) {
 	require.Equal(t, 300, identityToken.Lifetime)
 	require.Equal(t, []string{"relying-party"}, identityToken.Audiences)
 }
+
+// TestCreateIdentityTokenSessionBinding: an identity token issued within a
+// user session carries exactly one session-id claim bound to the validated
+// request, replacing any carried in from the subject; an anonymous request
+// yields none.
+func TestCreateIdentityTokenSessionBinding(t *testing.T) {
+	carried := claimspkg.NewClaimsPrincipal(claimspkg.WithClaimsPrincipalIdentity(claimspkg.NewClaimsIdentity(
+		claimspkg.WithAuthenticationType("test"),
+		claimspkg.WithClaims([]*claimspkg.Claim{
+			claimspkg.NewClaim(
+				claimspkg.WithClaimType(wicket.JwtClaimTypesSessionId),
+				claimspkg.WithClaimValue("carried-over-session"),
+			),
+		}),
+	)))
+	for name, tc := range map[string]struct {
+		sessionId string
+		subject   *claimspkg.ClaimsPrincipal
+		wantSid   string
+	}{
+		"session id is emitted when present":          {sessionId: "session-123", wantSid: "session-123"},
+		"carried session id is replaced, not stacked": {sessionId: "session-123", subject: carried, wantSid: "session-123"},
+		"anonymous request emits no sid claim":        {sessionId: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+			request := &responses_models.TokenCreationRequest{
+				Subject:          tc.subject,
+				ValidatedRequest: &validators_models.ValidatedRequest{SessionId: tc.sessionId, ClientId: "relying-party"},
+			}
+
+			token, err := svc.CreateIdentityToken(context.Background(), request)
+
+			require.NoError(t, err)
+			sidClaims := claimsOfType(token.Claims, wicket.JwtClaimTypesSessionId)
+			if tc.wantSid == "" {
+				require.Empty(t, sidClaims)
+				return
+			}
+			require.Len(t, sidClaims, 1)
+			require.Equal(t, tc.wantSid, sidClaims[0].Value)
+		})
+	}
+}

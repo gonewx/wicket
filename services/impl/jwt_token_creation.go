@@ -87,10 +87,15 @@ func (s *TokenCreationService) CreateToken(ctx context.Context, token *storage_m
 // headerType selects the JOSE typ header. Access tokens carry the configured
 // access-token media type (RFC 9068, default "at+jwt") so the resource
 // validation path can distinguish them from other JWTs; every other token uses
-// the RFC 7519 default.
+// the RFC 7519 default, except logout tokens, which are explicitly typed
+// "logout+jwt" (OIDC Back-Channel Logout 1.0 §2.4, §4.1) so they cannot be
+// mistaken for any other JWT the provider issues.
 func (s *TokenCreationService) headerType(token *storage_models.Token) string {
 	if token.Type == wicket.TokenTypesAccessToken && s.options.AccessTokenJwtType != "" {
 		return s.options.AccessTokenJwtType
+	}
+	if token.Type == TokenTypesLogoutToken {
+		return LogoutTokenJwtType
 	}
 	return "JWT"
 }

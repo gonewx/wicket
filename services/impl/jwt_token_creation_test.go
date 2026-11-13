@@ -108,3 +108,36 @@ func TestCreateTokenHeaderKidResolvesThroughValidationKeys(t *testing.T) {
 		t.Fatalf("validation key set did not verify the signed token: %v", err)
 	}
 }
+
+// TestCreateTokenTypHeaderPerTokenType: a logout token is explicitly typed
+// logout+jwt, while access and identity tokens keep their existing typ.
+func TestCreateTokenTypHeaderPerTokenType(t *testing.T) {
+	keys := NewKeyMaterialService(nil, nil, rs256Manager(), nil)
+	creator := NewTokenCreationService(keys, test_common.NewStubClock(), config_options.NewWicketOptions(), nil)
+
+	for tokenType, wantTyp := range map[string]string{
+		TokenTypesLogoutToken:          "logout+jwt",
+		wicket.TokenTypesAccessToken:   config_options.NewWicketOptions().AccessTokenJwtType,
+		wicket.TokenTypesIdentityToken: "JWT",
+	} {
+		t.Run(tokenType, func(t *testing.T) {
+			signed, err := creator.CreateToken(context.Background(), &storage_models.Token{
+				Type:      tokenType,
+				Issuer:    "https://issuer.wicket.test",
+				Audiences: []string{"relying-party"},
+				Lifetime:  60,
+			})
+			if err != nil {
+				t.Fatalf("create token: %v", err)
+			}
+			msg, err := jws.Parse([]byte(signed))
+			if err != nil {
+				t.Fatalf("parse jws: %v", err)
+			}
+			typ, _ := msg.Signatures()[0].ProtectedHeaders().Type()
+			if typ != wantTyp {
+				t.Fatalf("typ = %q, want %q", typ, wantTyp)
+			}
+		})
+	}
+}
