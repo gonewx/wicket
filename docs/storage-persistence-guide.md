@@ -249,6 +249,64 @@ godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗�
 
 **PostgreSQL 适配器已实现并发布。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器仓，九个 store 实现、schema 与迁移均已落地并发布 `v0.1.x`，表所有权归该仓；快速开始见上文「PostgreSQL 适配器」节与适配器仓 README。
 
+## 重放登记适配器
+
+重放登记是独立于上文三族的第四个端口：它让一次性标识（客户端断言的 `jti`、DPoP proof 的 `jti`）在有效期内只被接受一次，多副本部署下也成立。端口定义在 `replay` 包，契约套件在 `replay/replaytest`。
+
+```go
+type Registry interface {
+    Register(ctx context.Context, key string, expiresAt time.Time) error
+    RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
+}
+```
+
+- `Register` 是 insert-only 的原子登记：键未登记时返回 nil；已登记且尚未回收时返回 `replay.ErrDuplicateHandle`，已存记录（含过期时刻）原样不变。同一键的并发登记恰有一个成功。空键或零值过期时刻返回 `replay.ErrInvalidArgument`。
+- `RemoveExpired` 回收过期时刻**严格早于** `cutoff` 的记录并返回本次回收数；过期时刻等于 `cutoff` 的记录保留。
+- 端口没有读取、按键删除、枚举操作，也**不看任何时钟**：已登记而未回收的键，不论其过期时刻是否已过，一律判重复。
+- 键由 `replay.Key` 生成（64 个小写十六进制字符的摘要），适配器按字节精确比较，存储中不出现原始 `jti`。`replay.ErrDuplicateHandle` 是 `replay` 包自有的值，与 `storage.ErrDuplicateHandle` 不是同一个；适配器只需 import `replay`。
+
+**当前状态：** 这条注入缝只在依赖它的特性启用时才是必需的，而当前版本还没有任何特性启用它（由后续版本引入）。在此之前它不参与 `Freeze()` 校验，wicket 也不会读取它；现有装配无须任何改动。
+
+### 注入与回退
+
+```go
+cfg.SetReplayRegistry(registry) // 或 cfg.SetReplayRegistryProvider(func() replay.Registry { ... })
+```
+
+依赖它的特性启用后，未注入重放登记的装配在 `Freeze()` 失败。**全局的 `AllowInMemoryFallback()` 不豁免这条缝**；要用内存实现，须针对它单独声明：
+
+```go
+// 仅单进程部署或开发环境
+cfg.AllowInMemoryReplayRegistryFallback()
+```
+
+内存实现 `replay.MemoryRegistry` 只在单个进程内正确：各副本各有一份记录，在一个副本上用过的标识到另一个副本还能再用一次。落到内存实现时 wicket 记一条 WARN。
+
+### 单独比较 `SuiteVersion`
+
+`replaytest.SuiteVersion` 自 `1.0.0` 起**单独计版本**，不随 `storagetest` / `sessiontest` / `keymgmttest` 三套一起步进，它们的版本也不因它而变。重放登记适配器是独立的 store 类型（不与其他端口的 store 合为一个类型），暴露 `ConformsTo()` 返回它验证所依据的 `replaytest.SuiteVersion`。宿主对它单独做相等比较，不与 `storagetest.SuiteVersion` 比：
+
+```go
+if got := registry.ConformsTo(); got != replaytest.SuiteVersion {
+    log.Fatalf("重放登记适配器契约版本不匹配: 适配器=%s, wicket 要求=%s", got, replaytest.SuiteVersion)
+}
+```
+
+适配器在自己的测试里备好介质后调用 `replaytest.RunRegistrySuite(t, newRegistry)`，`newRegistry` 每次返回一个全新且空的登记。MUST 级用例恒运行；`replaytest.WithMay(true)` 另加 MAY 级用例。套件不看钟也不等待，时刻全部取自固定常量：基准为 `2100-01-01T00:00:00Z`、前后各不超过十小时，另有一个只用于「已过期但未回收」用例的 `2001-01-01T00:00:00Z`；所以介质须能存储并比较这两处的时刻。
+
+通过套件**不等于**满足全部契约，有两条硬性要求套件钉不住：
+
+- **原子性。** 并发用例对"先查后写"的检出力取决于查与写之间的窗口：窗口是一次网络或磁盘往返时能稳定暴露，窗口只有纳秒级时几乎检不出。适配器不得以该用例通过作为原子性的证明，须由介质的原子原语（唯一约束上的插入、条件写入等）保证。
+- **原生 TTL。** 套件无法检出介质原生 TTL，通过套件不构成未使用 TTL 的证明（见下节）。
+
+### 介质不得淘汰未过期记录
+
+这是**宿主的部署责任**。记录只能经 `RemoveExpired` 回收，由宿主按自身调度驱动；适配器不得使用介质原生 TTL 或淘汰策略，也不得在 `Register` 里顺手回收或自起后台任务（AD-12）。
+
+理由在于失败的方向：未回收的键一律判重复，所以回收得晚只是多占空间，不影响正确性；而介质若在记录到期前把它丢掉（内存上限触发的淘汰、原生过期、未持久化时的重启），被丢掉的标识就会被再次接受，重放防护在无任何报错的情况下失效。因此介质须配置为**不淘汰**，适配器文档须写明它所要求的介质配置，宿主部署时须照此核对。
+
+介质的时间精度粗于纳秒时，存储过期时刻只许向后取整（变晚），不许向前截断。
+
 ## 相关文档
 
 - ARCHITECTURE-SPINE — 权威架构约束（开发工作区 `_bmad-output/` 下，不随发布产物分发）
