@@ -851,7 +851,7 @@ func (r *Root) NewLogoutNotificationService() services.LogoutNotificationService
 }
 
 func (r *Root) NewBackchannelLogoutService() services.BackchannelLogoutService {
-	return impl.NewBackchannelLogoutService(r.NewLogoutNotificationService(), r.NewBackChannelLogoutHttpClient(), r.f_Ptr_Logger)
+	return impl.NewBackchannelLogoutService(r.NewLogoutNotificationService(), r.NewBackChannelLogoutHttpClient(), r.NewTokenCreationService(), r.NewClientStore(), r.NewIssuerNameService(), r.f_lazySessionStore, r.f_SystemClock, r.f_Ptr_WicketOptions, r.f_Ptr_Logger)
 }
 
 func (r *Root) NewResourceValidator() validators.ResourceValidator {
@@ -3863,7 +3863,7 @@ func (s *scope) NewLogoutNotificationService() services.LogoutNotificationServic
 }
 
 func (s *scope) NewBackchannelLogoutService() services.BackchannelLogoutService {
-	return impl.NewBackchannelLogoutService(s.NewLogoutNotificationService(), s.NewBackChannelLogoutHttpClient(), s.root.f_Ptr_Logger)
+	return impl.NewBackchannelLogoutService(s.NewLogoutNotificationService(), s.NewBackChannelLogoutHttpClient(), s.NewTokenCreationService(), s.NewClientStore(), s.NewIssuerNameService(), s.root.f_lazySessionStore, s.root.f_SystemClock, s.root.f_Ptr_WicketOptions, s.root.f_Ptr_Logger)
 }
 
 func (s *scope) NewResourceValidator() validators.ResourceValidator {

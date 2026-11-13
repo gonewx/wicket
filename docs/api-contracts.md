@@ -64,12 +64,12 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 |------|----------|
 | `*_endpoint`、`check_session_iframe`、`jwks_uri`（位于本服务 base URL 下） | 路径已注册为端点路由（scheme 与主机不区分大小写）。指向外部主机的绝对 URL 原样保留；不是绝对 URL 的值（如未展开的 `~/` 相对路径）客户端无法解析，不输出 |
 | `grant_types_supported` 中的 `device_code` | `device_authorization_endpoint` 仍在文档中 |
-| `backchannel_logout_supported` / `backchannel_logout_session_supported` | `BackchannelLogoutService` 实现了 `DeliversBackChannelLogout() bool` 且返回 `true`。Back-Channel Logout 发送**尚未提供**（默认实现不发送通知），因此默认不宣告 |
+| `backchannel_logout_supported` / `backchannel_logout_session_supported` | `BackchannelLogoutService` 实现了 `DeliversBackChannelLogout() bool` 且返回 `true`。默认实现在 `ServerSideSessions.Enabled` 与 `Endpoints.EnableCheckSessionEndpoint` 同时为 `true` 时返回 `true`；默认装配不开启 server-side sessions，因此默认不宣告（另受 generator 既有条件 `EnableEndSessionEndpoint` 约束）。见下文"Back-Channel Logout 发送" |
 | `authorization_response_iss_parameter_supported` | `EmitIssuerIdentificationResponseParameter` 为 `true` |
 | `tls_client_auth` / `self_signed_tls_client_auth` | 逐个判定：该方法在已注册解析器的 `GetAvailableAuthenticationMethods()` 中 |
 | `tls_client_certificate_bound_access_tokens`、`mtls_endpoint_aliases` | 至少注册了一种 tls 类客户端认证解析器。alias 条目逐条判定：对应主端点仍被宣告，且路径形态（未配置 `MutualTls.DomainName`）的 alias 路径已注册为端点路由（配置了 `DomainName` 的 domain / sub-domain 形态位于其他主机，只看主端点）；删空后整个键移除 |
 
-令牌撤销端点与设备授权端点已注册，`revocation_endpoint`、`device_authorization_endpoint` 以及 `grant_types_supported` 中的 `device_code` 在默认装配下照常输出；`EnableDeviceAuthorizationEndpoint=false` 时后两者不输出。`frontchannel_logout_*` 有真实实现，照常输出。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤，但键名与生成键相同的除外。生成键指 generator 会写入文档的键，其中多数按开关写入：开关打开时 generator 丢弃同名自定义值；开关关闭时 generator 不写该键，同名自定义值会进入文档。两种情况下，这些键下的值一律按上表过滤（列表值无论是 `[]string` 还是从配置解码出的 `[]any` 都逐项判定），即使自定义值与生成值相同，或宿主在自己的路由上提供了该能力，也无法借生成键名重新宣告被撤下的能力。宿主自有的能力请用 generator 从不写入的键名宣告（例如 `registration_endpoint`），这类键只可能来自宿主，原样保留。
+令牌撤销端点与设备授权端点已注册，`revocation_endpoint`、`device_authorization_endpoint` 以及 `grant_types_supported` 中的 `device_code` 在默认装配下照常输出；`EnableDeviceAuthorizationEndpoint=false` 时后两者不输出。`frontchannel_logout_*` 照常输出（不开启 server-side sessions 时 front-channel 通知不会发生，见下文 Back-Channel Logout 的已知限制）。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤，但键名与生成键相同的除外。生成键指 generator 会写入文档的键，其中多数按开关写入：开关打开时 generator 丢弃同名自定义值；开关关闭时 generator 不写该键，同名自定义值会进入文档。两种情况下，这些键下的值一律按上表过滤（列表值无论是 `[]string` 还是从配置解码出的 `[]any` 都逐项判定），即使自定义值与生成值相同，或宿主在自己的路由上提供了该能力，也无法借生成键名重新宣告被撤下的能力。宿主自有的能力请用 generator 从不写入的键名宣告（例如 `registration_endpoint`），这类键只可能来自宿主，原样保留。
 
 `MutualTls.Enabled=true` 且有任何 mTLS 相关值（上表最后两行）被移除时，每生成一次文档记一条 `slog` Warn。
 
@@ -204,6 +204,40 @@ err = interaction.Deny(ctx, userCode)
 - 令牌端点按 device_code 查找记录与删除记录不是原子操作，并发轮询可能重复兑换；交互服务的读取—写回同样不是原子操作。
 - 默认的 refresh token 服务不校验 refresh token 的客户端绑定与有效期，设备流签发的 refresh token 同样受影响。
 - 令牌响应对所有授权类型都写出 `refresh_token` 成员，未签发时为空字符串。
+
+### Back-Channel Logout 发送（OIDC Back-Channel Logout 1.0）
+
+**启用条件**：`ServerSideSessions.Enabled=true` 且 `Endpoints.EnableCheckSessionEndpoint=true`（后者默认开启）。只有这时 wicket 才跨请求记住会话与其登录过的客户端，ID Token 才带 `sid`。条件不满足时 discovery 不宣告，服务也不发送任何通知。
+
+**宿主要求**：
+- 登录时经 `services.UserSession.CreateSessionId` 建立会话（集成测试宿主的 cookie 认证处理器在 `SignIn` 中这样做）。之后的请求中，wicket 按会话 cookie 从会话存储恢复会话，但只在当前请求的已认证主体（缺省认证方案）与会话记录的 subject 相同时才采用；否则按无会话处理并清除会话 cookie。
+- 对缺省登出方案（`scheme` 为空或等于 `GetDefaultSignOutScheme()`）调用 `SignOut` 会同时清除会话 cookie；对其他方案（如外部登录的临时方案）的 `SignOut` 不影响会话。
+- 宿主登出页经 `InteractionService.GetLogoutContext` 取得 `SignOutIFrameUrl` 并渲染为 iframe。
+- 经 `ServerConfig.SetBackChannelLogoutHttpClient` 注入的 HTTP client **必须设置超时**：投递所用的 client 不关闭响应体，连接回收依赖超时。未注入时使用缺省 client：5 秒超时，不跟随重定向（避免 logout token 被转发到预注册地址之外）。注入的 client 原样使用，重定向策略由宿主负责：Go 的 `http.Client` 默认跟随重定向，遇到 307 / 308 会把表单（含 logout token）重发到新地址，建议同样设置 `CheckRedirect` 返回 `http.ErrUseLastResponse`。
+
+**触发点**：浏览器加载 `/connect/endsession/callback?endSessionId=…`（即上述 iframe）且回调校验通过时，按同一句柄读取登出上下文并投递，然后照常渲染 front-channel 页面。校验失败（400）不投递。上下文写入超过 300 秒后（按注入的 `SystemClock` 判定）再加载回调不再投递。
+
+**投递前核对**：上下文须指向会话存储中存在且未过期的会话；上下文若带 subject，须与会话记录一致；只通知同时出现在上下文与会话记录中的客户端。不满足时整轮不发送，记 Warn；会话存储读取失败时同样整轮不发送，Warn 中带存储错误。
+
+**logout token**：
+- JOSE 头 `typ=logout+jwt`，用当前签名凭证签名，算法规则同该客户端的 ID Token（`AllowedIdentityTokenSigningAlgorithms`）。
+- claims 只含 `iss`（当前 issuer；登出上下文中携带的 issuer 不被采用）、`aud`（client_id，序列化为单元素数组，RFC 7519 下与字符串等价）、`iat`、`nbf`、`exp`（`iat`+120 秒）、`jti`（每个 token 新生成）、`events`（`{"http://schemas.openid.net/event/backchannel-logout":{}}`）、`sid`（会话标识）与 `sub`（会话记录的 subject）；不含 `nonce`。
+- 跳过并记 Warn 的情形：`BackChannelLogoutUri` 不是绝对 http(s) URI 或含 fragment；`sub` 与 `sid` 都没有；客户端要求 `BackChannelLogoutSessionRequired` 但没有 `sid`；签发前再次查询时客户端已停用或查不到；签发失败。已停用或不存在的客户端通常在生成通知列表时就被排除，这一步不记日志。
+
+**发送**：对每个客户端以 `application/x-www-form-urlencoded` POST `logout_token=…`，并发进行，回调最多等待 5 秒；不重发。单个 RP 失败（连接错误、非 200 响应等）只记日志，不影响其他 RP，也不影响回调页面。日志不含 logout token。
+
+**ID Token `sid`**：会话内签发的 ID Token 带 `sid`，与 logout token 的 `sid` 相同，匿名请求不带。
+
+**已知限制**：
+- 投递依赖宿主渲染回调 iframe 且浏览器加载它；宿主不渲染或浏览器未加载时不发送。
+- 回调地址在上下文写入后 300 秒内重复加载会重复投递（每次 `jti` 不同）。
+- 不经 `/connect/endsession`、由宿主直接清除 cookie 的登出不产生登出上下文，不发送。
+- server-side session 过期或被管理面删除时不发送。
+- 登出上下文句柄由默认数据保护实现编码，不具加密与完整性保护；投递前的会话核对只能挡住指向未知会话的伪造，知道某个会话 `sid` 的一方（如该会话的 RP）可以伪造上下文，让该会话的所有 RP 收到登出通知。
+- HTTP client 把非 200 响应（包括规范视为成功的 204）记为 Warn，成功响应也以 Error 级记录。
+- 不对 `BackChannelLogoutUri` 做内网地址过滤。
+- 默认装配下 `frontchannel_logout_supported` / `frontchannel_logout_session_supported` 照常宣告，但不开启 server-side sessions 时 front-channel 通知同样不会发生。
+- 宿主登录未经 `CreateSessionId` 时不建立会话，也就不会投递。
 
 ## 存储端口（宿主实现）
 

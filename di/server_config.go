@@ -12,6 +12,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/services"
+	services_impl "github.com/gonewx/wicket/services/impl"
 	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
 	storage_models "github.com/gonewx/wicket/storage/models"
@@ -437,11 +438,27 @@ func (c *ServerConfig) SetBackChannelLogoutHttpClient(client *http.Client) {
 	c.backChannelLogoutHttpClient = client
 }
 
+// BackChannelLogoutHttpClient returns the host-provided client used to post
+// back-channel logout tokens, or, when the host provided none, a default client
+// with a bounded timeout that does not follow redirects, so a logout token is
+// never forwarded to a location other than the pre-registered logout URI.
 func (c *ServerConfig) BackChannelLogoutHttpClient() *http.Client {
 	if c == nil {
 		return nil
 	}
-	return c.backChannelLogoutHttpClient
+	if c.backChannelLogoutHttpClient != nil {
+		return c.backChannelLogoutHttpClient
+	}
+	return newDefaultBackChannelLogoutHttpClient()
+}
+
+func newDefaultBackChannelLogoutHttpClient() *http.Client {
+	return &http.Client{
+		Timeout: services_impl.BackChannelLogoutTimeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 }
 
 func (c *ServerConfig) SetBackchannelAuthenticationNotificationHttpClient(client *http.Client) {
