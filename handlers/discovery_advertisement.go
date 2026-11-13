@@ -5,6 +5,7 @@ package handlers
 
 import (
 	"log/slog"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -77,7 +78,8 @@ func filterDiscoveryAdvertisement(
 	baseUrl = utils.RemoveTrailingSlash(baseUrl)
 	filter := &discoveryFilter{document: document, baseUrl: baseUrl, options: options}
 
-	// endpoints: a URL under baseUrl must resolve to a registered route.
+	// endpoints: a URL under baseUrl must resolve to a registered route, and
+	// a value that is not an absolute URL cannot be resolved by a client.
 	for key, value := range document {
 		if !isEndpointKey(key) {
 			continue
@@ -87,7 +89,11 @@ func filterDiscoveryAdvertisement(
 			continue
 		}
 		path, local := filter.localPath(raw)
-		if !local || assembly.hasEndpointPath(path) {
+		if local {
+			if assembly.hasEndpointPath(path) {
+				continue
+			}
+		} else if isAbsoluteUrl(raw) {
 			continue
 		}
 		filter.remove(key)
@@ -127,11 +133,15 @@ func filterDiscoveryAdvertisement(
 }
 
 // generatedDiscoveryKeys holds the keys the discovery generator writes into
-// the document. When a custom entry shares one of these names the generator
-// keeps its own value, so such a key is always treated as generated. A key
-// the generator never writes (registration_endpoint, for example) can only
-// come from the host. The set only tells where a value comes from; it does
-// not decide whether anything can be served.
+// the document. The generator writes most of them only under a switch, and a
+// custom entry with the same name is discarded when the generator writes the
+// key but lands in the document when it does not. The filter cannot tell
+// these two cases apart after generation, so every value under one of these
+// names is filtered like a generated one: the host cannot advertise anything
+// under a generated name, whichever switch is off. A key the generator never
+// writes (registration_endpoint, for example) can only come from the host.
+// The set only tells where a value comes from; it does not decide whether
+// anything can be served.
 var generatedDiscoveryKeys = map[string]struct{}{
 	wicket.DiscoveryAuthorizationEndpoint:                       {},
 	wicket.DiscoveryAuthorizationResponseIssParameterSupported:  {},
@@ -179,16 +189,33 @@ type discoveryFilter struct {
 	options  *config_options.WicketOptions
 }
 
-// localPath returns the route path of a URL located under baseUrl.
+// localPath returns the route path of a URL located under baseUrl. The
+// scheme and host compare without regard to case, as the route paths do.
 func (f *discoveryFilter) localPath(raw string) (string, bool) {
-	rest, ok := strings.CutPrefix(raw, f.baseUrl)
+	rest, ok := f.cutBaseUrl(raw)
 	if !ok || (rest != "" && !strings.HasPrefix(rest, "/")) {
 		return "", false
 	}
+	return routePath(rest), true
+}
+
+func (f *discoveryFilter) cutBaseUrl(raw string) (string, bool) {
+	if len(raw) < len(f.baseUrl) || !strings.EqualFold(raw[:len(f.baseUrl)], f.baseUrl) {
+		return "", false
+	}
+	return raw[len(f.baseUrl):], true
+}
+
+func routePath(rest string) string {
 	if i := strings.IndexAny(rest, "?#"); i >= 0 {
 		rest = rest[:i]
 	}
-	return utils.EnsureLeadingSlash(rest), true
+	return utils.EnsureLeadingSlash(rest)
+}
+
+func isAbsoluteUrl(raw string) bool {
+	parsed, err := url.Parse(raw)
+	return err == nil && parsed.IsAbs() && parsed.Host != ""
 }
 
 // isHostEntry reports whether the document value of key was produced by the
@@ -213,20 +240,45 @@ func (f *discoveryFilter) remove(key string) bool {
 }
 
 // removeListValues rebuilds the string list under key without the values
-// matched by drop. It reports whether anything was removed.
+// matched by drop. A list decoded from configuration arrives as []any; its
+// string elements are judged the same way. It reports whether anything was
+// removed.
 func (f *discoveryFilter) removeListValues(key string, drop func(string) bool) bool {
-	values, ok := f.document[key].([]string)
-	if !ok || f.isHostEntry(key) || !slices.ContainsFunc(values, drop) {
+	if f.isHostEntry(key) {
 		return false
 	}
-	kept := make([]string, 0, len(values))
-	for _, value := range values {
-		if !drop(value) {
-			kept = append(kept, value)
+	switch values := f.document[key].(type) {
+	case []string:
+		if !slices.ContainsFunc(values, drop) {
+			return false
 		}
+		kept := make([]string, 0, len(values))
+		for _, value := range values {
+			if !drop(value) {
+				kept = append(kept, value)
+			}
+		}
+		f.document[key] = kept
+		return true
+	case []any:
+		dropped := func(value any) bool {
+			text, ok := value.(string)
+			return ok && drop(text)
+		}
+		if !slices.ContainsFunc(values, dropped) {
+			return false
+		}
+		kept := make([]any, 0, len(values))
+		for _, value := range values {
+			if !dropped(value) {
+				kept = append(kept, value)
+			}
+		}
+		f.document[key] = kept
+		return true
+	default:
+		return false
 	}
-	f.document[key] = kept
-	return true
 }
 
 // pruneMtlsAliases keeps only the aliases whose primary endpoint is still
@@ -265,10 +317,13 @@ func (f *discoveryFilter) keepMtlsAlias(assembly discoveryAssembly, name string,
 	}
 	raw, ok := value.(string)
 	if !ok {
-		return true
+		return false
 	}
 	path, local := f.aliasPath(raw)
-	return !local || assembly.hasEndpointPath(path)
+	if local {
+		return assembly.hasEndpointPath(path)
+	}
+	return isAbsoluteUrl(raw)
 }
 
 // aliasPath returns the route path of a path-form alias URL. With a mutual
@@ -280,14 +335,11 @@ func (f *discoveryFilter) aliasPath(raw string) (string, bool) {
 	if f.options.MutualTls.DomainName != "" {
 		return "", false
 	}
-	rest, ok := strings.CutPrefix(raw, f.baseUrl)
+	rest, ok := f.cutBaseUrl(raw)
 	if !ok {
 		return "", false
 	}
-	if i := strings.IndexAny(rest, "?#"); i >= 0 {
-		rest = rest[:i]
-	}
-	return utils.EnsureLeadingSlash(rest), true
+	return routePath(rest), true
 }
 
 func (f *discoveryFilter) replaceAliases(key string, before int, after int, kept any) bool {

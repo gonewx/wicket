@@ -445,6 +445,83 @@ func TestFilterDiscoveryAdvertisement(t *testing.T) {
 			},
 		},
 		{
+			name: "custom entry under a generated key whose switch is off stays filtered",
+			configure: func(o *config_options.WicketOptions) {
+				o.Endpoints.EnableTokenRevocationEndpoint = false
+				o.Discovery.CustomEntries = map[string]any{
+					wicket.DiscoveryRevocationEndpoint: advertisementUrl(wicket.ProtocolRoutePathsRevocation),
+				}
+			},
+			edit: func(d map[string]any) {
+				// the generator skips the key, so the custom value is the one in the document
+				d[wicket.DiscoveryRevocationEndpoint] = advertisementUrl(wicket.ProtocolRoutePathsRevocation)
+			},
+			absent: []string{wicket.DiscoveryRevocationEndpoint},
+		},
+		{
+			name: "custom grant types decoded from configuration lose device_code",
+			configure: func(o *config_options.WicketOptions) {
+				o.Discovery.ShowGrantTypes = false
+				o.Discovery.CustomEntries = map[string]any{
+					wicket.DiscoveryGrantTypesSupported: []any{wicket.GrantTypeAuthorizationCode, wicket.GrantTypeDeviceCode, 7},
+				}
+			},
+			edit: func(d map[string]any) {
+				d[wicket.DiscoveryGrantTypesSupported] = []any{wicket.GrantTypeAuthorizationCode, wicket.GrantTypeDeviceCode, 7}
+			},
+			values: map[string]any{
+				wicket.DiscoveryGrantTypesSupported: []any{wicket.GrantTypeAuthorizationCode, 7},
+			},
+		},
+		{
+			name: "endpoint values a client cannot resolve or with a differently cased host",
+			edit: func(d map[string]any) {
+				d[wicket.DiscoveryRevocationEndpoint] = strings.ToUpper(advertisementBaseUrl) + "/" + wicket.ProtocolRoutePathsRevocation
+				d[wicket.DiscoveryDeviceAuthorizationEndpoint] = "~/" + wicket.ProtocolRoutePathsDeviceAuthorization
+				d[wicket.DiscoveryIntrospectionEndpoint] = strings.ToUpper(advertisementBaseUrl) + "/" + wicket.ProtocolRoutePathsIntrospection
+			},
+			absent: []string{
+				wicket.DiscoveryRevocationEndpoint,
+				wicket.DiscoveryDeviceAuthorizationEndpoint,
+			},
+			present: []string{wicket.DiscoveryIntrospectionEndpoint},
+		},
+		{
+			name:      "mutual TLS aliases decoded as a generic map are pruned entry by entry",
+			mutualTls: true,
+			configure: func(o *config_options.WicketOptions) { o.MutualTls.Enabled = true },
+			assembly: func(a discoveryAssembly) discoveryAssembly {
+				a.authenticationMethods = append(a.authenticationMethods, wicket.EndpointAuthenticationMethodsTlsClientAuth)
+				a.endpointPaths = append(a.endpointPaths,
+					"/"+wicket.ProtocolRoutePathsMtlsIntrospection,
+					"/"+wicket.ProtocolRoutePathsMtlsRevocation,
+				)
+				return a
+			},
+			edit: func(d map[string]any) {
+				d[wicket.DiscoveryMtlsEndpointAliases] = map[string]any{
+					// route not registered
+					wicket.DiscoveryTokenEndpoint: advertisementUrl(wicket.ProtocolRoutePathsMtlsToken),
+					// primary endpoint withdrawn
+					wicket.DiscoveryRevocationEndpoint: advertisementUrl(wicket.ProtocolRoutePathsMtlsRevocation),
+					// not a URL
+					wicket.DiscoveryUserInfoEndpoint:      42,
+					wicket.DiscoveryIntrospectionEndpoint: advertisementUrl(wicket.ProtocolRoutePathsMtlsIntrospection),
+				}
+			},
+			values: map[string]any{
+				wicket.DiscoveryMtlsEndpointAliases: map[string]any{
+					wicket.DiscoveryIntrospectionEndpoint: advertisementUrl(wicket.ProtocolRoutePathsMtlsIntrospection),
+				},
+			},
+			authMethods: []string{
+				wicket.EndpointAuthenticationMethodsBasicAuthentication,
+				wicket.EndpointAuthenticationMethodsPostBody,
+				wicket.EndpointAuthenticationMethodsTlsClientAuth,
+			},
+			wantWarnings: 1,
+		},
+		{
 			name: "host registration endpoint under the base URL is kept",
 			configure: func(o *config_options.WicketOptions) {
 				o.Discovery.CustomEntries = map[string]any{
