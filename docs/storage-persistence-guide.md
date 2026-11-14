@@ -84,7 +84,7 @@ cfg.AllowInMemoryFallback()
 
 ### 可选缝：authorization parameters message store 与 client store
 
-`storeSeams()` 中的每条缝都带类别：`AuthorizationParametersMessageStore` 与 `ClientStore` 两条为**可选缝**，client registration store 一条为**特性条件必需缝**（见下文「注入可写 client 注册存储」），其余十条为必需缝。可选缝未注入时 `Freeze()` 不失败，也不需要 `AllowInMemoryFallback()`；配置了 logger 时 `Freeze()` 为每条未注入的可选缝记一条 WARN（只记一次，不随解析反复输出）：
+`storeSeams()` 中的每条缝都带类别：`AuthorizationParametersMessageStore` 与 `ClientStore` 两条为**可选缝**，client registration store 一条与 PAR 的两条（pushed authorization request store、pushed authorization data protection）为**特性条件必需缝**（见下文「注入可写 client 注册存储」「注入 PAR 存储与 PAR 数据保护」），其余十条为必需缝。可选缝未注入时 `Freeze()` 不失败，也不需要 `AllowInMemoryFallback()`；配置了 logger 时 `Freeze()` 为每条未注入的可选缝记一条 WARN（只记一次，不随解析反复输出）：
 
 - 未注入 `AuthorizationParametersMessageStore`：不在服务端保存授权参数。
 - 未注入 `ClientStore`：client 来自 `SetClients` / `SetClientsProvider` 的静态列表，由内存实现提供。经 `SetClientRegistrationStore` 注入的值同时填充这条缝，此时不记 WARN。
@@ -145,6 +145,48 @@ cfg.SetClientRegistrationStore(pgadapter.NewClientRegistrationStore(pool))
 | client 不存在 | `storage.ErrNotFound`（不得返回 `(nil, nil)`；装饰器也会把 `(nil, nil)` 改写为 `ErrNotFound`） |
 | 记录存在但配置校验失败（含依赖未启用的特性） | 装饰器返回包 `storage.ErrInvalidClientConfiguration` 的错误（带 clientId 与校验信息），并记 Error 日志 |
 | 基础设施故障 | 原样返回该错误（勿包成 `ErrNotFound`） |
+
+### 注入 PAR 存储与 PAR 数据保护
+
+推送授权请求（PAR，RFC 9126）需要两条缝：保存推送参数的存储端口 `storage.PushedAuthorizationRequestStore`，以及只作用于 PAR 载荷的数据保护缝。
+
+```go
+cfg.SetPushedAuthorizationRequestStore(pgadapter.NewPushedAuthorizationRequestStore(pool))
+cfg.SetPushedAuthorizationDataProtectionProvider(hostProtectionProvider) // 真正加密/认证的实现
+```
+
+`SetPushedAuthorizationRequestStoreProvider(func() storage.PushedAuthorizationRequestStore)` 为 provider 形态：`Freeze()` 不调用 provider，只检查是否已设置；provider 在特性首次取用存储时调用一次，届时返回 nil 即按未注入报错。
+
+**句柄与键。** 发给 client 的 `request_uri` 形如 `urn:ietf:params:oauth:request_uri:<随机串>`（前缀常量 `storage.PushedAuthorizationRequestURIPrefix`），由 `storage.NewPushedAuthorizationRequestURI()` 生成：前缀 + `crypto/rand` 32 字节的 RawURL base64；随机源失败返回 `("", err)`。store 从不见原始 URN，只见 `storage.PushedAuthorizationRequestKey(requestURI)` 求得的键——写入方与解析方的唯一入口，返回 `base64.RawURLEncoding(sha256(完整 URN))`，恒 43 字符、字符集 `[A-Za-z0-9_-]`；无前缀或前缀后为空返回 `storage.ErrInvalidRequestURI`。store 不生成句柄。
+
+端口方法：
+
+| 方法 | 语义 |
+|------|------|
+| `StorePushedAuthorizationRequest(ctx, key, *models.PushedAuthorizationRequest)` | insert-only；键已存在返回 `ErrDuplicateHandle`，原记录不变 |
+| `GetPushedAuthorizationRequest(ctx, key)` | 只读取用，不删除；返回独立副本；缺失返回 `ErrNotFound` |
+| `TakePushedAuthorizationRequest(ctx, key)` | 原子取出：命中即删除并返回独立副本；同一键的并发取出恰一个成功，其余得 `ErrNotFound` |
+| `RemoveExpired(ctx, cutoff) (int, error)` | 只回收 `RetentionExpiration` 严格早于 cutoff 的记录，返回计数 |
+
+- **记录类型** `models.PushedAuthorizationRequest`：可见字段 `ClientId`、`CreationTime`、`EntryExpiration`、`RetentionExpiration`，以及不透明的 `Payload`。不带 issuer 字段。
+- **两种时限。** `EntryExpiration` 是 `request_uri` 作为入口的有效期截止，由核心判定；`RetentionExpiration` = 入口有效期 + 交互往返（登录、同意）宽限，是回收的唯一依据。入口期已过但保留期未过的记录不得回收。读与取出都不判过期。
+- **不提供** 按 client 或全量枚举，也没有存储缝的回退声明。
+- **载荷经 PAR 数据保护。** 核心用 `storage.ProtectPushedAuthorizationParameters(protector, params)` 把参数编码成版本容器（`Version`=1、`DataProtected`=true、保护后的字节），用 `storage.UnprotectPushedAuthorizationParameters` 还原；nil protector、未知版本、未标记保护、损坏字节或保护器拒绝一律报错，不返回半成品参数。适配器只把字节与可见字段入库。
+
+PAR 数据保护缝：
+
+- **保护器固定 purpose。** 只经 `provider.Create(storage.PushedAuthorizationRequestPurpose)`（`"wicket.PushedAuthorizationRequest"`）取得，只用于 PAR 载荷。
+- **拒绝默认实现。** 默认的 `services/impl.DataProtectionProvider` 只做 base64url 编码，注入到这条缝时 `Freeze()` 必 panic（无论 PAR 是否启用），信息点名该缝。
+- **无回退。** 这条缝没有任何回退声明。
+- **全局绑定不变。** 容器里的 `dp.DataProtectionProvider` 绑定照旧是默认实现，key management 私钥记录与 message cookie 继续用它；PAR 缝不进容器，也不影响它们。
+
+注入约束：
+
+- **特性条件必需。** PAR 启用后，两条缝任一未注入即 `Freeze()` panic，信息点名缺失的缝，`AllowInMemoryFallback()` 不豁免；开发环境需要内存存储时显式注入 `memory.NewMemoryPushedAuthorizationRequestStore()`。PAR 未启用时两条缝不校验、不记 WARN，任何代码路径都取不到端口或保护器。
+- **PAR 的公开启用开关随端点一起提供**（后续版本）；本版本只交付端口、缝与契约套件，现有装配行为不变。
+- 注入值的生命周期归宿主：容器不关闭它。
+
+适配器用 `storagetest.RunPushedAuthorizationRequestStoreSuite` 验证合规性（见下文「校验适配器合规性」）。
 
 ### client 存在性闸门
 
@@ -280,6 +322,8 @@ if got := adapter.ConformsTo(); got != storagetest.SuiteVersion {
 ```
 
 client 注册存储的契约套件入口为 `storagetest.RunClientRegistrationStoreSuite(t, newStore, storagetest.WithMay(true))`，覆盖墓碑、修订号冲突与重试、并发注册与并发更新恰一次成功，以及 origin 查询精确匹配。
+
+PAR 存储的契约套件入口为 `storagetest.RunPushedAuthorizationRequestStoreSuite(t, newStore, storagetest.WithMay(true))`，所有键经 `storage.PushedAuthorizationRequestKey` 求得，覆盖键形态、insert-only、只读取用不消费、并发取出恰一次、过期仍可读可取，以及按 `RetentionExpiration` 回收（`MUST/RemoveExpiredKeepsRecordsInRoundTrip`：入口期已过、保留期未过的记录不得回收）。
 
 没有 `ConformsTo()` 的实现不是合规适配器——它可能连契约套件都没跑过，或者 `t.Skip()` 掉了一半用例。
 

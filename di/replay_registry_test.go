@@ -47,6 +47,9 @@ var replayOtherSeams = []struct {
 	// No dependent feature is enabled here, so the seam is not demanded;
 	// injecting a store would collide with the client store injected above.
 	{"client registration store", storeSeamFeatureRequired, func(*ServerConfig) {}},
+	// Pushed authorization is not enabled here, so neither seam is demanded.
+	{"pushed authorization request store", storeSeamFeatureRequired, func(*ServerConfig) {}},
+	{"pushed authorization data protection", storeSeamFeatureRequired, func(*ServerConfig) {}},
 }
 
 // replayOriginClientStore is the smallest injectable client store: Freeze
@@ -568,8 +571,8 @@ func TestReplayRegistryLeavesStoreSeamValidationUnchanged(t *testing.T) {
 			want = append(want, seam.name)
 			wantCategories = append(wantCategories, seam.category.String())
 		}
-		if len(names) != 13 || !slices.Equal(names, want) {
-			t.Fatalf("storeSeams() names = %v, want the 13 names %v", names, want)
+		if len(names) != 15 || !slices.Equal(names, want) {
+			t.Fatalf("storeSeams() names = %v, want the 15 names %v", names, want)
 		}
 		if !slices.Equal(categories, wantCategories) {
 			t.Fatalf("storeSeams() categories = %v, want %v", categories, wantCategories)

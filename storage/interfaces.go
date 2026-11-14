@@ -39,7 +39,9 @@
 // session identifier as visible, indexable fields so scoped removals do not
 // scan opaque payloads. Consumable records (authorization codes) are redeemed
 // with an atomic take: of any number of concurrent takes of one handle,
-// exactly one returns the record and the rest miss with ErrNotFound.
+// exactly one returns the record and the rest miss with ErrNotFound. Pushed
+// authorization requests are consumable the same way, through
+// PushedAuthorizationRequestStore.TakePushedAuthorizationRequest.
 package storage
 
 import (
@@ -257,6 +259,38 @@ type AuthorizationCodeStore interface {
 	// RemoveExpired removes codes whose creation time plus lifetime precedes
 	// cutoff, returning how many were removed. It reclaims space only; expiry
 	// judgement remains on the core side.
+	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
+}
+
+// PushedAuthorizationRequestStore stores pushed authorization requests (RFC
+// 9126) by key. Every key comes from PushedAuthorizationRequestKey: the store
+// never sees the request_uri handed to the client, and it never generates
+// handles. Payload is opaque protected bytes; ClientId and the three time
+// fields are the visible fields an adapter may index. EntryExpiration ends the
+// handle's validity as an entry point and is judged by the core;
+// RetentionExpiration adds the grace of the interaction round trip and is the
+// only field reclamation looks at. The port offers no enumeration, by client
+// or otherwise.
+type PushedAuthorizationRequestStore interface {
+	// StorePushedAuthorizationRequest writes a request under key. The write
+	// is insert-only: a key that already exists fails with
+	// ErrDuplicateHandle and the stored record is left unchanged.
+	StorePushedAuthorizationRequest(ctx context.Context, key string, request *models.PushedAuthorizationRequest) error
+	// GetPushedAuthorizationRequest returns an independent copy of the
+	// request stored under key without consuming it. A miss returns (nil,
+	// ErrNotFound). The store does not judge expiry.
+	GetPushedAuthorizationRequest(ctx context.Context, key string) (*models.PushedAuthorizationRequest, error)
+	// TakePushedAuthorizationRequest atomically removes the request stored
+	// under key and returns an independent copy of it. A miss returns (nil,
+	// ErrNotFound). Of any number of concurrent takes of the same key,
+	// exactly one succeeds; every other caller observes ErrNotFound. The
+	// store does not judge expiry: an expired request is taken like any
+	// other.
+	TakePushedAuthorizationRequest(ctx context.Context, key string) (*models.PushedAuthorizationRequest, error)
+	// RemoveExpired removes requests whose RetentionExpiration precedes
+	// cutoff, returning how many were removed. A request whose
+	// EntryExpiration has passed but whose RetentionExpiration has not stays.
+	// It reclaims space only; expiry judgement remains on the core side.
 	RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
 }
 

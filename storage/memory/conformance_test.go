@@ -36,3 +36,9 @@ func TestClientRegistrationStoreConformanceE2E(t *testing.T) {
 		return NewMemoryClientRegistrationStore()
 	}, storagetest.WithMay(true))
 }
+
+func TestPushedAuthorizationRequestStoreConformanceE2E(t *testing.T) {
+	storagetest.RunPushedAuthorizationRequestStoreSuite(t, func() storage.PushedAuthorizationRequestStore {
+		return NewMemoryPushedAuthorizationRequestStore()
+	}, storagetest.WithMay(true))
+}
