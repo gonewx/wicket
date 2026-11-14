@@ -40,7 +40,7 @@ Wicket 采用分层服务架构，以 godi 依赖注入组合根为核心装配�
 
 ### 组合根（di/）
 
-- `di/root.go` — `//go:generate godi-gen` 指令入口
+- `di/root.go` — `//go:generate go tool godi-gen` 指令入口
 - `di/dsl_*.go` — godi DSL 声明文件（`dsl_core.go` 核心服务、`dsl_anchor.go` 锚点、`dsl_inmemory.go` 内存存储扩展、`dsl_key_management.go` 密钥管理、`dsl_pluggable_services.go` 可插拔服务、`dsl_phone.go` / `dsl_wechat.go` 外部验证配置扩展点等）
 - `di/server_config.go` — `ServerConfig` 运行时配置缝（宿主注入存储、客户端、密钥等）
 - `di/inmemory.go` — 内存存储注册扩展

@@ -3,14 +3,14 @@
 ## 项目概览
 
 - **类型：** 单体 Go 库
-- **主语言：** Go 1.27（mise pin `1.27.0`）
+- **主语言：** Go 1.27（mise pin `1.27`，跟随最新补丁版）
 - **架构：** 服务/API 驱动 + 依赖注入组合根
 - **用途：** OpenID Connect / OAuth 2.0 身份认证服务器中间件
 
 ## 快速参考
 
 - **Module：** `github.com/gonewx/wicket`（已发布 v0.1.x）
-- **DI 框架：** godi v0.1.0（go.work workspace + go.mod 依赖）
+- **DI 框架：** godi v0.2.0（go.work workspace + go.mod 依赖）
 - **入口点：** `server.UseWicket()` → 中间件链
 - **组合根：** `di/root.go` → `di/container_gen.go`
 - **配置缝：** `di/server_config.go`（ServerConfig）
@@ -39,13 +39,13 @@
 mise install
 
 # 2. 构建
-mise exec go@1.27.0 -- go build ./...
+mise exec -- go build ./...
 
 # 3. 运行测试
-mise exec go@1.27.0 -- go test ./...
+mise exec -- go test ./...
 
 # 4. 代码生成（修改 di/ 后）
-mise exec go@1.27.0 -- go generate ./...
+GOWORK=off mise exec -- go generate ./...
 ```
 
 ## 宿主集成示例

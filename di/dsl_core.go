@@ -371,12 +371,12 @@ func registerCore() {
 		if err != nil {
 			// Accepted design decision from code review dated 2026-07-03:
 			// dotnet resolver exceptions fail startup synchronously, so this
-			// factory panics at construction time instead of threading the
-			// error through NewRoot()'s error return, matching that fail-fast
-			// semantics. This path is unreachable today because no
-			// ValidateOptions is registered for WicketOptions; if one
-			// is added later, a resolution failure will panic during NewRoot()
-			// rather than surface as a NewRoot() error.
+			// factory panics at construction time to fail fast. Since godi
+			// v0.2.0, NewRoot() recovers a panic raised while constructing a
+			// singleton and returns it as a *godi.BuildError, so startup still
+			// fails synchronously but through NewRoot()'s error return. This
+			// path is unreachable today because no ValidateOptions is
+			// registered for WicketOptions.
 			panic(fmt.Errorf("resolve WicketOptions: %w", err))
 		}
 		return v

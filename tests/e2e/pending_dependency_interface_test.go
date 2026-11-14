@@ -163,7 +163,7 @@ func TestGeneratedContainerIncludesPendingInterfacesE2E(t *testing.T) {
 		t.Fatal("di/container_gen.go missing godi generated header")
 	}
 	for _, want := range []string{
-		"func NewRoot() (*Root, error)",
+		"func NewRoot() (root *Root, err error)",
 		"func (r *Root) NewKeyMaterialService()",
 		"func (r *Root) NewBackchannelAuthenticationRequestIdValidator()",
 		"func (r *Root) NewSessionCoordinationService()",

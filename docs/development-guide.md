@@ -4,9 +4,9 @@
 
 | 工具 | 版本 | 说明 |
 |------|------|------|
-| Go | 1.27.0 | 通过 mise 管理 |
+| Go | 1.27（跟随最新补丁版） | 通过 mise 管理 |
 | mise | 最新 | 工具版本管理器 |
-| godi-gen | 与 godi 同步 | DI 代码生成器 |
+| godi-gen | 与 godi 同步（`go.mod` 的 `tool` 指令锁定） | DI 代码生成器，经 `go tool godi-gen` 调用 |
 
 ## 环境设置
 
@@ -18,7 +18,7 @@ curl https://mise.run | sh
 mise install
 
 # 验证
-mise exec go@1.27.0 -- go version
+mise exec -- go version
 ```
 
 ## 构建命令
@@ -27,16 +27,17 @@ mise exec go@1.27.0 -- go version
 
 ```bash
 # 代码生成（修改 di/ 装配后必须执行）
-mise exec go@1.27.0 -- go generate ./...
+# GOWORK=off：在 go.work 下生成器会把版本戳写成 (devel)，与 go.mod 中的 godi 版本漂移
+GOWORK=off mise exec -- go generate ./...
 
 # 构建
-mise exec go@1.27.0 -- go build ./...
+mise exec -- go build ./...
 
 # 运行全部测试
-mise exec go@1.27.0 -- go test ./...
+mise exec -- go test ./...
 
 # 运行集成测试
-mise exec go@1.27.0 -- go test -tags=integration ./...
+mise exec -- go test -tags=integration ./...
 ```
 
 ## 提交前门禁
@@ -44,9 +45,9 @@ mise exec go@1.27.0 -- go test -tags=integration ./...
 每次提交前必须运行以下三命令，全部通过方可提交：
 
 ```bash
-mise exec go@1.27.0 -- go generate ./...
-mise exec go@1.27.0 -- go build ./...
-mise exec go@1.27.0 -- go test ./...
+GOWORK=off mise exec -- go generate ./...
+mise exec -- go build ./...
+mise exec -- go test ./...
 ```
 
 **漂移门禁：** `go generate` 后 `git status --porcelain` 必须为空。如果 `di/container_gen.go` 出现未提交修改，说明装配漂移，构建视为失败。
@@ -61,7 +62,7 @@ GitHub Actions（`.github/workflows/ci.yml`）在每次 push 与 pull request �
 
 | 阶段 | 内容 |
 |------|------|
-| 工具链 | mise 安装 `mise.toml` pin 的版本（当前 `go = "1.27.0"`），不使用运行器自带 Go |
+| 工具链 | mise 安装 `mise.toml` pin 的版本（当前 `go = "1.27"`，解析为已安装的最新 1.27.x 补丁版），不使用运行器自带 Go |
 | 漂移门禁 | `go generate ./...` 后 `git status --porcelain` 必须为空 |
 | 构建 | `go build ./...` |
 | 全量测试 | `go test ./...`（排除 `tests/e2e` 包，见下） |
@@ -97,7 +98,7 @@ type(scope): description
 ### DI 装配修改流程
 
 1. 修改 `di/` 中的注册代码
-2. 运行 `mise exec go@1.27.0 -- go generate ./...`
+2. 运行 `GOWORK=off mise exec -- go generate ./...`
 3. 确认 `di/container_gen.go` 已更新
 4. 运行构建和测试
 5. 一起提交注册代码和生成物
@@ -124,7 +125,7 @@ type(scope): description
 - **接口放消费侧** — 不集中在 `interfaces/` 目录
 - **配置通过 ServerConfig 缝注入** — 业务包不用 `os.Getenv` / 全局变量
 - **导入路径一律 `github.com/gonewx/wicket/...`**
-- **一切命令经 `mise exec`** — PATH 上的裸 `go` 可能指向另一个版本（本项目在 1.27.0 抬升时点实测为遗留的 `1.27rc1`），直接敲 `go build` / `go test` 会用错工具链，而声明文件仍然全绿。自查：比较 `which go` 与 `mise which go` 是否一致。`tests/e2e` 的工具链守卫会断言实际运行版本等于 `mise.toml` 的 pin，忘记 `mise exec` 时它会转红并提示。
+- **一切命令经 `mise exec`** — PATH 上的裸 `go` 可能指向另一个版本（本项目在 1.27.0 抬升时点实测为遗留的 `1.27rc1`），直接敲 `go build` / `go test` 会用错工具链，而声明文件仍然全绿。自查：比较 `which go` 与 `mise which go` 是否一致。`tests/e2e` 的工具链守卫会断言实际运行版本满足 `mise.toml` 的 pin（`1.27` 接受任意 1.27.x 正式版，拒绝 rc），忘记 `mise exec` 时它会转红并提示。
 
 ## 常用开发任务
 
