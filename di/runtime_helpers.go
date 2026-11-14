@@ -82,7 +82,7 @@ func newAuthorizeCallbackHandlerFromProvider(p godi.Provider) *handlers.Authoriz
 
 func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
 	return handlers.NewTokenHandlerWithOptions(
-		godi.GetRequired[validators.ClientSecretValidator](p),
+		clientAuthenticatorFromProvider(p),
 		godi.GetRequired[validators.TokenRequestValidator](p),
 		godi.GetRequired[responses.TokenResponseGenerator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
@@ -96,7 +96,7 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 	for _, endpoint := range endpoints {
 		endpointPaths = append(endpointPaths, endpoint.Path)
 	}
-	return handlers.NewDiscoveryHandler(
+	handler := handlers.NewDiscoveryHandler(
 		godi.GetRequired[responses.DiscoveryResponseGenerator](p),
 		godi.GetRequired[services.ServerUrls](p),
 		godi.GetRequired[services.IssuerNameService](p),
@@ -106,6 +106,10 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 		godi.GetRequired[validators.SecretsListParser](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
+	if algorithms, ok := clientAssertionSigningAlgorithms(p); ok {
+		handler.SetClientAssertionSigningAlgorithms(algorithms)
+	}
+	return handler
 }
 
 func newDiscoveryKeyHandlerFromProvider(p godi.Provider) *handlers.DiscoveryKeyHandler {
@@ -125,7 +129,7 @@ func newCheckSessionHandlerFromProvider(p godi.Provider) *handlers.CheckSessionH
 
 func newBackchannelAuthenticationHandlerFromProvider(p godi.Provider) *handlers.BackchannelAuthenticationHandler {
 	return handlers.NewBackchannelAuthenticationHandlerWithOptions(
-		godi.GetRequired[validators.ClientSecretValidator](p),
+		clientAuthenticatorFromProvider(p),
 		godi.GetRequired[validators.BackchannelAuthenticationRequestValidator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
 	)
@@ -133,7 +137,7 @@ func newBackchannelAuthenticationHandlerFromProvider(p godi.Provider) *handlers.
 
 func newIntrospectionHandlerFromProvider(p godi.Provider) *handlers.IntrospectionHandler {
 	return handlers.NewIntrospectionHandlerWithOptions(
-		godi.GetRequired[validators.ApiSecretValidator](p),
+		apiAuthenticatorFromProvider(p),
 		godi.GetRequired[validators.IntrospectionRequestValidator](p),
 		godi.GetRequired[responses.IntrospectionResponseGenerator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
@@ -143,7 +147,7 @@ func newIntrospectionHandlerFromProvider(p godi.Provider) *handlers.Introspectio
 
 func newTokenRevocationHandlerFromProvider(p godi.Provider) *handlers.TokenRevocationHandler {
 	return handlers.NewTokenRevocationHandler(
-		godi.GetRequired[validators.ClientSecretValidator](p),
+		clientAuthenticatorFromProvider(p),
 		godi.GetRequired[validators.TokenRevocationRequestValidator](p),
 		godi.GetRequired[responses.TokenRevocationResponseGenerator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
@@ -153,7 +157,7 @@ func newTokenRevocationHandlerFromProvider(p godi.Provider) *handlers.TokenRevoc
 
 func newDeviceAuthorizationHandlerFromProvider(p godi.Provider) *handlers.DeviceAuthorizationHandler {
 	return handlers.NewDeviceAuthorizationHandler(
-		godi.GetRequired[validators.ClientSecretValidator](p),
+		clientAuthenticatorFromProvider(p),
 		godi.GetRequired[validators.DeviceAuthorizationRequestValidator](p),
 		godi.GetRequired[responses.DeviceAuthorizationResponseGenerator](p),
 		godi.GetRequired[services.ServerUrls](p),

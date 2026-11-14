@@ -4,11 +4,13 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/clientassertion"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/handlers/results"
@@ -79,6 +81,10 @@ func (h *IntrospectionHandler) Process(w http.ResponseWriter, r *http.Request) e
 	}
 
 	apiResult := h.apiValidator.Validate(r)
+	if apiResult != nil && errors.Is(apiResult.Error, clientassertion.ErrAuthenticationUnavailable) {
+		writeClientAuthenticationUnavailable(w)
+		return nil
+	}
 	if apiResult == nil || apiResult.Error != nil {
 		// RFC 7662 protects the endpoint itself: a caller that cannot
 		// authenticate as an API must not learn anything about tokens.

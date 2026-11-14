@@ -4,12 +4,14 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/clientassertion"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/handlers/results"
@@ -66,6 +68,10 @@ func (h *TokenRevocationHandler) Process(w http.ResponseWriter, r *http.Request)
 	}
 
 	clientResult := h.clientValidator.Validate(r)
+	if clientResult != nil && errors.Is(clientResult.Error, clientassertion.ErrAuthenticationUnavailable) {
+		writeClientAuthenticationUnavailable(w)
+		return nil
+	}
 	if clientResult == nil || clientResult.Error != nil || clientResult.Client == nil {
 		h.debug("revocation client authentication failed")
 		challenge := authorizationChallenge(r)

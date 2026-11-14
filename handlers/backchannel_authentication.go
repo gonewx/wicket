@@ -4,9 +4,11 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/clientassertion"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/validators"
@@ -61,6 +63,10 @@ func (h *BackchannelAuthenticationHandler) Process(w http.ResponseWriter, r *htt
 		return results.NewBadRequestResult(wicket.TokenErrorsInvalidRequest, "").Execute(w, r)
 	}
 	clientResult := h.clientValidator.Validate(r)
+	if clientResult != nil && errors.Is(clientResult.Error, clientassertion.ErrAuthenticationUnavailable) {
+		writeClientAuthenticationUnavailable(w)
+		return nil
+	}
 	if clientResult == nil || clientResult.Error != nil {
 		err := wicket.TokenErrorsInvalidClient
 		if clientResult != nil && clientResult.Error != nil {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/auth"
+	"github.com/gonewx/wicket/clientassertion"
 	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/replay"
 	"github.com/gonewx/wicket/services"
@@ -63,6 +64,8 @@ type ServerConfig struct {
 	replayRegistryProvider              func() replay.Registry
 	allowInMemoryReplayRegistryFallback bool
 	replayDependentFeatures             []string
+
+	privateKeyJwtOptions clientassertion.Options
 }
 
 func NewServerConfig() *ServerConfig {
@@ -109,6 +112,7 @@ func (c *ServerConfig) AllowInMemoryFallback() {
 
 func (c *ServerConfig) Freeze() {
 	c.frozen = true
+	c.requirePrivateKeyJwtOptions()
 	c.requireReplayRegistrySeam()
 	if c.allowInMemoryFallback {
 		return
