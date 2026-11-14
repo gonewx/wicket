@@ -41,6 +41,23 @@ func (s *MemoryClientStore) FindClientById(ctx context.Context, id string) (*mod
 	return client, nil
 }
 
+// FindClientsByAllowedOrigin returns every client whose AllowedCorsOrigins
+// contains origin exactly, without filtering on Enabled.
+func (s *MemoryClientStore) FindClientsByAllowedOrigin(ctx context.Context, origin string) ([]*models.Client, error) {
+	matches := []*models.Client{}
+	for _, client := range s.clients {
+		for _, allowed := range client.AllowedCorsOrigins {
+			if allowed == origin {
+				matches = append(matches, client)
+				break
+			}
+		}
+	}
+	return matches, nil
+}
+
+var _ storage.ClientOriginLookup = (*MemoryClientStore)(nil)
+
 type MemoryResourcesStore struct {
 	identityResources []*models.IdentityResource
 	apiResources      []*models.ApiResource

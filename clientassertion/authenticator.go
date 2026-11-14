@@ -6,6 +6,7 @@ package clientassertion
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -109,6 +110,10 @@ func (a *ClientAuthenticator) Validate(request *http.Request) *validators_models
 		return failedClient(wicket.TokenErrorsInvalidClient)
 	}
 	client, err := extensions.FindEnabledClientById(request.Context(), a.clients, parsed.Id)
+	if err != nil && !extensions.IsClientRejected(err) {
+		a.storeFailure(parsed.Id, err)
+		return failedClient(fmt.Errorf("%w: %w", ErrAuthenticationUnavailable, err))
+	}
 	if err != nil || client == nil {
 		return failedClient(wicket.TokenErrorsInvalidClient)
 	}
@@ -140,6 +145,12 @@ func (a *ClientAuthenticator) Validate(request *http.Request) *validators_models
 func (a *ClientAuthenticator) info(message string, clientId string) {
 	if a.logger != nil {
 		a.logger.Info(message, slog.String("client_id", clientId))
+	}
+}
+
+func (a *ClientAuthenticator) storeFailure(clientId string, err error) {
+	if a.logger != nil {
+		a.logger.Error("client store failed while loading client", slog.String("client_id", clientId), slog.String("error", err.Error()))
 	}
 }
 

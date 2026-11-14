@@ -5,10 +5,12 @@
 package impl
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/clientassertion"
 	"github.com/gonewx/wicket/extensions"
 	storage "github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/validators"
@@ -55,6 +57,11 @@ func (v *ClientSecretValidator) Validate(req *http.Request) *models.ClientSecret
 
 	// load client
 	client, err := extensions.FindEnabledClientById(req.Context(), v.clients, parsedSecret.Id)
+	if err != nil && !extensions.IsClientRejected(err) {
+		v.logger.Error("Client store failed while loading client", slog.String("clientId", parsedSecret.Id), slog.String("error", err.Error()))
+		fail.Error = fmt.Errorf("%w: %w", clientassertion.ErrAuthenticationUnavailable, err)
+		return fail
+	}
 	if err != nil || client == nil {
 		v.logger.Error("No client with id '{clientId}' found. aborting", slog.String("clientId", parsedSecret.Id))
 		return fail

@@ -15,7 +15,6 @@ import (
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/services"
-	services_memory "github.com/gonewx/wicket/services/memory"
 	"github.com/gonewx/wicket/storage"
 	storage_impl "github.com/gonewx/wicket/storage/impl"
 	storage_memory "github.com/gonewx/wicket/storage/memory"
@@ -40,13 +39,11 @@ func registerInMemory() {
 	// AddTransient<IClientStore, ValidatingClientStore<InMemoryClientStore>> 为
 	// IClientStore 真身。Transient：每次解析重建（含 NewMemoryClientStore 的
 	// 重复 id 校验与索引构建），缝数据只读，与 dotnet Transient 行为一致。
+	// 宿主经 SetClientStore 注入时 inner 为注入值（与 SetClients 互斥，Freeze
+	// 校验），两条路径都包 ValidatingClientStore，见 di/client_store.go。
 	godi.AddTransientFactory[storage.ClientStore](&r, func(p godi.Provider) storage.ClientStore {
-		inner, err := storage_memory.NewMemoryClientStore(godi.GetRequired[*ServerConfig](p).Clients())
-		if err != nil {
-			panic(fmt.Errorf("construct MemoryClientStore: %w", err))
-		}
 		return storage_impl.NewValidatingClientStore(
-			inner,
+			clientStoreSource(godi.GetRequired[*ServerConfig](p)),
 			godi.GetRequired[validators.ClientConfigurationValidator](p),
 			godi.GetRequired[*slog.Logger](p),
 		)
@@ -57,10 +54,13 @@ func registerInMemory() {
 	// dotnet 语义 = 当前注册为 DefaultCorsPolicyService(Transient) 则覆盖；gois
 	// 产品组合恒用 in-memory clients，最终注册即 InMemory 版。godi 无覆盖语义，
 	// Core.cs#L191 Default 版注册行已删除（REGISTRATION_MAP closed(3.5)）。
+	// 与 ClientStore 同源：经 storage.ClientOriginLookup 按 origin 查询（注入
+	// 值或静态列表的 MemoryClientStore），见 di/client_store.go。
 	godi.AddTransientFactory[services.CorsPolicyService](&r, func(p godi.Provider) services.CorsPolicyService {
-		return services_memory.NewMemoryCorsPolicyService(
+		return newCorsPolicyService(
+			godi.GetRequired[*ServerConfig](p),
+			godi.GetRequired[validators.ClientConfigurationValidator](p),
 			godi.GetRequired[*slog.Logger](p),
-			godi.GetRequired[*ServerConfig](p).Clients(),
 		)
 	})
 

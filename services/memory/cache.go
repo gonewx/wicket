@@ -4,11 +4,13 @@
 package memory
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/gonewx/wicket/services"
+	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/storage/models"
 )
 
@@ -58,20 +60,38 @@ func (c *MemoryDistributedCache) Remove(key string) error {
 	return nil
 }
 
+// MemoryCorsPolicyService allows an origin when a client lists it among its
+// allowed CORS origins. It reads clients through the same origin lookup the
+// assembly serves clients from; accept, when non-nil, further decides whether
+// a matching client counts (for example, enabled and with a valid
+// configuration).
 type MemoryCorsPolicyService struct {
-	clients []*models.Client
+	logger *slog.Logger
+	lookup storage.ClientOriginLookup
+	accept func(context.Context, *models.Client) bool
 }
 
-func NewMemoryCorsPolicyService(logger *slog.Logger, clients []*models.Client) *MemoryCorsPolicyService {
-	return &MemoryCorsPolicyService{clients: clients}
+func NewMemoryCorsPolicyService(logger *slog.Logger, lookup storage.ClientOriginLookup, accept func(context.Context, *models.Client) bool) *MemoryCorsPolicyService {
+	return &MemoryCorsPolicyService{logger: logger, lookup: lookup, accept: accept}
 }
 
+// IsOriginAllowed reports whether origin is allowed. A lookup failure denies
+// the origin.
 func (s *MemoryCorsPolicyService) IsOriginAllowed(origin string) bool {
-	for _, client := range s.clients {
-		for _, allowed := range client.AllowedCorsOrigins {
-			if allowed == origin {
-				return true
-			}
+	ctx := context.Background()
+	clients, err := s.lookup.FindClientsByAllowedOrigin(ctx, origin)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Error("client origin lookup failed; origin denied", slog.String("origin", origin), slog.String("error", err.Error()))
+		}
+		return false
+	}
+	for _, client := range clients {
+		if client == nil {
+			continue
+		}
+		if s.accept == nil || s.accept(ctx, client) {
+			return true
 		}
 	}
 	return false

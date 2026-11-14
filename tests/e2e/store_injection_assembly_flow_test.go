@@ -303,10 +303,17 @@ func TestStoreSeamFullInjectionAssemblyE2E(t *testing.T) {
 	}
 }
 
+// storeSeamE2EOptional names the optional store seams among the injections:
+// assembly accepts their absence without the fallback declaration.
+var storeSeamE2EOptional = map[string]bool{
+	"authorization parameters message store": true,
+}
+
 // TestStoreSeamMissingInjectionFailsAssemblyE2E pins the fail-fast production
-// assembly contract: a frozen configuration with a missing store seam panics
-// at assembly time naming the absent store, and mixed injection without the
-// fallback declaration fails the same way.
+// assembly contract: a frozen configuration with a missing required store
+// seam panics at assembly time naming the absent store, and mixed injection
+// without the fallback declaration fails the same way. A missing optional
+// seam does not fail assembly.
 func TestStoreSeamMissingInjectionFailsAssemblyE2E(t *testing.T) {
 	t.Parallel()
 
@@ -315,6 +322,17 @@ func TestStoreSeamMissingInjectionFailsAssemblyE2E(t *testing.T) {
 
 	for name := range injections {
 		name := name
+		if storeSeamE2EOptional[name] {
+			t.Run("missing optional "+name, func(t *testing.T) {
+				t.Parallel()
+
+				root := storeSeamE2ENewRoot(t)
+				cfg := root.ServerConfig()
+				injectStoreSeamE2EAll(cfg, injections, name)
+				cfg.Freeze() // must not panic: the seam is optional
+			})
+			continue
+		}
 		t.Run("missing "+name, func(t *testing.T) {
 			t.Parallel()
 

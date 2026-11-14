@@ -82,6 +82,52 @@ cfg.SetKeyRecordStore(pgadapter.NewKeyRecordStore(pool))
 cfg.AllowInMemoryFallback()
 ```
 
+### 可选缝：authorization parameters message store 与 client store
+
+`storeSeams()` 中的每条缝都带类别：`AuthorizationParametersMessageStore` 与 `ClientStore` 两条为**可选缝**，其余十条为必需缝。可选缝未注入时 `Freeze()` 不失败，也不需要 `AllowInMemoryFallback()`；配置了 logger 时 `Freeze()` 为每条未注入的可选缝记一条 WARN（只记一次，不随解析反复输出）：
+
+- 未注入 `AuthorizationParametersMessageStore`：不在服务端保存授权参数。
+- 未注入 `ClientStore`：client 来自 `SetClients` / `SetClientsProvider` 的静态列表，由内存实现提供。
+
+### 注入 client store
+
+client 默认经 `SetClients` 静态列表喂入。需要运行期增删 client（如存数据库）时，改用注入缝：
+
+```go
+cfg.SetClientStore(pgadapter.NewClientStore(pool))
+```
+
+约束：
+
+- **与 `SetClients` / `SetClientsProvider` 互斥。** 同时设置时 `Freeze()` panic，信息点名 client store 与 `SetClients`；不设静默优先级。
+- **注入值须同时实现 `storage.ClientOriginLookup`**（`FindClientsByAllowedOrigin(ctx, origin)`：按 origin 精确匹配 `AllowedCorsOrigins`，不过滤 `Enabled`、不做配置校验，无命中返回空切片与 nil）。CORS 判定经它查询，与 client 读路径同源；未实现时 `Freeze()` panic。注入路径下，命中的 client 须 `Enabled` 且通过配置校验才放行 origin；查询出错则拒绝该 origin 并记日志。静态列表路径的 CORS 匹配结果不变。
+- **读路径恒包 `ValidatingClientStore`。** 容器解析 `storage.ClientStore` 得到包着注入值的配置校验装饰器，注入值与静态列表两条路径一致。
+- 注入值的生命周期归宿主：容器不关闭它。
+
+`ClientStore.FindClientById` 的错误语义：
+
+| 情形 | 返回 |
+|------|------|
+| client 不存在 | `storage.ErrNotFound`（不得返回 `(nil, nil)`；装饰器也会把 `(nil, nil)` 改写为 `ErrNotFound`） |
+| 记录存在但配置校验失败（含依赖未启用的特性） | 装饰器返回包 `storage.ErrInvalidClientConfiguration` 的错误（带 clientId 与校验信息），并记 Error 日志 |
+| 基础设施故障 | 原样返回该错误（勿包成 `ErrNotFound`） |
+
+### client 存在性闸门
+
+client 被删除、禁用或配置失效后，它已签发的凭证随之失效；client store 故障则表现为服务端错误，而不是"凭证无效"。所有凭证兑换与内省路径对 client 加载做三分处置：`ErrNotFound` / `ErrInvalidClientConfiguration` → 无效凭证；其他错误 → 5xx。
+
+| 路径 | client 已不可用 | client store 故障 |
+|------|----------------|------------------|
+| token 端点客户端认证（共享密钥、`private_key_jwt`、mTLS 三个认证器）：授权码、refresh、device code、CIBA、client_credentials、password 兑换都先经此重新加载 client | 400 `invalid_client` | 500，固定体 `Internal Server Error`，不写 `invalid_client` / `invalid_grant` |
+| device authorization、CIBA 发起、revocation 端点（共用上述认证器） | 各端点既有 `invalid_client` 应答 | 500 |
+| 内省：JWT 的 `client_id` 与 reference token 的 `ClientId` | 200 `{"active":false}` | 5xx |
+| userinfo：同上 | 既有 `invalid_token` 应答 | 5xx |
+| end_session 的 `id_token_hint`（identity token 校验） | 既有无效 hint 处置 | 5xx |
+
+令牌响应生成阶段在认证成功之后同一请求内会再次加载 client，仅竞态窗口可达，任何错误均为 5xx，保持不动。
+
+**离线校验的外部资源服务器不受此闸门约束：** 资源服务器若自行用公开密钥验签 JWT access token 而不调用内省端点，则 client 删除后它仍会接受该 JWT，直到 `exp` 过期为止。需要及时失效时，缩短 access token 生命周期，或改用 reference token / 内省。
+
 ### 驱动清理
 
 wicket **不自起后台 goroutine**（AD-12），过期数据的清理由宿主按自身调度驱动：
@@ -205,7 +251,7 @@ if got := adapter.ConformsTo(); got != storagetest.SuiteVersion {
 
 宿主一般不需要关心这些细节，但理解它们有助于判断适配器质量、以及排查换介质后的行为差异。完整定义见 AD-3。
 
-**"不存在"与"故障"必须可区分。** store 在记录不存在时返回 `ErrNotFound` 哨兵，绝不返回 `(nil, nil)`。这条很要紧：若二者混为一谈，一次数据库网络抖动会被当成"凭证无效"，用户看到登录失败而日志里没有任何告警。
+**"不存在"与"故障"必须可区分。** store 在记录不存在时返回 `ErrNotFound` 哨兵，绝不返回 `(nil, nil)`。这条很要紧：若二者混为一谈，一次数据库网络抖动会被当成"凭证无效"，用户看到登录失败而日志里没有任何告警。client 读路径据此做存在性闸门，见上文「client 存在性闸门」。
 
 **写入默认 insert-only。** 句柄碰撞返回 `ErrDuplicateHandle`。refresh token 轮换的重放防线依赖这个语义——若某个适配器实现成 upsert（如 Redis 的 `SET` 天然覆盖），防线会静默失效。
 

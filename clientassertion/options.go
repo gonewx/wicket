@@ -29,7 +29,9 @@ const (
 )
 
 // ErrAuthenticationUnavailable reports that client authentication could not
-// be decided because the replay registry failed. It is neither a replay nor
+// be decided because a backing store failed: the replay registry, or the
+// client store read by the secret, assertion and certificate authenticators
+// (the store error is wrapped). It is neither a replay, an invalid client nor
 // a successful authentication; endpoints answer it with a server error.
 var ErrAuthenticationUnavailable = errors.New("client authentication temporarily unavailable")
 

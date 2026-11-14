@@ -29,6 +29,15 @@ func FindEnabledClientById(ctx context.Context, store storage.ClientStore, id st
 	return client, nil
 }
 
+// IsClientRejected reports whether a client load error means the client cannot
+// be used — absent, disabled, or with an invalid configuration — as opposed to
+// an infrastructure failure. Existence gates answer a rejected client with the
+// protocol's invalid-credential result and any other error with a server
+// error.
+func IsClientRejected(err error) bool {
+	return errors.Is(err, storage.ErrNotFound) || errors.Is(err, storage.ErrInvalidClientConfiguration)
+}
+
 func FindEnabledIdentityResourcesByScope(ctx context.Context, store storage.ResourceStore, scopes []string) ([]*storage_models.IdentityResource, error) {
 	resources, err := store.FindIdentityResourcesByScope(ctx, scopes)
 	if err != nil {
