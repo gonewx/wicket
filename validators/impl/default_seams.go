@@ -60,6 +60,10 @@ func (v ClientConfigurationValidator) Validate(context *validators_contexts.Clie
 		if v.features == nil || !v.features.PrivateKeyJwtEnabled() {
 			context.SetError("client requires private_key_jwt client authentication but the feature is not enabled")
 		}
+	case wicket.EndpointAuthenticationMethodsTlsClientAuth, wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth:
+		if message := validateClientCertificateMethod(v.features, context.Client); message != "" {
+			context.SetError(message)
+		}
 	default:
 		context.SetError("client declares an unsupported token endpoint authentication method")
 	}

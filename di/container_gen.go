@@ -62,12 +62,6 @@ type Root struct {
 	st_ClientFeatureDeclarations                              uint8
 	f_Ptr_KeySource                                           *clientassertion.KeySource
 	st_Ptr_KeySource                                          uint8
-	f_SystemClock                                             services.SystemClock
-	st_SystemClock                                            uint8
-	f_ServerConfig                                            *ServerConfig
-	st_ServerConfig                                           uint8
-	f_Ptr_Logger                                              *slog.Logger
-	st_Ptr_Logger                                             uint8
 	f_Ptr_Endpoint                                            *hosting.Endpoint
 	st_Ptr_Endpoint                                           uint8
 	f_Ptr_Endpoint__2                                         *hosting.Endpoint
@@ -76,6 +70,12 @@ type Root struct {
 	st_Ptr_Endpoint__3                                        uint8
 	f_Ptr_Endpoint__4                                         *hosting.Endpoint
 	st_Ptr_Endpoint__4                                        uint8
+	f_SystemClock                                             services.SystemClock
+	st_SystemClock                                            uint8
+	f_ServerConfig                                            *ServerConfig
+	st_ServerConfig                                           uint8
+	f_Ptr_Logger                                              *slog.Logger
+	st_Ptr_Logger                                             uint8
 	f_Ptr_Endpoint__5                                         *hosting.Endpoint
 	st_Ptr_Endpoint__5                                        uint8
 	f_Ptr_Endpoint__6                                         *hosting.Endpoint
@@ -94,6 +94,14 @@ type Root struct {
 	st_Ptr_Endpoint__12                                       uint8
 	f_Ptr_Endpoint__13                                        *hosting.Endpoint
 	st_Ptr_Endpoint__13                                       uint8
+	f_Ptr_Endpoint__14                                        *hosting.Endpoint
+	st_Ptr_Endpoint__14                                       uint8
+	f_Ptr_Endpoint__15                                        *hosting.Endpoint
+	st_Ptr_Endpoint__15                                       uint8
+	f_Ptr_Endpoint__16                                        *hosting.Endpoint
+	st_Ptr_Endpoint__16                                       uint8
+	f_Ptr_Endpoint__17                                        *hosting.Endpoint
+	st_Ptr_Endpoint__17                                       uint8
 	f_DataProtectionProvider                                  dp.DataProtectionProvider
 	st_DataProtectionProvider                                 uint8
 	f_UnnamedOptionsManager__options_WicketOptions            options2.Options[*options.WicketOptions]
@@ -194,13 +202,13 @@ func NewRoot() (root *Root, err error) {
 	r.get_lazyReplayRegistry()
 	r.get_ClientFeatureDeclarations()
 	r.get_Ptr_KeySource()
-	r.get_SystemClock()
-	r.get_ServerConfig()
-	r.get_Ptr_Logger()
 	r.get_Ptr_Endpoint()
 	r.get_Ptr_Endpoint__2()
 	r.get_Ptr_Endpoint__3()
 	r.get_Ptr_Endpoint__4()
+	r.get_SystemClock()
+	r.get_ServerConfig()
+	r.get_Ptr_Logger()
 	r.get_Ptr_Endpoint__5()
 	r.get_Ptr_Endpoint__6()
 	r.get_Ptr_Endpoint__7()
@@ -210,6 +218,10 @@ func NewRoot() (root *Root, err error) {
 	r.get_Ptr_Endpoint__11()
 	r.get_Ptr_Endpoint__12()
 	r.get_Ptr_Endpoint__13()
+	r.get_Ptr_Endpoint__14()
+	r.get_Ptr_Endpoint__15()
+	r.get_Ptr_Endpoint__16()
+	r.get_Ptr_Endpoint__17()
 	r.get_DataProtectionProvider()
 	r.get_UnnamedOptionsManager__options_WicketOptions()
 	r.get_UnnamedOptionsManager__auth_Options()
@@ -317,6 +329,94 @@ func (r *Root) get_Ptr_KeySource() *clientassertion.KeySource {
 	return v
 }
 
+func (r *Root) get_Ptr_Endpoint() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint == 2 {
+		return r.f_Ptr_Endpoint
+	}
+	if r.st_Ptr_Endpoint == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint"))
+	}
+	r.st_Ptr_Endpoint = 1
+	defer func() {
+		if r.st_Ptr_Endpoint != 2 {
+			r.st_Ptr_Endpoint = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesToken, wicket.ProtocolRoutePathsMtlsToken, mtlsEndpointHandler[*handlers.TokenHandler])
+	})(r)
+	r.f_Ptr_Endpoint = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint = 2
+	return v
+}
+
+func (r *Root) get_Ptr_Endpoint__2() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__2 == 2 {
+		return r.f_Ptr_Endpoint__2
+	}
+	if r.st_Ptr_Endpoint__2 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__2"))
+	}
+	r.st_Ptr_Endpoint__2 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__2 != 2 {
+			r.st_Ptr_Endpoint__2 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesRevocation, wicket.ProtocolRoutePathsMtlsRevocation, mtlsEndpointHandler[*handlers.TokenRevocationHandler])
+	})(r)
+	r.f_Ptr_Endpoint__2 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__2 = 2
+	return v
+}
+
+func (r *Root) get_Ptr_Endpoint__3() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__3 == 2 {
+		return r.f_Ptr_Endpoint__3
+	}
+	if r.st_Ptr_Endpoint__3 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__3"))
+	}
+	r.st_Ptr_Endpoint__3 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__3 != 2 {
+			r.st_Ptr_Endpoint__3 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesIntrospection, wicket.ProtocolRoutePathsMtlsIntrospection, mtlsEndpointHandler[*handlers.IntrospectionHandler])
+	})(r)
+	r.f_Ptr_Endpoint__3 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__3 = 2
+	return v
+}
+
+func (r *Root) get_Ptr_Endpoint__4() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__4 == 2 {
+		return r.f_Ptr_Endpoint__4
+	}
+	if r.st_Ptr_Endpoint__4 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__4"))
+	}
+	r.st_Ptr_Endpoint__4 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__4 != 2 {
+			r.st_Ptr_Endpoint__4 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesDeviceAuthorization, wicket.ProtocolRoutePathsMtlsDeviceAuthorization, mtlsEndpointHandler[*handlers.DeviceAuthorizationHandler])
+	})(r)
+	r.f_Ptr_Endpoint__4 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__4 = 2
+	return v
+}
+
 func (r *Root) get_SystemClock() services.SystemClock {
 	if r.st_SystemClock == 2 {
 		return r.f_SystemClock
@@ -377,94 +477,6 @@ func (r *Root) get_Ptr_Logger() *slog.Logger {
 	return v
 }
 
-func (r *Root) get_Ptr_Endpoint() *hosting.Endpoint {
-	if r.st_Ptr_Endpoint == 2 {
-		return r.f_Ptr_Endpoint
-	}
-	if r.st_Ptr_Endpoint == 1 {
-		panic(godi.CircularDependencyError("Ptr_Endpoint"))
-	}
-	r.st_Ptr_Endpoint = 1
-	defer func() {
-		if r.st_Ptr_Endpoint != 2 {
-			r.st_Ptr_Endpoint = 0
-		}
-	}()
-	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesAuthorize, wicket.ProtocolRoutePathsAuthorize, endpointHandler[*handlers.AuthorizeHandler])
-	})(r)
-	r.f_Ptr_Endpoint = v
-	r.disp.TrackAny(v)
-	r.st_Ptr_Endpoint = 2
-	return v
-}
-
-func (r *Root) get_Ptr_Endpoint__2() *hosting.Endpoint {
-	if r.st_Ptr_Endpoint__2 == 2 {
-		return r.f_Ptr_Endpoint__2
-	}
-	if r.st_Ptr_Endpoint__2 == 1 {
-		panic(godi.CircularDependencyError("Ptr_Endpoint__2"))
-	}
-	r.st_Ptr_Endpoint__2 = 1
-	defer func() {
-		if r.st_Ptr_Endpoint__2 != 2 {
-			r.st_Ptr_Endpoint__2 = 0
-		}
-	}()
-	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesAuthorize, wicket.ProtocolRoutePathsAuthorizeCallback, endpointHandler[*handlers.AuthorizeCallbackHandler])
-	})(r)
-	r.f_Ptr_Endpoint__2 = v
-	r.disp.TrackAny(v)
-	r.st_Ptr_Endpoint__2 = 2
-	return v
-}
-
-func (r *Root) get_Ptr_Endpoint__3() *hosting.Endpoint {
-	if r.st_Ptr_Endpoint__3 == 2 {
-		return r.f_Ptr_Endpoint__3
-	}
-	if r.st_Ptr_Endpoint__3 == 1 {
-		panic(godi.CircularDependencyError("Ptr_Endpoint__3"))
-	}
-	r.st_Ptr_Endpoint__3 = 1
-	defer func() {
-		if r.st_Ptr_Endpoint__3 != 2 {
-			r.st_Ptr_Endpoint__3 = 0
-		}
-	}()
-	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesToken, wicket.ProtocolRoutePathsToken, endpointHandler[*handlers.TokenHandler])
-	})(r)
-	r.f_Ptr_Endpoint__3 = v
-	r.disp.TrackAny(v)
-	r.st_Ptr_Endpoint__3 = 2
-	return v
-}
-
-func (r *Root) get_Ptr_Endpoint__4() *hosting.Endpoint {
-	if r.st_Ptr_Endpoint__4 == 2 {
-		return r.f_Ptr_Endpoint__4
-	}
-	if r.st_Ptr_Endpoint__4 == 1 {
-		panic(godi.CircularDependencyError("Ptr_Endpoint__4"))
-	}
-	r.st_Ptr_Endpoint__4 = 1
-	defer func() {
-		if r.st_Ptr_Endpoint__4 != 2 {
-			r.st_Ptr_Endpoint__4 = 0
-		}
-	}()
-	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesDiscovery, wicket.ProtocolRoutePathsDiscoveryConfiguration, endpointHandler[*handlers.DiscoveryHandler])
-	})(r)
-	r.f_Ptr_Endpoint__4 = v
-	r.disp.TrackAny(v)
-	r.st_Ptr_Endpoint__4 = 2
-	return v
-}
-
 func (r *Root) get_Ptr_Endpoint__5() *hosting.Endpoint {
 	if r.st_Ptr_Endpoint__5 == 2 {
 		return r.f_Ptr_Endpoint__5
@@ -479,7 +491,7 @@ func (r *Root) get_Ptr_Endpoint__5() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesDiscovery, wicket.ProtocolRoutePathsDiscoveryWebKeys, endpointHandler[*handlers.DiscoveryKeyHandler])
+		return newEndpoint(wicket.EndpointNamesAuthorize, wicket.ProtocolRoutePathsAuthorize, endpointHandler[*handlers.AuthorizeHandler])
 	})(r)
 	r.f_Ptr_Endpoint__5 = v
 	r.disp.TrackAny(v)
@@ -501,7 +513,7 @@ func (r *Root) get_Ptr_Endpoint__6() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesCheckSession, wicket.ProtocolRoutePathsCheckSession, endpointHandler[*handlers.CheckSessionHandler])
+		return newEndpoint(wicket.EndpointNamesAuthorize, wicket.ProtocolRoutePathsAuthorizeCallback, endpointHandler[*handlers.AuthorizeCallbackHandler])
 	})(r)
 	r.f_Ptr_Endpoint__6 = v
 	r.disp.TrackAny(v)
@@ -523,7 +535,7 @@ func (r *Root) get_Ptr_Endpoint__7() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesBackchannelAuthentication, wicket.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
+		return newEndpoint(wicket.EndpointNamesToken, wicket.ProtocolRoutePathsToken, endpointHandler[*handlers.TokenHandler])
 	})(r)
 	r.f_Ptr_Endpoint__7 = v
 	r.disp.TrackAny(v)
@@ -545,7 +557,7 @@ func (r *Root) get_Ptr_Endpoint__8() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesRevocation, wicket.ProtocolRoutePathsRevocation, endpointHandler[*handlers.TokenRevocationHandler])
+		return newEndpoint(wicket.EndpointNamesDiscovery, wicket.ProtocolRoutePathsDiscoveryConfiguration, endpointHandler[*handlers.DiscoveryHandler])
 	})(r)
 	r.f_Ptr_Endpoint__8 = v
 	r.disp.TrackAny(v)
@@ -567,7 +579,7 @@ func (r *Root) get_Ptr_Endpoint__9() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesDeviceAuthorization, wicket.ProtocolRoutePathsDeviceAuthorization, endpointHandler[*handlers.DeviceAuthorizationHandler])
+		return newEndpoint(wicket.EndpointNamesDiscovery, wicket.ProtocolRoutePathsDiscoveryWebKeys, endpointHandler[*handlers.DiscoveryKeyHandler])
 	})(r)
 	r.f_Ptr_Endpoint__9 = v
 	r.disp.TrackAny(v)
@@ -589,7 +601,7 @@ func (r *Root) get_Ptr_Endpoint__10() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesIntrospection, wicket.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
+		return newEndpoint(wicket.EndpointNamesCheckSession, wicket.ProtocolRoutePathsCheckSession, endpointHandler[*handlers.CheckSessionHandler])
 	})(r)
 	r.f_Ptr_Endpoint__10 = v
 	r.disp.TrackAny(v)
@@ -611,7 +623,7 @@ func (r *Root) get_Ptr_Endpoint__11() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesUserInfo, wicket.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
+		return newEndpoint(wicket.EndpointNamesBackchannelAuthentication, wicket.ProtocolRoutePathsBackchannelAuthentication, endpointHandler[*handlers.BackchannelAuthenticationHandler])
 	})(r)
 	r.f_Ptr_Endpoint__11 = v
 	r.disp.TrackAny(v)
@@ -633,7 +645,7 @@ func (r *Root) get_Ptr_Endpoint__12() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
+		return newEndpoint(wicket.EndpointNamesRevocation, wicket.ProtocolRoutePathsRevocation, endpointHandler[*handlers.TokenRevocationHandler])
 	})(r)
 	r.f_Ptr_Endpoint__12 = v
 	r.disp.TrackAny(v)
@@ -655,11 +667,99 @@ func (r *Root) get_Ptr_Endpoint__13() *hosting.Endpoint {
 		}
 	}()
 	v := (func(p godi.Provider) *hosting.Endpoint {
-		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSessionCallback, endpointHandler[*handlers.EndSessionCallbackHandler])
+		return newEndpoint(wicket.EndpointNamesDeviceAuthorization, wicket.ProtocolRoutePathsDeviceAuthorization, endpointHandler[*handlers.DeviceAuthorizationHandler])
 	})(r)
 	r.f_Ptr_Endpoint__13 = v
 	r.disp.TrackAny(v)
 	r.st_Ptr_Endpoint__13 = 2
+	return v
+}
+
+func (r *Root) get_Ptr_Endpoint__14() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__14 == 2 {
+		return r.f_Ptr_Endpoint__14
+	}
+	if r.st_Ptr_Endpoint__14 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__14"))
+	}
+	r.st_Ptr_Endpoint__14 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__14 != 2 {
+			r.st_Ptr_Endpoint__14 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesIntrospection, wicket.ProtocolRoutePathsIntrospection, endpointHandler[*handlers.IntrospectionHandler])
+	})(r)
+	r.f_Ptr_Endpoint__14 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__14 = 2
+	return v
+}
+
+func (r *Root) get_Ptr_Endpoint__15() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__15 == 2 {
+		return r.f_Ptr_Endpoint__15
+	}
+	if r.st_Ptr_Endpoint__15 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__15"))
+	}
+	r.st_Ptr_Endpoint__15 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__15 != 2 {
+			r.st_Ptr_Endpoint__15 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesUserInfo, wicket.ProtocolRoutePathsUserInfo, endpointHandler[*handlers.UserInfoHandler])
+	})(r)
+	r.f_Ptr_Endpoint__15 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__15 = 2
+	return v
+}
+
+func (r *Root) get_Ptr_Endpoint__16() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__16 == 2 {
+		return r.f_Ptr_Endpoint__16
+	}
+	if r.st_Ptr_Endpoint__16 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__16"))
+	}
+	r.st_Ptr_Endpoint__16 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__16 != 2 {
+			r.st_Ptr_Endpoint__16 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSession, endpointHandler[*handlers.EndSessionHandler])
+	})(r)
+	r.f_Ptr_Endpoint__16 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__16 = 2
+	return v
+}
+
+func (r *Root) get_Ptr_Endpoint__17() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__17 == 2 {
+		return r.f_Ptr_Endpoint__17
+	}
+	if r.st_Ptr_Endpoint__17 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__17"))
+	}
+	r.st_Ptr_Endpoint__17 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__17 != 2 {
+			r.st_Ptr_Endpoint__17 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesEndSession, wicket.ProtocolRoutePathsEndSessionCallback, endpointHandler[*handlers.EndSessionCallbackHandler])
+	})(r)
+	r.f_Ptr_Endpoint__17 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__17 = 2
 	return v
 }
 
@@ -1608,6 +1708,18 @@ func (r *Root) NewSecretParser() validators.SecretParser {
 	return v
 }
 
+func (r *Root) NewSecretParser__2() validators.SecretParser {
+	v := (tlsClientAuthSecretParserFromProvider)(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
+func (r *Root) NewSecretParser__3() validators.SecretParser {
+	v := (selfSignedTlsClientAuthSecretParserFromProvider)(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
 func (r *Root) NewEndpointRouter() hosting.EndpointRouter {
 	v := (func(p godi.Provider) hosting.EndpointRouter {
 		return hosting.NewEndpointRouter(
@@ -2527,12 +2639,6 @@ func (r *Root) ClientFeatureDeclarations() validators.ClientFeatureDeclarations 
 
 func (r *Root) Ptr_KeySource() *clientassertion.KeySource { return r.get_Ptr_KeySource() }
 
-func (r *Root) SystemClock() services.SystemClock { return r.get_SystemClock() }
-
-func (r *Root) ServerConfig() *ServerConfig { return r.get_ServerConfig() }
-
-func (r *Root) Ptr_Logger() *slog.Logger { return r.get_Ptr_Logger() }
-
 func (r *Root) Ptr_Endpoint() *hosting.Endpoint { return r.get_Ptr_Endpoint() }
 
 func (r *Root) Ptr_Endpoint__2() *hosting.Endpoint { return r.get_Ptr_Endpoint__2() }
@@ -2540,6 +2646,12 @@ func (r *Root) Ptr_Endpoint__2() *hosting.Endpoint { return r.get_Ptr_Endpoint__
 func (r *Root) Ptr_Endpoint__3() *hosting.Endpoint { return r.get_Ptr_Endpoint__3() }
 
 func (r *Root) Ptr_Endpoint__4() *hosting.Endpoint { return r.get_Ptr_Endpoint__4() }
+
+func (r *Root) SystemClock() services.SystemClock { return r.get_SystemClock() }
+
+func (r *Root) ServerConfig() *ServerConfig { return r.get_ServerConfig() }
+
+func (r *Root) Ptr_Logger() *slog.Logger { return r.get_Ptr_Logger() }
 
 func (r *Root) Ptr_Endpoint__5() *hosting.Endpoint { return r.get_Ptr_Endpoint__5() }
 
@@ -2558,6 +2670,14 @@ func (r *Root) Ptr_Endpoint__11() *hosting.Endpoint { return r.get_Ptr_Endpoint_
 func (r *Root) Ptr_Endpoint__12() *hosting.Endpoint { return r.get_Ptr_Endpoint__12() }
 
 func (r *Root) Ptr_Endpoint__13() *hosting.Endpoint { return r.get_Ptr_Endpoint__13() }
+
+func (r *Root) Ptr_Endpoint__14() *hosting.Endpoint { return r.get_Ptr_Endpoint__14() }
+
+func (r *Root) Ptr_Endpoint__15() *hosting.Endpoint { return r.get_Ptr_Endpoint__15() }
+
+func (r *Root) Ptr_Endpoint__16() *hosting.Endpoint { return r.get_Ptr_Endpoint__16() }
+
+func (r *Root) Ptr_Endpoint__17() *hosting.Endpoint { return r.get_Ptr_Endpoint__17() }
 
 func (r *Root) DataProtectionProvider() dp.DataProtectionProvider {
 	return r.get_DataProtectionProvider()
@@ -2741,6 +2861,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewPtr_Verifier()
 	case reflect.TypeFor[validators.SecretParser]():
 		return r.NewPostBodySecretParser()
+	case reflect.TypeFor[*hosting.Endpoint]():
+		return r.get_Ptr_Endpoint__17()
 	case reflect.TypeFor[services.SystemClock]():
 		return r.get_SystemClock()
 	case reflect.TypeFor[*ServerConfig]():
@@ -2751,8 +2873,6 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.get_DefaultHttpContextAccessor()
 	case reflect.TypeFor[hosting.EndpointRouter]():
 		return r.NewEndpointRouter()
-	case reflect.TypeFor[*hosting.Endpoint]():
-		return r.get_Ptr_Endpoint__13()
 	case reflect.TypeFor[*handlers.AuthorizeHandler]():
 		return r.NewPtr_AuthorizeHandler()
 	case reflect.TypeFor[*handlers.AuthorizeCallbackHandler]():
@@ -3053,6 +3173,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[validators.SecretParser]():
 		return true
+	case reflect.TypeFor[*hosting.Endpoint]():
+		return true
 	case reflect.TypeFor[services.SystemClock]():
 		return true
 	case reflect.TypeFor[*ServerConfig]():
@@ -3062,8 +3184,6 @@ func (r *Root) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return true
 	case reflect.TypeFor[hosting.EndpointRouter]():
-		return true
-	case reflect.TypeFor[*hosting.Endpoint]():
 		return true
 	case reflect.TypeFor[*handlers.AuthorizeHandler]():
 		return true
@@ -3421,7 +3541,9 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*clientassertion.Verifier]():
 			return []any{r.NewPtr_Verifier()}
 		case reflect.TypeFor[validators.SecretParser]():
-			return []any{r.NewSecretParser(), r.NewBasicAuthenticationSecretParser(), r.NewPostBodySecretParser()}
+			return []any{r.NewSecretParser(), r.NewSecretParser__2(), r.NewSecretParser__3(), r.NewBasicAuthenticationSecretParser(), r.NewPostBodySecretParser()}
+		case reflect.TypeFor[*hosting.Endpoint]():
+			return []any{r.get_Ptr_Endpoint(), r.get_Ptr_Endpoint__2(), r.get_Ptr_Endpoint__3(), r.get_Ptr_Endpoint__4(), r.get_Ptr_Endpoint__5(), r.get_Ptr_Endpoint__6(), r.get_Ptr_Endpoint__7(), r.get_Ptr_Endpoint__8(), r.get_Ptr_Endpoint__9(), r.get_Ptr_Endpoint__10(), r.get_Ptr_Endpoint__11(), r.get_Ptr_Endpoint__12(), r.get_Ptr_Endpoint__13(), r.get_Ptr_Endpoint__14(), r.get_Ptr_Endpoint__15(), r.get_Ptr_Endpoint__16(), r.get_Ptr_Endpoint__17()}
 		case reflect.TypeFor[services.SystemClock]():
 			return []any{r.get_SystemClock()}
 		case reflect.TypeFor[*ServerConfig]():
@@ -3432,8 +3554,6 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.get_DefaultHttpContextAccessor()}
 		case reflect.TypeFor[hosting.EndpointRouter]():
 			return []any{r.NewEndpointRouter()}
-		case reflect.TypeFor[*hosting.Endpoint]():
-			return []any{r.get_Ptr_Endpoint(), r.get_Ptr_Endpoint__2(), r.get_Ptr_Endpoint__3(), r.get_Ptr_Endpoint__4(), r.get_Ptr_Endpoint__5(), r.get_Ptr_Endpoint__6(), r.get_Ptr_Endpoint__7(), r.get_Ptr_Endpoint__8(), r.get_Ptr_Endpoint__9(), r.get_Ptr_Endpoint__10(), r.get_Ptr_Endpoint__11(), r.get_Ptr_Endpoint__12(), r.get_Ptr_Endpoint__13()}
 		case reflect.TypeFor[*handlers.AuthorizeHandler]():
 			return []any{r.NewPtr_AuthorizeHandler()}
 		case reflect.TypeFor[*handlers.AuthorizeCallbackHandler]():
@@ -3792,6 +3912,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewPtr_Verifier()
 	case reflect.TypeFor[validators.SecretParser]():
 		return s.NewPostBodySecretParser()
+	case reflect.TypeFor[*hosting.Endpoint]():
+		return s.root.get_Ptr_Endpoint__17()
 	case reflect.TypeFor[services.SystemClock]():
 		return s.root.get_SystemClock()
 	case reflect.TypeFor[*ServerConfig]():
@@ -3802,8 +3924,6 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.get_DefaultHttpContextAccessor()
 	case reflect.TypeFor[hosting.EndpointRouter]():
 		return s.NewEndpointRouter()
-	case reflect.TypeFor[*hosting.Endpoint]():
-		return s.root.get_Ptr_Endpoint__13()
 	case reflect.TypeFor[*handlers.AuthorizeHandler]():
 		return s.NewPtr_AuthorizeHandler()
 	case reflect.TypeFor[*handlers.AuthorizeCallbackHandler]():
@@ -4104,6 +4224,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[validators.SecretParser]():
 		return true
+	case reflect.TypeFor[*hosting.Endpoint]():
+		return true
 	case reflect.TypeFor[services.SystemClock]():
 		return true
 	case reflect.TypeFor[*ServerConfig]():
@@ -4113,8 +4235,6 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[accessor.HttpContextAccessor]():
 		return true
 	case reflect.TypeFor[hosting.EndpointRouter]():
-		return true
-	case reflect.TypeFor[*hosting.Endpoint]():
 		return true
 	case reflect.TypeFor[*handlers.AuthorizeHandler]():
 		return true
@@ -4451,7 +4571,9 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*clientassertion.Verifier]():
 			return []any{s.NewPtr_Verifier()}
 		case reflect.TypeFor[validators.SecretParser]():
-			return []any{s.NewSecretParser(), s.NewBasicAuthenticationSecretParser(), s.NewPostBodySecretParser()}
+			return []any{s.NewSecretParser(), s.NewSecretParser__2(), s.NewSecretParser__3(), s.NewBasicAuthenticationSecretParser(), s.NewPostBodySecretParser()}
+		case reflect.TypeFor[*hosting.Endpoint]():
+			return []any{s.root.get_Ptr_Endpoint(), s.root.get_Ptr_Endpoint__2(), s.root.get_Ptr_Endpoint__3(), s.root.get_Ptr_Endpoint__4(), s.root.get_Ptr_Endpoint__5(), s.root.get_Ptr_Endpoint__6(), s.root.get_Ptr_Endpoint__7(), s.root.get_Ptr_Endpoint__8(), s.root.get_Ptr_Endpoint__9(), s.root.get_Ptr_Endpoint__10(), s.root.get_Ptr_Endpoint__11(), s.root.get_Ptr_Endpoint__12(), s.root.get_Ptr_Endpoint__13(), s.root.get_Ptr_Endpoint__14(), s.root.get_Ptr_Endpoint__15(), s.root.get_Ptr_Endpoint__16(), s.root.get_Ptr_Endpoint__17()}
 		case reflect.TypeFor[services.SystemClock]():
 			return []any{s.root.get_SystemClock()}
 		case reflect.TypeFor[*ServerConfig]():
@@ -4462,8 +4584,6 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.get_DefaultHttpContextAccessor()}
 		case reflect.TypeFor[hosting.EndpointRouter]():
 			return []any{s.NewEndpointRouter()}
-		case reflect.TypeFor[*hosting.Endpoint]():
-			return []any{s.root.get_Ptr_Endpoint(), s.root.get_Ptr_Endpoint__2(), s.root.get_Ptr_Endpoint__3(), s.root.get_Ptr_Endpoint__4(), s.root.get_Ptr_Endpoint__5(), s.root.get_Ptr_Endpoint__6(), s.root.get_Ptr_Endpoint__7(), s.root.get_Ptr_Endpoint__8(), s.root.get_Ptr_Endpoint__9(), s.root.get_Ptr_Endpoint__10(), s.root.get_Ptr_Endpoint__11(), s.root.get_Ptr_Endpoint__12(), s.root.get_Ptr_Endpoint__13()}
 		case reflect.TypeFor[*handlers.AuthorizeHandler]():
 			return []any{s.NewPtr_AuthorizeHandler()}
 		case reflect.TypeFor[*handlers.AuthorizeCallbackHandler]():
@@ -4904,6 +5024,18 @@ func (s *scope) NewPtr_Verifier() *clientassertion.Verifier {
 
 func (s *scope) NewSecretParser() validators.SecretParser {
 	v := (clientAssertionSecretParserFromProvider)(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewSecretParser__2() validators.SecretParser {
+	v := (tlsClientAuthSecretParserFromProvider)(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewSecretParser__3() validators.SecretParser {
+	v := (selfSignedTlsClientAuthSecretParserFromProvider)(s)
 	s.disp.TrackAny(v)
 	return v
 }
@@ -5827,12 +5959,6 @@ func (s *scope) ClientFeatureDeclarations() validators.ClientFeatureDeclarations
 
 func (s *scope) Ptr_KeySource() *clientassertion.KeySource { return s.root.get_Ptr_KeySource() }
 
-func (s *scope) SystemClock() services.SystemClock { return s.root.get_SystemClock() }
-
-func (s *scope) ServerConfig() *ServerConfig { return s.root.get_ServerConfig() }
-
-func (s *scope) Ptr_Logger() *slog.Logger { return s.root.get_Ptr_Logger() }
-
 func (s *scope) Ptr_Endpoint() *hosting.Endpoint { return s.root.get_Ptr_Endpoint() }
 
 func (s *scope) Ptr_Endpoint__2() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__2() }
@@ -5840,6 +5966,12 @@ func (s *scope) Ptr_Endpoint__2() *hosting.Endpoint { return s.root.get_Ptr_Endp
 func (s *scope) Ptr_Endpoint__3() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__3() }
 
 func (s *scope) Ptr_Endpoint__4() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__4() }
+
+func (s *scope) SystemClock() services.SystemClock { return s.root.get_SystemClock() }
+
+func (s *scope) ServerConfig() *ServerConfig { return s.root.get_ServerConfig() }
+
+func (s *scope) Ptr_Logger() *slog.Logger { return s.root.get_Ptr_Logger() }
 
 func (s *scope) Ptr_Endpoint__5() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__5() }
 
@@ -5858,6 +5990,14 @@ func (s *scope) Ptr_Endpoint__11() *hosting.Endpoint { return s.root.get_Ptr_End
 func (s *scope) Ptr_Endpoint__12() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__12() }
 
 func (s *scope) Ptr_Endpoint__13() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__13() }
+
+func (s *scope) Ptr_Endpoint__14() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__14() }
+
+func (s *scope) Ptr_Endpoint__15() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__15() }
+
+func (s *scope) Ptr_Endpoint__16() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__16() }
+
+func (s *scope) Ptr_Endpoint__17() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__17() }
 
 func (s *scope) DataProtectionProvider() dp.DataProtectionProvider {
 	return s.root.get_DataProtectionProvider()

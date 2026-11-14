@@ -11,6 +11,7 @@ import (
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/clientassertion"
+	"github.com/gonewx/wicket/clientcert"
 	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/replay"
 	"github.com/gonewx/wicket/services"
@@ -66,6 +67,11 @@ type ServerConfig struct {
 	replayDependentFeatures             []string
 
 	privateKeyJwtOptions clientassertion.Options
+
+	// Mutual TLS client authentication, see client_certificate.go.
+	clientCertificateEnabled bool
+	clientCertificateOptions clientcert.Options
+	clientCertificateSource  clientcert.CertificateSource
 }
 
 func NewServerConfig() *ServerConfig {

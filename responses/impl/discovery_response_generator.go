@@ -69,7 +69,7 @@ func NewDiscoveryResponseGenerator(
 func (g *DiscoveryResponseGenerator) constructMtlsEndpoint(baseUrl string, issuerUri string, endpoint string) string {
 	// path based
 	if g.options.MutualTls.DomainName == "" {
-		return baseUrl + strings.Replace(endpoint, wicket.ProtocolRoutePathsConnectPathPrefix, wicket.ProtocolRoutePathsMtlsPathPrefix, -1)
+		return baseUrl + "/" + strings.Replace(endpoint, wicket.ProtocolRoutePathsConnectPathPrefix, wicket.ProtocolRoutePathsMtlsPathPrefix, -1)
 	}
 
 	// domain based
@@ -78,7 +78,7 @@ func (g *DiscoveryResponseGenerator) constructMtlsEndpoint(baseUrl string, issue
 	} else {
 		// sub-domain based
 		parts := strings.Split(baseUrl, "://")
-		return fmt.Sprintf("https://%s.%s%s", g.options.MutualTls.DomainName, parts[1], endpoint)
+		return fmt.Sprintf("https://%s.%s/%s", g.options.MutualTls.DomainName, parts[1], endpoint)
 	}
 }
 

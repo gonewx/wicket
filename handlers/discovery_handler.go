@@ -28,6 +28,10 @@ type DiscoveryHandler struct {
 	options   *config_options.WicketOptions
 	assembly  discoveryAssembly
 	logger    *slog.Logger
+
+	// servesClientCertificateAuthentication is set once the assembly
+	// declared mutual TLS client authentication enabled.
+	servesClientCertificateAuthentication bool
 }
 
 // NewDiscoveryHandler builds the discovery handler from the generator and the
@@ -77,6 +81,9 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 		return fmt.Errorf("create discovery document: %w", err)
 	}
 	filterDiscoveryAdvertisement(document, baseUrl, h.options, h.assembly, h.logger)
+	if h.servesClientCertificateAuthentication {
+		settleMutualTlsAdvertisement(document, h.options)
+	}
 
 	return results.NewDiscoveryDocumentResult(document, h.options.Discovery.ResponseCacheInterval).Execute(w, r)
 }
@@ -87,4 +94,11 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 // advertised.
 func (h *DiscoveryHandler) SetClientAssertionSigningAlgorithms(algorithms []string) {
 	h.assembly.clientAssertionSigningAlgorithms = slices.Clone(algorithms)
+}
+
+// ServeClientCertificateAuthentication records that the assembly serves
+// mutual TLS client authentication. The handler then settles the mutual TLS
+// entries of the filtered document, see settleMutualTlsAdvertisement.
+func (h *DiscoveryHandler) ServeClientCertificateAuthentication() {
+	h.servesClientCertificateAuthentication = true
 }
