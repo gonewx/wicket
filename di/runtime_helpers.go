@@ -109,6 +109,9 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 	if algorithms, ok := clientAssertionSigningAlgorithms(p); ok {
 		handler.SetClientAssertionSigningAlgorithms(algorithms)
 	}
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.ClientCertificateAuthenticationEnabled() {
+		handler.ServeClientCertificateAuthentication()
+	}
 	return handler
 }
 

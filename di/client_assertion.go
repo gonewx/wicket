@@ -120,16 +120,16 @@ func clientAssertionSecretParserFromProvider(p godi.Provider) validators.SecretP
 func clientAuthenticatorFromProvider(p godi.Provider) validators.ClientSecretValidator {
 	inner := godi.GetRequired[validators.ClientSecretValidator](p)
 	if !godi.GetRequired[*ServerConfig](p).PrivateKeyJwtEnabled() {
-		return inner
+		return withClientCertificateAuthentication(p, inner)
 	}
-	return clientassertion.NewClientAuthenticator(
+	return withClientCertificateAuthentication(p, clientassertion.NewClientAuthenticator(
 		inner,
 		godi.GetRequired[validators.SecretsListParser](p),
 		godi.GetRequired[storage.ClientStore](p),
 		godi.GetRequired[*clientassertion.Verifier](p),
 		godi.GetRequired[services.IssuerNameService](p),
 		godi.GetRequired[*slog.Logger](p),
-	)
+	))
 }
 
 // apiAuthenticatorFromProvider is clientAuthenticatorFromProvider for the

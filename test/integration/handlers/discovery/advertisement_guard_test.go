@@ -293,6 +293,13 @@ var unadvertisedRoutes = []string{
 func assertRegisteredRoutesAdvertised(t *testing.T, guard *advertisementGuard) {
 	t.Helper()
 
+	mtlsAliasRoutes := []string{
+		"/" + wicket.ProtocolRoutePathsMtlsToken,
+		"/" + wicket.ProtocolRoutePathsMtlsRevocation,
+		"/" + wicket.ProtocolRoutePathsMtlsIntrospection,
+		"/" + wicket.ProtocolRoutePathsMtlsDeviceAuthorization,
+	}
+
 	advertisedUrls := map[string]struct{}{}
 	for _, value := range guard.document {
 		if raw, ok := value.(string); ok {
@@ -317,6 +324,16 @@ func assertRegisteredRoutesAdvertised(t *testing.T, guard *advertisementGuard) {
 	for _, endpoint := range endpoints {
 		if slices.ContainsFunc(unadvertisedRoutes, func(path string) bool { return strings.EqualFold(path, endpoint.Path) }) {
 			continue
+		}
+		// The mtls alias routes are registered with the root container and
+		// yield no handler until the host enables mutual TLS client
+		// authentication; the request then falls through to the next handler,
+		// so this assembly does not serve them. Only these four routes are
+		// exempted, and only while they yield no handler.
+		if slices.Contains(mtlsAliasRoutes, endpoint.Path) {
+			if handler, err := endpoint.Handler(guard.scope); err == nil && handler == nil {
+				continue
+			}
 		}
 		want := guard.pipeline.TestServer.URL + endpoint.Path
 		_, ok := advertisedUrls[want]
