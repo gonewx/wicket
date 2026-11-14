@@ -41,6 +41,13 @@ type ServerConfig struct {
 	// excludes clientsProvider.
 	clientStore storage.ClientStore
 
+	// Client registration store seam, see client_registration_store.go. It
+	// also serves the client store seam and excludes clientStore and
+	// clientsProvider. The seam is required exactly when
+	// clientRegistrationDependentFeatures is non-empty.
+	clientRegistrationStore             storage.ClientRegistrationStore
+	clientRegistrationDependentFeatures []string
+
 	authorizationParametersMessageStoreProvider   func() storage.AuthorizationParametersMessageStore
 	persistedGrantStoreProvider                   func() storage.PersistedGrantStore
 	deviceFlowStoreProvider                       func() storage.DeviceFlowStore
@@ -123,7 +130,8 @@ func (c storeSeamCategory) String() string {
 // directly by the ReturnUrlParser factory (no container wrapper, di/
 // lifecycle.go covers the ten required seams), so its lifecycle belongs to the
 // host — the host that injected the store owns closing it, and the container
-// never releases it. The same holds for an injected client store.
+// never releases it. The same holds for an injected client store and for an
+// injected client registration store.
 type storeSeam struct {
 	name     string
 	category storeSeamCategory
@@ -149,7 +157,13 @@ func (c *ServerConfig) storeSeams() []storeSeam {
 		{name: "session store", injected: func() bool { return c.sessionStoreProvider != nil }},
 		{name: "distributed cache", injected: func() bool { return c.distributedCacheProvider != nil }},
 		{name: "key record store", injected: func() bool { return c.recordStoreProvider != nil }},
-		{name: "client store", category: storeSeamOptional, injected: func() bool { return c.clientStore != nil }},
+		{name: "client store", category: storeSeamOptional, injected: func() bool { return c.ClientStore() != nil }},
+		{
+			name:      clientRegistrationStoreSeamName,
+			category:  storeSeamFeatureRequired,
+			injected:  func() bool { return c.clientRegistrationStore != nil },
+			condition: c.clientRegistrationStoreRequired,
+		},
 	}
 }
 
@@ -188,8 +202,10 @@ func validateStoreSeams(seams []storeSeam, allowInMemoryFallback bool, logger *s
 
 // requireClientStoreSeam checks an injected client store: it excludes the
 // static client list, and it must answer CORS origin lookups from the same
-// data it serves clients from.
+// data it serves clients from. An injected client registration store is held
+// to the same rules and also excludes SetClientStore.
 func (c *ServerConfig) requireClientStoreSeam() {
+	c.requireClientRegistrationStoreSeam()
 	if c.clientStore == nil {
 		return
 	}
@@ -280,18 +296,27 @@ func (c *ServerConfig) Clients() []*storage_models.Client {
 // it in the configuration-validating decorator, so every read path sees only
 // clients whose configuration passes validation. The value must also
 // implement storage.ClientOriginLookup, which CORS decisions read, and it
-// excludes SetClients and SetClientsProvider; Freeze enforces both.
+// excludes SetClients, SetClientsProvider and SetClientRegistrationStore;
+// Freeze enforces both.
 func (c *ServerConfig) SetClientStore(store storage.ClientStore) {
 	c.clientStore = store
 }
 
-// ClientStore returns the host-injected client store, or nil when the host
-// feeds clients through SetClients or SetClientsProvider.
+// ClientStore returns the host-injected client store: the value of
+// SetClientStore, or the value of SetClientRegistrationStore when only that
+// one was injected. It returns nil when the host feeds clients through
+// SetClients or SetClientsProvider.
 func (c *ServerConfig) ClientStore() storage.ClientStore {
 	if c == nil {
 		return nil
 	}
-	return c.clientStore
+	if c.clientStore != nil {
+		return c.clientStore
+	}
+	if c.clientRegistrationStore != nil {
+		return c.clientRegistrationStore
+	}
+	return nil
 }
 
 func (c *ServerConfig) SetIdentityScopesProvider(provider func() []*storage_models.IdentityResource) {

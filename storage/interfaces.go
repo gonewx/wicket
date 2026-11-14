@@ -86,6 +86,48 @@ type ClientStore interface {
 	FindClientById(ctx context.Context, clientId string) (*models.Client, error)
 }
 
+// ClientRegistrationStore keeps registered clients and serves them to the
+// read path from the same data: FindClientById returns the client of a
+// registered record. A host that injects it implements ClientOriginLookup on
+// the same value, so CORS decisions read the same records.
+//
+// The record of a client is keyed by Client.ClientId. An adapter persists the
+// client as the opaque bytes of EncodeClient and restores it with
+// DecodeClient, next to the visible fields of the record (client id,
+// revision, registration access token digest, registration time).
+//
+// Registration is insert-only: a client id that is registered, or that was
+// registered and removed, fails with ErrDuplicateHandle and leaves the stored
+// data unchanged. Removal leaves a tombstone, so a removed client id is never
+// registered again; reads, updates and removals of a removed client id report
+// ErrNotFound.
+//
+// The store assigns revisions. A registration commits revision 1; an update
+// or removal carries the revision the caller read and fails with
+// ErrVersionConflict, leaving the record unchanged, when it does not match the
+// stored one; a successful update commits the expected revision plus one.
+// Write methods return the committed revision and ignore the Revision of the
+// record passed in. The caller resolves a conflict by reloading the record.
+//
+// Registered clients have no server-side lifecycle, so the store carries no
+// reclamation method. It offers no lookup by registration access token digest
+// and no unfiltered enumeration.
+type ClientRegistrationStore interface {
+	ClientStore
+	// RegisterClient stores a new registration and returns its revision, 1.
+	RegisterClient(ctx context.Context, registration *models.ClientRegistration) (int, error)
+	// FindClientRegistration returns the registration of a client id, or
+	// ErrNotFound.
+	FindClientRegistration(ctx context.Context, clientId string) (*models.ClientRegistration, error)
+	// UpdateClientRegistration replaces the registration of
+	// registration.Client.ClientId when its stored revision equals
+	// expectedRevision, and returns the committed revision.
+	UpdateClientRegistration(ctx context.Context, registration *models.ClientRegistration, expectedRevision int) (int, error)
+	// RemoveClientRegistration removes the registration of a client id when
+	// its stored revision equals expectedRevision, and leaves a tombstone.
+	RemoveClientRegistration(ctx context.Context, clientId string, expectedRevision int) error
+}
+
 // ResourceStore loads API and identity resources by current caller criteria.
 // Resource records are configuration data without a lifecycle, so the store
 // carries no reclamation method.

@@ -243,14 +243,18 @@ func TestStoreSeamCategories(t *testing.T) {
 			if seam.category != storeSeamOptional {
 				t.Fatalf("seam %q is %v, want optional", seam.name, seam.category)
 			}
+		case "client registration store":
+			if seam.category != storeSeamFeatureRequired {
+				t.Fatalf("seam %q is %v, want feature-required", seam.name, seam.category)
+			}
 		default:
 			if seam.category != storeSeamRequired {
 				t.Fatalf("seam %q is %v, want required", seam.name, seam.category)
 			}
 		}
 	}
-	if counts[storeSeamOptional] != 2 || counts[storeSeamRequired] != 10 || counts[storeSeamFeatureRequired] != 0 {
-		t.Fatalf("category counts = %v, want 2 optional, 10 required, 0 feature-required", counts)
+	if counts[storeSeamOptional] != 2 || counts[storeSeamRequired] != 10 || counts[storeSeamFeatureRequired] != 1 {
+		t.Fatalf("category counts = %v, want 2 optional, 10 required, 1 feature-required", counts)
 	}
 }
 

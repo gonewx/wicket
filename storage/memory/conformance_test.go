@@ -30,3 +30,9 @@ func TestBackchannelAuthenticationRequestStoreConformanceE2E(t *testing.T) {
 		return NewMemoryBackchannelAuthenticationRequestStore()
 	}, storagetest.WithMay(true))
 }
+
+func TestClientRegistrationStoreConformanceE2E(t *testing.T) {
+	storagetest.RunClientRegistrationStoreSuite(t, func() storage.ClientRegistrationStore {
+		return NewMemoryClientRegistrationStore()
+	}, storagetest.WithMay(true))
+}
