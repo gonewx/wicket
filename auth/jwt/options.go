@@ -93,6 +93,13 @@ type Options struct {
 
 	// The minimum time between <see cref="ConfigurationManager" /> retrievals, in the event that a retrieval failed, or that a refresh was explicitly requested. 30 seconds is the default.
 	RefreshInterval time.Duration
+
+	// CertificateBindingSource, when set, makes the handler fail a token bound
+	// to a client certificate (cnf / x5t#S256, RFC 8705 §3) unless the request
+	// presents that certificate as read from this source. Nil disables the check.
+	// While it is set, a token produced by a custom SecurityTokenValidator (any
+	// SecurityToken other than the built-in handler's) fails authentication.
+	CertificateBindingSource CertificateSource
 }
 
 func NewOptions() *Options {

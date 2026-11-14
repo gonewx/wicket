@@ -145,6 +145,7 @@ func registerPluggableServicesAndValidators() {
 			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[*slog.Logger](p),
 			requestFromProvider(p),
+			accessTokenConfirmationFromProvider(p),
 		)
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L197 (TryAddTransient)

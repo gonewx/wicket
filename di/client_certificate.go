@@ -128,3 +128,29 @@ func withClientCertificateAuthentication(p godi.Provider, inner validators.Clien
 		godi.GetRequired[*slog.Logger](p),
 	)
 }
+
+// accessTokenConfirmationFromProvider yields the access token binder while
+// mutual TLS client authentication is enabled and nil otherwise, in which
+// case the token service leaves every access token unbound as before.
+func accessTokenConfirmationFromProvider(p godi.Provider) services.AccessTokenConfirmation {
+	cfg := godi.GetRequired[*ServerConfig](p)
+	if !cfg.ClientCertificateAuthenticationEnabled() {
+		return nil
+	}
+	return clientcert.NewAccessTokenBinder(
+		godi.GetRequired[storage.ClientStore](p),
+		cfg.ClientCertificateSource(),
+	)
+}
+
+// withCertificateBoundAccessTokens wraps the token endpoint's client
+// authenticator so a client registered for certificate bound access tokens
+// is refused without a client certificate before any grant is redeemed. It
+// returns inner while mutual TLS client authentication is not enabled.
+func withCertificateBoundAccessTokens(p godi.Provider, inner validators.ClientSecretValidator) validators.ClientSecretValidator {
+	cfg := godi.GetRequired[*ServerConfig](p)
+	if !cfg.ClientCertificateAuthenticationEnabled() {
+		return inner
+	}
+	return clientcert.NewCertificateBindingValidator(inner, cfg.ClientCertificateSource(), godi.GetRequired[*slog.Logger](p))
+}

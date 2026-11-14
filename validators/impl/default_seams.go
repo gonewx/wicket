@@ -67,6 +67,12 @@ func (v ClientConfigurationValidator) Validate(context *validators_contexts.Clie
 	default:
 		context.SetError("client declares an unsupported token endpoint authentication method")
 	}
+	if !context.IsValid {
+		return
+	}
+	if message := validateCertificateBoundAccessTokens(v.features, context.Client); message != "" {
+		context.SetError(message)
+	}
 }
 
 // CustomTokenRequestValidator leaves token request validation unchanged.

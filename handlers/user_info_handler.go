@@ -23,6 +23,7 @@ type UserInfoHandler struct {
 	generator        responses.UserInfoResponseGenerator
 	options          *config_options.WicketOptions
 	logger           *slog.Logger
+	certificates     ClientCertificateSource
 }
 
 func NewUserInfoHandler(
@@ -63,6 +64,11 @@ func (h *UserInfoHandler) Process(w http.ResponseWriter, r *http.Request) error 
 	}
 	if validationResult.Error != nil {
 		return results.NewProtectedResourceErrorResult(validationResult.Error, validationResult.Description).Execute(w, r)
+	}
+	if validationResult.TokenValidationResult != nil {
+		if err := h.checkCertificateBinding(r, validationResult.TokenValidationResult.Claims); err != nil {
+			return results.NewProtectedResourceErrorResult(wicket.ProtectedResourceErrorsInvalidToken, "").Execute(w, r)
+		}
 	}
 
 	claims, err := h.generator.Handle(r.Context(), validationResult)

@@ -120,6 +120,10 @@ func (h *Handler) HandleAuthenticate() (*auth.Result, error) {
 				return auth.NoResult(), nil
 			}
 
+			if err := h.certificateBindingError(r, validatedToken); err != nil {
+				return auth.Fail(err), nil
+			}
+
 			tokenValidatedContext := NewTokenValidatedContext(r, w, h.Scheme, h.Options)
 			tokenValidatedContext.SetSecurityToken(validatedToken)
 			tokenValidatedContext.Principal = principal

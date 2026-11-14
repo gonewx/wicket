@@ -36,4 +36,13 @@ type ClientAuthenticationMetadata struct {
 	// TlsClientAuthSanEmail is an expected rfc822Name subject alternative
 	// name.
 	TlsClientAuthSanEmail string
+	// TlsClientCertificateBoundAccessTokens (RFC 8705 §3.4) asks for every
+	// access token issued to the client at the token endpoint to be bound to
+	// the client certificate presented with that token request: the token
+	// carries the certificate's SHA-256 thumbprint under cnf / x5t#S256, and
+	// a token request without a client certificate is refused. It is valid
+	// only while mutual TLS client authentication is enabled, not for a
+	// public client (RequireClientSecret false) and not together with
+	// AllowAccessTokensViaBrowser.
+	TlsClientCertificateBoundAccessTokens bool
 }

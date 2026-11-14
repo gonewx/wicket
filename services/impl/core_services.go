@@ -5,6 +5,7 @@ package impl
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -524,8 +525,12 @@ type TokenService struct {
 	options       *config_options.WicketOptions
 	logger        *slog.Logger
 	request       *http.Request
+	confirmation  services.AccessTokenConfirmation
 }
 
+// NewTokenService builds the token service. confirmation decides the
+// confirmation of every access token serialized; nil leaves the
+// confirmation a token model carries untouched.
 func NewTokenService(
 	claims services.ClaimsService,
 	reference storage.ReferenceTokenStore,
@@ -535,8 +540,9 @@ func NewTokenService(
 	options *config_options.WicketOptions,
 	logger *slog.Logger,
 	request *http.Request,
+	confirmation services.AccessTokenConfirmation,
 ) *TokenService {
-	return &TokenService{claims: claims, reference: reference, tokenCreation: tokenCreation, clock: clock, keys: keys, options: options, logger: logger, request: request}
+	return &TokenService{claims: claims, reference: reference, tokenCreation: tokenCreation, clock: clock, keys: keys, options: options, logger: logger, request: request, confirmation: confirmation}
 }
 
 func (s *TokenService) CreateAccessToken(ctx context.Context, request *responses_models.TokenCreationRequest) (*storage_models.Token, error) {
@@ -675,6 +681,16 @@ func (s *TokenService) identitySigningAlgorithm(ctx context.Context, request *re
 }
 
 func (s *TokenService) CreateSecurityToken(ctx context.Context, token *storage_models.Token) (string, error) {
+	// Every access token is bound here, the one exit all of them share,
+	// including the access token a refresh request reissues unchanged: the
+	// binding always follows the certificate of the current request.
+	if token.Type == wicket.TokenTypesAccessToken && s.confirmation != nil {
+		confirmation, err := s.confirmation.Confirmation(ctx, s.request, token.ClientId)
+		if err != nil {
+			return "", err
+		}
+		token.Confirmation = confirmation
+	}
 	// Only access tokens carry a jwt id, and only when the client opted in. Any
 	// value carried in from an earlier assembly is dropped and replaced with a
 	// freshly generated one so the id is never reused.
@@ -747,6 +763,21 @@ func (s *TokenService) createReferenceToken(ctx context.Context, token *storage_
 	stored.Claims = append([]*claims.Claim(nil), token.Claims...)
 	stored.Audiences = append([]string(nil), token.Audiences...)
 	stored.AllowedSigningAlgorithms = append([]string(nil), token.AllowedSigningAlgorithms...)
+	// Validation turns only the record's claims into token claims, so the
+	// confirmation is also kept as a cnf claim of the stored copy.
+	if strings.TrimSpace(token.Confirmation) != "" {
+		var confirmation map[string]any
+		if err := json.Unmarshal([]byte(token.Confirmation), &confirmation); err != nil || confirmation == nil {
+			return "", errors.New("create security token: reference token confirmation is not a JSON object")
+		}
+		stored.Claims = append(
+			utils.Where(stored.Claims, func(c *claims.Claim) bool { return c.Type != wicket.JwtClaimTypesConfirmation }),
+			claims.NewClaim(
+				claims.WithClaimType(wicket.JwtClaimTypesConfirmation),
+				claims.WithClaimValue(confirmation),
+			),
+		)
+	}
 	if err := s.reference.StoreReferenceToken(ctx, handle, &stored); err != nil {
 		message, category := referenceTokenStoreFailureMessage, "store_failure"
 		if errors.Is(err, storage.ErrDuplicateHandle) {
