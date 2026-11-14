@@ -19,6 +19,7 @@
 //	RunDeviceFlowStoreSuite
 //	RunBackchannelAuthenticationRequestStoreSuite
 //	RunClientRegistrationStoreSuite
+//	RunPushedAuthorizationRequestStoreSuite
 //
 // Every entry takes a factory that must return a fresh empty store on each
 // call; the suite calls the factory before every case so no state leaks
@@ -45,7 +46,12 @@
 // matching nothing rather than selecting records whose field is empty. The
 // authorization code take is atomic: of concurrent takes of one handle,
 // exactly one obtains the record and the others miss with ErrNotFound; the
-// take does not judge expiry.
+// take does not judge expiry. The pushed authorization request take follows
+// the same rule, a read of a pushed request does not consume it, and its
+// reclamation removes only requests whose RetentionExpiration precedes the
+// cutoff, keeping requests whose EntryExpiration alone has passed. Every
+// pushed authorization key the suite uses comes from
+// storage.PushedAuthorizationRequestKey.
 //
 // # Compliance credential
 //

@@ -75,6 +75,12 @@ func TestGrantStoreConformanceSuiteRunsExternalE2E(t *testing.T) {
 				return memory.NewMemoryClientRegistrationStore()
 			}, storagetest.WithMay(true))
 		},
+		"pushed authorization requests": func(t *testing.T) {
+			t.Parallel()
+			storagetest.RunPushedAuthorizationRequestStoreSuite(t, func() storage.PushedAuthorizationRequestStore {
+				return memory.NewMemoryPushedAuthorizationRequestStore()
+			}, storagetest.WithMay(true))
+		},
 	}
 
 	for name, run := range suites {
@@ -509,6 +515,139 @@ func TestAdapterRunsSuite(t *testing.T) {
 	// The violation is the only one: every other case of the run passes.
 	if strings.Count(combined, "--- FAIL: TestAdapterRunsSuite/") != 1 {
 		t.Fatalf("suite failed more cases than the tombstone one:\n%s", combined)
+	}
+}
+
+const scratchPushedAuthorizationDir = "tests/e2e/scratch-pushed-authorization"
+
+// TestGrantStoreConformanceSuiteRejectsEntryExpirationReclamationE2E vets a
+// pushed authorization request adapter that reclaims on EntryExpiration
+// instead of RetentionExpiration: it drops requests still inside their
+// interaction round trip. The suite must fail that run and name the
+// round-trip retention case, from a scratch package of its own.
+func TestGrantStoreConformanceSuiteRejectsEntryExpirationReclamationE2E(t *testing.T) {
+	t.Parallel()
+
+	if _, err := exec.LookPath("mise"); err != nil {
+		t.Fatalf("locate mise toolchain: %v", err)
+	}
+
+	root := projectRoot(t)
+	scratch := filepath.Join(root, scratchPushedAuthorizationDir)
+	if err := os.RemoveAll(scratch); err != nil {
+		t.Fatalf("clear scratch suite package: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(scratch); err != nil {
+			t.Logf("remove scratch suite package: %v", err)
+		}
+	})
+
+	writeScratchFile(t, filepath.Join(scratch, "adapter.go"), `// Copyright 2026 Decker.
+// Licensed under the Apache License, Version 2.0.
+
+package scratchpushedauthorization
+
+import (
+	"context"
+	"sync"
+	"time"
+
+	"github.com/gonewx/wicket/storage"
+	"github.com/gonewx/wicket/storage/models"
+)
+
+// eagerStore violates the reclamation contract: RemoveExpired looks at
+// EntryExpiration, so a request still inside its round trip is dropped.
+type eagerStore struct {
+	mu   sync.Mutex
+	rows map[string]models.PushedAuthorizationRequest
+}
+
+func newEagerStore() *eagerStore {
+	return &eagerStore{rows: map[string]models.PushedAuthorizationRequest{}}
+}
+
+func copyRequest(r models.PushedAuthorizationRequest) *models.PushedAuthorizationRequest {
+	r.Payload = append([]byte(nil), r.Payload...)
+	return &r
+}
+
+func (s *eagerStore) StorePushedAuthorizationRequest(_ context.Context, key string, r *models.PushedAuthorizationRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.rows[key]; ok {
+		return storage.ErrDuplicateHandle
+	}
+	s.rows[key] = *copyRequest(*r)
+	return nil
+}
+
+func (s *eagerStore) GetPushedAuthorizationRequest(_ context.Context, key string) (*models.PushedAuthorizationRequest, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.rows[key]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return copyRequest(r), nil
+}
+
+func (s *eagerStore) TakePushedAuthorizationRequest(_ context.Context, key string) (*models.PushedAuthorizationRequest, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.rows[key]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	delete(s.rows, key)
+	return copyRequest(r), nil
+}
+
+func (s *eagerStore) RemoveExpired(_ context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	removed := 0
+	for key, r := range s.rows {
+		if r.EntryExpiration.Before(cutoff) {
+			delete(s.rows, key)
+			removed++
+		}
+	}
+	return removed, nil
+}
+`)
+
+	writeScratchFile(t, filepath.Join(scratch, "adapter_test.go"), `// Copyright 2026 Decker.
+// Licensed under the Apache License, Version 2.0.
+
+package scratchpushedauthorization
+
+import (
+	"testing"
+
+	"github.com/gonewx/wicket/storage"
+	"github.com/gonewx/wicket/storage/storagetest"
+)
+
+func TestAdapterRunsSuite(t *testing.T) {
+	storagetest.RunPushedAuthorizationRequestStoreSuite(t, func() storage.PushedAuthorizationRequestStore {
+		return newEagerStore()
+	}, storagetest.WithMay(true))
+}
+`)
+
+	cmd := exec.Command("mise", "exec", "go@"+readGoToolchainPin(t), "--", "go", "test", "./"+scratchPushedAuthorizationDir+"/", "-count=1")
+	cmd.Dir = root
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	output, err := cmd.Output()
+	combined := string(output) + stderr.String()
+	if err == nil {
+		t.Fatal("suite accepted a pushed authorization request store that reclaims on EntryExpiration")
+	}
+	if !strings.Contains(combined, "--- FAIL: TestAdapterRunsSuite/MUST/RemoveExpiredKeepsRecordsInRoundTrip") {
+		t.Fatalf("suite failure output does not name the violated case:\n%s", combined)
 	}
 }
 

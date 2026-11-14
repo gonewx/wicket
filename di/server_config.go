@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/clientassertion"
 	"github.com/gonewx/wicket/clientcert"
+	"github.com/gonewx/wicket/dp"
 	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/replay"
 	"github.com/gonewx/wicket/services"
@@ -87,6 +89,14 @@ type ServerConfig struct {
 	// Hardening options, see hardening.go.
 	asymmetricRequestObjectsRequired        bool
 	clientCredentialsAuthenticationRequired bool
+
+	// Pushed authorization seams, see pushed_authorization.go. Both are
+	// required exactly when pushedAuthorizationEnabled is set.
+	pushedAuthorizationEnabled                bool
+	pushedAuthorizationRequestStoreProvider   func() storage.PushedAuthorizationRequestStore
+	pushedAuthorizationRequestStoreOnce       sync.Once
+	pushedAuthorizationRequestStore           storage.PushedAuthorizationRequestStore
+	pushedAuthorizationDataProtectionProvider dp.DataProtectionProvider
 }
 
 func NewServerConfig() *ServerConfig {
@@ -130,8 +140,9 @@ func (c storeSeamCategory) String() string {
 // directly by the ReturnUrlParser factory (no container wrapper, di/
 // lifecycle.go covers the ten required seams), so its lifecycle belongs to the
 // host — the host that injected the store owns closing it, and the container
-// never releases it. The same holds for an injected client store and for an
-// injected client registration store.
+// never releases it. The same holds for an injected client store, for an
+// injected client registration store and for an injected pushed
+// authorization request store.
 type storeSeam struct {
 	name     string
 	category storeSeamCategory
@@ -163,6 +174,18 @@ func (c *ServerConfig) storeSeams() []storeSeam {
 			category:  storeSeamFeatureRequired,
 			injected:  func() bool { return c.clientRegistrationStore != nil },
 			condition: c.clientRegistrationStoreRequired,
+		},
+		{
+			name:      pushedAuthorizationRequestStoreSeamName,
+			category:  storeSeamFeatureRequired,
+			injected:  func() bool { return c.pushedAuthorizationRequestStoreProvider != nil },
+			condition: c.pushedAuthorizationRequired,
+		},
+		{
+			name:      pushedAuthorizationDataProtectionSeamName,
+			category:  storeSeamFeatureRequired,
+			injected:  func() bool { return c.pushedAuthorizationDataProtectionProvider != nil },
+			condition: c.pushedAuthorizationRequired,
 		},
 	}
 }
@@ -229,6 +252,7 @@ func (c *ServerConfig) Freeze() {
 	c.requirePrivateKeyJwtOptions()
 	c.requireReplayRegistrySeam()
 	c.requireClientStoreSeam()
+	c.requirePushedAuthorizationDataProtectionSeam()
 	validateStoreSeams(c.storeSeams(), c.allowInMemoryFallback, c.logger)
 }
 
