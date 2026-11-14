@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/clientassertion"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/utils"
 )
@@ -33,7 +34,19 @@ type discoveryAssembly struct {
 	backChannelLogout any
 	// authenticationMethods lists the methods of the registered secret parsers.
 	authenticationMethods []string
+	// clientAssertionSigningAlgorithms lists the signature algorithms of the
+	// registered private_key_jwt parser, in configuration order.
+	clientAssertionSigningAlgorithms []string
 }
+
+// clientAssertionAlgorithmSource is the secret parser the client assertion
+// signing algorithms come from.
+type clientAssertionAlgorithmSource interface {
+	AuthenticationMethod() string
+	SigningAlgorithms() []string
+}
+
+var _ clientAssertionAlgorithmSource = (*clientassertion.Parser)(nil)
 
 func (a discoveryAssembly) hasEndpointPath(path string) bool {
 	for _, registered := range a.endpointPaths {
@@ -57,6 +70,23 @@ func (a discoveryAssembly) hasTlsClientAuthentication() bool {
 // method without a registered parser providing it.
 func (a discoveryAssembly) unregisteredTlsMethod(method string) bool {
 	return isTlsAuthenticationMethod(method) && !slices.Contains(a.authenticationMethods, method)
+}
+
+// advertisesClientAssertion reports whether a private_key_jwt parser is
+// registered and the filtered document still lists that method.
+func (a discoveryAssembly) advertisesClientAssertion(document map[string]any) bool {
+	method := wicket.EndpointAuthenticationMethodsPrivateKeyJwt
+	if !slices.Contains(a.authenticationMethods, method) {
+		return false
+	}
+	switch values := document[wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported].(type) {
+	case []string:
+		return slices.Contains(values, method)
+	case []any:
+		return slices.Contains(values, any(method))
+	default:
+		return false
+	}
 }
 
 func isTlsAuthenticationMethod(method string) bool {
@@ -130,6 +160,26 @@ func filterDiscoveryAdvertisement(
 		logger.Warn("Mutual TLS is enabled but the current assembly cannot serve all of it; the unservable mutual TLS entries are not advertised in discovery.",
 			slog.Bool("tls_client_authentication_registered", assembly.hasTlsClientAuthentication()))
 	}
+
+	// client assertion signing algorithms: the key is written only here and
+	// only from the registered private_key_jwt parser, once the token
+	// endpoint authentication methods are filtered.
+	algorithmsKey := wicket.DiscoveryTokenEndpointAuthSigningAlgorithmsSupported
+	hostValueRemoved := false
+	if _, ok := document[algorithmsKey]; ok {
+		filter.remove(algorithmsKey)
+		hostValueRemoved = true
+	}
+	if assembly.advertisesClientAssertion(document) {
+		if len(assembly.clientAssertionSigningAlgorithms) > 0 {
+			document[algorithmsKey] = slices.Clone(assembly.clientAssertionSigningAlgorithms)
+		} else if logger != nil {
+			logger.Warn("private_key_jwt is advertised but its parser names no signing algorithm; token_endpoint_auth_signing_alg_values_supported is not advertised in discovery.")
+		}
+	}
+	if hostValueRemoved && logger != nil {
+		logger.Warn("A custom discovery entry named token_endpoint_auth_signing_alg_values_supported is ignored; the key is written only from the registered client assertion parser.")
+	}
 }
 
 // generatedDiscoveryKeys holds the keys the discovery generator writes into
@@ -175,6 +225,13 @@ var generatedDiscoveryKeys = map[string]struct{}{
 	wicket.DiscoveryTokenEndpoint:                               {},
 	wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported: {},
 	wicket.DiscoveryUserInfoEndpoint:                            {},
+}
+
+// handlerWrittenDiscoveryKeys holds the keys the discovery handler itself
+// writes after generation. A custom entry under one of these names is never
+// a host entry: only the handler decides whether the key is advertised.
+var handlerWrittenDiscoveryKeys = map[string]struct{}{
+	wicket.DiscoveryTokenEndpointAuthSigningAlgorithmsSupported: {},
 }
 
 func isEndpointKey(key string) bool {
@@ -228,7 +285,8 @@ func (f *discoveryFilter) isHostEntry(key string) bool {
 		return false
 	}
 	_, generated := generatedDiscoveryKeys[key]
-	return !generated
+	_, handlerWritten := handlerWrittenDiscoveryKeys[key]
+	return !generated && !handlerWritten
 }
 
 func (f *discoveryFilter) remove(key string) bool {

@@ -72,6 +72,7 @@ type Client struct {
 	CoordinateLifetimeWithUserSession     *bool
 	AllowedCorsOrigins                    []string
 	Properties                            map[string]string
+	ClientAuthenticationMetadata
 }
 
 func NewClient() *Client {
