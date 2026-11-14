@@ -19,6 +19,7 @@ import (
 	"github.com/gonewx/wicket/auth/google"
 	"github.com/gonewx/wicket/auth/jwt"
 	core2 "github.com/gonewx/wicket/auth/oauth/core"
+	"github.com/gonewx/wicket/clientassertion"
 	"github.com/gonewx/wicket/config"
 	"github.com/gonewx/wicket/config/options"
 	options2 "github.com/gonewx/wicket/di/options"
@@ -33,6 +34,7 @@ import (
 	"github.com/gonewx/wicket/models/messages"
 	"github.com/gonewx/wicket/oidcverify"
 	"github.com/gonewx/wicket/phoneverify"
+	"github.com/gonewx/wicket/replay"
 	"github.com/gonewx/wicket/responses"
 	impl3 "github.com/gonewx/wicket/responses/impl"
 	"github.com/gonewx/wicket/server"
@@ -54,6 +56,12 @@ import (
 
 // Root is the generated singleton container (AD-1: singleton = Root field).
 type Root struct {
+	f_lazyReplayRegistry                                      replay.Registry
+	st_lazyReplayRegistry                                     uint8
+	f_ClientFeatureDeclarations                               validators.ClientFeatureDeclarations
+	st_ClientFeatureDeclarations                              uint8
+	f_Ptr_KeySource                                           *clientassertion.KeySource
+	st_Ptr_KeySource                                          uint8
 	f_SystemClock                                             services.SystemClock
 	st_SystemClock                                            uint8
 	f_ServerConfig                                            *ServerConfig
@@ -183,6 +191,9 @@ func NewRoot() (root *Root, err error) {
 			root, err = nil, godi.BuildError(rec)
 		}
 	}()
+	r.get_lazyReplayRegistry()
+	r.get_ClientFeatureDeclarations()
+	r.get_Ptr_KeySource()
 	r.get_SystemClock()
 	r.get_ServerConfig()
 	r.get_Ptr_Logger()
@@ -236,6 +247,74 @@ func NewRoot() (root *Root, err error) {
 	r.get_lazySessionStore()
 	r.get_Ptr_Config()
 	return r, nil
+}
+
+func (r *Root) get_lazyReplayRegistry() replay.Registry {
+	if r.st_lazyReplayRegistry == 2 {
+		return r.f_lazyReplayRegistry
+	}
+	if r.st_lazyReplayRegistry == 1 {
+		panic(godi.CircularDependencyError("lazyReplayRegistry"))
+	}
+	r.st_lazyReplayRegistry = 1
+	defer func() {
+		if r.st_lazyReplayRegistry != 2 {
+			r.st_lazyReplayRegistry = 0
+		}
+	}()
+	v := NewlazyReplayRegistry(r.get_ServerConfig(), r.get_Ptr_Logger())
+	r.f_lazyReplayRegistry = v
+	r.disp.TrackAny(v)
+	r.st_lazyReplayRegistry = 2
+	return v
+}
+
+func (r *Root) get_ClientFeatureDeclarations() validators.ClientFeatureDeclarations {
+	if r.st_ClientFeatureDeclarations == 2 {
+		return r.f_ClientFeatureDeclarations
+	}
+	if r.st_ClientFeatureDeclarations == 1 {
+		panic(godi.CircularDependencyError("ClientFeatureDeclarations"))
+	}
+	r.st_ClientFeatureDeclarations = 1
+	defer func() {
+		if r.st_ClientFeatureDeclarations != 2 {
+			r.st_ClientFeatureDeclarations = 0
+		}
+	}()
+	v := (func(p godi.Provider) validators.ClientFeatureDeclarations {
+		return godi.GetRequired[*ServerConfig](p)
+	})(r)
+	r.f_ClientFeatureDeclarations = v
+	r.disp.TrackAny(v)
+	r.st_ClientFeatureDeclarations = 2
+	return v
+}
+
+func (r *Root) get_Ptr_KeySource() *clientassertion.KeySource {
+	if r.st_Ptr_KeySource == 2 {
+		return r.f_Ptr_KeySource
+	}
+	if r.st_Ptr_KeySource == 1 {
+		panic(godi.CircularDependencyError("Ptr_KeySource"))
+	}
+	r.st_Ptr_KeySource = 1
+	defer func() {
+		if r.st_Ptr_KeySource != 2 {
+			r.st_Ptr_KeySource = 0
+		}
+	}()
+	v := (func(p godi.Provider) *clientassertion.KeySource {
+		return clientassertion.NewKeySource(
+			godi.GetRequired[*ServerConfig](p).PrivateKeyJwtOptions,
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[*slog.Logger](p),
+		)
+	})(r)
+	r.f_Ptr_KeySource = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_KeySource = 2
+	return v
 }
 
 func (r *Root) get_SystemClock() services.SystemClock {
@@ -1509,6 +1588,26 @@ func (r *Root) NewAuthorizationParametersMessageStore() storage.AuthorizationPar
 	return v
 }
 
+func (r *Root) NewPtr_Verifier() *clientassertion.Verifier {
+	v := (func(p godi.Provider) *clientassertion.Verifier {
+		return clientassertion.NewVerifier(
+			godi.GetRequired[*ServerConfig](p).PrivateKeyJwtOptions,
+			godi.GetRequired[*clientassertion.KeySource](p),
+			godi.GetRequired[replay.Registry](p),
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[*slog.Logger](p),
+		)
+	})(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
+func (r *Root) NewSecretParser() validators.SecretParser {
+	v := (clientAssertionSecretParserFromProvider)(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
 func (r *Root) NewEndpointRouter() hosting.EndpointRouter {
 	v := (func(p godi.Provider) hosting.EndpointRouter {
 		return hosting.NewEndpointRouter(
@@ -2301,7 +2400,7 @@ func (r *Root) NewUserInfoRequestValidator() validators.UserInfoRequestValidator
 }
 
 func (r *Root) NewClientConfigurationValidator() validators.ClientConfigurationValidator {
-	return impl2.NewClientConfigurationValidator()
+	return impl2.NewClientConfigurationValidator(r.get_ClientFeatureDeclarations())
 }
 
 func (r *Root) NewDeviceAuthorizationRequestValidator() validators.DeviceAuthorizationRequestValidator {
@@ -2419,6 +2518,14 @@ func (r *Root) NewHandler_wicket_JwtBearerAuthenticationScheme() auth.Handler {
 	r.disp.TrackAny(v)
 	return v
 }
+
+func (r *Root) lazyReplayRegistry() replay.Registry { return r.get_lazyReplayRegistry() }
+
+func (r *Root) ClientFeatureDeclarations() validators.ClientFeatureDeclarations {
+	return r.get_ClientFeatureDeclarations()
+}
+
+func (r *Root) Ptr_KeySource() *clientassertion.KeySource { return r.get_Ptr_KeySource() }
 
 func (r *Root) SystemClock() services.SystemClock { return r.get_SystemClock() }
 
@@ -2624,6 +2731,16 @@ func (r *Root) GetService(t reflect.Type) any {
 	switch t {
 	case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
 		return r.NewAuthorizationParametersMessageStore()
+	case reflect.TypeFor[replay.Registry]():
+		return r.get_lazyReplayRegistry()
+	case reflect.TypeFor[validators.ClientFeatureDeclarations]():
+		return r.get_ClientFeatureDeclarations()
+	case reflect.TypeFor[*clientassertion.KeySource]():
+		return r.get_Ptr_KeySource()
+	case reflect.TypeFor[*clientassertion.Verifier]():
+		return r.NewPtr_Verifier()
+	case reflect.TypeFor[validators.SecretParser]():
+		return r.NewPostBodySecretParser()
 	case reflect.TypeFor[services.SystemClock]():
 		return r.get_SystemClock()
 	case reflect.TypeFor[*ServerConfig]():
@@ -2768,8 +2885,6 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewTokenRevocationResponseGenerator()
 	case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
 		return r.NewDeviceAuthorizationResponseGenerator()
-	case reflect.TypeFor[validators.SecretParser]():
-		return r.NewPostBodySecretParser()
 	case reflect.TypeFor[validators.SecretValidator]():
 		return r.NewHashedSharedSecretValidator()
 	case reflect.TypeFor[*impl2.ExtensionGrantValidator]():
@@ -2928,6 +3043,16 @@ func (r *Root) IsService(t reflect.Type) bool {
 	switch t {
 	case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
 		return true
+	case reflect.TypeFor[replay.Registry]():
+		return true
+	case reflect.TypeFor[validators.ClientFeatureDeclarations]():
+		return true
+	case reflect.TypeFor[*clientassertion.KeySource]():
+		return true
+	case reflect.TypeFor[*clientassertion.Verifier]():
+		return true
+	case reflect.TypeFor[validators.SecretParser]():
+		return true
 	case reflect.TypeFor[services.SystemClock]():
 		return true
 	case reflect.TypeFor[*ServerConfig]():
@@ -3071,8 +3196,6 @@ func (r *Root) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[responses.TokenRevocationResponseGenerator]():
 		return true
 	case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
-		return true
-	case reflect.TypeFor[validators.SecretParser]():
 		return true
 	case reflect.TypeFor[validators.SecretValidator]():
 		return true
@@ -3289,6 +3412,16 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		switch t {
 		case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
 			return []any{r.NewAuthorizationParametersMessageStore()}
+		case reflect.TypeFor[replay.Registry]():
+			return []any{r.get_lazyReplayRegistry()}
+		case reflect.TypeFor[validators.ClientFeatureDeclarations]():
+			return []any{r.get_ClientFeatureDeclarations()}
+		case reflect.TypeFor[*clientassertion.KeySource]():
+			return []any{r.get_Ptr_KeySource()}
+		case reflect.TypeFor[*clientassertion.Verifier]():
+			return []any{r.NewPtr_Verifier()}
+		case reflect.TypeFor[validators.SecretParser]():
+			return []any{r.NewSecretParser(), r.NewBasicAuthenticationSecretParser(), r.NewPostBodySecretParser()}
 		case reflect.TypeFor[services.SystemClock]():
 			return []any{r.get_SystemClock()}
 		case reflect.TypeFor[*ServerConfig]():
@@ -3433,8 +3566,6 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewTokenRevocationResponseGenerator()}
 		case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
 			return []any{r.NewDeviceAuthorizationResponseGenerator()}
-		case reflect.TypeFor[validators.SecretParser]():
-			return []any{r.NewBasicAuthenticationSecretParser(), r.NewPostBodySecretParser()}
 		case reflect.TypeFor[validators.SecretValidator]():
 			return []any{r.NewHashedSharedSecretValidator()}
 		case reflect.TypeFor[*impl2.ExtensionGrantValidator]():
@@ -3651,6 +3782,16 @@ func (s *scope) GetService(t reflect.Type) any {
 	switch t {
 	case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
 		return s.NewAuthorizationParametersMessageStore()
+	case reflect.TypeFor[replay.Registry]():
+		return s.root.get_lazyReplayRegistry()
+	case reflect.TypeFor[validators.ClientFeatureDeclarations]():
+		return s.root.get_ClientFeatureDeclarations()
+	case reflect.TypeFor[*clientassertion.KeySource]():
+		return s.root.get_Ptr_KeySource()
+	case reflect.TypeFor[*clientassertion.Verifier]():
+		return s.NewPtr_Verifier()
+	case reflect.TypeFor[validators.SecretParser]():
+		return s.NewPostBodySecretParser()
 	case reflect.TypeFor[services.SystemClock]():
 		return s.root.get_SystemClock()
 	case reflect.TypeFor[*ServerConfig]():
@@ -3795,8 +3936,6 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewTokenRevocationResponseGenerator()
 	case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
 		return s.NewDeviceAuthorizationResponseGenerator()
-	case reflect.TypeFor[validators.SecretParser]():
-		return s.NewPostBodySecretParser()
 	case reflect.TypeFor[validators.SecretValidator]():
 		return s.NewHashedSharedSecretValidator()
 	case reflect.TypeFor[*impl2.ExtensionGrantValidator]():
@@ -3955,6 +4094,16 @@ func (s *scope) IsService(t reflect.Type) bool {
 	switch t {
 	case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
 		return true
+	case reflect.TypeFor[replay.Registry]():
+		return true
+	case reflect.TypeFor[validators.ClientFeatureDeclarations]():
+		return true
+	case reflect.TypeFor[*clientassertion.KeySource]():
+		return true
+	case reflect.TypeFor[*clientassertion.Verifier]():
+		return true
+	case reflect.TypeFor[validators.SecretParser]():
+		return true
 	case reflect.TypeFor[services.SystemClock]():
 		return true
 	case reflect.TypeFor[*ServerConfig]():
@@ -4098,8 +4247,6 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[responses.TokenRevocationResponseGenerator]():
 		return true
 	case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
-		return true
-	case reflect.TypeFor[validators.SecretParser]():
 		return true
 	case reflect.TypeFor[validators.SecretValidator]():
 		return true
@@ -4295,6 +4442,16 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		switch t {
 		case reflect.TypeFor[storage.AuthorizationParametersMessageStore]():
 			return []any{s.NewAuthorizationParametersMessageStore()}
+		case reflect.TypeFor[replay.Registry]():
+			return []any{s.root.get_lazyReplayRegistry()}
+		case reflect.TypeFor[validators.ClientFeatureDeclarations]():
+			return []any{s.root.get_ClientFeatureDeclarations()}
+		case reflect.TypeFor[*clientassertion.KeySource]():
+			return []any{s.root.get_Ptr_KeySource()}
+		case reflect.TypeFor[*clientassertion.Verifier]():
+			return []any{s.NewPtr_Verifier()}
+		case reflect.TypeFor[validators.SecretParser]():
+			return []any{s.NewSecretParser(), s.NewBasicAuthenticationSecretParser(), s.NewPostBodySecretParser()}
 		case reflect.TypeFor[services.SystemClock]():
 			return []any{s.root.get_SystemClock()}
 		case reflect.TypeFor[*ServerConfig]():
@@ -4439,8 +4596,6 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewTokenRevocationResponseGenerator()}
 		case reflect.TypeFor[responses.DeviceAuthorizationResponseGenerator]():
 			return []any{s.NewDeviceAuthorizationResponseGenerator()}
-		case reflect.TypeFor[validators.SecretParser]():
-			return []any{s.NewBasicAuthenticationSecretParser(), s.NewPostBodySecretParser()}
 		case reflect.TypeFor[validators.SecretValidator]():
 			return []any{s.NewHashedSharedSecretValidator()}
 		case reflect.TypeFor[*impl2.ExtensionGrantValidator]():
@@ -4729,6 +4884,26 @@ func (s *scope) NewAuthorizationParametersMessageStore() storage.AuthorizationPa
 	v := (func(p godi.Provider) storage.AuthorizationParametersMessageStore {
 		return godi.GetRequired[*ServerConfig](p).AuthorizationParametersMessageStore()
 	})(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewPtr_Verifier() *clientassertion.Verifier {
+	v := (func(p godi.Provider) *clientassertion.Verifier {
+		return clientassertion.NewVerifier(
+			godi.GetRequired[*ServerConfig](p).PrivateKeyJwtOptions,
+			godi.GetRequired[*clientassertion.KeySource](p),
+			godi.GetRequired[replay.Registry](p),
+			godi.GetRequired[services.SystemClock](p),
+			godi.GetRequired[*slog.Logger](p),
+		)
+	})(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewSecretParser() validators.SecretParser {
+	v := (clientAssertionSecretParserFromProvider)(s)
 	s.disp.TrackAny(v)
 	return v
 }
@@ -5525,7 +5700,7 @@ func (s *scope) NewUserInfoRequestValidator() validators.UserInfoRequestValidato
 }
 
 func (s *scope) NewClientConfigurationValidator() validators.ClientConfigurationValidator {
-	return impl2.NewClientConfigurationValidator()
+	return impl2.NewClientConfigurationValidator(s.root.get_ClientFeatureDeclarations())
 }
 
 func (s *scope) NewDeviceAuthorizationRequestValidator() validators.DeviceAuthorizationRequestValidator {
@@ -5643,6 +5818,14 @@ func (s *scope) NewHandler_wicket_JwtBearerAuthenticationScheme() auth.Handler {
 	s.disp.TrackAny(v)
 	return v
 }
+
+func (s *scope) lazyReplayRegistry() replay.Registry { return s.root.get_lazyReplayRegistry() }
+
+func (s *scope) ClientFeatureDeclarations() validators.ClientFeatureDeclarations {
+	return s.root.get_ClientFeatureDeclarations()
+}
+
+func (s *scope) Ptr_KeySource() *clientassertion.KeySource { return s.root.get_Ptr_KeySource() }
 
 func (s *scope) SystemClock() services.SystemClock { return s.root.get_SystemClock() }
 

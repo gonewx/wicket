@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/clientassertion"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/handlers/results"
@@ -72,6 +73,10 @@ func (h *DeviceAuthorizationHandler) Process(w http.ResponseWriter, r *http.Requ
 	// RFC 8628 §3.1: clients with credentials authenticate as at the token
 	// endpoint; a public client identifies itself with client_id alone.
 	clientResult := h.clientValidator.Validate(r)
+	if clientResult != nil && errors.Is(clientResult.Error, clientassertion.ErrAuthenticationUnavailable) {
+		writeClientAuthenticationUnavailable(w)
+		return nil
+	}
 	if clientResult == nil || clientResult.Error != nil || clientResult.Client == nil {
 		h.debug("device authorization client authentication failed")
 		challenge := authorizationChallenge(r)

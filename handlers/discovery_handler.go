@@ -80,3 +80,11 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 
 	return results.NewDiscoveryDocumentResult(document, h.options.Discovery.ResponseCacheInterval).Execute(w, r)
 }
+
+// SetClientAssertionSigningAlgorithms records the signature algorithms of the
+// registered private_key_jwt parser. The handler advertises them under
+// token_endpoint_auth_signing_alg_values_supported while that method is
+// advertised.
+func (h *DiscoveryHandler) SetClientAssertionSigningAlgorithms(algorithms []string) {
+	h.assembly.clientAssertionSigningAlgorithms = slices.Clone(algorithms)
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/storage"
 	storage_models "github.com/gonewx/wicket/storage/models"
+	"github.com/gonewx/wicket/validators"
 	validators_contexts "github.com/gonewx/wicket/validators/contexts"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -39,13 +40,29 @@ func (ScopeParser) ParseScopeValues(scopes []string) *validators_models.ParsedSc
 
 // ClientConfigurationValidator accepts current client configuration.
 // input: client validation context -> behavior: leave context unchanged -> output: valid context.
-type ClientConfigurationValidator struct{}
-
-func NewClientConfigurationValidator() ClientConfigurationValidator {
-	return ClientConfigurationValidator{}
+type ClientConfigurationValidator struct {
+	// features reports the features the assembly declared enabled; nil
+	// means none is enabled.
+	features validators.ClientFeatureDeclarations
 }
 
-func (ClientConfigurationValidator) Validate(*validators_contexts.ClientConfigurationValidationContext) {
+func NewClientConfigurationValidator(features validators.ClientFeatureDeclarations) ClientConfigurationValidator {
+	return ClientConfigurationValidator{features: features}
+}
+
+func (v ClientConfigurationValidator) Validate(context *validators_contexts.ClientConfigurationValidationContext) {
+	if context == nil || context.Client == nil {
+		return
+	}
+	switch context.Client.TokenEndpointAuthMethod {
+	case "":
+	case wicket.EndpointAuthenticationMethodsPrivateKeyJwt:
+		if v.features == nil || !v.features.PrivateKeyJwtEnabled() {
+			context.SetError("client requires private_key_jwt client authentication but the feature is not enabled")
+		}
+	default:
+		context.SetError("client declares an unsupported token endpoint authentication method")
+	}
 }
 
 // CustomTokenRequestValidator leaves token request validation unchanged.

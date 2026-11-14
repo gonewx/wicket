@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/clientassertion"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/responses"
@@ -84,6 +85,10 @@ func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	clientResult := h.clientValidator.Validate(r)
+	if clientResult != nil && errors.Is(clientResult.Error, clientassertion.ErrAuthenticationUnavailable) {
+		writeClientAuthenticationUnavailable(w)
+		return nil
+	}
 	if clientResult == nil || clientResult.Error != nil {
 		response := responses_models.NewTokenErrorResponse()
 		response.Error = wicket.TokenErrorsInvalidClient
