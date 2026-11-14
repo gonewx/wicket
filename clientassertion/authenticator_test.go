@@ -6,17 +6,15 @@ package clientassertion
 import (
 	"context"
 	"errors"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"testing"
 	"time"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/models"
 	storage_models "github.com/gonewx/wicket/storage/models"
 	"github.com/gonewx/wicket/validators"
-	validators_impl "github.com/gonewx/wicket/validators/impl"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
@@ -82,9 +80,21 @@ func (v *innerApiValidator) Validate(*http.Request) *validators_models.ApiSecret
 	return v.result
 }
 
+// singleParserChain is the secret parser chain with the assertion parser as
+// its only member. The production chain lives in validators/impl, which
+// imports this package, so a test here cannot use it.
+type singleParserChain struct{ parser validators.SecretParser }
+
+func (c singleParserChain) Parse(request *http.Request) (*models.ParsedSecret, error) {
+	return c.parser.Parse(request)
+}
+
+func (c singleParserChain) GetAvailableAuthenticationMethods() []string {
+	return []string{c.parser.AuthenticationMethod()}
+}
+
 func parserChain() validators.SecretsListParser {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return validators_impl.NewSecretParser([]validators.SecretParser{NewParser(Options{}, 100)}, logger)
+	return singleParserChain{parser: NewParser(Options{}, 100)}
 }
 
 type clientScene struct {

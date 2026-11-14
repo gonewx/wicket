@@ -10,7 +10,8 @@ import "net/http"
 const clientAuthenticationUnavailableBody = "Internal Server Error\n"
 
 // writeClientAuthenticationUnavailable answers a request whose client
-// authentication could not be decided because the replay registry failed.
+// authentication could not be decided because a backing store (the replay
+// registry or the client store) failed.
 // The response is fixed: it carries no protocol error and no detail of the
 // failure, and must not be cached.
 func writeClientAuthenticationUnavailable(w http.ResponseWriter) {

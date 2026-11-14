@@ -42,7 +42,7 @@ func (s *ValidatingClientStore[T]) FindClientById(ctx context.Context, id string
 	}
 
 	if client == nil {
-		return nil, nil
+		return nil, storage.ErrNotFound
 	}
 
 	if s.logger.Enabled(ctx, slog.LevelDebug) {
@@ -59,5 +59,5 @@ func (s *ValidatingClientStore[T]) FindClientById(ctx context.Context, id string
 
 	s.logger.Error("Invalid client configuration for client.", slog.String("clientId", client.ClientId), slog.String("errorMessage", validationCtx.ErrorMessage))
 
-	return nil, fmt.Errorf("Invalid client configuration for client")
+	return nil, fmt.Errorf("%w: client %q: %s", storage.ErrInvalidClientConfiguration, client.ClientId, validationCtx.ErrorMessage)
 }

@@ -15,8 +15,9 @@
 // together in front of the shared-secret validators.
 //
 // Every validation failure is reported the same way, as invalid_client
-// without a description. A failing replay registry is reported as
-// ErrAuthenticationUnavailable, which is neither a replay nor a success.
+// without a description. A failing replay registry or client store is
+// reported as ErrAuthenticationUnavailable, which is neither a replay nor a
+// success.
 // Assertions, signatures, assertion identifiers, registry keys and fetched
 // key sets are never logged.
 package clientassertion

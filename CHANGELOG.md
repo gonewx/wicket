@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ServerConfig.SetClientStore` / `ClientStore`: an optional injection seam for the client store, so clients can live in a database instead of the static `SetClients` list. The container always wraps the injected store in `storage/impl.ValidatingClientStore`. The seam excludes `SetClients` and `SetClientsProvider`: setting both panics in `Freeze()` naming the client store and `SetClients`. The injected value must also implement the new `storage.ClientOriginLookup` (`FindClientsByAllowedOrigin(ctx, origin)`, an exact match on `AllowedCorsOrigins` without filtering on `Enabled`), which CORS decisions now read; `Freeze()` panics when it does not. With an injected store an origin is allowed only through an enabled client that passes configuration validation, and a lookup failure denies the origin; the CORS result for the static client list is unchanged. `storage/memory.MemoryClientStore` implements `ClientOriginLookup`.
+- `storage.ErrInvalidClientConfiguration`: the sentinel for a client record that exists but fails configuration validation, and `extensions.IsClientRejected(err)`, which reports `storage.ErrNotFound` or `storage.ErrInvalidClientConfiguration`.
+
+### Changed
+
+- **Breaking**: `storage/impl.ValidatingClientStore.FindClientById` returns `storage.ErrNotFound` when the inner store returns `(nil, nil)`, and an error wrapping `storage.ErrInvalidClientConfiguration` (with the client id and the validation message) when validation fails, instead of `(nil, nil)` and an unclassified error.
+- Client existence gate: every credential redemption and introspection path now tells a rejected client from a client store failure. Client authentication at the token, revocation, backchannel authentication and device authorization endpoints (shared secret, `private_key_jwt` and mutual TLS) answers `invalid_client` for a missing, disabled or invalid client as before, and 500 with the fixed body `Internal Server Error` for any other client store error, which previously answered `invalid_client`. Access token validation (introspection, userinfo) and identity token validation (`id_token_hint` at end session) keep their invalid-token results for a rejected client and return the store error, answered as a server error, for any other failure. Authorization codes, refresh tokens and tokens of a deleted client therefore stop working at the next redemption or introspection; a resource server that validates JWT access tokens offline accepts them until they expire.
+- **Breaking**: `services/memory.NewMemoryCorsPolicyService` takes a `storage.ClientOriginLookup` and an optional acceptance function instead of a client slice.
+- Store seam validation: each store seam now carries a category. The authorization parameters message store and the client store are optional: `Freeze()` no longer fails when the authorization parameters message store is not injected and no fallback is declared, and it logs one warning per optional seam left uninjected when a logger is set. The other ten seams stay required.
+
 ## [0.4.0] - 2026-11-13
 
 ### Added

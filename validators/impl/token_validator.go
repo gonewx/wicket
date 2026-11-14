@@ -92,7 +92,10 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 			return nil, err
 		}
 
-		result = v.validateJwt(ctx, token, keys, true, "")
+		result, err = v.validateJwt(ctx, token, keys, true, "")
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		if len(token) > v.options.InputLengthRestrictions.TokenHandle {
 			v.logger.Error("token handle too long")
@@ -102,7 +105,11 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 			return result, nil
 		}
 
-		result = v.validateReferenceAccessToken(ctx, token)
+		var err error
+		result, err = v.validateReferenceAccessToken(ctx, token)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if result.Error != nil {
@@ -116,6 +123,10 @@ func (v *TokenValidator) ValidateAccessToken(ctx context.Context, token string, 
 
 	if clientClaim != nil {
 		client, err := extensions.FindEnabledClientById(ctx, v.clients, clientClaim.Value.(string))
+		if err != nil && !extensions.IsClientRejected(err) {
+			v.logger.Error("Client store failed while loading client", slog.String("clientId", clientClaim.Value.(string)), slog.String("error", err.Error()))
+			return nil, err
+		}
 		if err != nil || client == nil {
 			v.logger.Error("Client deleted or disabled", slog.String("clientId", clientClaim.Value.(string)))
 			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
@@ -224,6 +235,10 @@ func (v *TokenValidator) ValidateIdentityToken(ctx context.Context, token string
 	}
 
 	client, err := extensions.FindEnabledClientById(ctx, v.clients, clientId)
+	if err != nil && !extensions.IsClientRejected(err) {
+		v.logger.Error("Client store failed while loading client", slog.String("clientId", clientId), slog.String("error", err.Error()))
+		return nil, err
+	}
 	if err != nil || client == nil {
 		v.logger.Error("Unknown or disabled client", slog.String("clientId", clientId))
 		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
@@ -237,7 +252,10 @@ func (v *TokenValidator) ValidateIdentityToken(ctx context.Context, token string
 		return nil, err
 	}
 
-	result := v.validateJwt(ctx, token, keys, validateLifetime, clientId)
+	result, err := v.validateJwt(ctx, token, keys, validateLifetime, clientId)
+	if err != nil {
+		return nil, err
+	}
 
 	result.Client = client
 
@@ -310,15 +328,17 @@ func (v *TokenValidator) parseJwt(jwtString string, validationKeys []*models.Sec
 	return jwt.Parse([]byte(jwtString), opts...)
 }
 
-func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, validationKeys []*models.SecurityKeyInfo, validateLifetime bool, audience string) *validators_models.TokenValidationResult {
+// validateJwt returns an invalid result for a token that cannot be accepted
+// and a non-nil error only for an infrastructure failure.
+func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, validationKeys []*models.SecurityKeyInfo, validateLifetime bool, audience string) (*validators_models.TokenValidationResult, error) {
 	token, err := v.parseJwt(jwtString, validationKeys, validateLifetime, audience)
 	if err != nil {
 		if errors.Is(err, jwt.TokenExpiredError()) {
 			v.logger.Error("JWT token validation expired error", slog.String("error", err.Error()))
-			return v.invalid(wicket.ProtectedResourceErrorsExpiredToken)
+			return v.invalid(wicket.ProtectedResourceErrorsExpiredToken), nil
 		} else {
 			v.logger.Error("JWT token validation error", slog.String("error", err.Error()))
-			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 		}
 	}
 
@@ -334,13 +354,17 @@ func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, vali
 		cid, ok := clientId.(string)
 		if !ok || cid == "" {
 			v.logger.Error("No client id in token")
-			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 		}
 
 		client, err = extensions.FindEnabledClientById(ctx, v.clients, cid)
+		if err != nil && !extensions.IsClientRejected(err) {
+			v.logger.Error("Client store failed while loading client", slog.String("clientId", cid), slog.String("error", err.Error()))
+			return nil, err
+		}
 		if err != nil || client == nil {
 			v.logger.Error("Client deleted or disabled", slog.String("clientId", cid))
-			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
+			return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 		}
 	}
 
@@ -359,7 +383,7 @@ func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, vali
 			// check the scope format (array vs space delimited string)
 			scopes, err := parseScopes(value)
 			if err != nil {
-				return v.invalid(err)
+				return v.invalid(err), nil
 			}
 
 			for _, scope := range scopes {
@@ -392,7 +416,7 @@ func (v *TokenValidator) validateJwt(ctx context.Context, jwtString string, vali
 	result.Client = client
 	result.Jwt = jwtString
 
-	return result
+	return result, nil
 }
 
 func parseScope(s string) []string {
@@ -445,34 +469,40 @@ func (v *TokenValidator) getClientIdFromJwt(token string) (string, error) {
 	return clientId, nil
 }
 
-func (v *TokenValidator) validateReferenceAccessToken(ctx context.Context, tokenHandle string) *validators_models.TokenValidationResult {
+// validateReferenceAccessToken returns an invalid result for a token that
+// cannot be accepted and a non-nil error only for a client store failure.
+func (v *TokenValidator) validateReferenceAccessToken(ctx context.Context, tokenHandle string) (*validators_models.TokenValidationResult, error) {
 	token, err := v.referenceTokenStore.GetReferenceToken(ctx, tokenHandle)
 	if err != nil || token == nil {
 		v.logger.Error("Invalid reference token")
-		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
+		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 	}
 
 	if v.clock.Now().After(token.CreationTime.Add(time.Duration(token.Lifetime) * time.Second)) {
 		v.logger.Error("Reference token expired")
-		return v.invalid(wicket.ProtectedResourceErrorsExpiredToken)
+		return v.invalid(wicket.ProtectedResourceErrorsExpiredToken), nil
 	}
 
 	// load the client that is defined in the token
 	var client *storage_models.Client
 	if token.ClientId != "" {
 		client, err = extensions.FindEnabledClientById(ctx, v.clients, token.ClientId)
+		if err != nil && !extensions.IsClientRejected(err) {
+			v.logger.Error("Client store failed while loading client", slog.String("clientId", token.ClientId), slog.String("error", err.Error()))
+			return nil, err
+		}
 	}
 
 	if err != nil || client == nil {
-		v.logger.Error("lient deleted or disabled", slog.String("clientId", token.ClientId))
-		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken)
+		v.logger.Error("Client deleted or disabled", slog.String("clientId", token.ClientId))
+		return v.invalid(wicket.ProtectedResourceErrorsInvalidToken), nil
 	}
 
 	result := validators_models.NewTokenValidationResult()
 	result.Client = client
 	result.Claims = v.referenceTokenToClaims(token)
 
-	return result
+	return result, nil
 }
 
 func (v *TokenValidator) referenceTokenToClaims(token *storage_models.Token) []*claimspkg.Claim {

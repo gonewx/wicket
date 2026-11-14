@@ -4,6 +4,7 @@
 package clientcert
 
 import (
+	"fmt"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/clientassertion"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/models"
 	"github.com/gonewx/wicket/services"
@@ -69,6 +71,12 @@ func (a *ClientAuthenticator) Validate(request *http.Request) *validators_models
 		return a.delegate(request)
 	}
 	client, err := extensions.FindEnabledClientById(request.Context(), a.clients, clientId)
+	if err != nil && !extensions.IsClientRejected(err) {
+		if a.logger != nil {
+			a.logger.Error("client store failed while loading client", slog.String("client_id", clientId), slog.String("error", err.Error()))
+		}
+		return unavailable(err)
+	}
 	if err != nil || client == nil || !IsCertificateMethod(client.TokenEndpointAuthMethod) {
 		return a.delegate(request)
 	}
@@ -133,6 +141,14 @@ func (a *ClientAuthenticator) info(message string, clientId string) {
 func failed() *validators_models.ClientSecretValidationResult {
 	result := validators_models.NewClientSecretValidationResult()
 	result.Error = wicket.TokenErrorsInvalidClient
+	return result
+}
+
+// unavailable reports that the client could not be loaded because the client
+// store failed, which is neither an invalid client nor a success.
+func unavailable(err error) *validators_models.ClientSecretValidationResult {
+	result := validators_models.NewClientSecretValidationResult()
+	result.Error = fmt.Errorf("%w: %w", clientassertion.ErrAuthenticationUnavailable, err)
 	return result
 }
 

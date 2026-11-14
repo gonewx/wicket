@@ -15,31 +15,58 @@ import (
 	"time"
 
 	"github.com/gonewx/wicket/replay"
+	"github.com/gonewx/wicket/storage"
+	storage_models "github.com/gonewx/wicket/storage/models"
 )
 
 const replayTestKey = "7e0c6a1f5d3b49287f6e5d4c3b2a19087e6d5c4b3a29180f7e6d5c4b3a291807"
 
 var replayTestInstant = time.Date(2100, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-// replayOtherSeams lists the store seams that existed before the replay
-// registry seam, in the order Freeze checks them, each with a way to mark it
+// replayOtherSeams lists the store seams other than the replay registry, in
+// the order Freeze checks them, each with its category and a way to mark it
 // injected. A provider that returns nil is enough: Freeze looks at whether a
 // provider was set and never calls it.
 var replayOtherSeams = []struct {
-	name   string
-	inject func(*ServerConfig)
+	name     string
+	category storeSeamCategory
+	inject   func(*ServerConfig)
 }{
-	{"authorization parameters message store", func(c *ServerConfig) { c.SetAuthorizationParametersMessageStore(nil) }},
-	{"persisted grant store", func(c *ServerConfig) { c.SetPersistedGrantStore(nil) }},
-	{"device flow store", func(c *ServerConfig) { c.SetDeviceFlowStore(nil) }},
-	{"backchannel authentication request store", func(c *ServerConfig) { c.SetBackchannelAuthenticationRequestStore(nil) }},
-	{"authorization code store", func(c *ServerConfig) { c.SetAuthorizationCodeStore(nil) }},
-	{"refresh token store", func(c *ServerConfig) { c.SetRefreshTokenStore(nil) }},
-	{"reference token store", func(c *ServerConfig) { c.SetReferenceTokenStore(nil) }},
-	{"user consent store", func(c *ServerConfig) { c.SetUserConsentStore(nil) }},
-	{"session store", func(c *ServerConfig) { c.SetSessionStore(nil) }},
-	{"distributed cache", func(c *ServerConfig) { c.SetDistributedCache(nil) }},
-	{"key record store", func(c *ServerConfig) { c.SetRecordStore(nil) }},
+	{"authorization parameters message store", storeSeamOptional, func(c *ServerConfig) { c.SetAuthorizationParametersMessageStore(nil) }},
+	{"persisted grant store", storeSeamRequired, func(c *ServerConfig) { c.SetPersistedGrantStore(nil) }},
+	{"device flow store", storeSeamRequired, func(c *ServerConfig) { c.SetDeviceFlowStore(nil) }},
+	{"backchannel authentication request store", storeSeamRequired, func(c *ServerConfig) { c.SetBackchannelAuthenticationRequestStore(nil) }},
+	{"authorization code store", storeSeamRequired, func(c *ServerConfig) { c.SetAuthorizationCodeStore(nil) }},
+	{"refresh token store", storeSeamRequired, func(c *ServerConfig) { c.SetRefreshTokenStore(nil) }},
+	{"reference token store", storeSeamRequired, func(c *ServerConfig) { c.SetReferenceTokenStore(nil) }},
+	{"user consent store", storeSeamRequired, func(c *ServerConfig) { c.SetUserConsentStore(nil) }},
+	{"session store", storeSeamRequired, func(c *ServerConfig) { c.SetSessionStore(nil) }},
+	{"distributed cache", storeSeamRequired, func(c *ServerConfig) { c.SetDistributedCache(nil) }},
+	{"key record store", storeSeamRequired, func(c *ServerConfig) { c.SetRecordStore(nil) }},
+	{"client store", storeSeamOptional, func(c *ServerConfig) { c.SetClientStore(replayOriginClientStore{}) }},
+}
+
+// replayOriginClientStore is the smallest injectable client store: Freeze
+// only checks that it answers origin lookups as well.
+type replayOriginClientStore struct{}
+
+func (replayOriginClientStore) FindClientById(context.Context, string) (*storage_models.Client, error) {
+	return nil, storage.ErrNotFound
+}
+
+func (replayOriginClientStore) FindClientsByAllowedOrigin(context.Context, string) ([]*storage_models.Client, error) {
+	return []*storage_models.Client{}, nil
+}
+
+// replayFirstRequiredSeam is the first seam Freeze fails on when nothing is
+// injected.
+func replayFirstRequiredSeam() string {
+	for _, seam := range replayOtherSeams {
+		if seam.category == storeSeamRequired {
+			return seam.name
+		}
+	}
+	return ""
 }
 
 // replayConfig returns a configuration with every other seam injected except
@@ -523,20 +550,26 @@ func TestReplayRegistryProviderYieldingNil(t *testing.T) {
 	})
 }
 
-// The store seams that existed before keep their names, their order and
-// their failure text, with or without the replay registry seam in play.
+// The store seams keep their names, their order, their categories and their
+// failure text, with or without the replay registry seam in play. The replay
+// registry is not one of them.
 func TestReplayRegistryLeavesStoreSeamValidationUnchanged(t *testing.T) {
 	t.Run("seam list", func(t *testing.T) {
-		var names []string
+		var names, categories []string
 		for _, seam := range NewServerConfig().storeSeams() {
 			names = append(names, seam.name)
+			categories = append(categories, seam.category.String())
 		}
-		var want []string
+		var want, wantCategories []string
 		for _, seam := range replayOtherSeams {
 			want = append(want, seam.name)
+			wantCategories = append(wantCategories, seam.category.String())
 		}
-		if len(names) != 11 || !slices.Equal(names, want) {
-			t.Fatalf("storeSeams() names = %v, want the 11 names %v", names, want)
+		if len(names) != 12 || !slices.Equal(names, want) {
+			t.Fatalf("storeSeams() names = %v, want the 12 names %v", names, want)
+		}
+		if !slices.Equal(categories, wantCategories) {
+			t.Fatalf("storeSeams() categories = %v, want %v", categories, wantCategories)
 		}
 	})
 
@@ -545,6 +578,15 @@ func TestReplayRegistryLeavesStoreSeamValidationUnchanged(t *testing.T) {
 	}
 
 	for _, seam := range replayOtherSeams {
+		if seam.category == storeSeamOptional {
+			t.Run("missing optional "+seam.name, func(t *testing.T) {
+				replayConfig(nil, seam.name).Freeze()
+				cfg := replayConfig([]string{"private_key_jwt"}, seam.name)
+				cfg.SetReplayRegistry(&replayRecordingRegistry{})
+				cfg.Freeze()
+			})
+			continue
+		}
 		t.Run("missing "+seam.name, func(t *testing.T) {
 			if got := replayPanicString(t, replayConfig(nil, seam.name).Freeze); got != missingText(seam.name) {
 				t.Fatalf("Freeze panicked with %q, want %q", got, missingText(seam.name))
@@ -574,7 +616,7 @@ func TestReplayRegistryLeavesStoreSeamValidationUnchanged(t *testing.T) {
 	})
 
 	t.Run("nothing injected and nothing declared", func(t *testing.T) {
-		first := replayOtherSeams[0].name
+		first := replayFirstRequiredSeam()
 		if got := replayPanicString(t, NewServerConfig().Freeze); got != missingText(first) {
 			t.Fatalf("Freeze panicked with %q, want %q", got, missingText(first))
 		}
@@ -583,7 +625,7 @@ func TestReplayRegistryLeavesStoreSeamValidationUnchanged(t *testing.T) {
 	t.Run("replay registry fallback is not the global fallback", func(t *testing.T) {
 		cfg := NewServerConfig()
 		cfg.AllowInMemoryReplayRegistryFallback()
-		first := replayOtherSeams[0].name
+		first := replayFirstRequiredSeam()
 		if got := replayPanicString(t, cfg.Freeze); got != missingText(first) {
 			t.Fatalf("Freeze panicked with %q, want %q", got, missingText(first))
 		}

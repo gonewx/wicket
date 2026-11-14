@@ -40,7 +40,6 @@ import (
 	"github.com/gonewx/wicket/server"
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/services/impl"
-	memory2 "github.com/gonewx/wicket/services/memory"
 	"github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
 	impl4 "github.com/gonewx/wicket/storage/impl"
@@ -2149,12 +2148,8 @@ func (r *Root) NewSlice_ValidationKeysStore() []storage.ValidationKeysStore {
 
 func (r *Root) NewClientStore() storage.ClientStore {
 	v := (func(p godi.Provider) storage.ClientStore {
-		inner, err := memory.NewMemoryClientStore(godi.GetRequired[*ServerConfig](p).Clients())
-		if err != nil {
-			panic(fmt.Errorf("construct MemoryClientStore: %w", err))
-		}
 		return impl4.NewValidatingClientStore(
-			inner,
+			clientStoreSource(godi.GetRequired[*ServerConfig](p)),
 			godi.GetRequired[validators.ClientConfigurationValidator](p),
 			godi.GetRequired[*slog.Logger](p),
 		)
@@ -2165,9 +2160,10 @@ func (r *Root) NewClientStore() storage.ClientStore {
 
 func (r *Root) NewCorsPolicyService() services.CorsPolicyService {
 	v := (func(p godi.Provider) services.CorsPolicyService {
-		return memory2.NewMemoryCorsPolicyService(
+		return newCorsPolicyService(
+			godi.GetRequired[*ServerConfig](p),
+			godi.GetRequired[validators.ClientConfigurationValidator](p),
 			godi.GetRequired[*slog.Logger](p),
-			godi.GetRequired[*ServerConfig](p).Clients(),
 		)
 	})(r)
 	r.disp.TrackAny(v)
@@ -5476,12 +5472,8 @@ func (s *scope) NewSlice_ValidationKeysStore() []storage.ValidationKeysStore {
 
 func (s *scope) NewClientStore() storage.ClientStore {
 	v := (func(p godi.Provider) storage.ClientStore {
-		inner, err := memory.NewMemoryClientStore(godi.GetRequired[*ServerConfig](p).Clients())
-		if err != nil {
-			panic(fmt.Errorf("construct MemoryClientStore: %w", err))
-		}
 		return impl4.NewValidatingClientStore(
-			inner,
+			clientStoreSource(godi.GetRequired[*ServerConfig](p)),
 			godi.GetRequired[validators.ClientConfigurationValidator](p),
 			godi.GetRequired[*slog.Logger](p),
 		)
@@ -5492,9 +5484,10 @@ func (s *scope) NewClientStore() storage.ClientStore {
 
 func (s *scope) NewCorsPolicyService() services.CorsPolicyService {
 	v := (func(p godi.Provider) services.CorsPolicyService {
-		return memory2.NewMemoryCorsPolicyService(
+		return newCorsPolicyService(
+			godi.GetRequired[*ServerConfig](p),
+			godi.GetRequired[validators.ClientConfigurationValidator](p),
 			godi.GetRequired[*slog.Logger](p),
-			godi.GetRequired[*ServerConfig](p).Clients(),
 		)
 	})(s)
 	s.disp.TrackAny(v)

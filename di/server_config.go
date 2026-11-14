@@ -37,6 +37,10 @@ type ServerConfig struct {
 	apiResourcesProvider            func() []*storage_models.ApiResource
 	apiScopesProvider               func() []*storage_models.ApiScope
 
+	// clientStore is the host-injected client store, see SetClientStore. It
+	// excludes clientsProvider.
+	clientStore storage.ClientStore
+
 	authorizationParametersMessageStoreProvider   func() storage.AuthorizationParametersMessageStore
 	persistedGrantStoreProvider                   func() storage.PersistedGrantStore
 	deviceFlowStoreProvider                       func() storage.DeviceFlowStore
@@ -82,34 +86,118 @@ func NewServerConfig() *ServerConfig {
 	return &ServerConfig{}
 }
 
+// storeSeamCategory says what Freeze demands of a store seam the host did not
+// inject.
+type storeSeamCategory int
+
+const (
+	// storeSeamRequired must be injected unless the host declared the
+	// in-memory fallback with AllowInMemoryFallback.
+	storeSeamRequired storeSeamCategory = iota
+	// storeSeamOptional may stay uninjected; the assembly then runs without a
+	// store or on a fixed in-memory implementation, and Freeze logs a warning.
+	storeSeamOptional
+	// storeSeamFeatureRequired must be injected while its condition holds,
+	// unless the host declared that seam's own fallback. AllowInMemoryFallback
+	// does not exempt it.
+	storeSeamFeatureRequired
+)
+
+func (c storeSeamCategory) String() string {
+	switch c {
+	case storeSeamRequired:
+		return "required"
+	case storeSeamOptional:
+		return "optional"
+	case storeSeamFeatureRequired:
+		return "feature-required"
+	default:
+		return fmt.Sprintf("storeSeamCategory(%d)", int(c))
+	}
+}
+
 // storeSeam describes one store injection seam for the assembly-time
-// validation in Freeze. A seam is satisfied when the host injected a provider;
-// otherwise the host must have declared the in-memory fallback explicitly.
+// validation in Freeze.
 //
 // The authorization parameters message store seam is special: it is read
 // directly by the ReturnUrlParser factory (no container wrapper, di/
-// lifecycle.go covers the other ten seams), so its lifecycle belongs to the
+// lifecycle.go covers the ten required seams), so its lifecycle belongs to the
 // host — the host that injected the store owns closing it, and the container
-// never releases it.
+// never releases it. The same holds for an injected client store.
 type storeSeam struct {
 	name     string
+	category storeSeamCategory
 	injected func() bool
+	// condition and fallbackDeclared apply to storeSeamFeatureRequired only:
+	// the seam is demanded while condition reports true, and fallbackDeclared
+	// reports the host's per-seam fallback declaration.
+	condition        func() bool
+	fallbackDeclared func() bool
 }
 
 // storeSeams enumerates every store seam the composition root validates.
 func (c *ServerConfig) storeSeams() []storeSeam {
 	return []storeSeam{
-		{"authorization parameters message store", func() bool { return c.authorizationParametersMessageStoreProvider != nil }},
-		{"persisted grant store", func() bool { return c.persistedGrantStoreProvider != nil }},
-		{"device flow store", func() bool { return c.deviceFlowStoreProvider != nil }},
-		{"backchannel authentication request store", func() bool { return c.backchannelAuthenticationRequestStoreProvider != nil }},
-		{"authorization code store", func() bool { return c.authorizationCodeStoreProvider != nil }},
-		{"refresh token store", func() bool { return c.refreshTokenStoreProvider != nil }},
-		{"reference token store", func() bool { return c.referenceTokenStoreProvider != nil }},
-		{"user consent store", func() bool { return c.userConsentStoreProvider != nil }},
-		{"session store", func() bool { return c.sessionStoreProvider != nil }},
-		{"distributed cache", func() bool { return c.distributedCacheProvider != nil }},
-		{"key record store", func() bool { return c.recordStoreProvider != nil }},
+		{name: "authorization parameters message store", category: storeSeamOptional, injected: func() bool { return c.authorizationParametersMessageStoreProvider != nil }},
+		{name: "persisted grant store", injected: func() bool { return c.persistedGrantStoreProvider != nil }},
+		{name: "device flow store", injected: func() bool { return c.deviceFlowStoreProvider != nil }},
+		{name: "backchannel authentication request store", injected: func() bool { return c.backchannelAuthenticationRequestStoreProvider != nil }},
+		{name: "authorization code store", injected: func() bool { return c.authorizationCodeStoreProvider != nil }},
+		{name: "refresh token store", injected: func() bool { return c.refreshTokenStoreProvider != nil }},
+		{name: "reference token store", injected: func() bool { return c.referenceTokenStoreProvider != nil }},
+		{name: "user consent store", injected: func() bool { return c.userConsentStoreProvider != nil }},
+		{name: "session store", injected: func() bool { return c.sessionStoreProvider != nil }},
+		{name: "distributed cache", injected: func() bool { return c.distributedCacheProvider != nil }},
+		{name: "key record store", injected: func() bool { return c.recordStoreProvider != nil }},
+		{name: "client store", category: storeSeamOptional, injected: func() bool { return c.clientStore != nil }},
+	}
+}
+
+// validateStoreSeams applies each seam's category to the host's injections.
+// It panics on the first unmet seam and logs one warning per uninjected
+// optional seam when logger is non-nil.
+func validateStoreSeams(seams []storeSeam, allowInMemoryFallback bool, logger *slog.Logger) {
+	for _, seam := range seams {
+		if seam.injected() {
+			continue
+		}
+		switch seam.category {
+		case storeSeamOptional:
+			if logger != nil {
+				logger.Warn("optional store seam not injected by host", slog.String("seam", seam.name))
+			}
+		case storeSeamFeatureRequired:
+			if seam.condition == nil {
+				panic(fmt.Sprintf("store seam %q is feature-required but declares no condition", seam.name))
+			}
+			if !seam.condition() {
+				continue
+			}
+			if seam.fallbackDeclared != nil && seam.fallbackDeclared() {
+				continue
+			}
+			panic(fmt.Sprintf("store seam %q is required by an enabled feature, not injected by host and its fallback not declared", seam.name))
+		default:
+			if allowInMemoryFallback {
+				continue
+			}
+			panic(fmt.Sprintf("store seam %q not injected by host and in-memory fallback not declared", seam.name))
+		}
+	}
+}
+
+// requireClientStoreSeam checks an injected client store: it excludes the
+// static client list, and it must answer CORS origin lookups from the same
+// data it serves clients from.
+func (c *ServerConfig) requireClientStoreSeam() {
+	if c.clientStore == nil {
+		return
+	}
+	if c.clientsProvider != nil {
+		panic("client store injected by host together with SetClients or SetClientsProvider; use one of them")
+	}
+	if _, ok := c.clientStore.(storage.ClientOriginLookup); !ok {
+		panic(fmt.Sprintf("client store injected by host (%T) does not implement storage.ClientOriginLookup, which CORS decisions require", c.clientStore))
 	}
 }
 
@@ -124,14 +212,8 @@ func (c *ServerConfig) Freeze() {
 	c.frozen = true
 	c.requirePrivateKeyJwtOptions()
 	c.requireReplayRegistrySeam()
-	if c.allowInMemoryFallback {
-		return
-	}
-	for _, seam := range c.storeSeams() {
-		if !seam.injected() {
-			panic(fmt.Sprintf("store seam %q not injected by host and in-memory fallback not declared", seam.name))
-		}
-	}
+	c.requireClientStoreSeam()
+	validateStoreSeams(c.storeSeams(), c.allowInMemoryFallback, c.logger)
 }
 
 func (c *ServerConfig) Frozen() bool {
@@ -192,6 +274,24 @@ func (c *ServerConfig) Clients() []*storage_models.Client {
 		return nil
 	}
 	return c.clientsProvider()
+}
+
+// SetClientStore injects the host's client store. The container always wraps
+// it in the configuration-validating decorator, so every read path sees only
+// clients whose configuration passes validation. The value must also
+// implement storage.ClientOriginLookup, which CORS decisions read, and it
+// excludes SetClients and SetClientsProvider; Freeze enforces both.
+func (c *ServerConfig) SetClientStore(store storage.ClientStore) {
+	c.clientStore = store
+}
+
+// ClientStore returns the host-injected client store, or nil when the host
+// feeds clients through SetClients or SetClientsProvider.
+func (c *ServerConfig) ClientStore() storage.ClientStore {
+	if c == nil {
+		return nil
+	}
+	return c.clientStore
 }
 
 func (c *ServerConfig) SetIdentityScopesProvider(provider func() []*storage_models.IdentityResource) {

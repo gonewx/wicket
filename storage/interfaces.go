@@ -54,6 +54,13 @@ var ErrDuplicateHandle = errors.New("storage: duplicate handle")
 // resolves the conflict itself.
 var ErrVersionConflict = errors.New("storage: version conflict")
 
+// ErrInvalidClientConfiguration reports that a client record was found but its
+// configuration failed the runtime configuration validation (including a
+// configuration that relies on a feature the assembly does not enable). Read
+// paths treat it like an absent client: the client cannot be used, and the
+// failure is not an infrastructure error.
+var ErrInvalidClientConfiguration = errors.New("storage: invalid client configuration")
+
 // MessageStore persists an opaque message value by generated handle. Message
 // data is either self-contained in a protected payload or held by the client,
 // so the store keeps no server-side lifecycle and carries no reclamation

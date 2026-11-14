@@ -491,7 +491,6 @@ func TestServerConfigFreezeRequiresInjectedStores(t *testing.T) {
 		name  string
 		unset func(*ServerConfig)
 	}{
-		{"authorization parameters message store", func(c *ServerConfig) { c.authorizationParametersMessageStoreProvider = nil }},
 		{"persisted grant store", func(c *ServerConfig) { c.persistedGrantStoreProvider = nil }},
 		{"device flow store", func(c *ServerConfig) { c.deviceFlowStoreProvider = nil }},
 		{"backchannel authentication request store", func(c *ServerConfig) { c.backchannelAuthenticationRequestStoreProvider = nil }},
@@ -521,6 +520,17 @@ func TestServerConfigFreezeRequiresInjectedStores(t *testing.T) {
 			cfg.Freeze()
 		})
 	}
+
+	// The authorization parameters message store is an optional seam: without
+	// it the assembly stores no authorize parameters, so Freeze accepts its
+	// absence even without the fallback declaration.
+	t.Run("missing optional authorization parameters message store", func(t *testing.T) {
+		t.Parallel()
+		cfg := NewServerConfig()
+		injectAll(cfg)
+		cfg.authorizationParametersMessageStoreProvider = nil
+		cfg.Freeze() // must not panic
+	})
 
 	t.Run("mixed injection without declaration", func(t *testing.T) {
 		t.Parallel()

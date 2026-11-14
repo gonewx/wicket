@@ -109,6 +109,11 @@ type WicketPipeline struct {
 	CustomRequest   *messages.AuthorizationRequest
 
 	AuthorizationParametersMessageStore storage.AuthorizationParametersMessageStore
+
+	// ClientStore, when set before Initialize, is injected as the host client
+	// store and replaces Clients; it must also implement
+	// storage.ClientOriginLookup.
+	ClientStore storage.ClientStore
 }
 
 func NewWicketPipeline() *WicketPipeline {
@@ -397,9 +402,13 @@ func (p *WicketPipeline) configureServices() {
 	cfg.SetValidationKeysStoresProvider(func() []storage.ValidationKeysStore {
 		return p.ValidationKeysStores
 	})
-	cfg.SetClientsProvider(func() []*storage_models.Client {
-		return p.Clients
-	})
+	if p.ClientStore != nil {
+		cfg.SetClientStore(p.ClientStore)
+	} else {
+		cfg.SetClientsProvider(func() []*storage_models.Client {
+			return p.Clients
+		})
+	}
 	cfg.SetIdentityScopesProvider(func() []*storage_models.IdentityResource {
 		return p.IdentityScopes
 	})

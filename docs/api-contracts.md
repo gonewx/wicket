@@ -293,7 +293,8 @@ err = interaction.Deny(ctx, userCode)
 
 | 接口 | 用途 |
 |------|------|
-| `ClientStore` | 客户端注册查询 |
+| `ClientStore` | 客户端注册查询（可选缝 `SetClientStore`，与 `SetClients` 互斥） |
+| `ClientOriginLookup` | 按 CORS origin 查询 client；注入的 client store 须同时实现 |
 | `ResourceStore` | API/Identity 资源 |
 | `AuthorizationCodeStore` | 授权码（带句柄、版本化轮换） |
 | `RefreshTokenStore` | 刷新令牌（带句柄、版本化轮换） |
@@ -305,6 +306,10 @@ err = interaction.Deny(ctx, userCode)
 | `SigningCredentialStore` | 签名凭据 |
 | `ValidationKeysStore` | 验证密钥 |
 | `AuthorizationParametersMessageStore` | 授权参数跨重定向持久化 |
+
+存储缝分类：`AuthorizationParametersMessageStore` 与 `ClientStore` 为可选缝（未注入时 `Freeze()` 记 WARN、不失败），其余十条为必需缝。
+
+client 读路径哨兵：`storage.ErrNotFound`（client 不存在）、`storage.ErrInvalidClientConfiguration`（记录存在但配置校验失败）；判定函数 `extensions.IsClientRejected(err)` 对二者返回 true。存在性闸门：token 端点客户端认证（含 device authorization、CIBA、revocation 共用的认证器）对被拒 client 答 `invalid_client`，内省答 `{"active":false}`，userinfo / end_session 走既有无效令牌处置；client store 其他错误一律 5xx（认证路径为 500 固定体 `Internal Server Error`）。外部资源服务器离线验签 JWT 不经 wicket，接受到 `exp` 为止。详见 [存储持久化接入指南](./storage-persistence-guide.md)。
 
 ### session 族（`session/session.go`）
 
