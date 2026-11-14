@@ -547,7 +547,7 @@ func (p *WicketPipeline) RequestAuthorizationEndpoint(
 	if err != nil {
 		panic(err)
 	}
-	if resp.StatusCode != http.StatusFound {
+	if resp.StatusCode != http.StatusFound && resp.StatusCode != http.StatusSeeOther {
 		panic(fmt.Errorf("unexpected status code: %d", resp.StatusCode))
 	}
 

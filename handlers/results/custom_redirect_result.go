@@ -69,6 +69,6 @@ func (crr *CustomRedirectResult) Execute(w http.ResponseWriter, r *http.Request)
 		return err
 	}
 
-	http.Redirect(w, r, target, http.StatusFound)
+	http.Redirect(w, r, target, redirectStatusCode(crr.options))
 	return nil
 }
