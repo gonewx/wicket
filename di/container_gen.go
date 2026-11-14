@@ -2555,6 +2555,12 @@ func (r *Root) NewReturnUrlParser() services.ReturnUrlParser {
 	return v
 }
 
+func (r *Root) NewJwtRequestValidator__2() validators.JwtRequestValidator {
+	v := (jwtRequestValidatorFromProvider)(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
 func (r *Root) NewHandler_wicket_DefaultCookieAuthenticationScheme() auth.Handler {
 	v := (func(p godi.Provider) auth.Handler {
 		if provider := godi.GetRequired[*ServerConfig](p).AuthenticationHandlerProvider(wicket.DefaultCookieAuthenticationScheme); provider != nil {
@@ -3013,7 +3019,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*impl2.BearerTokenUsageValidator]():
 		return r.NewBearerTokenUsageValidator()
 	case reflect.TypeFor[validators.JwtRequestValidator]():
-		return r.NewJwtRequestValidator()
+		return r.NewJwtRequestValidator__2()
 	case reflect.TypeFor[*impl.ReturnUrlParser]():
 		return r.NewPtr_ReturnUrlParser()
 	case reflect.TypeFor[[]storage.SigningCredentialStore]():
@@ -3694,7 +3700,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*impl2.BearerTokenUsageValidator]():
 			return []any{r.NewBearerTokenUsageValidator()}
 		case reflect.TypeFor[validators.JwtRequestValidator]():
-			return []any{r.NewJwtRequestValidator()}
+			return []any{r.NewJwtRequestValidator(), r.NewJwtRequestValidator__2()}
 		case reflect.TypeFor[*impl.ReturnUrlParser]():
 			return []any{r.NewPtr_ReturnUrlParser()}
 		case reflect.TypeFor[[]storage.SigningCredentialStore]():
@@ -4064,7 +4070,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[*impl2.BearerTokenUsageValidator]():
 		return s.NewBearerTokenUsageValidator()
 	case reflect.TypeFor[validators.JwtRequestValidator]():
-		return s.NewJwtRequestValidator()
+		return s.NewJwtRequestValidator__2()
 	case reflect.TypeFor[*impl.ReturnUrlParser]():
 		return s.NewPtr_ReturnUrlParser()
 	case reflect.TypeFor[[]storage.SigningCredentialStore]():
@@ -4724,7 +4730,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[*impl2.BearerTokenUsageValidator]():
 			return []any{s.NewBearerTokenUsageValidator()}
 		case reflect.TypeFor[validators.JwtRequestValidator]():
-			return []any{s.NewJwtRequestValidator()}
+			return []any{s.NewJwtRequestValidator(), s.NewJwtRequestValidator__2()}
 		case reflect.TypeFor[*impl.ReturnUrlParser]():
 			return []any{s.NewPtr_ReturnUrlParser()}
 		case reflect.TypeFor[[]storage.SigningCredentialStore]():
@@ -5872,6 +5878,12 @@ func (s *scope) NewReturnUrlParser() services.ReturnUrlParser {
 			godi.GetRequired[*ServerConfig](p).AuthorizationParametersMessageStore(),
 		)
 	})(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewJwtRequestValidator__2() validators.JwtRequestValidator {
+	v := (jwtRequestValidatorFromProvider)(s)
 	s.disp.TrackAny(v)
 	return v
 }

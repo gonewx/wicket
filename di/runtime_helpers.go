@@ -82,7 +82,7 @@ func newAuthorizeCallbackHandlerFromProvider(p godi.Provider) *handlers.Authoriz
 
 func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
 	return handlers.NewTokenHandlerWithOptions(
-		withCertificateBoundAccessTokens(p, clientAuthenticatorFromProvider(p)),
+		withClientCredentialsAuthentication(p, withCertificateBoundAccessTokens(p, clientAuthenticatorFromProvider(p))),
 		godi.GetRequired[validators.TokenRequestValidator](p),
 		godi.GetRequired[responses.TokenResponseGenerator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
@@ -111,6 +111,9 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 	}
 	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.ClientCertificateAuthenticationEnabled() {
 		handler.ServeClientCertificateAuthentication()
+	}
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.AsymmetricRequestObjectsRequired() {
+		handler.ServeAsymmetricRequestObjectsOnly()
 	}
 	return handler
 }

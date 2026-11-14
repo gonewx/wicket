@@ -13,6 +13,7 @@ import (
 	"github.com/gonewx/wicket/clientassertion"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/utils"
+	validators_impl "github.com/gonewx/wicket/validators/impl"
 )
 
 // backChannelLogoutCapability is the capability marker a back-channel logout
@@ -37,6 +38,9 @@ type discoveryAssembly struct {
 	// clientAssertionSigningAlgorithms lists the signature algorithms of the
 	// registered private_key_jwt parser, in configuration order.
 	clientAssertionSigningAlgorithms []string
+	// asymmetricRequestObjectsOnly is set when request objects are accepted
+	// only with an asymmetric signature.
+	asymmetricRequestObjectsOnly bool
 }
 
 // clientAssertionAlgorithmSource is the secret parser the client assertion
@@ -180,6 +184,45 @@ func filterDiscoveryAdvertisement(
 	if hostValueRemoved && logger != nil {
 		logger.Warn("A custom discovery entry named token_endpoint_auth_signing_alg_values_supported is ignored; the key is written only from the registered client assertion parser.")
 	}
+
+	// request object signing algorithms: only the accepted asymmetric ones
+	// remain while request objects require an asymmetric signature.
+	if assembly.asymmetricRequestObjectsOnly {
+		filter.keepAsymmetricRequestObjectAlgorithms()
+	}
+}
+
+// keepAsymmetricRequestObjectAlgorithms rebuilds the request object signing
+// algorithm list with only the algorithms the asymmetric request object
+// validator accepts, whether the value was generated or set by the host. A
+// value that is not a list, or a list left empty, removes the key.
+func (f *discoveryFilter) keepAsymmetricRequestObjectAlgorithms() {
+	key := wicket.DiscoveryRequestObjectSigningAlgorithmsSupported
+	value, ok := f.document[key]
+	if !ok {
+		return
+	}
+	accepted := validators_impl.AsymmetricRequestObjectSigningAlgorithms()
+	var kept []string
+	switch values := value.(type) {
+	case []string:
+		for _, algorithm := range values {
+			if slices.Contains(accepted, algorithm) {
+				kept = append(kept, algorithm)
+			}
+		}
+	case []any:
+		for _, entry := range values {
+			if algorithm, ok := entry.(string); ok && slices.Contains(accepted, algorithm) {
+				kept = append(kept, algorithm)
+			}
+		}
+	}
+	if len(kept) == 0 {
+		delete(f.document, key)
+		return
+	}
+	f.document[key] = kept
 }
 
 // generatedDiscoveryKeys holds the keys the discovery generator writes into

@@ -53,13 +53,14 @@ removed, err := registry.RemoveExpired(ctx, time.Now())
 
 ## client 元数据
 
-`storage/models.Client` 内嵌 `ClientAuthenticationMetadata`，三个字段：
+`storage/models.Client` 内嵌 `ClientAuthenticationMetadata`，与 `private_key_jwt` 相关的字段如下：
 
 | 字段 | 含义 |
 | --- | --- |
 | `TokenEndpointAuthMethod` | `""` 表示未登记（沿用共享 secret 或公开 client 的既有行为）；`"private_key_jwt"` 表示该 client 只能用断言认证 |
 | `Jwks` | 内联 JWK Set 文档（JSON 文本） |
 | `JwksUri` | 预登记的 JWK Set 地址 |
+| `TokenEndpointAuthSigningAlgorithms` | 可选：该 client 断言可用的签名算法白名单。空表示不额外限制（只受 `Options.SigningAlgorithms` 约束） |
 
 规则：
 
@@ -69,6 +70,20 @@ removed, err := registry.RemoveExpired(ctx, time.Now())
 - 同一请求同时带断言与共享 secret（多种认证机制并存）→ `invalid_client`。
 - **未启用特性的装配中**，登记为 `private_key_jwt` 的 client 被 client 配置校验器判为配置无效，从 `storage.ClientStore` 加载不出来，任何端点都拒绝它；不存在静默降级为共享 secret 或公开 client 的路径。
 - `TokenEndpointAuthMethod` 取这两个值之外的任何值，同样被判为配置无效。
+
+### 按 client 的签名算法白名单
+
+`TokenEndpointAuthSigningAlgorithms` 让单个 client 把可用算法收窄到服务器算法表的一个子集，例如只允许 `ES256`：
+
+```go
+client.TokenEndpointAuthMethod = "private_key_jwt"
+client.TokenEndpointAuthSigningAlgorithms = []string{"ES256"}
+```
+
+- 非空时，断言头部的 `alg` 必须在白名单内，否则 `invalid_client`（失败类别 `algorithm` 只进日志）。这一判定发生在取钥、验签和 `jti` 登记之前，被拒的断言不会登记 `jti`。
+- 白名单只对 `private_key_jwt` client 有效，并且必须是服务器有效算法表（`Options.SigningAlgorithms`，未设置时为全部九种）的子集。白名单非空但 `TokenEndpointAuthMethod` 不是 `private_key_jwt`，或含服务器算法表之外的值（含空串），client 配置校验判为无效：从 `storage.ClientStore` 加载不出来，token 端点返回 `invalid_client`。
+- 白名单不影响 introspection 端点的 API 资源认证。
+- discovery 的 `token_endpoint_auth_signing_alg_values_supported` 仍宣告服务器算法表：配置校验保证每个白名单都是它的子集。
 
 ### introspection 端点
 

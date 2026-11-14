@@ -102,3 +102,10 @@ func (h *DiscoveryHandler) SetClientAssertionSigningAlgorithms(algorithms []stri
 func (h *DiscoveryHandler) ServeClientCertificateAuthentication() {
 	h.servesClientCertificateAuthentication = true
 }
+
+// ServeAsymmetricRequestObjectsOnly records that the assembly accepts only
+// asymmetrically signed request objects. The handler then advertises only
+// those algorithms under request_object_signing_alg_values_supported.
+func (h *DiscoveryHandler) ServeAsymmetricRequestObjectsOnly() {
+	h.assembly.asymmetricRequestObjectsOnly = true
+}

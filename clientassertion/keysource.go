@@ -32,6 +32,11 @@ type Principal struct {
 	Jwks string
 	// JwksUri is the registered JWK Set address.
 	JwksUri string
+	// SigningAlgorithms, when not empty, further narrows the algorithms the
+	// server accepts for this principal's assertions: the header algorithm
+	// has to be in both lists. It can never add an algorithm the server does
+	// not accept.
+	SigningAlgorithms []string
 }
 
 // Failure categories. They are written to the log only.

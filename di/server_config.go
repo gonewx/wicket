@@ -72,6 +72,10 @@ type ServerConfig struct {
 	clientCertificateEnabled bool
 	clientCertificateOptions clientcert.Options
 	clientCertificateSource  clientcert.CertificateSource
+
+	// Hardening options, see hardening.go.
+	asymmetricRequestObjectsRequired        bool
+	clientCredentialsAuthenticationRequired bool
 }
 
 func NewServerConfig() *ServerConfig {

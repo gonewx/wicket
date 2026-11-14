@@ -117,7 +117,12 @@ func (a *ClientAuthenticator) Validate(request *http.Request) *validators_models
 		return failedClient(wicket.TokenErrorsInvalidClient)
 	}
 
-	principal := Principal{ID: client.ClientId, Jwks: client.Jwks, JwksUri: client.JwksUri}
+	principal := Principal{
+		ID:                client.ClientId,
+		Jwks:              client.Jwks,
+		JwksUri:           client.JwksUri,
+		SigningAlgorithms: client.TokenEndpointAuthSigningAlgorithms,
+	}
 	if err := a.verifier.Verify(request.Context(), principal, a.issuer.GetCurrent(), parsed.Credential); err != nil {
 		if errors.Is(err, ErrAuthenticationUnavailable) {
 			return failedClient(ErrAuthenticationUnavailable)
