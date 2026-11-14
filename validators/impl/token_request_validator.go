@@ -211,7 +211,7 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 
 	s.validatedRequest.AuthorizationCodeHandle = code
 
-	authZcode, err := s.AuthorizationCodeStore.GetAuthorizationCode(ctx, code)
+	authZcode, err := s.AuthorizationCodeStore.TakeAuthorizationCode(ctx, code)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			s.Logger.Error("Invalid authorization code", slog.String("code", code))
@@ -224,13 +224,6 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 	// validate client binding
 	if authZcode.ClientId != s.validatedRequest.Client.ClientId {
 		s.Logger.Error("Client is trying to use a code from a different client")
-		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
-	}
-
-	// remove code from store
-	// todo: set to consumed in the future?
-	if err := s.AuthorizationCodeStore.RemoveAuthorizationCode(ctx, code); err != nil {
-		s.Logger.Error("Error removing authorization code", slog.String("code", code))
 		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
 

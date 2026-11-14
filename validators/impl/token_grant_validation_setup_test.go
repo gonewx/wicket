@@ -297,8 +297,17 @@ func (failingAuthorizationCodeStore) StoreAuthorizationCode(context.Context, str
 func (failingAuthorizationCodeStore) GetAuthorizationCode(context.Context, string) (*storage_models.AuthorizationCode, error) {
 	return nil, errors.New("store unavailable")
 }
+func (failingAuthorizationCodeStore) TakeAuthorizationCode(context.Context, string) (*storage_models.AuthorizationCode, error) {
+	return nil, errors.New("store unavailable")
+}
 func (failingAuthorizationCodeStore) RemoveAuthorizationCode(context.Context, string) error {
 	return errors.New("store unavailable")
+}
+func (failingAuthorizationCodeStore) RemoveAuthorizationCodesByClient(context.Context, string) (int, error) {
+	return 0, errors.New("store unavailable")
+}
+func (failingAuthorizationCodeStore) RemoveAuthorizationCodesBySession(context.Context, string) (int, error) {
+	return 0, errors.New("store unavailable")
 }
 func (failingAuthorizationCodeStore) RemoveExpired(context.Context, time.Time) (int, error) {
 	return 0, errors.New("store unavailable")

@@ -42,11 +42,41 @@ func (s *AuthorizationCodeStore) GetAuthorizationCode(ctx context.Context, handl
 	return copyAuthorizationCode(code), nil
 }
 
+// TakeAuthorizationCode looks up and deletes the code under one lock hold, so
+// concurrent takes of the same handle see exactly one hit.
+func (s *AuthorizationCodeStore) TakeAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	code, ok := s.items[handle]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	delete(s.items, handle)
+	return copyAuthorizationCode(code), nil
+}
+
 func (s *AuthorizationCodeStore) RemoveAuthorizationCode(ctx context.Context, handle string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, handle)
 	return nil
+}
+
+func (s *AuthorizationCodeStore) RemoveAuthorizationCodesByClient(ctx context.Context, clientId string) (int, error) {
+	return s.removeMatching(clientId, func(code *models.AuthorizationCode) string { return code.ClientId })
+}
+
+func (s *AuthorizationCodeStore) RemoveAuthorizationCodesBySession(ctx context.Context, sessionId string) (int, error) {
+	return s.removeMatching(sessionId, func(code *models.AuthorizationCode) string { return code.SessionId })
+}
+
+func (s *AuthorizationCodeStore) removeMatching(value string, field func(*models.AuthorizationCode) string) (int, error) {
+	if value == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return deleteWhere(s.items, func(code *models.AuthorizationCode) bool { return field(code) == value }), nil
 }
 
 func (s *AuthorizationCodeStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
@@ -118,6 +148,23 @@ func (s *RefreshTokenStore) RemoveRefreshToken(ctx context.Context, handle strin
 	return nil
 }
 
+func (s *RefreshTokenStore) RemoveRefreshTokensByClient(ctx context.Context, clientId string) (int, error) {
+	return s.removeMatching(clientId, func(token *models.RefreshToken) string { return token.ClientId })
+}
+
+func (s *RefreshTokenStore) RemoveRefreshTokensBySession(ctx context.Context, sessionId string) (int, error) {
+	return s.removeMatching(sessionId, func(token *models.RefreshToken) string { return token.SessionId })
+}
+
+func (s *RefreshTokenStore) removeMatching(value string, field func(*models.RefreshToken) string) (int, error) {
+	if value == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return deleteWhere(s.items, func(token *models.RefreshToken) bool { return field(token) == value }), nil
+}
+
 func (s *RefreshTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -176,6 +223,23 @@ func (s *ReferenceTokenStore) RemoveReferenceTokens(ctx context.Context, subject
 		}
 	}
 	return nil
+}
+
+func (s *ReferenceTokenStore) RemoveReferenceTokensByClient(ctx context.Context, clientId string) (int, error) {
+	return s.removeMatching(clientId, func(token *models.Token) string { return token.ClientId })
+}
+
+func (s *ReferenceTokenStore) RemoveReferenceTokensBySession(ctx context.Context, sessionId string) (int, error) {
+	return s.removeMatching(sessionId, func(token *models.Token) string { return token.SessionId() })
+}
+
+func (s *ReferenceTokenStore) removeMatching(value string, field func(*models.Token) string) (int, error) {
+	if value == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return deleteWhere(s.items, func(token *models.Token) bool { return field(token) == value }), nil
 }
 
 func (s *ReferenceTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
@@ -239,6 +303,15 @@ func (s *UserConsentStore) RemoveUserConsent(ctx context.Context, subjectId, cli
 	return nil
 }
 
+func (s *UserConsentStore) RemoveUserConsentsByClient(ctx context.Context, clientId string) (int, error) {
+	if clientId == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return deleteWhere(s.items, func(consent *models.Consent) bool { return consent.ClientId == clientId }), nil
+}
+
 func (s *UserConsentStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -250,6 +323,19 @@ func (s *UserConsentStore) RemoveExpired(ctx context.Context, cutoff time.Time) 
 		}
 	}
 	return count, nil
+}
+
+// deleteWhere removes every entry of items whose value satisfies match and
+// returns how many were removed. The caller holds the store lock.
+func deleteWhere[V any](items map[string]V, match func(V) bool) int {
+	count := 0
+	for key, value := range items {
+		if match(value) {
+			delete(items, key)
+			count++
+		}
+	}
+	return count
 }
 
 // copyStrings returns an independent copy of values that preserves nil-ness:

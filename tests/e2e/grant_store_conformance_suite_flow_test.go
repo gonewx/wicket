@@ -131,7 +131,9 @@ const scratchConformanceDir = "tests/e2e/scratch-conformance"
 
 // TestGrantStoreConformanceSuiteRejectsViolationsE2E runs the suite the way a
 // host vets an unknown adapter: against a store that violates one insert-only
-// contract point. The suite must fail that run and name the violated case. A
+// contract point, and against a store whose take looks the code up and
+// deletes it in two separate steps. The suite must fail each run and name the
+// violated case. A
 // suite that passes a violating adapter could not serve as a compliance gate,
 // so the run happens in a scratch package and its failure is the assertion.
 func TestGrantStoreConformanceSuiteRejectsViolationsE2E(t *testing.T) {
@@ -159,6 +161,8 @@ package scratchconformance
 
 import (
 	"context"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/gonewx/wicket/storage"
@@ -167,12 +171,16 @@ import (
 
 // overwritingStore violates the insert-only contract for authorization codes:
 // a second write under an existing handle silently replaces the stored record
-// instead of failing with storage.ErrDuplicateHandle.
+// instead of failing with storage.ErrDuplicateHandle. Every other method
+// honors the contract, so the insert-only case is the only one that fails.
 type overwritingStore struct {
+	mu    sync.Mutex
 	codes map[string]*models.AuthorizationCode
 }
 
 func (s *overwritingStore) StoreAuthorizationCode(_ context.Context, handle string, code *models.AuthorizationCode) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.codes == nil {
 		s.codes = make(map[string]*models.AuthorizationCode)
 	}
@@ -181,6 +189,8 @@ func (s *overwritingStore) StoreAuthorizationCode(_ context.Context, handle stri
 }
 
 func (s *overwritingStore) GetAuthorizationCode(_ context.Context, handle string) (*models.AuthorizationCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	code, ok := s.codes[handle]
 	if !ok {
 		return nil, storage.ErrNotFound
@@ -188,12 +198,51 @@ func (s *overwritingStore) GetAuthorizationCode(_ context.Context, handle string
 	return code, nil
 }
 
+func (s *overwritingStore) TakeAuthorizationCode(_ context.Context, handle string) (*models.AuthorizationCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	code, ok := s.codes[handle]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	delete(s.codes, handle)
+	return code, nil
+}
+
 func (s *overwritingStore) RemoveAuthorizationCode(_ context.Context, handle string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	delete(s.codes, handle)
 	return nil
 }
 
+func (s *overwritingStore) RemoveAuthorizationCodesByClient(_ context.Context, clientId string) (int, error) {
+	return s.removeWhere(clientId, func(code *models.AuthorizationCode) string { return code.ClientId })
+}
+
+func (s *overwritingStore) RemoveAuthorizationCodesBySession(_ context.Context, sessionId string) (int, error) {
+	return s.removeWhere(sessionId, func(code *models.AuthorizationCode) string { return code.SessionId })
+}
+
+func (s *overwritingStore) removeWhere(value string, field func(*models.AuthorizationCode) string) (int, error) {
+	if value == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for handle, code := range s.codes {
+		if field(code) == value {
+			delete(s.codes, handle)
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *overwritingStore) RemoveExpired(_ context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	count := 0
 	for handle, code := range s.codes {
 		if code.CreationTime.Add(time.Duration(code.Lifetime) * time.Second).Before(cutoff) {
@@ -202,6 +251,38 @@ func (s *overwritingStore) RemoveExpired(_ context.Context, cutoff time.Time) (i
 		}
 	}
 	return count, nil
+}
+
+// nonAtomicTakeStore honors the insert-only contract but takes a code in two
+// locked steps, a lookup and then a delete, yielding in between: concurrent
+// takers can all see the code before any of them deletes it.
+type nonAtomicTakeStore struct {
+	overwritingStore
+}
+
+func (s *nonAtomicTakeStore) StoreAuthorizationCode(_ context.Context, handle string, code *models.AuthorizationCode) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.codes == nil {
+		s.codes = make(map[string]*models.AuthorizationCode)
+	}
+	if _, exists := s.codes[handle]; exists {
+		return storage.ErrDuplicateHandle
+	}
+	s.codes[handle] = code
+	return nil
+}
+
+func (s *nonAtomicTakeStore) TakeAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error) {
+	code, err := s.GetAuthorizationCode(ctx, handle)
+	if err != nil {
+		return nil, err
+	}
+	runtime.Gosched()
+	if err := s.RemoveAuthorizationCode(ctx, handle); err != nil {
+		return nil, err
+	}
+	return code, nil
 }
 `)
 
@@ -222,6 +303,12 @@ func TestAdapterRunsSuite(t *testing.T) {
 		return &overwritingStore{}
 	}, storagetest.WithMay(true))
 }
+
+func TestNonAtomicTakeRunsSuite(t *testing.T) {
+	storagetest.RunAuthorizationCodeStoreSuite(t, func() storage.AuthorizationCodeStore {
+		return &nonAtomicTakeStore{}
+	}, storagetest.WithMay(true))
+}
 `)
 
 	cmd := exec.Command("mise", "exec", "go@"+readGoToolchainPin(t), "--", "go", "test", "./"+scratchConformanceDir+"/", "-count=1")
@@ -235,6 +322,9 @@ func TestAdapterRunsSuite(t *testing.T) {
 	}
 	if !strings.Contains(combined, "MUST/DuplicateHandleRejected") {
 		t.Fatalf("suite failure output does not name the violated case:\n%s", combined)
+	}
+	if !strings.Contains(combined, "--- FAIL: TestNonAtomicTakeRunsSuite/MUST/TakeExactlyOnceUnderConcurrency") {
+		t.Fatalf("suite accepted a non-atomic take or did not name the violated case:\n%s", combined)
 	}
 }
 

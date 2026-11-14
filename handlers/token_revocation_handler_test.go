@@ -930,6 +930,14 @@ func (s *recordingReferenceTokens) RemoveReferenceTokens(context.Context, string
 	return errors.New("unexpected call")
 }
 
+func (s *recordingReferenceTokens) RemoveReferenceTokensByClient(context.Context, string) (int, error) {
+	return 0, errors.New("unexpected call")
+}
+
+func (s *recordingReferenceTokens) RemoveReferenceTokensBySession(context.Context, string) (int, error) {
+	return 0, errors.New("unexpected call")
+}
+
 func (s *recordingReferenceTokens) RemoveExpired(context.Context, time.Time) (int, error) {
 	return 0, errors.New("unexpected call")
 }

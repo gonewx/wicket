@@ -193,8 +193,20 @@ func (s *lazyAuthorizationCodeStore) GetAuthorizationCode(ctx context.Context, h
 	return s.store().GetAuthorizationCode(ctx, handle)
 }
 
+func (s *lazyAuthorizationCodeStore) TakeAuthorizationCode(ctx context.Context, handle string) (*storage_models.AuthorizationCode, error) {
+	return s.store().TakeAuthorizationCode(ctx, handle)
+}
+
 func (s *lazyAuthorizationCodeStore) RemoveAuthorizationCode(ctx context.Context, handle string) error {
 	return s.store().RemoveAuthorizationCode(ctx, handle)
+}
+
+func (s *lazyAuthorizationCodeStore) RemoveAuthorizationCodesByClient(ctx context.Context, clientId string) (int, error) {
+	return s.store().RemoveAuthorizationCodesByClient(ctx, clientId)
+}
+
+func (s *lazyAuthorizationCodeStore) RemoveAuthorizationCodesBySession(ctx context.Context, sessionId string) (int, error) {
+	return s.store().RemoveAuthorizationCodesBySession(ctx, sessionId)
 }
 
 func (s *lazyAuthorizationCodeStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
@@ -236,6 +248,14 @@ func (s *lazyRefreshTokenStore) RemoveRefreshToken(ctx context.Context, handle s
 	return s.store().RemoveRefreshToken(ctx, handle)
 }
 
+func (s *lazyRefreshTokenStore) RemoveRefreshTokensByClient(ctx context.Context, clientId string) (int, error) {
+	return s.store().RemoveRefreshTokensByClient(ctx, clientId)
+}
+
+func (s *lazyRefreshTokenStore) RemoveRefreshTokensBySession(ctx context.Context, sessionId string) (int, error) {
+	return s.store().RemoveRefreshTokensBySession(ctx, sessionId)
+}
+
 func (s *lazyRefreshTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
 	return s.store().RemoveExpired(ctx, cutoff)
 }
@@ -275,6 +295,14 @@ func (s *lazyReferenceTokenStore) RemoveReferenceTokens(ctx context.Context, sub
 	return s.store().RemoveReferenceTokens(ctx, subjectId, clientId)
 }
 
+func (s *lazyReferenceTokenStore) RemoveReferenceTokensByClient(ctx context.Context, clientId string) (int, error) {
+	return s.store().RemoveReferenceTokensByClient(ctx, clientId)
+}
+
+func (s *lazyReferenceTokenStore) RemoveReferenceTokensBySession(ctx context.Context, sessionId string) (int, error) {
+	return s.store().RemoveReferenceTokensBySession(ctx, sessionId)
+}
+
 func (s *lazyReferenceTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
 	return s.store().RemoveExpired(ctx, cutoff)
 }
@@ -312,6 +340,10 @@ func (s *lazyUserConsentStore) GetAllUserConsents(ctx context.Context, subjectId
 
 func (s *lazyUserConsentStore) RemoveUserConsent(ctx context.Context, subjectId, clientId string) error {
 	return s.store().RemoveUserConsent(ctx, subjectId, clientId)
+}
+
+func (s *lazyUserConsentStore) RemoveUserConsentsByClient(ctx context.Context, clientId string) (int, error) {
+	return s.store().RemoveUserConsentsByClient(ctx, clientId)
 }
 
 func (s *lazyUserConsentStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {

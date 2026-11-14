@@ -33,6 +33,20 @@
 // compliance. MAY cases cover enhanced behavior; they are skipped by default
 // and enabled with WithMay(true).
 //
+// # Removal and take semantics
+//
+// The suite pins the removal and take semantics declared on the ports.
+// Every single-handle removal returns nil for a handle that does not exist,
+// including one already removed, so concurrent duplicate revocations succeed;
+// the subject/client batch removal of reference tokens likewise returns nil
+// when nothing matches. Scoped removals by client or by session return the
+// number of records removed, return (0, nil) when nothing matches, leave
+// records outside the scope untouched, and treat an empty argument as
+// matching nothing rather than selecting records whose field is empty. The
+// authorization code take is atomic: of concurrent takes of one handle,
+// exactly one obtains the record and the others miss with ErrNotFound; the
+// take does not judge expiry.
+//
 // # Compliance credential
 //
 // SuiteVersion identifies the contract version this suite verifies. A

@@ -5,6 +5,7 @@ package storagetest
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 // variant that the suite must catch).
 
 type fakeAuthorizationCodeStore struct {
+	mu    sync.Mutex
 	items map[string]*models.AuthorizationCode
 }
 
@@ -27,6 +29,8 @@ func newFakeAuthorizationCodeStore() *fakeAuthorizationCodeStore {
 }
 
 func (s *fakeAuthorizationCodeStore) StoreAuthorizationCode(ctx context.Context, handle string, code *models.AuthorizationCode) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if _, ok := s.items[handle]; ok {
 		return storage.ErrDuplicateHandle
 	}
@@ -35,6 +39,8 @@ func (s *fakeAuthorizationCodeStore) StoreAuthorizationCode(ctx context.Context,
 }
 
 func (s *fakeAuthorizationCodeStore) GetAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	code, ok := s.items[handle]
 	if !ok {
 		return nil, storage.ErrNotFound
@@ -42,12 +48,62 @@ func (s *fakeAuthorizationCodeStore) GetAuthorizationCode(ctx context.Context, h
 	return code, nil
 }
 
+// TakeAuthorizationCode finds and deletes under the same lock hold, which is
+// what makes the take atomic.
+func (s *fakeAuthorizationCodeStore) TakeAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	code, ok := s.items[handle]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	delete(s.items, handle)
+	taken := *code
+	return &taken, nil
+}
+
 func (s *fakeAuthorizationCodeStore) RemoveAuthorizationCode(ctx context.Context, handle string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	delete(s.items, handle)
 	return nil
 }
 
+func (s *fakeAuthorizationCodeStore) RemoveAuthorizationCodesByClient(ctx context.Context, clientId string) (int, error) {
+	if clientId == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for handle, code := range s.items {
+		if code.ClientId == clientId {
+			delete(s.items, handle)
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (s *fakeAuthorizationCodeStore) RemoveAuthorizationCodesBySession(ctx context.Context, sessionId string) (int, error) {
+	if sessionId == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for handle, code := range s.items {
+		if code.SessionId == sessionId {
+			delete(s.items, handle)
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *fakeAuthorizationCodeStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	count := 0
 	for handle, code := range s.items {
 		if code.CreationTime.Add(time.Duration(code.Lifetime) * time.Second).Before(cutoff) {
@@ -59,6 +115,7 @@ func (s *fakeAuthorizationCodeStore) RemoveExpired(ctx context.Context, cutoff t
 }
 
 type fakeRefreshTokenStore struct {
+	mu    sync.Mutex
 	items map[string]*models.RefreshToken
 }
 
@@ -67,6 +124,8 @@ func newFakeRefreshTokenStore() *fakeRefreshTokenStore {
 }
 
 func (s *fakeRefreshTokenStore) StoreRefreshToken(ctx context.Context, handle string, token *models.RefreshToken) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if _, ok := s.items[handle]; ok {
 		return storage.ErrDuplicateHandle
 	}
@@ -78,6 +137,8 @@ func (s *fakeRefreshTokenStore) StoreRefreshToken(ctx context.Context, handle st
 }
 
 func (s *fakeRefreshTokenStore) GetRefreshToken(ctx context.Context, handle string) (*models.RefreshToken, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	token, ok := s.items[handle]
 	if !ok {
 		return nil, storage.ErrNotFound
@@ -87,6 +148,8 @@ func (s *fakeRefreshTokenStore) GetRefreshToken(ctx context.Context, handle stri
 }
 
 func (s *fakeRefreshTokenStore) UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken, expectedVersion int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	current, ok := s.items[handle]
 	if !ok {
 		return storage.ErrNotFound
@@ -102,11 +165,47 @@ func (s *fakeRefreshTokenStore) UpdateRefreshToken(ctx context.Context, handle s
 }
 
 func (s *fakeRefreshTokenStore) RemoveRefreshToken(ctx context.Context, handle string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	delete(s.items, handle)
 	return nil
 }
 
+func (s *fakeRefreshTokenStore) RemoveRefreshTokensByClient(ctx context.Context, clientId string) (int, error) {
+	if clientId == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for handle, token := range s.items {
+		if token.ClientId == clientId {
+			delete(s.items, handle)
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (s *fakeRefreshTokenStore) RemoveRefreshTokensBySession(ctx context.Context, sessionId string) (int, error) {
+	if sessionId == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	count := 0
+	for handle, token := range s.items {
+		if token.SessionId == sessionId {
+			delete(s.items, handle)
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *fakeRefreshTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	count := 0
 	for handle, token := range s.items {
 		if token.CreationTime.Add(time.Duration(token.Lifetime) * time.Second).Before(cutoff) {

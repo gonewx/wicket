@@ -297,6 +297,21 @@ client 注册存储的契约套件入口为 `storagetest.RunClientRegistrationSt
 
 **过期判定在核心侧。** 适配器**不得**在查询里加 `expires_at > now()` 之类的过滤。理由是集群里数据库时钟与应用节点时钟会漂移，两处判定得出不同结论；统一在核心侧用注入的 `Clock` 判定才可控。
 
+**一次性兑换靠原子取出。** 授权码兑换走 `AuthorizationCodeStore.TakeAuthorizationCode`：命中即删除并返回独立副本，未命中返回 `ErrNotFound`；同一句柄的并发取出恰一个成功，其余均得 `ErrNotFound`。适配器须在单条原子操作内完成"查找 + 删除"（如 `DELETE ... RETURNING`、Redis `GETDEL`），不得拆成先读后删两步。介质没有这类原语时（如 MySQL、Redis < 6.2），在事务内先 `SELECT ... FOR UPDATE` 再 `DELETE`，以影响行数 == 1 判定命中（Redis 则用 Lua 脚本完成查找加删除）；READ COMMITTED 下普通的先读后删不是原子的。取出不判过期，过期码照样取出（核心随后判过期并拒绝，码已作废）。token 端点先取出再做 client 绑定、过期、redirect_uri、PKCE 等全部授权码校验，所以校验失败的码也已作废。
+
+**删除不存在的句柄返回 nil。** 全部单句柄删除（`RemoveAuthorizationCode`、`RemoveRefreshToken`、`RemoveReferenceToken`、`RemoveUserConsent`、`PersistedGrantStore.Remove`、`DeviceFlowStore.RemoveByDeviceCode`、`RemoveBackchannelAuthenticationRequest`）对不存在或已删除的句柄必须返回 nil；`RemoveReferenceTokens(subjectId, clientId)` 零匹配同样返回 nil。并发重复撤销时，后到的请求会删一个已不存在的句柄，若适配器报错，撤销端点会以服务器错误应答。
+
+**按 client、按会话批量删除。** 以下方法返回删除条数：
+
+| 端口 | 按 `client_id` | 按会话标识 |
+|------|---------------|-----------|
+| `AuthorizationCodeStore` | `RemoveAuthorizationCodesByClient` | `RemoveAuthorizationCodesBySession`（`SessionId` 字段） |
+| `RefreshTokenStore` | `RemoveRefreshTokensByClient` | `RemoveRefreshTokensBySession`（`SessionId` 字段） |
+| `ReferenceTokenStore` | `RemoveReferenceTokensByClient` | `RemoveReferenceTokensBySession`（`Token.SessionId()`，即 `sid` claim） |
+| `UserConsentStore` | `RemoveUserConsentsByClient` | — |
+
+删零条返回 `(0, nil)`，不算错误；参数为空串时不匹配任何记录、返回 `(0, nil)`，不得清掉"字段为空"的记录。不支持事务的介质可以部分完成，但必须返回错误。适配器须把 `client_id` 与会话标识存成可见、可索引的列，不得只藏在序列化载荷里——否则批量删除只能全表扫描并逐条反序列化。`PersistedGrantStore` 继续用 `RemoveAll` 的 `ClientId` / `SessionId` 过滤。
+
 ## 编写适配器
 
 若要为新介质编写适配器，最低要求：

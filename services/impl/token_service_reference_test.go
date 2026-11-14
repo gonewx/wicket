@@ -55,6 +55,14 @@ func (s *retainingReferenceStore) RemoveReferenceTokens(ctx context.Context, sub
 	return nil
 }
 
+func (s *retainingReferenceStore) RemoveReferenceTokensByClient(ctx context.Context, clientId string) (int, error) {
+	return 0, nil
+}
+
+func (s *retainingReferenceStore) RemoveReferenceTokensBySession(ctx context.Context, sessionId string) (int, error) {
+	return 0, nil
+}
+
 func (s *retainingReferenceStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
 	return 0, nil
 }

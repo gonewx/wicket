@@ -98,6 +98,14 @@ func (s *resourceRefreshTokenStore) RemoveRefreshToken(ctx context.Context, hand
 	return nil
 }
 
+func (s *resourceRefreshTokenStore) RemoveRefreshTokensByClient(ctx context.Context, clientId string) (int, error) {
+	return 0, nil
+}
+
+func (s *resourceRefreshTokenStore) RemoveRefreshTokensBySession(ctx context.Context, sessionId string) (int, error) {
+	return 0, nil
+}
+
 func (s *resourceRefreshTokenStore) RemoveExpired(ctx context.Context, cutoff time.Time) (int, error) {
 	return 0, nil
 }
