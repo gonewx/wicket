@@ -17,10 +17,17 @@ type WicketOptions struct {
 	EmitIssuerIdentificationResponseParameter bool
 	EmitStateHash                             bool
 	StrictJarValidation                       bool
-	ValidateTenantOnAuthorization             bool
-	Endpoints                                 *EndpointsOptions
-	Discovery                                 *DiscoveryOptions
-	Authentication                            *AuthenticationOptions
+	// UseSeeOtherRedirects makes the browser redirects produced by the authorize
+	// endpoint (and its callback) and the end session endpoint answer 303 See
+	// Other instead of 302 Found, whatever the request method. A 302 lets a
+	// user agent replay a POST body (which may carry credentials or authorization
+	// parameters) to the redirect target; RFC 9700 §4.12 and FAPI 2.0 Security
+	// Profile §5.3.2.2 recommend 303. Defaults to false, which keeps 302.
+	UseSeeOtherRedirects          bool
+	ValidateTenantOnAuthorization bool
+	Endpoints                     *EndpointsOptions
+	Discovery                     *DiscoveryOptions
+	Authentication                *AuthenticationOptions
 	// Events                                    EventsOptions
 	InputLengthRestrictions *InputLengthRestrictions
 	UserInteraction         *UserInteractionOptions

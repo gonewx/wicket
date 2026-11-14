@@ -103,6 +103,6 @@ func (esr *EndSessionResult) Execute(w http.ResponseWriter, r *http.Request) err
 		redirect = utils.AddQuery(redirect, esr.options.UserInteraction.LogoutIdParameter, id)
 	}
 
-	http.Redirect(w, r, redirect, http.StatusFound)
+	http.Redirect(w, r, redirect, redirectStatusCode(esr.options))
 	return nil
 }

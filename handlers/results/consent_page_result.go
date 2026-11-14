@@ -66,6 +66,6 @@ func (cpr *ConsentPageResult) Execute(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 
-	http.Redirect(w, r, target, http.StatusFound)
+	http.Redirect(w, r, target, redirectStatusCode(cpr.options))
 	return nil
 }

@@ -81,3 +81,14 @@ func addCsp(w http.ResponseWriter, options *config_options.CspOptions, directive
 		w.Header().Set("X-Content-Security-Policy", value)
 	}
 }
+
+// redirectStatusCode returns the status code of the browser redirects produced
+// by the authorize and end session results: 303 See Other when
+// WicketOptions.UseSeeOtherRedirects is set, 302 Found otherwise (also for nil
+// options).
+func redirectStatusCode(options *config_options.WicketOptions) int {
+	if options == nil || !options.UseSeeOtherRedirects {
+		return http.StatusFound
+	}
+	return http.StatusSeeOther
+}

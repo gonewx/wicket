@@ -177,7 +177,7 @@ func (ar *AuthorizeResult) renderAuthorizeResponse(w http.ResponseWriter, r *htt
 	if req.ResponseMode == wicket.ResponseModesQuery || req.ResponseMode == wicket.ResponseModesFragment {
 		HttpRespSetNoCache(w)
 		redirectUri := ar.buildRedirectUri()
-		http.Redirect(w, r, redirectUri, http.StatusFound)
+		http.Redirect(w, r, redirectUri, redirectStatusCode(ar.options))
 	} else {
 		if req.ResponseMode == wicket.ResponseModesFormPost {
 			HttpRespSetNoCache(w)
@@ -237,7 +237,7 @@ func (ar *AuthorizeResult) RedirectToErrorPage(w http.ResponseWriter, r *http.Re
 	url.RawQuery = values.Encode()
 
 	// http.Redirect(w, r, url.String(), http.StatusFound)
-	http.Redirect(w, r, utils.GetAbsoluteUrl(ar.urls.BaseUrl(), url.String()), http.StatusFound)
+	http.Redirect(w, r, utils.GetAbsoluteUrl(ar.urls.BaseUrl(), url.String()), redirectStatusCode(ar.options))
 	return nil
 }
 

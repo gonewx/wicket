@@ -66,6 +66,6 @@ func (lpr *LoginPageResult) Execute(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
-	http.Redirect(w, r, target, http.StatusFound)
+	http.Redirect(w, r, target, redirectStatusCode(lpr.options))
 	return nil
 }
