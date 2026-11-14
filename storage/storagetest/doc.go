@@ -18,6 +18,7 @@
 //	RunPersistedGrantStoreSuite
 //	RunDeviceFlowStoreSuite
 //	RunBackchannelAuthenticationRequestStoreSuite
+//	RunClientRegistrationStoreSuite
 //
 // Every entry takes a factory that must return a fresh empty store on each
 // call; the suite calls the factory before every case so no state leaks

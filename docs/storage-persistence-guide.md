@@ -84,10 +84,10 @@ cfg.AllowInMemoryFallback()
 
 ### 可选缝：authorization parameters message store 与 client store
 
-`storeSeams()` 中的每条缝都带类别：`AuthorizationParametersMessageStore` 与 `ClientStore` 两条为**可选缝**，其余十条为必需缝。可选缝未注入时 `Freeze()` 不失败，也不需要 `AllowInMemoryFallback()`；配置了 logger 时 `Freeze()` 为每条未注入的可选缝记一条 WARN（只记一次，不随解析反复输出）：
+`storeSeams()` 中的每条缝都带类别：`AuthorizationParametersMessageStore` 与 `ClientStore` 两条为**可选缝**，client registration store 一条为**特性条件必需缝**（见下文「注入可写 client 注册存储」），其余十条为必需缝。可选缝未注入时 `Freeze()` 不失败，也不需要 `AllowInMemoryFallback()`；配置了 logger 时 `Freeze()` 为每条未注入的可选缝记一条 WARN（只记一次，不随解析反复输出）：
 
 - 未注入 `AuthorizationParametersMessageStore`：不在服务端保存授权参数。
-- 未注入 `ClientStore`：client 来自 `SetClients` / `SetClientsProvider` 的静态列表，由内存实现提供。
+- 未注入 `ClientStore`：client 来自 `SetClients` / `SetClientsProvider` 的静态列表，由内存实现提供。经 `SetClientRegistrationStore` 注入的值同时填充这条缝，此时不记 WARN。
 
 ### 注入 client store
 
@@ -103,6 +103,40 @@ cfg.SetClientStore(pgadapter.NewClientStore(pool))
 - **注入值须同时实现 `storage.ClientOriginLookup`**（`FindClientsByAllowedOrigin(ctx, origin)`：按 origin 精确匹配 `AllowedCorsOrigins`，不过滤 `Enabled`、不做配置校验，无命中返回空切片与 nil）。CORS 判定经它查询，与 client 读路径同源；未实现时 `Freeze()` panic。注入路径下，命中的 client 须 `Enabled` 且通过配置校验才放行 origin；查询出错则拒绝该 origin 并记日志。静态列表路径的 CORS 匹配结果不变。
 - **读路径恒包 `ValidatingClientStore`。** 容器解析 `storage.ClientStore` 得到包着注入值的配置校验装饰器，注入值与静态列表两条路径一致。
 - 注入值的生命周期归宿主：容器不关闭它。
+
+### 注入可写 client 注册存储
+
+动态客户端注册这类特性需要一个可写的 client 端口 `storage.ClientRegistrationStore`。它内嵌 `ClientStore`，读与写落在同一个值上，避免「注册成功却查不到」：
+
+```go
+cfg.SetClientRegistrationStore(pgadapter.NewClientRegistrationStore(pool))
+```
+
+端口方法：
+
+| 方法 | 语义 |
+|------|------|
+| `RegisterClient(ctx, *models.ClientRegistration) (int, error)` | insert-only，返回修订号 1；client id 已存在或曾被删除（墓碑）返回 `ErrDuplicateHandle`，原记录不变 |
+| `FindClientRegistration(ctx, clientId)` | 返回注册记录；缺失（含已删除）返回 `ErrNotFound` |
+| `UpdateClientRegistration(ctx, *models.ClientRegistration, expectedRevision) (int, error)` | 修订号与存储值一致才替换，返回提交后的修订号（期望值 +1）；不一致返回 `ErrVersionConflict` 且记录不变；缺失返回 `ErrNotFound` |
+| `RemoveClientRegistration(ctx, clientId, expectedRevision)` | 修订号一致才删除并留墓碑；冲突与缺失同上 |
+| `FindClientById(ctx, clientId)` | 返回已注册记录中的 client，供既有读路径使用 |
+| `FindClientsByAllowedOrigin(ctx, origin)`（`storage.ClientOriginLookup`，注入值必须实现） | 返回 `AllowedCorsOrigins` 精确命中 origin 的已注册 client，不过滤 `Enabled`；更新后按新 origin 命中，已删除者不返回；无命中返回空切片与 nil |
+
+- **修订号由 store 分配。** 入参记录的 `Revision` 被忽略；冲突时调用方重新加载后重试，store 不自行解决冲突。
+- **墓碑永久保留。** 已删除的 client id 不会被重新注册，防止已删 client 同名复活后接手它签发过的凭证。
+- **不提供** 按注册访问令牌摘要查找、无过滤条件的全量枚举与 `RemoveExpired`；记录不带 issuer 字段。
+- **记录类型** `models.ClientRegistration`：`Client`、`Revision`、`RegistrationAccessTokenDigest`、`RegistrationTime`。
+- **client 以不透明字节落盘。** 适配器用 `storage.EncodeClient` 序列化 `*models.Client`（带版本号的封套，含 `AllowedGrantTypes`），用 `storage.DecodeClient` 还原；未知版本、损坏输入返回错误，不返回半成品 client。适配器只把字节与可见字段（client id、修订号、摘要、注册时间）入库。codec 按原样编码 `Secret.Value`，不做哈希或保护：调用方必须在 client 中存放 secret 的哈希，不得存明文。
+
+注入约束：
+
+- **注入值须同时实现 `storage.ClientOriginLookup`**，否则 `Freeze()` panic。该值同时充当 client store 缝：容器解析 `storage.ClientStore` 得到包着它的 `ValidatingClientStore`，CORS 判定也经它的 origin 查询（命中的 client 须 `Enabled` 且通过配置校验）。
+- **与 `SetClientStore`、`SetClients` / `SetClientsProvider` 互斥。** 并用时 `Freeze()` panic，信息点名两者；不设静默优先级。
+- **特性条件必需。** 依赖该端口的特性启用后，未注入即 `Freeze()` panic，`AllowInMemoryFallback()` 不豁免，也没有逐缝回退声明；开发环境需要内存实现时显式注入 `memory.NewMemoryClientRegistrationStore()`。没有依赖特性时该缝不校验，任何代码路径都不会取用可写端口。本版本尚无依赖特性，现有装配行为不变。
+- 注入值的生命周期归宿主：容器不关闭它。
+
+适配器用 `storagetest.RunClientRegistrationStoreSuite` 验证合规性（见下文「校验适配器合规性」）。
 
 `ClientStore.FindClientById` 的错误语义：
 
@@ -244,6 +278,8 @@ if got := adapter.ConformsTo(); got != storagetest.SuiteVersion {
     log.Fatalf("适配器契约版本不匹配: 适配器=%s, wicket 要求=%s", got, storagetest.SuiteVersion)
 }
 ```
+
+client 注册存储的契约套件入口为 `storagetest.RunClientRegistrationStoreSuite(t, newStore, storagetest.WithMay(true))`，覆盖墓碑、修订号冲突与重试、并发注册与并发更新恰一次成功，以及 origin 查询精确匹配。
 
 没有 `ConformsTo()` 的实现不是合规适配器——它可能连契约套件都没跑过，或者 `t.Skip()` 掉了一半用例。
 

@@ -21,7 +21,7 @@ import (
 // from this consumer package, which shares no package with the stores or the
 // suite. The suite is a published contract harness: an adapter author imports
 // it, supplies a fresh store factory, and runs. This pins the import-and-run
-// flow for the whole seven-port family against the in-repo stores, with the
+// flow for the whole port family against the in-repo stores, with the
 // enhanced MAY surface enabled.
 func TestGrantStoreConformanceSuiteRunsExternalE2E(t *testing.T) {
 	t.Parallel()
@@ -67,6 +67,12 @@ func TestGrantStoreConformanceSuiteRunsExternalE2E(t *testing.T) {
 			t.Parallel()
 			storagetest.RunBackchannelAuthenticationRequestStoreSuite(t, func() storage.BackchannelAuthenticationRequestStore {
 				return memory.NewMemoryBackchannelAuthenticationRequestStore()
+			}, storagetest.WithMay(true))
+		},
+		"client registrations": func(t *testing.T) {
+			t.Parallel()
+			storagetest.RunClientRegistrationStoreSuite(t, func() storage.ClientRegistrationStore {
+				return memory.NewMemoryClientRegistrationStore()
 			}, storagetest.WithMay(true))
 		},
 	}
@@ -229,6 +235,190 @@ func TestAdapterRunsSuite(t *testing.T) {
 	}
 	if !strings.Contains(combined, "MUST/DuplicateHandleRejected") {
 		t.Fatalf("suite failure output does not name the violated case:\n%s", combined)
+	}
+}
+
+const scratchClientRegistrationDir = "tests/e2e/scratch-client-registration"
+
+// TestGrantStoreConformanceSuiteRejectsTombstoneViolationE2E vets a client
+// registration adapter that forgets removed client ids: after a removal it
+// accepts a new registration under the same id. The suite must fail that run
+// and name the tombstone case, from a scratch package of its own.
+func TestGrantStoreConformanceSuiteRejectsTombstoneViolationE2E(t *testing.T) {
+	t.Parallel()
+
+	if _, err := exec.LookPath("mise"); err != nil {
+		t.Fatalf("locate mise toolchain: %v", err)
+	}
+
+	root := projectRoot(t)
+	scratch := filepath.Join(root, scratchClientRegistrationDir)
+	if err := os.RemoveAll(scratch); err != nil {
+		t.Fatalf("clear scratch suite package: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(scratch); err != nil {
+			t.Logf("remove scratch suite package: %v", err)
+		}
+	})
+
+	writeScratchFile(t, filepath.Join(scratch, "adapter.go"), `// Copyright 2026 Decker.
+// Licensed under the Apache License, Version 2.0.
+
+package scratchclientregistration
+
+import (
+	"context"
+	"sync"
+	"time"
+
+	"github.com/gonewx/wicket/storage"
+	"github.com/gonewx/wicket/storage/models"
+)
+
+type row struct {
+	data     []byte
+	revision int
+	digest   string
+	at       time.Time
+}
+
+// forgetfulStore violates the tombstone contract: removing a registration
+// deletes it without a trace, so the client id can be registered again.
+type forgetfulStore struct {
+	mu   sync.Mutex
+	rows map[string]row
+}
+
+func newForgetfulStore() *forgetfulStore { return &forgetfulStore{rows: map[string]row{}} }
+
+func (s *forgetfulStore) encode(r *models.ClientRegistration, revision int) (row, error) {
+	data, err := storage.EncodeClient(r.Client)
+	return row{data: data, revision: revision, digest: r.RegistrationAccessTokenDigest, at: r.RegistrationTime}, err
+}
+
+func (s *forgetfulStore) RegisterClient(_ context.Context, r *models.ClientRegistration) (int, error) {
+	encoded, err := s.encode(r, 1)
+	if err != nil {
+		return 0, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.rows[r.Client.ClientId]; ok {
+		return 0, storage.ErrDuplicateHandle
+	}
+	s.rows[r.Client.ClientId] = encoded
+	return 1, nil
+}
+
+func (s *forgetfulStore) FindClientRegistration(_ context.Context, id string) (*models.ClientRegistration, error) {
+	s.mu.Lock()
+	stored, ok := s.rows[id]
+	s.mu.Unlock()
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	client, err := storage.DecodeClient(stored.data)
+	if err != nil {
+		return nil, err
+	}
+	return &models.ClientRegistration{Client: client, Revision: stored.revision, RegistrationAccessTokenDigest: stored.digest, RegistrationTime: stored.at}, nil
+}
+
+func (s *forgetfulStore) FindClientById(ctx context.Context, id string) (*models.Client, error) {
+	r, err := s.FindClientRegistration(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return r.Client, nil
+}
+
+func (s *forgetfulStore) UpdateClientRegistration(_ context.Context, r *models.ClientRegistration, expected int) (int, error) {
+	encoded, err := s.encode(r, expected+1)
+	if err != nil {
+		return 0, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.rows[r.Client.ClientId]
+	if !ok {
+		return 0, storage.ErrNotFound
+	}
+	if current.revision != expected {
+		return 0, storage.ErrVersionConflict
+	}
+	s.rows[r.Client.ClientId] = encoded
+	return encoded.revision, nil
+}
+
+func (s *forgetfulStore) RemoveClientRegistration(_ context.Context, id string, expected int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.rows[id]
+	if !ok {
+		return storage.ErrNotFound
+	}
+	if current.revision != expected {
+		return storage.ErrVersionConflict
+	}
+	delete(s.rows, id)
+	return nil
+}
+
+func (s *forgetfulStore) FindClientsByAllowedOrigin(_ context.Context, origin string) ([]*models.Client, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	matches := []*models.Client{}
+	for _, stored := range s.rows {
+		client, err := storage.DecodeClient(stored.data)
+		if err != nil {
+			return nil, err
+		}
+		for _, allowed := range client.AllowedCorsOrigins {
+			if allowed == origin {
+				matches = append(matches, client)
+				break
+			}
+		}
+	}
+	return matches, nil
+}
+`)
+
+	writeScratchFile(t, filepath.Join(scratch, "adapter_test.go"), `// Copyright 2026 Decker.
+// Licensed under the Apache License, Version 2.0.
+
+package scratchclientregistration
+
+import (
+	"testing"
+
+	"github.com/gonewx/wicket/storage"
+	"github.com/gonewx/wicket/storage/storagetest"
+)
+
+func TestAdapterRunsSuite(t *testing.T) {
+	storagetest.RunClientRegistrationStoreSuite(t, func() storage.ClientRegistrationStore {
+		return newForgetfulStore()
+	}, storagetest.WithMay(true))
+}
+`)
+
+	cmd := exec.Command("mise", "exec", "go@"+readGoToolchainPin(t), "--", "go", "test", "./"+scratchClientRegistrationDir+"/", "-count=1")
+	cmd.Dir = root
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	output, err := cmd.Output()
+	combined := string(output) + stderr.String()
+	if err == nil {
+		t.Fatal("suite accepted a client registration store that leaves no tombstone")
+	}
+	if !strings.Contains(combined, "--- FAIL: TestAdapterRunsSuite/MUST/TombstoneBlocksReRegistration") {
+		t.Fatalf("suite failure output does not name the violated case:\n%s", combined)
+	}
+	// The violation is the only one: every other case of the run passes.
+	if strings.Count(combined, "--- FAIL: TestAdapterRunsSuite/") != 1 {
+		t.Fatalf("suite failed more cases than the tombstone one:\n%s", combined)
 	}
 }
 
