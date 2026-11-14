@@ -120,43 +120,21 @@ func walkRepositoryTextFiles(t *testing.T, visit func(rel string, content string
 	t.Helper()
 
 	root := projectRoot(t)
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-
-		if d.IsDir() {
-			switch rel {
-			case ".git", ".claude", ".agents", ".qoder", ".rnix", ".codegraph", ".cursor", ".opencode", "_bmad-output":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
+	for _, rel := range projectFiles(t) {
 		switch rel {
 		case "PROVENANCE.md", "NOTICE", "LICENSE":
-			return nil
+			continue
 		}
 
-		contentBytes, err := os.ReadFile(path)
+		contentBytes, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
-			return err
+			t.Fatalf("read %s: %v", rel, err)
 		}
 		if !utf8.Valid(contentBytes) {
-			return nil
+			continue
 		}
 
 		visit(rel, string(contentBytes))
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk repository files: %v", err)
 	}
 }
 

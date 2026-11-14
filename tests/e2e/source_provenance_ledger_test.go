@@ -185,6 +185,40 @@ func projectRoot(t *testing.T) string {
 	}
 }
 
+// projectFiles returns every file that belongs to the repository, relative to
+// the project root with forward slashes: tracked files plus untracked files
+// that .gitignore does not exclude, so content that is about to be committed
+// is still checked. .gitignore is the single source of truth for what is not
+// repository content (tool state, bmad-loop run directories, nested worktrees),
+// which keeps the content guards from drifting behind hand-kept skip lists.
+// Files deleted from the working tree but still in the index are left out.
+func projectFiles(t *testing.T) []string {
+	t.Helper()
+
+	root := projectRoot(t)
+	output := runCommand(t, root, "git", "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+	seen := make(map[string]bool)
+	var files []string
+	for _, rel := range strings.Split(output, "\x00") {
+		if rel == "" || seen[rel] {
+			continue
+		}
+		seen[rel] = true
+		info, err := os.Lstat(filepath.Join(root, filepath.FromSlash(rel)))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			t.Fatalf("stat %s: %v", rel, err)
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+		files = append(files, rel)
+	}
+	return files
+}
+
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 

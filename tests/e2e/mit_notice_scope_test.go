@@ -154,41 +154,30 @@ func readMitManifestPaths(t *testing.T, evidenceRoot string) []string {
 func scanMitHeaderFiles(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	result := make(map[string]bool)
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	for _, rel := range projectFiles(t) {
+		if !strings.HasSuffix(rel, ".go") || rel == "vendor" || strings.HasPrefix(rel, "vendor/") {
+			continue
+		}
+		f, err := os.Open(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
-			return err
+			t.Fatalf("open %s: %v", rel, err)
 		}
-		if info.IsDir() {
-			base := filepath.Base(path)
-			if base == ".git" || base == "_bmad-output" || base == ".claude" || base == ".codegraph" || base == "vendor" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") {
-			return nil
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
 		scanner := bufio.NewScanner(f)
 		lineCount := 0
 		for scanner.Scan() && lineCount < 5 {
 			line := scanner.Text()
 			if strings.Contains(line, ".NET Foundation and Contributors") &&
 				strings.Contains(line, "Copyright") {
-				rel, _ := filepath.Rel(root, path)
-				result[rel] = true
+				result[filepath.FromSlash(rel)] = true
 				break
 			}
 			lineCount++
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk project tree: %v", err)
+		scanErr := scanner.Err()
+		f.Close()
+		if scanErr != nil {
+			t.Fatalf("read %s: %v", rel, scanErr)
+		}
 	}
 	return result
 }

@@ -165,28 +165,10 @@ func goFiles(t *testing.T) []string {
 	t.Helper()
 
 	var files []string
-	err := filepath.WalkDir(projectRoot(t), func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, rel := range projectFiles(t) {
+		if strings.HasSuffix(rel, ".go") {
+			files = append(files, rel)
 		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", ".claude", ".agents", ".rnix":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if strings.HasSuffix(path, ".go") {
-			rel, err := filepath.Rel(projectRoot(t), path)
-			if err != nil {
-				return err
-			}
-			files = append(files, filepath.ToSlash(rel))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk project Go files: %v", err)
 	}
 	return files
 }

@@ -17,31 +17,13 @@ func TestTrademarkStringsAreLimitedToAllowedE2E(t *testing.T) {
 	t.Parallel()
 
 	root := projectRoot(t)
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	for _, rel := range projectFiles(t) {
+		contentBytes, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
-			return err
-		}
-
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-
-		if d.IsDir() {
-			switch rel {
-			case ".git", ".claude", ".agents", ".qoder", ".rnix", ".codegraph", ".cursor", ".opencode", "_bmad-output":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		contentBytes, err := os.ReadFile(path)
-		if err != nil {
-			return err
+			t.Fatalf("read %s: %v", rel, err)
 		}
 		if !utf8.Valid(contentBytes) {
-			return nil
+			continue
 		}
 
 		for lineNo, line := range strings.Split(string(contentBytes), "\n") {
@@ -55,10 +37,6 @@ func TestTrademarkStringsAreLimitedToAllowedE2E(t *testing.T) {
 				t.Fatalf("%s:%d contains disallowed trademark token %q: %s", rel, lineNo+1, token, line)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk release tree: %v", err)
 	}
 }
 
