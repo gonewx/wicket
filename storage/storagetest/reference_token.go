@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/claims"
 	"github.com/gonewx/wicket/storage"
 	"github.com/gonewx/wicket/storage/models"
 )
@@ -164,6 +166,114 @@ func RunReferenceTokenStoreSuite(t *testing.T, newStore func() storage.Reference
 			_ = store.RemoveReferenceToken(context.Background(), "handle-1")
 		})
 	})
+	mustCase(t, "RemoveByClientIsolated", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		for handle, clientId := range map[string]string{"a-1": "client-a", "a-2": "client-a", "b-1": "client-b"} {
+			if err := store.StoreReferenceToken(context.Background(), handle, newReferenceToken(clientId)); err != nil {
+				t.Fatalf("store %s: %v", handle, err)
+			}
+		}
+		count, err := store.RemoveReferenceTokensByClient(context.Background(), "client-a")
+		expectRemovedCount(t, count, err, 2)
+		for _, handle := range []string{"a-1", "a-2"} {
+			_, err := store.GetReferenceToken(context.Background(), handle)
+			expectNotFound(t, err)
+		}
+		if _, err := store.GetReferenceToken(context.Background(), "b-1"); err != nil {
+			t.Fatalf("other client token removed: %v", err)
+		}
+		count, err = store.RemoveReferenceTokensByClient(context.Background(), "client-a")
+		expectRemovedCount(t, count, err, 0)
+	})
+	// The session of a reference token is its sid claim, read through
+	// Token.SessionId(); the suite builds the tokens with that claim.
+	mustCase(t, "RemoveBySessionIsolated", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		for handle, sessionId := range map[string]string{"s1-1": "session-1", "s1-2": "session-1", "s2-1": "session-2", "none": ""} {
+			if err := store.StoreReferenceToken(context.Background(), handle, newSessionReferenceToken("client-a", sessionId)); err != nil {
+				t.Fatalf("store %s: %v", handle, err)
+			}
+		}
+		count, err := store.RemoveReferenceTokensBySession(context.Background(), "session-1")
+		expectRemovedCount(t, count, err, 2)
+		for _, handle := range []string{"s1-1", "s1-2"} {
+			_, err := store.GetReferenceToken(context.Background(), handle)
+			expectNotFound(t, err)
+		}
+		for _, handle := range []string{"s2-1", "none"} {
+			if _, err := store.GetReferenceToken(context.Background(), handle); err != nil {
+				t.Fatalf("token %s outside the session removed: %v", handle, err)
+			}
+		}
+		count, err = store.RemoveReferenceTokensBySession(context.Background(), "session-1")
+		expectRemovedCount(t, count, err, 0)
+	})
+	mustCase(t, "ScopedRemoveEmptyArgumentMatchesNothing", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreReferenceToken(context.Background(), "blank", newReferenceToken("")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		count, err := store.RemoveReferenceTokensByClient(context.Background(), "")
+		expectRemovedCount(t, count, err, 0)
+		count, err = store.RemoveReferenceTokensBySession(context.Background(), "")
+		expectRemovedCount(t, count, err, 0)
+		if _, err := store.GetReferenceToken(context.Background(), "blank"); err != nil {
+			t.Fatalf("token with empty fields removed by empty argument: %v", err)
+		}
+	})
+	mustCase(t, "RemoveMissingHandleSucceeds", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreReferenceToken(context.Background(), "handle-1", newReferenceToken("client-a")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		if err := store.RemoveReferenceToken(context.Background(), "missing"); err != nil {
+			t.Fatalf("Remove(missing) = %v, want nil", err)
+		}
+		if err := store.RemoveReferenceToken(context.Background(), "handle-1"); err != nil {
+			t.Fatalf("Remove: %v", err)
+		}
+		if err := store.RemoveReferenceToken(context.Background(), "handle-1"); err != nil {
+			t.Fatalf("Remove(already removed) = %v, want nil", err)
+		}
+	})
+	// Refresh-token revocation removes the subject/client pair's reference
+	// tokens right after the refresh token; under concurrent revocation the
+	// pair may already be gone, and that must not surface as a failure.
+	mustCase(t, "RemoveBySubjectAndClientZeroMatchSucceeds", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.RemoveReferenceTokens(context.Background(), "subject-1", "client-a"); err != nil {
+			t.Fatalf("RemoveReferenceTokens on empty store = %v, want nil", err)
+		}
+		token := newReferenceToken("client-a")
+		token.Claims = []*claims.Claim{claims.NewClaim(
+			claims.WithClaimType(wicket.JwtClaimTypesSubject),
+			claims.WithClaimValue("subject-1"),
+		)}
+		if err := store.StoreReferenceToken(context.Background(), "h1", token); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		if err := store.RemoveReferenceTokens(context.Background(), "subject-1", "client-a"); err != nil {
+			t.Fatalf("RemoveReferenceTokens: %v", err)
+		}
+		_, err := store.GetReferenceToken(context.Background(), "h1")
+		expectNotFound(t, err)
+		if err := store.RemoveReferenceTokens(context.Background(), "subject-1", "client-a"); err != nil {
+			t.Fatalf("RemoveReferenceTokens after pair already removed = %v, want nil", err)
+		}
+	})
+	mustCase(t, "NoBackgroundGoroutinesScopedRemoval", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.ReferenceTokenStore) {
+			_ = store.StoreReferenceToken(context.Background(), "handle-1", newSessionReferenceToken("client-a", "session-1"))
+			_, _ = store.RemoveReferenceTokensBySession(context.Background(), "session-1")
+			_ = store.StoreReferenceToken(context.Background(), "handle-2", newSessionReferenceToken("client-a", "session-1"))
+			_, _ = store.RemoveReferenceTokensByClient(context.Background(), "client-a")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 
@@ -174,4 +284,17 @@ func newReferenceToken(clientId string) *models.Token {
 		Type:         "reference",
 		ClientId:     clientId,
 	}
+}
+
+// newSessionReferenceToken builds a reference token whose session is carried
+// by a sid claim; an empty sessionId yields a token without the claim.
+func newSessionReferenceToken(clientId, sessionId string) *models.Token {
+	token := newReferenceToken(clientId)
+	if sessionId != "" {
+		token.Claims = []*claims.Claim{claims.NewClaim(
+			claims.WithClaimType(wicket.JwtClaimTypesSessionId),
+			claims.WithClaimValue(sessionId),
+		)}
+	}
+	return token
 }

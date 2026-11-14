@@ -229,6 +229,22 @@ func RunPersistedGrantStoreSuite(t *testing.T, newStore func() storage.Persisted
 			_ = store.Remove(context.Background(), "key-1")
 		})
 	})
+	mustCase(t, "RemoveMissingHandleSucceeds", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.Store(context.Background(), newPersistedGrant("key-1", "subject-1")); err != nil {
+			t.Fatalf("Store: %v", err)
+		}
+		if err := store.Remove(context.Background(), "missing"); err != nil {
+			t.Fatalf("Remove(missing) = %v, want nil", err)
+		}
+		if err := store.Remove(context.Background(), "key-1"); err != nil {
+			t.Fatalf("Remove: %v", err)
+		}
+		if err := store.Remove(context.Background(), "key-1"); err != nil {
+			t.Fatalf("Remove(already removed) = %v, want nil", err)
+		}
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

@@ -28,6 +28,12 @@ func (sentinelRefreshStore) UpdateRefreshToken(context.Context, string, *models.
 func (sentinelRefreshStore) RemoveRefreshToken(context.Context, string) error {
 	return storage.ErrNotFound
 }
+func (sentinelRefreshStore) RemoveRefreshTokensByClient(context.Context, string) (int, error) {
+	return 0, nil
+}
+func (sentinelRefreshStore) RemoveRefreshTokensBySession(context.Context, string) (int, error) {
+	return 0, nil
+}
 func (sentinelRefreshStore) RemoveExpired(context.Context, time.Time) (int, error) {
 	return 0, storage.ErrNotFound
 }
@@ -48,6 +54,12 @@ func (failingRefreshStore) UpdateRefreshToken(context.Context, string, *models.R
 }
 func (failingRefreshStore) RemoveRefreshToken(context.Context, string) error {
 	return errors.New("store unavailable")
+}
+func (failingRefreshStore) RemoveRefreshTokensByClient(context.Context, string) (int, error) {
+	return 0, errors.New("store unavailable")
+}
+func (failingRefreshStore) RemoveRefreshTokensBySession(context.Context, string) (int, error) {
+	return 0, errors.New("store unavailable")
 }
 func (failingRefreshStore) RemoveExpired(context.Context, time.Time) (int, error) {
 	return 0, errors.New("store unavailable")

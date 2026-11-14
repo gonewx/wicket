@@ -159,6 +159,22 @@ func RunBackchannelAuthenticationRequestStoreSuite(t *testing.T, newStore func()
 			_ = store.RemoveBackchannelAuthenticationRequest(context.Background(), "req-1")
 		})
 	})
+	mustCase(t, "RemoveMissingHandleSucceeds", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreBackchannelAuthenticationRequest(context.Background(), "req-1", newBackchannelRequest("client-a")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		if err := store.RemoveBackchannelAuthenticationRequest(context.Background(), "missing"); err != nil {
+			t.Fatalf("Remove(missing) = %v, want nil", err)
+		}
+		if err := store.RemoveBackchannelAuthenticationRequest(context.Background(), "req-1"); err != nil {
+			t.Fatalf("Remove: %v", err)
+		}
+		if err := store.RemoveBackchannelAuthenticationRequest(context.Background(), "req-1"); err != nil {
+			t.Fatalf("Remove(already removed) = %v, want nil", err)
+		}
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

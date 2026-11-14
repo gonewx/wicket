@@ -78,6 +78,18 @@ func expectNotFound(t *testing.T, err error) {
 	}
 }
 
+// expectRemovedCount checks a scoped removal's result: no error and exactly
+// want records removed. Removing zero records is a success, not an error.
+func expectRemovedCount(t *testing.T, got int, err error, want int) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("scoped removal error = %v, want nil", err)
+	}
+	if got != want {
+		t.Fatalf("scoped removal count = %d, want %d", got, want)
+	}
+}
+
 func expectEmptySlice[T any](t *testing.T, got []T) {
 	t.Helper()
 	if got == nil {
@@ -136,6 +148,15 @@ const (
 	goroutineTolerance              = 2
 	noBackgroundGoroutineIterations = 4
 	noBackgroundGoroutineSpacing    = 2 * time.Millisecond
+)
+
+// takeRounds and takeConcurrency size the concurrent take case: every round
+// uses a fresh store holding one code and releases takeConcurrency takers at
+// once. Repeating the round widens the chance that a non-atomic take
+// interleaves at least once.
+const (
+	takeRounds      = 200
+	takeConcurrency = 16
 )
 
 // runNoBackgroundGoroutinesCase asserts that running the representative store

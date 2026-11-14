@@ -24,6 +24,22 @@
 // reclaims space only and carries no correctness responsibility. Ports whose
 // data has no server-side lifecycle (message stores, configuration data, key
 // records) carry no reclamation method.
+//
+// Removal and take semantics. A single-handle removal (RemoveAuthorizationCode,
+// RemoveRefreshToken, RemoveReferenceToken, RemoveUserConsent,
+// PersistedGrantStore.Remove, DeviceFlowStore.RemoveByDeviceCode,
+// RemoveBackchannelAuthenticationRequest) is idempotent: removing a handle that
+// does not exist returns nil, so concurrent duplicate revocations do not
+// surface as failures. Scoped removals (the ...ByClient and ...BySession
+// methods) return how many records were removed; removing zero records is not
+// an error and returns (0, nil). An empty scope argument matches no record and
+// returns (0, nil); it never selects the records whose field is empty. An
+// adapter without transactions may complete a scoped removal partially, but
+// must then return a non-nil error. Adapters must persist client_id and the
+// session identifier as visible, indexable fields so scoped removals do not
+// scan opaque payloads. Consumable records (authorization codes) are redeemed
+// with an atomic take: of any number of concurrent takes of one handle,
+// exactly one returns the record and the rest miss with ErrNotFound.
 package storage
 
 import (
@@ -148,6 +164,8 @@ type PersistedGrantStore interface {
 	Store(ctx context.Context, grant *models.PersistedGrant) error
 	Get(ctx context.Context, key string) (*models.PersistedGrant, error)
 	GetAll(ctx context.Context, filter *PersistedGrantFilter) ([]*models.PersistedGrant, error)
+	// Remove deletes the grant stored under key. Removing a key that does not
+	// exist returns nil.
 	Remove(ctx context.Context, key string) error
 	RemoveAll(ctx context.Context, filter *PersistedGrantFilter) error
 	// RemoveExpired removes grants whose Expiration is set and precedes cutoff,
@@ -170,6 +188,9 @@ type DeviceFlowStore interface {
 	// semantics of the flow are enforced by state fields and removal, not by
 	// an optimistic-concurrency marker.
 	UpdateByUserCode(ctx context.Context, userCode string, data *models.DeviceCode) error
+	// RemoveByDeviceCode deletes the record stored under deviceCode together
+	// with its user code. Removing a device code that does not exist returns
+	// nil.
 	RemoveByDeviceCode(ctx context.Context, deviceCode string) error
 	// RemoveExpired removes device-flow records whose creation time plus
 	// lifetime precedes cutoff, returning how many were removed. It reclaims
@@ -190,6 +211,8 @@ type BackchannelAuthenticationRequestStore interface {
 	// version-guarded: the one-shot semantics of the flow are enforced by
 	// state fields and removal, not by an optimistic-concurrency marker.
 	UpdateBackchannelAuthenticationRequest(ctx context.Context, requestID string, data *models.BackchannelAuthenticationRequest) error
+	// RemoveBackchannelAuthenticationRequest deletes the request stored under
+	// requestID. Removing a request id that does not exist returns nil.
 	RemoveBackchannelAuthenticationRequest(ctx context.Context, requestID string) error
 	// RemoveExpired removes CIBA requests whose ExpirationTime precedes cutoff,
 	// returning how many were removed. It reclaims space only; expiry judgement
@@ -206,7 +229,31 @@ type AuthorizationCodeStore interface {
 	// GetAuthorizationCode returns an independent copy of the stored code.
 	// The caller may mutate the returned value without affecting the store.
 	GetAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error)
+	// TakeAuthorizationCode atomically removes the code stored under handle
+	// and returns an independent copy of it. A miss returns (nil,
+	// ErrNotFound). Of any number of concurrent takes of the same handle,
+	// exactly one succeeds; every other caller observes ErrNotFound. The
+	// store does not judge expiry: an expired code is taken like any other.
+	// Redemption must use this method instead of a Get followed by a Remove.
+	// The caller's cancellation and deadline propagate to the adapter as for
+	// every other method.
+	TakeAuthorizationCode(ctx context.Context, handle string) (*models.AuthorizationCode, error)
+	// RemoveAuthorizationCode deletes the code stored under handle. Removing
+	// a handle that does not exist returns nil.
 	RemoveAuthorizationCode(ctx context.Context, handle string) error
+	// RemoveAuthorizationCodesByClient deletes every code whose ClientId
+	// equals clientId and returns how many were removed. Zero matches return
+	// (0, nil); an empty clientId matches nothing. An adapter without
+	// transactions may complete partially but must then return an error.
+	// Context semantics are those of every other method.
+	RemoveAuthorizationCodesByClient(ctx context.Context, clientId string) (int, error)
+	// RemoveAuthorizationCodesBySession deletes every code whose SessionId
+	// equals sessionId and returns how many were removed. Zero matches return
+	// (0, nil); an empty sessionId matches nothing (codes without a session
+	// are never selected). An adapter without transactions may complete
+	// partially but must then return an error. Context semantics are those of
+	// every other method.
+	RemoveAuthorizationCodesBySession(ctx context.Context, sessionId string) (int, error)
 	// RemoveExpired removes codes whose creation time plus lifetime precedes
 	// cutoff, returning how many were removed. It reclaims space only; expiry
 	// judgement remains on the core side.
@@ -231,7 +278,22 @@ type RefreshTokenStore interface {
 	// mismatch fails with ErrVersionConflict and the stored record is left
 	// unchanged.
 	UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken, expectedVersion int) error
+	// RemoveRefreshToken deletes the token stored under handle. Removing a
+	// handle that does not exist returns nil.
 	RemoveRefreshToken(ctx context.Context, handle string) error
+	// RemoveRefreshTokensByClient deletes every token whose ClientId equals
+	// clientId and returns how many were removed. Zero matches return (0,
+	// nil); an empty clientId matches nothing. An adapter without
+	// transactions may complete partially but must then return an error.
+	// Context semantics are those of every other method.
+	RemoveRefreshTokensByClient(ctx context.Context, clientId string) (int, error)
+	// RemoveRefreshTokensBySession deletes every token whose SessionId equals
+	// sessionId and returns how many were removed. Zero matches return (0,
+	// nil); an empty sessionId matches nothing (tokens without a session are
+	// never selected). An adapter without transactions may complete partially
+	// but must then return an error. Context semantics are those of every
+	// other method.
+	RemoveRefreshTokensBySession(ctx context.Context, sessionId string) (int, error)
 	// RemoveExpired removes tokens whose creation time plus lifetime precedes
 	// cutoff, returning how many were removed. It reclaims space only; expiry
 	// judgement remains on the core side.
@@ -247,8 +309,27 @@ type ReferenceTokenStore interface {
 	// GetReferenceToken returns an independent copy of the stored token.
 	// The caller may mutate the returned value without affecting the store.
 	GetReferenceToken(ctx context.Context, handle string) (*models.Token, error)
+	// RemoveReferenceToken deletes the token stored under handle. Removing a
+	// handle that does not exist returns nil.
 	RemoveReferenceToken(ctx context.Context, handle string) error
+	// RemoveReferenceTokens deletes every token whose SubjectId() and
+	// ClientId match the pair. A pair that matches nothing returns nil:
+	// refresh-token revocation calls this right after removing the refresh
+	// token, and under concurrent revocation the tokens may already be gone.
 	RemoveReferenceTokens(ctx context.Context, subjectId, clientId string) error
+	// RemoveReferenceTokensByClient deletes every token whose ClientId equals
+	// clientId and returns how many were removed. Zero matches return (0,
+	// nil); an empty clientId matches nothing. An adapter without
+	// transactions may complete partially but must then return an error.
+	// Context semantics are those of every other method.
+	RemoveReferenceTokensByClient(ctx context.Context, clientId string) (int, error)
+	// RemoveReferenceTokensBySession deletes every token whose SessionId()
+	// (the sid claim) equals sessionId and returns how many were removed.
+	// Zero matches return (0, nil); an empty sessionId matches nothing
+	// (tokens without a sid claim are never selected). An adapter without
+	// transactions may complete partially but must then return an error.
+	// Context semantics are those of every other method.
+	RemoveReferenceTokensBySession(ctx context.Context, sessionId string) (int, error)
 	// RemoveExpired removes tokens whose creation time plus lifetime precedes
 	// cutoff, returning how many were removed. It reclaims space only; expiry
 	// judgement remains on the core side.
@@ -265,7 +346,15 @@ type UserConsentStore interface {
 	StoreUserConsent(ctx context.Context, consent *models.Consent) error
 	GetUserConsent(ctx context.Context, subjectId, clientId string) (*models.Consent, error)
 	GetAllUserConsents(ctx context.Context, subjectId string) ([]*models.Consent, error)
+	// RemoveUserConsent deletes the consent stored for the subject/client
+	// pair. Removing a pair that does not exist returns nil.
 	RemoveUserConsent(ctx context.Context, subjectId, clientId string) error
+	// RemoveUserConsentsByClient deletes every consent whose ClientId equals
+	// clientId and returns how many were removed. Zero matches return (0,
+	// nil); an empty clientId matches nothing. An adapter without
+	// transactions may complete partially but must then return an error.
+	// Context semantics are those of every other method.
+	RemoveUserConsentsByClient(ctx context.Context, clientId string) (int, error)
 	// RemoveExpired removes consents whose Expiration is set and precedes
 	// cutoff, returning how many were removed. It reclaims space only; expiry
 	// judgement remains on the core side.

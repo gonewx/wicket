@@ -204,6 +204,94 @@ func RunRefreshTokenStoreSuite(t *testing.T, newStore func() storage.RefreshToke
 			_ = store.RemoveRefreshToken(context.Background(), "handle-1")
 		})
 	})
+	mustCase(t, "RemoveByClientIsolated", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		for handle, clientId := range map[string]string{"a-1": "client-a", "a-2": "client-a", "b-1": "client-b"} {
+			if err := store.StoreRefreshToken(context.Background(), handle, newRefreshToken(clientId)); err != nil {
+				t.Fatalf("store %s: %v", handle, err)
+			}
+		}
+		count, err := store.RemoveRefreshTokensByClient(context.Background(), "client-a")
+		expectRemovedCount(t, count, err, 2)
+		for _, handle := range []string{"a-1", "a-2"} {
+			_, err := store.GetRefreshToken(context.Background(), handle)
+			expectNotFound(t, err)
+		}
+		if _, err := store.GetRefreshToken(context.Background(), "b-1"); err != nil {
+			t.Fatalf("other client token removed: %v", err)
+		}
+		count, err = store.RemoveRefreshTokensByClient(context.Background(), "client-a")
+		expectRemovedCount(t, count, err, 0)
+	})
+	mustCase(t, "RemoveBySessionIsolated", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		for handle, sessionId := range map[string]string{"s1-1": "session-1", "s1-2": "session-1", "s2-1": "session-2", "none": ""} {
+			token := newRefreshToken("client-a")
+			token.SessionId = sessionId
+			if err := store.StoreRefreshToken(context.Background(), handle, token); err != nil {
+				t.Fatalf("store %s: %v", handle, err)
+			}
+		}
+		count, err := store.RemoveRefreshTokensBySession(context.Background(), "session-1")
+		expectRemovedCount(t, count, err, 2)
+		for _, handle := range []string{"s1-1", "s1-2"} {
+			_, err := store.GetRefreshToken(context.Background(), handle)
+			expectNotFound(t, err)
+		}
+		for _, handle := range []string{"s2-1", "none"} {
+			if _, err := store.GetRefreshToken(context.Background(), handle); err != nil {
+				t.Fatalf("token %s outside the session removed: %v", handle, err)
+			}
+		}
+		count, err = store.RemoveRefreshTokensBySession(context.Background(), "session-1")
+		expectRemovedCount(t, count, err, 0)
+	})
+	mustCase(t, "ScopedRemoveEmptyArgumentMatchesNothing", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		blank := newRefreshToken("")
+		blank.SessionId = ""
+		if err := store.StoreRefreshToken(context.Background(), "blank", blank); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		count, err := store.RemoveRefreshTokensByClient(context.Background(), "")
+		expectRemovedCount(t, count, err, 0)
+		count, err = store.RemoveRefreshTokensBySession(context.Background(), "")
+		expectRemovedCount(t, count, err, 0)
+		if _, err := store.GetRefreshToken(context.Background(), "blank"); err != nil {
+			t.Fatalf("token with empty fields removed by empty argument: %v", err)
+		}
+	})
+	// Concurrent duplicate revocations race to remove the same handle; the
+	// loser must see success, not a failure the endpoint would surface.
+	mustCase(t, "RemoveMissingHandleSucceeds", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreRefreshToken(context.Background(), "handle-1", newRefreshToken("client-a")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		if err := store.RemoveRefreshToken(context.Background(), "missing"); err != nil {
+			t.Fatalf("Remove(missing) = %v, want nil", err)
+		}
+		if err := store.RemoveRefreshToken(context.Background(), "handle-1"); err != nil {
+			t.Fatalf("Remove: %v", err)
+		}
+		if err := store.RemoveRefreshToken(context.Background(), "handle-1"); err != nil {
+			t.Fatalf("Remove(already removed) = %v, want nil", err)
+		}
+	})
+	mustCase(t, "NoBackgroundGoroutinesScopedRemoval", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.RefreshTokenStore) {
+			token := newRefreshToken("client-a")
+			token.SessionId = "session-1"
+			_ = store.StoreRefreshToken(context.Background(), "handle-1", token)
+			_, _ = store.RemoveRefreshTokensBySession(context.Background(), "session-1")
+			_ = store.StoreRefreshToken(context.Background(), "handle-2", token)
+			_, _ = store.RemoveRefreshTokensByClient(context.Background(), "client-a")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

@@ -256,6 +256,22 @@ func RunDeviceFlowStoreSuite(t *testing.T, newStore func() storage.DeviceFlowSto
 			_ = store.RemoveByDeviceCode(context.Background(), "dev-1")
 		})
 	})
+	mustCase(t, "RemoveMissingHandleSucceeds", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreDeviceAuthorization(context.Background(), "device-1", "user-1", newDeviceCode("client-a")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		if err := store.RemoveByDeviceCode(context.Background(), "missing"); err != nil {
+			t.Fatalf("RemoveByDeviceCode(missing) = %v, want nil", err)
+		}
+		if err := store.RemoveByDeviceCode(context.Background(), "device-1"); err != nil {
+			t.Fatalf("RemoveByDeviceCode: %v", err)
+		}
+		if err := store.RemoveByDeviceCode(context.Background(), "device-1"); err != nil {
+			t.Fatalf("RemoveByDeviceCode(already removed) = %v, want nil", err)
+		}
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 

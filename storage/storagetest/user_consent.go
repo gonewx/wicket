@@ -160,6 +160,64 @@ func RunUserConsentStoreSuite(t *testing.T, newStore func() storage.UserConsentS
 			_ = store.RemoveUserConsent(context.Background(), "subject-1", "client-a")
 		})
 	})
+	mustCase(t, "RemoveByClientIsolated", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		for _, c := range []*models.Consent{
+			newConsent("subject-1", "client-a"),
+			newConsent("subject-2", "client-a"),
+			newConsent("subject-1", "client-b"),
+		} {
+			if err := store.StoreUserConsent(context.Background(), c); err != nil {
+				t.Fatalf("store: %v", err)
+			}
+		}
+		count, err := store.RemoveUserConsentsByClient(context.Background(), "client-a")
+		expectRemovedCount(t, count, err, 2)
+		for _, subject := range []string{"subject-1", "subject-2"} {
+			_, err := store.GetUserConsent(context.Background(), subject, "client-a")
+			expectNotFound(t, err)
+		}
+		if _, err := store.GetUserConsent(context.Background(), "subject-1", "client-b"); err != nil {
+			t.Fatalf("other client consent removed: %v", err)
+		}
+		count, err = store.RemoveUserConsentsByClient(context.Background(), "client-a")
+		expectRemovedCount(t, count, err, 0)
+	})
+	mustCase(t, "ScopedRemoveEmptyArgumentMatchesNothing", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreUserConsent(context.Background(), newConsent("subject-1", "")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		count, err := store.RemoveUserConsentsByClient(context.Background(), "")
+		expectRemovedCount(t, count, err, 0)
+		if _, err := store.GetUserConsent(context.Background(), "subject-1", ""); err != nil {
+			t.Fatalf("consent with empty client removed by empty argument: %v", err)
+		}
+	})
+	mustCase(t, "RemoveMissingHandleSucceeds", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreUserConsent(context.Background(), newConsent("subject-1", "client-a")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		if err := store.RemoveUserConsent(context.Background(), "absent-subject", "client-a"); err != nil {
+			t.Fatalf("Remove(missing) = %v, want nil", err)
+		}
+		if err := store.RemoveUserConsent(context.Background(), "subject-1", "client-a"); err != nil {
+			t.Fatalf("Remove: %v", err)
+		}
+		if err := store.RemoveUserConsent(context.Background(), "subject-1", "client-a"); err != nil {
+			t.Fatalf("Remove(already removed) = %v, want nil", err)
+		}
+	})
+	mustCase(t, "NoBackgroundGoroutinesScopedRemoval", func(t *testing.T) {
+		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.UserConsentStore) {
+			_ = store.StoreUserConsent(context.Background(), newConsent("subject-1", "client-a"))
+			_, _ = store.RemoveUserConsentsByClient(context.Background(), "client-a")
+		})
+	})
 	cfg.maybeAssertConformsTo(t, "ConformsToCredential", newStore())
 }
 
