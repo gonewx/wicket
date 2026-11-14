@@ -121,9 +121,10 @@ func TestMutualTlsAdvertisementMatchesAnEnabledAssembly(t *testing.T) {
 					require.NotEqualf(t, http.StatusNotFound, response.StatusCode, "alias %s = %q is not routed", name, raw)
 				}
 			})
-			t.Run("certificate bound tokens are not advertised", func(t *testing.T) {
-				_, ok := guard.document[wicket.DiscoveryTlsClientCertificateBoundAccessTokens]
-				require.False(t, ok)
+			t.Run("certificate bound tokens are advertised", func(t *testing.T) {
+				value, ok := guard.document[wicket.DiscoveryTlsClientCertificateBoundAccessTokens]
+				require.True(t, ok)
+				require.Equal(t, true, value)
 			})
 			t.Run("the existing guard holds", func(t *testing.T) {
 				assertEndpointsRouted(t, guard)

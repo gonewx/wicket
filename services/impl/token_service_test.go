@@ -75,7 +75,7 @@ func TestCreateAccessTokenAudiences(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil, nil)
 
 			token, err := svc.CreateAccessToken(context.Background(), accessTokenRequest(tc.resourceNames, ""))
 
@@ -97,7 +97,7 @@ func TestCreateAccessTokenSessionBinding(t *testing.T) {
 		"no session id emits no sid claim":   {sessionId: "", wantSidSet: false},
 	} {
 		t.Run(name, func(t *testing.T) {
-			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil, nil)
 
 			token, err := svc.CreateAccessToken(context.Background(), accessTokenRequest(nil, tc.sessionId))
 
@@ -118,7 +118,7 @@ func TestCreateAccessTokenSessionBinding(t *testing.T) {
 // session-id claim, the one bound to the validated request, so the claim never
 // serializes as a JSON array.
 func TestCreateAccessTokenSessionIdSingleClaim(t *testing.T) {
-	svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+	svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil, nil)
 
 	identity := claimspkg.NewClaimsIdentity(
 		claimspkg.WithAuthenticationType("test"),
@@ -162,7 +162,7 @@ func TestCreateSecurityTokenJwtIdAssembly(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			capture := &capturingTokenCreation{}
-			svc := NewTokenService(nil, nil, capture, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+			svc := NewTokenService(nil, nil, capture, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil, nil)
 
 			token := &storage_models.Token{Type: tc.tokenType, IncludeJwtId: tc.includeJwtId, Version: tc.version}
 			if tc.presetJwtId != "" {
@@ -207,7 +207,7 @@ func TestCreateTokenIssuerAndLifetimeAssembly(t *testing.T) {
 		},
 	}
 
-	svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+	svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil, nil)
 
 	accessToken, err := svc.CreateAccessToken(context.Background(), request)
 	require.NoError(t, err)
@@ -245,7 +245,7 @@ func TestCreateIdentityTokenSessionBinding(t *testing.T) {
 		"anonymous request emits no sid claim":        {sessionId: ""},
 	} {
 		t.Run(name, func(t *testing.T) {
-			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil)
+			svc := NewTokenService(nil, nil, nil, fixedClock{}, nil, config_options.NewWicketOptions(), nil, nil, nil)
 			request := &responses_models.TokenCreationRequest{
 				Subject:          tc.subject,
 				ValidatedRequest: &validators_models.ValidatedRequest{SessionId: tc.sessionId, ClientId: "relying-party"},

@@ -84,7 +84,7 @@ var bothParsers = []string{
 	wicket.EndpointAuthenticationMethodsSelfSignedTlsClientAuth,
 }
 
-func TestServedMutualTlsIsAdvertisedOnceWithoutBoundTokens(t *testing.T) {
+func TestServedMutualTlsIsAdvertisedOnceWithBoundTokens(t *testing.T) {
 	t.Parallel()
 
 	document, logs := mutualTlsHandler(t, true, bothParsers, true)
@@ -92,8 +92,8 @@ func TestServedMutualTlsIsAdvertisedOnceWithoutBoundTokens(t *testing.T) {
 	if got := methodsOf(document); !slices.Equal(got, want) {
 		t.Fatalf("methods = %v, want %v", got, want)
 	}
-	if _, ok := document[wicket.DiscoveryTlsClientCertificateBoundAccessTokens]; ok {
-		t.Fatalf("%s advertised before bound tokens exist", wicket.DiscoveryTlsClientCertificateBoundAccessTokens)
+	if value, ok := document[wicket.DiscoveryTlsClientCertificateBoundAccessTokens]; !ok || value != true {
+		t.Fatalf("%s = %v, want true", wicket.DiscoveryTlsClientCertificateBoundAccessTokens, value)
 	}
 	aliases, _ := document[wicket.DiscoveryMtlsEndpointAliases].(map[string]any)
 	if len(aliases) != 4 {

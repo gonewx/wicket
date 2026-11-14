@@ -77,7 +77,7 @@ func referenceAccessToken(clientId string) *storage_models.Token {
 }
 
 func newReferenceTokenService(store storage.ReferenceTokenStore, creation *capturingTokenCreation, logger *slog.Logger) *TokenService {
-	return NewTokenService(nil, store, creation, fixedClock{}, nil, config_options.NewWicketOptions(), logger, nil)
+	return NewTokenService(nil, store, creation, fixedClock{}, nil, config_options.NewWicketOptions(), logger, nil, nil)
 }
 
 // requireNoHandleTrace fails when text holds the handle or any eight character

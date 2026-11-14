@@ -14,9 +14,7 @@ import (
 //     methods the registered parsers list are withdrawn;
 //   - the authentication methods list is deduplicated, keeping the first
 //     occurrence of each method, since the generator appends the tls methods
-//     after those of the parsers;
-//   - certificate bound access tokens are not advertised, as nothing issues
-//     them yet.
+//     after those of the parsers.
 //
 // These withdrawals are expected and are not logged.
 func settleMutualTlsAdvertisement(document map[string]any, options *config_options.WicketOptions) {
@@ -57,5 +55,4 @@ func settleMutualTlsAdvertisement(document map[string]any, options *config_optio
 		}
 		document[key] = kept
 	}
-	delete(document, wicket.DiscoveryTlsClientCertificateBoundAccessTokens)
 }

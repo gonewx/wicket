@@ -82,7 +82,7 @@ func newAuthorizeCallbackHandlerFromProvider(p godi.Provider) *handlers.Authoriz
 
 func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
 	return handlers.NewTokenHandlerWithOptions(
-		clientAuthenticatorFromProvider(p),
+		withCertificateBoundAccessTokens(p, clientAuthenticatorFromProvider(p)),
 		godi.GetRequired[validators.TokenRequestValidator](p),
 		godi.GetRequired[responses.TokenResponseGenerator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
@@ -170,13 +170,20 @@ func newDeviceAuthorizationHandlerFromProvider(p godi.Provider) *handlers.Device
 }
 
 func newUserInfoHandlerFromProvider(p godi.Provider) *handlers.UserInfoHandler {
-	return handlers.NewUserInfoHandler(
+	handler := handlers.NewUserInfoHandler(
 		godi.GetRequired[*validators_impl.BearerTokenUsageValidator](p),
 		godi.GetRequired[validators.UserInfoRequestValidator](p),
 		godi.GetRequired[responses.UserInfoResponseGenerator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
+	// A token bound to a client certificate is checked whether or not the
+	// feature is enabled, so the handler always reads certificates from the
+	// same source as the token endpoint.
+	if cfg, ok := godi.Get[*ServerConfig](p); ok {
+		handler.SetClientCertificateSource(cfg.ClientCertificateSource())
+	}
+	return handler
 }
 
 func newEndSessionHandlerFromProvider(p godi.Provider) *handlers.EndSessionHandler {

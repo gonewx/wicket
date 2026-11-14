@@ -251,6 +251,7 @@ func newResourceIndicatorE2EFixture(t *testing.T) *resourceIndicatorE2EFixture {
 		options,
 		logger,
 		nil,
+		nil,
 	)
 
 	return &resourceIndicatorE2EFixture{

@@ -2377,6 +2377,7 @@ func (r *Root) NewTokenService() services.TokenService {
 			godi.GetRequired[*options.WicketOptions](p),
 			godi.GetRequired[*slog.Logger](p),
 			requestFromProvider(p),
+			accessTokenConfirmationFromProvider(p),
 		)
 	})(r)
 	r.disp.TrackAny(v)
@@ -5697,6 +5698,7 @@ func (s *scope) NewTokenService() services.TokenService {
 			godi.GetRequired[*options.WicketOptions](p),
 			godi.GetRequired[*slog.Logger](p),
 			requestFromProvider(p),
+			accessTokenConfirmationFromProvider(p),
 		)
 	})(s)
 	s.disp.TrackAny(v)
