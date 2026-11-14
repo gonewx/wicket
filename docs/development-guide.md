@@ -27,8 +27,8 @@ mise exec -- go version
 
 ```bash
 # 代码生成（修改 di/ 装配后必须执行）
-# GOWORK=off：在 go.work 下生成器会把版本戳写成 (devel)，与 go.mod 中的 godi 版本漂移
-GOWORK=off mise exec -- go generate ./...
+# 生成指令自带 GOWORK=off：在 go.work 下生成器会把版本戳写成 (devel)，与 go.mod 漂移
+mise exec -- go generate ./...
 
 # 构建
 mise exec -- go build ./...
@@ -45,7 +45,7 @@ mise exec -- go test -tags=integration ./...
 每次提交前必须运行以下三命令，全部通过方可提交：
 
 ```bash
-GOWORK=off mise exec -- go generate ./...
+mise exec -- go generate ./...
 mise exec -- go build ./...
 mise exec -- go test ./...
 ```
@@ -98,7 +98,7 @@ type(scope): description
 ### DI 装配修改流程
 
 1. 修改 `di/` 中的注册代码
-2. 运行 `GOWORK=off mise exec -- go generate ./...`
+2. 运行 `mise exec -- go generate ./...`
 3. 确认 `di/container_gen.go` 已更新
 4. 运行构建和测试
 5. 一起提交注册代码和生成物
