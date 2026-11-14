@@ -102,6 +102,24 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | `client_secret_post` | `PostBodySecretParser` |
 | `client_secret_hashed` | `HashedSharedSecretValidator` |
 
+## 收紧选项（默认全关）
+
+三项收紧选项可单独开启、任意组合，均默认关闭；关闭时行为与以往完全相同。前两项在 `ServerConfig` 上声明，须在 `Freeze()` 之前调用，之后调用会 panic；重复调用幂等。
+
+```go
+cfg := root.ServerConfig()
+cfg.RequireAsymmetricRequestObjects()        // request object 只收非对称签名
+cfg.RequireClientCredentialsAuthentication() // client_credentials 必须真正认证
+cfg.Freeze()
+```
+
+| 选项 | 查询方法 | 开启后的行为 |
+|------|----------|--------------|
+| `RequireAsymmetricRequestObjects()` | `AsymmetricRequestObjectsRequired()` | `request` 与 `request_uri` 两条路径的 request object 只接受 `RS256/384/512`、`PS256/384/512`、`ES256/384/512` 签名。`HS*`、`none`、头部无法解析、JSON 序列化或多签名一律 `invalid_request_object`。验签只使用 client 登记的非对称密钥：对称（`kty=oct`）密钥在验签前被剔除，所以头部写 `RS256`、实际用对称密钥做 HMAC 的请求同样被拒；只登记了对称密钥的 client 无法再使用 request object。discovery 的 `request_object_signing_alg_values_supported` 只宣告上述九个值（宿主同名自定义值同样过滤），过滤后为空则删除该键。CIBA 的 `request` 参数不在此范围内 |
+| `RequireClientCredentialsAuthentication()` | `ClientCredentialsAuthenticationRequired()` | token 端点上 `grant_type=client_credentials`（请求体或查询串）的请求，只签发给真正认证的 client：`RequireClientSecret=true` 且 secret 正确（implicit-only client 除外）、`private_key_jwt` 断言认证成功，或 tls 类方法以证书认证成功。公开 client（`RequireClientSecret=false`）只带 `client_id` 或带任意 secret 都返回 HTTP 400 `invalid_client`（RFC 6749 §4.4）。其他 grant 与其他端点（撤销、CIBA、设备授权）不受影响 |
+
+第三项是 client 元数据：`ClientAuthenticationMetadata.TokenEndpointAuthSigningAlgorithms` 为 `private_key_jwt` client 限定断言签名算法，见 [private_key_jwt 接入指南](private-key-jwt-guide.md#按-client-的签名算法白名单)。
+
 ## 请求/响应模型
 
 ### 令牌请求（Token Endpoint）

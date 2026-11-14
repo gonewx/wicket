@@ -70,6 +70,10 @@ func (v ClientConfigurationValidator) Validate(context *validators_contexts.Clie
 	if !context.IsValid {
 		return
 	}
+	if message := validateTokenEndpointAuthSigningAlgorithms(v.features, context.Client); message != "" {
+		context.SetError(message)
+		return
+	}
 	if message := validateCertificateBoundAccessTokens(v.features, context.Client); message != "" {
 		context.SetError(message)
 	}

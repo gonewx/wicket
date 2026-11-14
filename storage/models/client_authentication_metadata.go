@@ -45,4 +45,10 @@ type ClientAuthenticationMetadata struct {
 	// public client (RequireClientSecret false) and not together with
 	// AllowAccessTokensViaBrowser.
 	TlsClientCertificateBoundAccessTokens bool
+	// TokenEndpointAuthSigningAlgorithms lists the JWS algorithms the
+	// client's private_key_jwt assertions may be signed with. Empty means no
+	// restriction beyond the server's own list. It is valid only for a client
+	// whose TokenEndpointAuthMethod is "private_key_jwt", and every value
+	// has to be one of the algorithms the server accepts for private_key_jwt.
+	TokenEndpointAuthSigningAlgorithms []string
 }

@@ -127,6 +127,10 @@ func (v *Verifier) checkStateless(ctx context.Context, options Options, principa
 	if !slices.Contains(options.SigningAlgorithms, header.Algorithm) || !slices.Contains(supportedSigningAlgorithms, header.Algorithm) {
 		return header, time.Time{}, "", reject(reasonAlgorithm)
 	}
+	// A principal that registered its own algorithms narrows the server's.
+	if len(principal.SigningAlgorithms) > 0 && !slices.Contains(principal.SigningAlgorithms, header.Algorithm) {
+		return header, time.Time{}, "", reject(reasonAlgorithm)
+	}
 	algorithm, known := jwa.LookupSignatureAlgorithm(header.Algorithm)
 	if !known {
 		return header, time.Time{}, "", reject(reasonAlgorithm)
