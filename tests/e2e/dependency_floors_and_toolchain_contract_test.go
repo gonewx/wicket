@@ -30,6 +30,25 @@ func runningToolchainVersion(reported string) (string, error) {
 	return match[1], nil
 }
 
+// toolchainPinPattern matches the pin spellings the project accepts in
+// mise.toml: the language line alone (`1.27`, tracking the latest released
+// patch) or an exact released patch (`1.27.4`). Release candidates and other
+// pre-release spellings do not match.
+var toolchainPinPattern = regexp.MustCompile(`^1\.27(?:\.\d+)?$`)
+
+// toolchainSatisfiesPin reports whether a running released toolchain version
+// satisfies the mise pin. A line pin (`1.27`) accepts any patch of that line,
+// mirroring how mise resolves a fuzzy version; an exact pin requires equality.
+func toolchainSatisfiesPin(running, pin string) bool {
+	if running == pin {
+		return true
+	}
+	if strings.Count(pin, ".") == 1 {
+		return strings.HasPrefix(running, pin+".")
+	}
+	return false
+}
+
 // tomlTableHeaderPattern matches a TOML table header line, e.g. `[tools]`.
 var tomlTableHeaderPattern = regexp.MustCompile(`^\[([^\]]*)\]\s*$`)
 
@@ -165,8 +184,8 @@ func TestToolchainVersionsArePinnedToReleasesE2E(t *testing.T) {
 	}
 
 	toolchainPin := readGoToolchainPin(t)
-	if toolchainPin != "1.27.0" {
-		t.Fatalf("mise.toml pins go %q, want the released 1.27.0 toolchain", toolchainPin)
+	if !toolchainPinPattern.MatchString(toolchainPin) {
+		t.Fatalf("mise.toml pins go %q, want the 1.27 line (\"1.27\") or a released 1.27.N patch", toolchainPin)
 	}
 
 	// The two checks above only read declarations. This one closes the gap
@@ -177,8 +196,8 @@ func TestToolchainVersionsArePinnedToReleasesE2E(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v (mise.toml pins %s)", err, toolchainPin)
 	}
-	if running != toolchainPin {
-		t.Fatalf("tests are running on go%s, but mise.toml pins %s — run commands through `mise exec`", running, toolchainPin)
+	if !toolchainSatisfiesPin(running, toolchainPin) {
+		t.Fatalf("tests are running on go%s, which does not satisfy the mise.toml pin %s — run commands through `mise exec`", running, toolchainPin)
 	}
 }
 
@@ -311,5 +330,41 @@ func TestRunningToolchainVersion(t *testing.T) {
 				t.Fatalf("runningToolchainVersion(%q) = %q, want %q", tc.reported, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestToolchainPinSpellings pins which mise.toml spellings the toolchain guard
+// accepts and how a running toolchain is matched against each. The line pin
+// lets local machines and CI pick up Go patch releases (bug and security fixes)
+// without an edit, while still rejecting release candidates and other lines.
+func TestToolchainPinSpellings(t *testing.T) {
+	t.Parallel()
+
+	for pin, ok := range map[string]bool{
+		"1.27": true, "1.27.0": true, "1.27.4": true,
+		"1.27rc1": false, "1.26": false, "1.28.0": false, "1": false, "1.27.x": false, "": false,
+	} {
+		if got := toolchainPinPattern.MatchString(pin); got != ok {
+			t.Errorf("toolchainPinPattern.MatchString(%q) = %v, want %v", pin, got, ok)
+		}
+	}
+
+	cases := []struct {
+		running, pin string
+		want         bool
+	}{
+		{"1.27.4", "1.27", true},
+		{"1.27.0", "1.27", true},
+		{"1.27", "1.27", true},
+		{"1.270.1", "1.27", false},
+		{"1.28.0", "1.27", false},
+		{"1.27.4", "1.27.4", true},
+		{"1.27.3", "1.27.4", false},
+		{"1.27.40", "1.27.4", false},
+	}
+	for _, tc := range cases {
+		if got := toolchainSatisfiesPin(tc.running, tc.pin); got != tc.want {
+			t.Errorf("toolchainSatisfiesPin(%q, %q) = %v, want %v", tc.running, tc.pin, got, tc.want)
+		}
 	}
 }

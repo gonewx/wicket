@@ -45,7 +45,7 @@ http.ListenAndServe(":8080", mux)
 
 ## 要求
 
-- Go 1.27 工具链（mise pin `1.27.0`）
+- Go 1.27 工具链（mise pin `1.27`，跟随最新补丁版）
 
 ## 许可证
 

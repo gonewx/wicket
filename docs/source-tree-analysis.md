@@ -7,7 +7,7 @@ wicket/                          # Module: github.com/gonewx/wicket
 ├── go.mod                      # Module 声明；go 1.27（无 rc 指令）
 ├── go.work                     # Workspace（引用 ../godi，开发用，不入库）
 ├── go.work.sum                 # Workspace 校验和（不入库）
-├── mise.toml                   # 工具链 pin（go = "1.27.0"）
+├── mise.toml                   # 工具链 pin（go = "1.27"）
 ├── constants.go                # 全局常量（端点名、路由路径、scheme 名、grant type）
 ├── decorator.go                # 通用装饰器泛型
 ├── option.go                   # 函数选项模式辅助
