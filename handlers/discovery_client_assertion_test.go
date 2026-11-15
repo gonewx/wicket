@@ -22,10 +22,10 @@ import (
 const algorithmsKey = "token_endpoint_auth_signing_alg_values_supported"
 
 func TestHandlerWrittenDiscoveryKeys(t *testing.T) {
-	if len(handlerWrittenDiscoveryKeys) != 5 {
+	if len(handlerWrittenDiscoveryKeys) != 6 {
 		t.Fatalf("handler written keys: %v", handlerWrittenDiscoveryKeys)
 	}
-	for _, key := range []string{algorithmsKey, wicket.DiscoveryPushedAuthorizationRequestEndpoint, wicket.DiscoveryRequirePushedAuthorizationRequests, wicket.DiscoveryDPoPSigningAlgValuesSupported, wicket.DiscoveryIntrospectionSigningAlgValuesSupported} {
+	for _, key := range []string{algorithmsKey, wicket.DiscoveryPushedAuthorizationRequestEndpoint, wicket.DiscoveryRequirePushedAuthorizationRequests, wicket.DiscoveryDPoPSigningAlgValuesSupported, wicket.DiscoveryIntrospectionSigningAlgValuesSupported, wicket.DiscoveryPromptValuesSupported} {
 		if _, ok := handlerWrittenDiscoveryKeys[key]; !ok {
 			t.Fatalf("%s is not a handler written key", key)
 		}

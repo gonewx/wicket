@@ -99,6 +99,10 @@ type ServerConfig struct {
 	asymmetricRequestObjectsRequired        bool
 	clientCredentialsAuthenticationRequired bool
 
+	// accountCreationUrl is the host's account creation page, see
+	// account_creation.go. Empty means account creation is not offered.
+	accountCreationUrl string
+
 	// Pushed authorization seams, see pushed_authorization.go. Both are
 	// required exactly when pushedAuthorizationEnabled is set.
 	pushedAuthorizationEnabled                bool

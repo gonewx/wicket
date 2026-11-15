@@ -247,6 +247,34 @@ DPoP 未启用时 userinfo 不识别 `DPoP` 方案（与此前一致，按缺少
 
 DPoP 启用时 discovery 文档写入 `dpop_signing_alg_values_supported`（配置的算法列表）；未启用时不宣告。该键只由 discovery handler 写入，宿主自定义的同名条目被删除并记录告警。
 
+## 账户创建（`prompt=create`）
+
+OpenID Connect Prompt Create 1.0 为 `prompt` 增加取值 `create`（`wicket.PromptModesCreate`）：RP 请求 OP 展示账户创建界面而不是登录界面。wicket 不带 UI，账户创建页由宿主提供。
+
+### 配置
+
+```go
+cfg := root.ServerConfig()
+cfg.SetAccountCreationUrl("/account/register") // 或 "https://accounts.example/register"
+cfg.Freeze()
+```
+
+- `SetAccountCreationUrl(url)` 接受本地路径（以 `/` 或 `~/` 开头）或带主机的 `http` / `https` 绝对 URL，去掉首尾空白后保存；空值、其他形式或 `Freeze()` 之后调用都会 panic。重复调用以最后一次为准。`AccountCreationUrl()` 返回已声明的地址，未声明时为空串。
+- 没有 `UserInteractionOptions` 字段或 `EndpointsOptions` 开关与之对应。
+
+### authorize 行为
+
+- **已配置**：`prompt` 含 `create` 的请求（无论用户是否已登录）经既有自定义重定向交互结果被送到账户创建页，地址后附 `UserInteraction.CustomRedirectReturnUrlParameter`（默认 `returnUrl`）指向 `connect/authorize/callback` 的返回 URL，参数携带方式与登录页、同意页相同（内联或经 `AuthorizationParametersMessageStore` 句柄）。返回 URL 是相对 wicket base URL 的服务器相对路径；账户创建页若声明为其他主机上的绝对 URL，须自行按 wicket 的 base URL 解析该路径，并能在 wicket 所在站点签发登录会话。账户创建页经 `InteractionService.GetAuthorizationContext(returnUrl)` 取得请求，其 `PromptModes` 含 `create`。
+- **宿主页职责**：创建账户并让用户登录（签发登录会话），然后跳回 returnUrl。回到 callback 时不再进入账户创建页。
+- **组合**：跳转前，`prompt` 中的 `create`、`login`、`select_account` 并入 `suppressed_prompt` 随 returnUrl 往返，所以 `create login`、`create select_account` 回来后不再强制登录 / 选择账户；`consent` 不属认证，`create consent` 回来后照常进入同意页。已配置时，`none` 与 `create`（或任何其他值）同时出现返回 `invalid_request`（`Invalid prompt`）；未配置时含 `create` 的列表先按下条拒绝。
+- **未配置**：`prompt` 含 `create` 时返回 `invalid_request`，`error_description` 为 `prompt value create is not supported`，经既有 authorize 错误分发（错误页，错误消息中带回 client 的重定向地址；PAR 端点为 400）。**行为变化**：此前未知的 `create` 使整条 `prompt` 被静默忽略。
+- 含其他未知值的列表（如 `create foo`）仍按以往整条忽略；不含 `create` 的请求行为不变。
+- PAR：推送的 `prompt=create` 同样生效；未配置时推送端点直接返回 400 `invalid_request`。
+
+### Discovery
+
+已配置且 settle 后文档含 `authorization_endpoint` 时，openid-configuration 与授权服务器元数据宣告 `prompt_values_supported`（`wicket.DiscoveryPromptValuesSupported`）：`["none","login","consent","select_account","create"]`；否则不宣告。该键只由 handler 写入（组合根在已配置时调用 `(*handlers.DiscoveryHandler).ServeAccountCreation()`），宿主同名自定义条目被删除并记录告警（未配置时同样删除）。未配置且宿主没有该自定义条目时，discovery 文档不变。
+
 ## 支持的授权类型（Grant Types）
 
 | Grant Type | 说明 |
@@ -295,6 +323,7 @@ DPoP 启用时 discovery 文档写入 `dpop_signing_alg_values_supported`（配�
 | `tls_client_auth` / `self_signed_tls_client_auth` | 逐个判定：该方法在已注册解析器的 `GetAvailableAuthenticationMethods()` 中 |
 | `tls_client_certificate_bound_access_tokens`、`mtls_endpoint_aliases` | 至少注册了一种 tls 类客户端认证解析器。alias 条目逐条判定：对应主端点仍被宣告，且路径形态（未配置 `MutualTls.DomainName`）的 alias 路径已注册为端点路由（配置了 `DomainName` 的 domain / sub-domain 形态位于其他主机，只看主端点）；删空后整个键移除 |
 | `pushed_authorization_request_endpoint` / `require_pushed_authorization_requests` | 仅由 handler 写入：PAR 已启用且其路由已注册时写入端点 URL 与是否全局强制；否则两键一律移除（宿主同名自定义条目同样被移除）。`mtls_endpoint_aliases` 已宣告且 mTLS 别名路由已注册时追加 PAR 别名（路径形态 `connect/mtls/pushedauthorization`，或按 `MutualTls.DomainName` 的 domain / sub-domain 形态） |
+| `prompt_values_supported` | 仅由 handler 写入：装配声明了账户创建页（`ServerConfig.SetAccountCreationUrl`）且 settle 后文档含 `authorization_endpoint` 时写入 `none`、`login`、`consent`、`select_account`、`create`；否则不宣告。宿主同名自定义条目被删除并记录告警。见「账户创建（`prompt=create`）」 |
 
 令牌撤销端点与设备授权端点已注册，`revocation_endpoint`、`device_authorization_endpoint` 以及 `grant_types_supported` 中的 `device_code` 在默认装配下照常输出；`EnableDeviceAuthorizationEndpoint=false` 时后两者不输出；`EnableTokenRevocationEndpoint=false` 时 generator 不输出 `revocation_endpoint`，宿主未配置同名自定义条目时文档中没有该键。授权、令牌、内省、CIBA 四个端点的开关同理，关闭时 generator 不输出下列键，宿主未配置同名自定义条目时文档中没有这些键：`EnableAuthorizeEndpoint=false` 时为 `authorization_endpoint`、`request_parameter_supported`、`request_object_signing_alg_values_supported`，以及 `EnableJwtRequestUri=true` 时才有的 `request_uri_parameter_supported`；`EnableTokenEndpoint=false` 时为 `token_endpoint`；`EnableIntrospectionEndpoint=false` 时为 `introspection_endpoint`；`EnableBackchannelAuthenticationEndpoint=false` 时为 `backchannel_authentication_endpoint`、`backchannel_token_delivery_modes_supported`、`backchannel_user_code_parameter_supported`，以及 `grant_types_supported` 中的 `urn:openid:params:grant-type:ciba`。authorize 或 token 端点关闭后，`response_types_supported`、`response_modes_supported`、`grant_types_supported`、`token_endpoint_auth_methods_supported` 等仍照常输出。`frontchannel_logout_*` 照常输出（不开启 server-side sessions 时 front-channel 通知不会发生，见下文 Back-Channel Logout 的已知限制）。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤，但键名与生成键相同的除外。生成键指 generator 会写入文档的键，其中多数按开关写入：开关打开时 generator 丢弃同名自定义值；开关关闭时 generator 不写该键，同名自定义值会进入文档。两种情况下，这些键下的值一律按上表过滤（列表值无论是 `[]string` 还是从配置解码出的 `[]any` 都逐项判定）。上表按装配事实判定，端点开关不是过滤条件。被过滤撤下的能力，宿主无法借生成键名重新宣告：就端点而言，路径未注册为端点路由时，同名自定义值若指向本服务 base URL 下的该路径（包括宿主在 wicket 端点路由之外自行提供的路径），或不是绝对 URL，照样被撤下，即使自定义值与生成值相同。开关关闭而路由仍已注册时则不被撤下：`EnableTokenRevocationEndpoint=false` 时 generator 不写入 `revocation_endpoint`，端点对任何请求返回 404；宿主此时若以同名自定义条目写入指向本服务撤销路由的值，或任何外部绝对 URL，该值会出现在 discovery 文档中。其中指回本服务撤销路由的情形是已知限制：文档宣告了一个返回 404 的端点，开关关闭时，宿主不应以该键指回本服务的撤销路由。同一已知限制也适用于 `authorization_endpoint`、`token_endpoint`、`introspection_endpoint`、`backchannel_authentication_endpoint`：对应开关关闭而宿主以同名自定义条目指回本服务的对应路由时，条目仍出现在文档中，而该端点返回 404；开关关闭时，宿主不应以这些键指回本服务路由。`request_parameter_supported`、`request_object_signing_alg_values_supported`（authorize 关闭时）与 `backchannel_token_delivery_modes_supported`、`backchannel_user_code_parameter_supported`（CIBA 关闭时）的同名自定义值同样会进入文档。宿主自有的能力请用 generator 从不写入的键名宣告（例如 `registration_endpoint`），这类键只可能来自宿主，原样保留。
 

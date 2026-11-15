@@ -45,6 +45,10 @@ type DiscoveryHandler struct {
 	// introspectionSigningKeys is set once the assembly declared signed
 	// introspection responses, see ServeSignedIntrospection.
 	introspectionSigningKeys services.KeyMaterialService
+
+	// servesAccountCreation is set once the assembly declared an account
+	// creation page for the create prompt, see ServeAccountCreation.
+	servesAccountCreation bool
 }
 
 // NewDiscoveryHandler builds the discovery handler from the generator and the
@@ -112,6 +116,7 @@ func (h *DiscoveryHandler) settledDocument(r *http.Request) (map[string]any, err
 	}
 	settlePushedAuthorizationAdvertisement(document, baseUrl, h.options, h.assembly, h.pushedAuthorization)
 	settleDPoPAdvertisement(document, h.servesDPoP, h.dpopSigningAlgorithms, h.logger)
+	settlePromptValuesAdvertisement(document, h.servesAccountCreation, h.logger)
 	if err := settleIntrospectionSigningAdvertisement(r.Context(), document, baseUrl, h.introspectionSigningKeys, h.logger); err != nil {
 		return nil, fmt.Errorf("settle discovery document: %w", err)
 	}
