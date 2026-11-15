@@ -94,7 +94,9 @@ func TestUserInfoChecksTheCertificateBinding(t *testing.T) {
 		{name: "bound token without a certificate", result: userInfoResultWith(confirmation), source: presentedCertificates(nil)},
 		{name: "bound token without TLS", result: userInfoResultWith(confirmation)},
 		{name: "unbound token without a certificate", result: userInfoResultWith(), source: presentedCertificates(nil), wantOk: true},
-		{name: "confirmation without a thumbprint", result: userInfoResultWith(map[string]any{"jkt": "x"}), wantOk: true},
+		{name: "confirmation without a thumbprint", result: userInfoResultWith(map[string]any{"other": "x"}), wantOk: true},
+		// A DPoP bound token never passes as a bearer token (RFC 9449 section 7.2).
+		{name: "DPoP bound token as a bearer token", result: userInfoResultWith(map[string]any{"jkt": "x"})},
 		{name: "confirmation that is not an object", result: userInfoResultWith("text"), source: presentedCertificates{bound}},
 		{name: "null confirmation", result: userInfoResultWith(nil), source: presentedCertificates{bound}},
 		{name: "empty thumbprint", result: userInfoResultWith(map[string]any{"x5t#S256": ""}), source: presentedCertificates{bound}},

@@ -115,7 +115,7 @@ client 元数据（`models.ClientPushedAuthorizationMetadata`，嵌入 `models.C
 
 ## DPoP（RFC 9449）
 
-client 在 token 请求上用 `DPoP` 请求头出示 proof（用自己私钥签名的 JWT，头部带公钥 `jwk`），签发的 access token 绑定到该公钥（`cnf.jkt`），被窃取后没有私钥就无法使用。默认关闭；本版覆盖 token 端点、authorize / PAR 的 `dpop_jkt` 预绑定与可选的服务端 nonce（userinfo / introspection 贯通与资源端校验另行提供）。
+client 在 token 请求上用 `DPoP` 请求头出示 proof（用自己私钥签名的 JWT，头部带公钥 `jwk`），签发的 access token 绑定到该公钥（`cnf.jkt`），被窃取后没有私钥就无法使用。默认关闭；本版覆盖 token 端点、authorize / PAR 的 `dpop_jkt` 预绑定、可选的服务端 nonce，以及 userinfo / introspection 对绑定 token 的处理（资源端 JWT Bearer handler 的校验另行提供）。
 
 ### 启用
 
@@ -202,8 +202,41 @@ cfg.Freeze()
 | 绑定的 refresh token 未带 proof 或换用其他密钥 | `invalid_grant`（wicket 的选择，不区分两种情形） |
 | 授权码带 `dpop_jkt` 而未带 proof 或换用其他密钥 | `invalid_grant`（授权码已作废） |
 | `RequireNonce` 开启，proof 缺 nonce 或 nonce 不被接受 | `use_dpop_nonce`（RFC 9449 §8），响应带 `DPoP-Nonce` |
+| userinfo：proof 缺失 / 无效 / 重放、`ath` 不符 | `invalid_dpop_proof`（401，DPoP 质询） |
+| userinfo：token 无效 / 过期 / 未绑定、指纹不符、`cnf` 畸形、证书绑定失败，或绑定 token 以 Bearer 出示 | `invalid_token`（401） |
+| userinfo：`DPoP` 授权头畸形，或同时带表单 `access_token` | `invalid_request`（400） |
 
 `DPoP-Nonce` 响应头只在 `RequireNonce` 开启且请求带 `DPoP` 头时发出（见上文"服务端 nonce"）。
+
+### userinfo 与 introspection
+
+**userinfo**（RFC 9449 §7）。DPoP 启用时 userinfo 接受 `Authorization: DPoP <access token>`（方案名大小写不敏感，`wicket.AuthenticationSchemesAuthorizationHeaderDPoP`；方案后一个或多个空格，token 非空且不含空白）。处理顺序：
+
+1. 解析授权头：`DPoP` 后无 token、token 含空白，或同时在表单带 `access_token` → 400 `invalid_request`。
+2. proof 无状态校验：与 token 端点相同的全部检查（`htm` 为本次请求方法，`htu` 为 userinfo 的 URL），并要求 `ath` 为字符串且等于该 access token 的 SHA-256 摘要（ASCII 字节，base64url 无填充，`dpop.AccessTokenHash`）。缺 proof、多个 proof、`ath` 缺失 / 非字符串 / 不符 → 401 `invalid_dpop_proof`。
+3. token 校验（与 Bearer 相同的路径）：无效 → 401 `invalid_token`；过期 → 401 `invalid_token` 带描述 `The access token expired`；scope 不足 → 403 `insufficient_scope`。
+4. 绑定比对：token 必须带 `cnf.jkt`，且等于 proof 公钥指纹（常量时间比较）。未绑定、指纹不符、`cnf` 畸形 → 401 `invalid_token`。
+5. 证书绑定检查（`cnf.x5t#S256`，见 [mTLS 指南](./mtls-client-auth-guide.md#资源端校验)）：两种绑定同时存在时都须满足，否则 401 `invalid_token`。
+6. proof `jti` 登记（键与过期时刻同 token 端点）：重放 → 401 `invalid_dpop_proof`；登记端口故障 → 固定 500（`Internal Server Error`，`Cache-Control: no-store`，日志只记错误类型），不返回 claims。
+7. 返回 claims，内容与 Bearer 出示时相同。
+
+任何拒绝都先于登记，被拒请求不消耗 proof `jti`。服务端 nonce 不适用于 userinfo：`RequireNonce` 开启时 userinfo 仍只判 `iat` 新鲜度，proof 中格式合法的 `nonce` 被忽略（格式不合法仍按 `invalid_dpop_proof` 拒绝），不发 `DPoP-Nonce`。
+
+**质询头**：DPoP 方案路径上的一切 4xx，以及 DPoP 启用时绑定 token 以 Bearer 出示的拒绝，都只带一个头值
+
+```
+WWW-Authenticate: DPoP error="<code>"[, error_description="<desc>"], algs="<配置的算法，空格分隔>"
+```
+
+并带 `Cache-Control: no-store`，无响应体。`invalid_dpop_proof` 为 401，其余错误码的状态码同 Bearer（`invalid_request` 400、`insufficient_scope` 403、其他 401）。
+
+**绑定 token 不得以 Bearer 出示**（RFC 9449 §7.2）：带 `cnf.jkt` 的 token 以 `Authorization: Bearer` 或表单 `access_token` 出示，且 token 本身校验通过时，回 401 `invalid_token`（有无 `DPoP` 头都一样）；`cnf` 畸形（不是对象或 JSON 损坏、`jkt` 不是非空字符串、多个 `cnf`）同样拒绝。这一拒绝在 token 校验之后判定：token 无效、过期或 scope 不足时，仍按既有方式回校验器给出的错误（如 403 `insufficient_scope`）。DPoP 启用时发上述 DPoP 质询，未启用时用既有 Bearer 结果。`cnf` 可以是对象，也可以是适配器往返后的 JSON 文本，两者等价。未绑定的 token 以 Bearer 出示时行为不变，请求所带的 `DPoP` 头被忽略。
+
+DPoP 未启用时 userinfo 不识别 `DPoP` 方案（与此前一致，按缺少 Bearer token 回 401），也不解析重放登记端口。
+
+未出示任何 token 的请求仍只回 Bearer 质询。
+
+**introspection**：active 响应对绑定的 token 返回 `cnf`（`{"jkt":"<指纹>"}`，与证书绑定并存时同时含 `x5t#S256`），JWT 与 reference token 一致；未绑定 token 不含 `cnf`。响应不含 `token_type`。reference token 的 `cnf` 取自存储副本的 `cnf` claim，按存入的形态原样返回。
 
 ### Discovery
 
@@ -231,6 +264,7 @@ DPoP 启用时 discovery 文档写入 `dpop_signing_alg_values_supported`（配�
 | `Google` | Google OAuth 2.0 |
 | `Facebook` | Facebook OAuth 2.0 |
 | `Bearer`（JWT） | JWT Bearer 令牌 |
+| `DPoP`（userinfo） | DPoP 绑定的 access token，随 `DPoP` proof 出示；仅 DPoP 启用时识别，见上文"userinfo 与 introspection" |
 | 动态方案 | 运行时通过 `DynamicProviderOptions` 注册 |
 
 ## Discovery 文档结构

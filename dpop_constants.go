@@ -23,6 +23,10 @@ const (
 	// thumbprint of the DPoP key the authorization code is bound to
 	// (RFC 9449 section 10).
 	AuthorizeRequestDPoPJkt = "dpop_jkt"
+	// AuthenticationSchemesAuthorizationHeaderDPoP is the Authorization
+	// header scheme presenting a DPoP bound access token (RFC 9449 section
+	// 7.1). It is matched without regard to case.
+	AuthenticationSchemesAuthorizationHeaderDPoP = "DPoP"
 )
 
 // TokenErrorsInvalidDPoPProof is the token endpoint error answering an
