@@ -109,7 +109,9 @@ func (c *ServerConfig) applyHighSecurityProfileToOptions() {
 }
 
 // highSecurityProfileDeficiencies lists every prerequisite the enabled
-// profile misses and every conflict of a client of the static list.
+// profile misses and every conflict of a client of the static list,
+// including token endpoint authentication signing algorithms outside the
+// narrowed set.
 func (c *ServerConfig) highSecurityProfileDeficiencies() []string {
 	if !c.HighSecurityProfileEnabled() {
 		return nil
@@ -136,7 +138,11 @@ func (c *ServerConfig) highSecurityProfileDeficiencies() []string {
 		if client == nil {
 			continue
 		}
-		if conflicts := validators_impl.HighSecurityProfileConflicts(client); len(conflicts) > 0 {
+		conflicts := validators_impl.HighSecurityProfileConflicts(client)
+		if message := validators_impl.HighSecurityProfileSigningAlgorithmConflict(c, client); message != "" {
+			conflicts = append(conflicts, message)
+		}
+		if len(conflicts) > 0 {
 			missing = append(missing, fmt.Sprintf("client %q conflicts with the profile: %s", client.ClientId, strings.Join(conflicts, "; ")))
 		}
 	}

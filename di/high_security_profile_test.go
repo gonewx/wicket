@@ -91,6 +91,11 @@ func TestHighSecurityProfileEffectiveValues(t *testing.T) {
 	for name, declare := range orders {
 		t.Run(name, func(t *testing.T) {
 			root, cfg := highSecurityRoot(t)
+			// The host turned both protocol options off explicitly;
+			// Freeze overrides that while the profile is enabled.
+			declared := godi.GetRequired[*config_options.WicketOptions](root)
+			declared.UseSeeOtherRedirects = false
+			declared.EmitIssuerIdentificationResponseParameter = false
 			declare(cfg)
 			cfg.Freeze()
 
@@ -172,6 +177,17 @@ func TestHighSecurityProfileFreezeRequirements(t *testing.T) {
 			want:   []string{`client "shared" conflicts with the profile: token endpoint authentication method`},
 			absent: []string{`client "fapi"`},
 		},
+		"static client with RS256 assertions only": {
+			declare: func(cfg *ServerConfig) {
+				enableHighSecurityPrerequisites(cfg)
+				rs256 := compliantProfileClient()
+				rs256.ClientId = "rs256"
+				rs256.TokenEndpointAuthSigningAlgorithms = []string{"RS256"}
+				cfg.SetClients([]*storage_models.Client{compliantProfileClient(), rs256})
+			},
+			want:   []string{`client "rs256" conflicts with the profile: client lists a token endpoint authentication signing algorithm the server does not accept`},
+			absent: []string{`client "fapi"`},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -205,7 +221,18 @@ func TestHighSecurityProfileFreezeRequirements(t *testing.T) {
 		_, cfg := highSecurityRoot(t)
 		cfg.EnableHighSecurityProfile()
 		enableHighSecurityPrerequisites(cfg)
-		cfg.SetClients([]*storage_models.Client{compliantProfileClient()})
+		es256 := compliantProfileClient()
+		es256.ClientId = "es256"
+		es256.TokenEndpointAuthSigningAlgorithms = []string{"ES256"}
+		cfg.SetClients([]*storage_models.Client{compliantProfileClient(), es256})
+		cfg.Freeze()
+	})
+	t.Run("RS256 static client without the profile", func(t *testing.T) {
+		_, cfg := highSecurityRoot(t)
+		enableHighSecurityPrerequisites(cfg)
+		rs256 := compliantProfileClient()
+		rs256.TokenEndpointAuthSigningAlgorithms = []string{"RS256"}
+		cfg.SetClients([]*storage_models.Client{rs256})
 		cfg.Freeze()
 	})
 	t.Run("enabling after Freeze", func(t *testing.T) {

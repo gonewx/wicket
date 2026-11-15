@@ -102,12 +102,23 @@ func isNonLoopbackHttpUri(raw string) bool {
 	if err != nil {
 		return true
 	}
+	// url.Parse refuses an unbracketed "::1" host, so a parsed "::1" is
+	// always the bracketed loopback literal.
 	host := parsed.Hostname()
-	if host != "127.0.0.1" && host != "::1" {
-		return true
+	return host != "127.0.0.1" && host != "::1"
+}
+
+// HighSecurityProfileSigningAlgorithmConflict returns the configuration
+// error of a client whose token endpoint authentication signing algorithms
+// the server does not accept, or "" when they are acceptable. It applies the
+// same rule as the default ClientConfigurationValidator, so that assembly can
+// report a client of the static list whose algorithms fall outside the set
+// the high security profile narrows the server to.
+func HighSecurityProfileSigningAlgorithmConflict(features validators.ClientFeatureDeclarations, client *storage_models.Client) string {
+	if client == nil {
+		return ""
 	}
-	// "::1" is only a loopback literal in its bracketed form.
-	return host == "::1" && !strings.HasPrefix(parsed.Host, "[")
+	return validateTokenEndpointAuthSigningAlgorithms(features, client)
 }
 
 // validateHighSecurityProfile returns the configuration error of a client

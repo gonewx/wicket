@@ -7,16 +7,19 @@
 package highsecurity
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -94,6 +97,48 @@ func (k ecKey) sign(t *testing.T, header map[string]any, claims map[string]any) 
 		t.Fatal(err)
 	}
 	return input + "." + encode(append(r.FillBytes(make([]byte, 32)), s.FillBytes(make([]byte, 32))...))
+}
+
+// rsaKey is an RSA key signing RS256 compact JWS, an algorithm the profile
+// narrows away.
+type rsaKey struct{ private *rsa.PrivateKey }
+
+func newRsaKey(t *testing.T) rsaKey {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rsaKey{private: key}
+}
+
+func (k rsaKey) jwk() map[string]any {
+	return map[string]any{
+		"kty": "RSA",
+		"n":   encode(k.private.N.Bytes()),
+		"e":   encode(big.NewInt(int64(k.private.E)).Bytes()),
+	}
+}
+
+func (k rsaKey) keySet(kid string) string {
+	jwk := k.jwk()
+	jwk["kid"] = kid
+	raw, _ := json.Marshal(map[string]any{"keys": []any{jwk}})
+	return string(raw)
+}
+
+func (k rsaKey) sign(t *testing.T, header map[string]any, claims map[string]any) string {
+	t.Helper()
+	header["alg"] = "RS256"
+	rawHeader, _ := json.Marshal(header)
+	rawClaims, _ := json.Marshal(claims)
+	input := encode(rawHeader) + "." + encode(rawClaims)
+	digest := sha256.Sum256([]byte(input))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, k.private, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return input + "." + encode(signature)
 }
 
 // compliantClient complies with the high security profile: private_key_jwt,
@@ -422,6 +467,89 @@ func TestHighSecurityProfileFlow(t *testing.T) {
 	})
 }
 
+// authorizationCode pushes and authorizes for fapiClient with the signed-in
+// browser and returns the issued code.
+func (s *scene) authorizationCode() string {
+	s.t.Helper()
+	r := s.push(s.authenticate(fapiClient, authorizationParameters(fapiClient)))
+	if r.status != http.StatusCreated {
+		s.t.Fatalf("push: status %d body %v", r.status, r.body)
+	}
+	_, location := s.browse(s.authorizeUrl(url.Values{
+		wicket.AuthorizeRequestClientId:   {fapiClient},
+		wicket.AuthorizeRequestRequestUri: {r.field("request_uri")},
+	}))
+	code := ""
+	if location != nil {
+		code = location.Query().Get("code")
+	}
+	if code == "" {
+		s.t.Fatalf("authorize redirected to %v", location)
+	}
+	return code
+}
+
+// TestHighSecurityProfileNarrowsSigningAlgorithms presents an RS256 client
+// assertion and an RS256 DPoP proof, both accepted by the default algorithm
+// sets: the same assembly accepts them with the profile off and refuses them
+// with the profile on.
+func TestHighSecurityProfileNarrowsSigningAlgorithms(t *testing.T) {
+	t.Parallel()
+	for _, profileOn := range []bool{false, true} {
+		name := "profile off"
+		if profileOn {
+			name = "profile on"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			assertionKey := newRsaKey(t)
+			const rsaClient = "rsa.client"
+			s := newScene(t, sceneOptions{profileOff: !profileOn, clients: func(ecAssertionKey ecKey) []*storage_models.Client {
+				client := compliantClient(rsaClient, ecAssertionKey)
+				client.Jwks = assertionKey.keySet("r1")
+				return []*storage_models.Client{compliantClient(fapiClient, ecAssertionKey), client}
+			}})
+			s.login()
+
+			values := authorizationParameters(rsaClient)
+			values.Set(wicket.AuthorizeRequestClientId, rsaClient)
+			values.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+			values.Set("client_assertion", assertionKey.sign(t,
+				map[string]any{"kid": "r1", "typ": "client-authentication+jwt"},
+				map[string]any{
+					"iss": rsaClient, "sub": rsaClient, "aud": s.issuer,
+					"exp": time.Now().Add(time.Minute).Unix(), "iat": time.Now().Unix(), "jti": nextId("assertion"),
+				}))
+			r := s.push(values)
+			if profileOn {
+				if r.status == http.StatusCreated || r.field("error") != "invalid_client" {
+					t.Fatalf("RS256 assertion push: status %d body %v, want invalid_client", r.status, r.body)
+				}
+			} else if r.status != http.StatusCreated {
+				t.Fatalf("RS256 assertion push: status %d body %v, want 201", r.status, r.body)
+			}
+
+			proofKey := newRsaKey(t)
+			proof := proofKey.sign(t,
+				map[string]any{"typ": "dpop+jwt", "jwk": proofKey.jwk()},
+				map[string]any{"jti": nextId("proof"), "htm": http.MethodPost, "htu": s.pipeline.TestServer.URL + integration_common.TokenEndpoint, "iat": time.Now().Unix()})
+			token := s.post(integration_common.TokenEndpoint, s.authenticate(fapiClient, url.Values{
+				"grant_type":    {wicket.GrantTypeAuthorizationCode},
+				"code":          {s.authorizationCode()},
+				"redirect_uri":  {redirectUriOf(fapiClient)},
+				"code_verifier": {codeVerifier},
+			}), http.Header{wicket.DPoPHeaderName: {proof}})
+			if profileOn {
+				if token.status != http.StatusBadRequest || token.field("error") != "invalid_dpop_proof" {
+					t.Fatalf("RS256 DPoP proof: status %d body %v, want invalid_dpop_proof", token.status, token.body)
+				}
+			} else if token.status != http.StatusOK || !strings.EqualFold(token.field("token_type"), "DPoP") {
+				t.Fatalf("RS256 DPoP proof: status %d body %v, want a DPoP token", token.status, token.body)
+			}
+		})
+	}
+}
+
 // TestHighSecurityProfileRefusesConflictingInjectedClients serves clients
 // that conflict with the profile from an injected store: they are invalid
 // clients at the token and PAR endpoints.
@@ -483,14 +611,16 @@ func TestHighSecurityProfileRefusesConflictingInjectedClients(t *testing.T) {
 	}
 }
 
-// TestHighSecurityProfileRequiresClientCredentialsAuthentication sends an
+// TestHighSecurityProfileRefusesUnauthenticatedClientCredentials sends an
 // unauthenticated client_credentials request for a client that requires no
-// secret, without RequireClientCredentialsAuthentication being declared. A
-// client the profile accepts registers private_key_jwt or a tls method, whose
-// authenticator already refuses a request without credentials, so this reply
-// does not isolate the client_credentials tightening; the di unit tests
-// assert that ClientCredentialsAuthenticationRequired follows the profile.
-func TestHighSecurityProfileRequiresClientCredentialsAuthentication(t *testing.T) {
+// secret, without RequireClientCredentialsAuthentication being declared, and
+// expects invalid_client. It is a guard on the outcome only: a client the
+// profile accepts registers private_key_jwt or a tls method, whose
+// authenticator already refuses a request without credentials, so the
+// client_credentials tightening the profile folds into
+// ClientCredentialsAuthenticationRequired is defense in depth that no
+// end-to-end reply can isolate. The di unit tests are its evidence.
+func TestHighSecurityProfileRefusesUnauthenticatedClientCredentials(t *testing.T) {
 	t.Parallel()
 	s := newScene(t, sceneOptions{clients: func(assertionKey ecKey) []*storage_models.Client {
 		client := compliantClient(sharedClient, assertionKey)
@@ -638,6 +768,28 @@ func TestHighSecurityProfileDiscovery(t *testing.T) {
 	}
 	if !slices.Contains(strings_(off[wicket.DiscoveryGrantTypesSupported]), wicket.GrantTypePassword) {
 		t.Fatalf("baseline grant_types_supported %v", off[wicket.DiscoveryGrantTypesSupported])
+	}
+	// With the profile off, every entry the profile narrows equals the
+	// baseline the generator writes for this assembly, value for value.
+	algorithms := []any{"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512"}
+	baseline := map[string]any{
+		wicket.DiscoveryRequirePushedAuthorizationRequests:          false,
+		wicket.DiscoveryCodeChallengeMethodsSupported:               []any{"plain", "S256"},
+		wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported: []any{"private_key_jwt", "client_secret_basic", "client_secret_post"},
+		wicket.DiscoveryResponseTypesSupported:                      []any{"code", "token", "id_token", "id_token token", "code id_token", "code token", "code id_token token"},
+		wicket.DiscoveryGrantTypesSupported:                         []any{"authorization_code", "client_credentials", "refresh_token", "implicit", "password", "urn:ietf:params:oauth:grant-type:device_code", "urn:openid:params:grant-type:ciba"},
+		wicket.DiscoveryAuthorizationResponseIssParameterSupported:  true,
+		wicket.DiscoveryTokenEndpointAuthSigningAlgorithmsSupported: algorithms,
+		wicket.DiscoveryDPoPSigningAlgValuesSupported:               algorithms,
+		wicket.DiscoveryRequestObjectSigningAlgorithmsSupported:     append(slices.Clone(algorithms), "HS256", "HS384", "HS512"),
+	}
+	if len(baseline) != len(narrowedDiscoveryKeys) {
+		t.Fatalf("baseline covers %d of %d narrowed entries", len(baseline), len(narrowedDiscoveryKeys))
+	}
+	for _, key := range narrowedDiscoveryKeys {
+		if !reflect.DeepEqual(off[key], baseline[key]) {
+			t.Fatalf("profile off: %s = %#v, baseline %#v", key, off[key], baseline[key])
+		}
 	}
 	if on[wicket.DiscoveryAuthorizationResponseIssParameterSupported] != true {
 		t.Fatalf("authorization_response_iss_parameter_supported %v", on[wicket.DiscoveryAuthorizationResponseIssParameterSupported])
