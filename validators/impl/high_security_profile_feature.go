@@ -111,9 +111,11 @@ func isNonLoopbackHttpUri(raw string) bool {
 // HighSecurityProfileSigningAlgorithmConflict returns the configuration
 // error of a client whose token endpoint authentication signing algorithms
 // the server does not accept, or "" when they are acceptable. It applies the
-// same rule as the default ClientConfigurationValidator, so that assembly can
-// report a client of the static list whose algorithms fall outside the set
-// the high security profile narrows the server to.
+// whole rule of the default ClientConfigurationValidator, so that assembly
+// can report a client of the static list whose algorithms fall outside the
+// set the high security profile narrows the server to. That rule also
+// refuses a client that lists algorithms without using private_key_jwt,
+// whatever the algorithms are.
 func HighSecurityProfileSigningAlgorithmConflict(features validators.ClientFeatureDeclarations, client *storage_models.Client) string {
 	if client == nil {
 		return ""
