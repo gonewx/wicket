@@ -69,11 +69,11 @@ func (c keymgmtCredentialCarrier) ConformsTo() string { return c.version }
 func TestSessionAndKeymgmtConformanceSuiteVersionAndCredentialE2E(t *testing.T) {
 	t.Parallel()
 
-	if sessiontest.SuiteVersion != "1.1.0" {
-		t.Fatalf("sessiontest.SuiteVersion = %q, want %q", sessiontest.SuiteVersion, "1.1.0")
+	if sessiontest.SuiteVersion != "2.0.0" {
+		t.Fatalf("sessiontest.SuiteVersion = %q, want %q", sessiontest.SuiteVersion, "2.0.0")
 	}
-	if keymgmttest.SuiteVersion != "1.1.0" {
-		t.Fatalf("keymgmttest.SuiteVersion = %q, want %q", keymgmttest.SuiteVersion, "1.1.0")
+	if keymgmttest.SuiteVersion != "2.0.0" {
+		t.Fatalf("keymgmttest.SuiteVersion = %q, want %q", keymgmttest.SuiteVersion, "2.0.0")
 	}
 	if sessiontest.SuiteVersion != keymgmttest.SuiteVersion {
 		t.Fatalf("suite versions diverge: sessiontest %q vs keymgmttest %q", sessiontest.SuiteVersion, keymgmttest.SuiteVersion)

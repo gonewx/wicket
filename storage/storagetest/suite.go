@@ -15,8 +15,10 @@ import (
 
 // SuiteVersion identifies the contract version this suite verifies. A
 // compliant adapter exposes ConformsTo() string returning this value; a host
-// compares adapter.ConformsTo() to SuiteVersion at assembly time.
-const SuiteVersion = "1.1.0"
+// compares adapter.ConformsTo() to SuiteVersion at assembly time. The three
+// suite packages (storagetest, sessiontest, keymgmttest) step this value in
+// lockstep so a host validates a single number at assembly.
+const SuiteVersion = "2.0.0"
 
 // Option configures a suite run.
 type Option func(*options)

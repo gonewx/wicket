@@ -145,7 +145,7 @@ func TestNewPushedAuthorizationRequestURIFailsWithEntropy(t *testing.T) {
 	}
 }
 
-// xorProtector is a test protector unrelated to the default implementation:
+// xorProtector is a test protector unrelated to the default provider:
 // it flips every byte, and Unprotect rejects input that does not carry its
 // trailing marker.
 type xorProtector struct{ mask byte }
