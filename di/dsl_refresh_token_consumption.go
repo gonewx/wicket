@@ -42,5 +42,8 @@ func refreshTokenServiceFromProvider(p godi.Provider) services.RefreshTokenServi
 		godi.GetRequired[services.SystemClock](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
+	// A refresh token records its browser session only while the grants of
+	// a session are revoked with it, see session_grant_revocation.go.
+	service.SetSessionBinding(godi.GetRequired[*ServerConfig](p).RevokeGrantsOnSessionSubjectChange())
 	return service
 }

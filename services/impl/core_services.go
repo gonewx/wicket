@@ -179,6 +179,13 @@ type UserSession struct {
 	// restore its session from the session cookie, or no longer may (after a
 	// session was created or removed in this request).
 	restoreDone bool
+
+	// revoker, when set, removes the grants of the session named by the
+	// session cookie once another subject signs in on it, see
+	// SetSessionGrantRevoker. revokedSession is the session this instance
+	// already revoked, so one request revokes it at most once.
+	revoker        *SessionGrantRevoker
+	revokedSession string
 }
 
 func NewUserSession(
@@ -372,6 +379,7 @@ func (s *UserSession) restore() {
 
 	subjectId := extensions.GetSubjectIdFromPrincipal(s.GetUser())
 	if subjectId == "" || subjectId != rec.SubjectID {
+		s.revokeOnSubjectChange(request.Context(), sessionID, rec, subjectId)
 		s.clearSessionCookie()
 		return
 	}
@@ -380,8 +388,56 @@ func (s *UserSession) restore() {
 	s.clients = append([]string(nil), rec.ClientIDs...)
 }
 
+// SetSessionGrantRevoker makes the user session revoke the grants of the
+// browser session it finds in the session cookie when a different subject
+// signs in on that session: when a session is created, and when a request's
+// authenticated subject does not match the session it carries. It takes
+// effect only while server-side sessions are enabled; nil turns it off.
+func (s *UserSession) SetSessionGrantRevoker(revoker *SessionGrantRevoker) {
+	s.revoker = revoker
+}
+
+// revokeOnSubjectChange revokes the grants of the session sessionID, whose
+// record is rec, when signing in newSubject changes its subject. A failure
+// is logged by the revoker and does not reach the caller.
+func (s *UserSession) revokeOnSubjectChange(ctx context.Context, sessionID string, rec *sessionpkg.Record, newSubject string) {
+	if s.revoker == nil || sessionID == "" || sessionID == s.revokedSession {
+		return
+	}
+	if !sessionSubjectChanged(rec, newSubject) {
+		return
+	}
+	s.revokedSession = sessionID
+	_ = s.revoker.Revoke(ctx, sessionID, rec.SubjectID)
+}
+
+// revokeBeforeSignIn applies revokeOnSubjectChange to the session the
+// request's session cookie names, before principal signs in. An expired
+// record still counts: its grants may outlive it. A missing record or a
+// store failure revokes nothing; the failure is logged.
+func (s *UserSession) revokeBeforeSignIn(ctx context.Context, principal *claims.ClaimsPrincipal) {
+	if s.revoker == nil || !s.enabled || s.store == nil {
+		return
+	}
+	sessionID := s.readSessionCookie()
+	if sessionID == "" {
+		return
+	}
+	rec, err := s.store.GetSession(ctx, sessionID)
+	if err != nil {
+		if !errors.Is(err, sessionpkg.ErrSessionNotFound) && s.logger != nil {
+			// The error type only: the store's error text may repeat the
+			// session id it was given.
+			s.logger.Warn("create session: cannot load the former session", slog.String("errorType", fmt.Sprintf("%T", err)))
+		}
+		return
+	}
+	s.revokeOnSubjectChange(ctx, sessionID, rec, extensions.GetSubjectIdFromPrincipal(principal))
+}
+
 func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	s.restoreDone = true
+	s.revokeBeforeSignIn(ctx, principal)
 	s.user = principal
 	sessionId, err := utils.CreateUniqueId(32, utils.Hex)
 	if err != nil {
@@ -808,6 +864,17 @@ type RefreshTokenService struct {
 	consumption services.RefreshTokenConsumption
 	clock       services.SystemClock
 	logger      *slog.Logger
+
+	// sessionBound records the issuing browser session on every refresh
+	// token created, see SetSessionBinding.
+	sessionBound bool
+}
+
+// SetSessionBinding declares whether a refresh token created from now on
+// records the browser session its access token was issued in, so that the
+// token can be revoked with that session. Off by default.
+func (s *RefreshTokenService) SetSessionBinding(bound bool) {
+	s.sessionBound = bound
 }
 
 func NewRefreshTokenService(store storage.RefreshTokenStore, handles services.HandleGenerationService) *RefreshTokenService {
@@ -822,6 +889,9 @@ func (s *RefreshTokenService) CreateRefreshToken(ctx context.Context, request *r
 	token.AuthorizedScopes = request.AuthorizedScopes
 	token.AuthorizedResourceGaps = request.AuthorizedResourceGaps
 	token.SetAccessToken(request.AccessToken, request.RequestedResourceGap)
+	if s.sessionBound && request.AccessToken != nil {
+		token.SessionId = request.AccessToken.SessionId()
+	}
 	// The refresh token of a public client is bound to the key of the DPoP
 	// proof it was issued with, once and for good: a stolen token cannot be
 	// redeemed without that key. A confidential client authenticates every

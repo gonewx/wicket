@@ -365,6 +365,8 @@ PAR 存储的契约套件入口为 `storagetest.RunPushedAuthorizationRequestSto
 | `ReferenceTokenStore` | `RemoveReferenceTokensByClient` | `RemoveReferenceTokensBySession`（`Token.SessionId()`，即 `sid` claim） |
 | `UserConsentStore` | `RemoveUserConsentsByClient` | — |
 
+声明了会话主体变化时撤销原会话授权（`ServerConfig.SetRevokeGrantsOnSessionSubjectChange`，见 [API 契约 · 会话主体变化时撤销原会话授权](./api-contracts.md#会话主体变化时撤销原会话授权)）时，核心在登录请求里调用三个按会话删除与 `PersistedGrantStore.RemoveAll`（`SessionId` 过滤），这些方法因此处在登录路径上，宜走索引。
+
 删零条返回 `(0, nil)`，不算错误；参数为空串时不匹配任何记录、返回 `(0, nil)`，不得清掉"字段为空"的记录。不支持事务的介质可以部分完成，但必须返回错误。适配器须把 `client_id` 与会话标识存成可见、可索引的列，不得只藏在序列化载荷里——否则批量删除只能全表扫描并逐条反序列化。`PersistedGrantStore` 继续用 `RemoveAll` 的 `ClientId` / `SessionId` 过滤。
 
 ## 升级到契约套件 2.0.0（v0.5.0）

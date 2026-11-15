@@ -396,6 +396,50 @@ cfg.Freeze()
 - 删除模式下旧记录已不存在，重放只得 `invalid_grant`，无法沿链撤销。
 - 撤销时遇到存储故障（缺失与版本冲突之外的错误）以 5xx 返回，不伪装成 `invalid_grant`。
 
+## 会话主体变化时撤销原会话授权
+
+共享设备上，用户 B 在同一浏览器会话里登录后，用户 A 先前在该会话中取得的授权仍可被后来者使用。宿主可以声明：同一浏览器会话的主体变化时，撤销原会话绑定的授权。默认关闭，关闭时行为与此前完全一致。
+
+### 配置
+
+```go
+cfg := root.ServerConfig()
+cfg.SetRevokeGrantsOnSessionSubjectChange(true)
+cfg.Freeze()
+```
+
+- `SetRevokeGrantsOnSessionSubjectChange` 须在 `Freeze()` 之前调用，之后调用会 panic，消息点名该方法；`RevokeGrantsOnSessionSubjectChange()` 查询当前声明（nil 的 `*ServerConfig` 报告 `false`）。宿主级开关，没有 client 级设置，没有 discovery 键与之对应。
+- **依赖 server-side sessions**（`WicketOptions.ServerSideSessions.Enabled`）。只有它开启时才有可识别的"浏览器会话"；开关开启而 server-side sessions 关闭时，请求期什么都不做——不读会话 cookie、不撤销，`Freeze()` 也不报错。
+- 组合根在每次解析 `services.UserSession` 时读取声明，开启时为其装上 `(*services/impl.UserSession).SetSessionGrantRevoker(services/impl.NewSessionGrantRevoker(...))`；每次解析 `services.RefreshTokenService` 时调用 `(*services/impl.RefreshTokenService).SetSessionBinding(声明)`。
+
+### 何时判定为主体变化
+
+请求带着会话 cookie，会话存储中该记录存在（已过期的记录也算），记录的主体非空，而新主体非空且与之不同。判定发生在两处，用同一判定：
+
+- 登录：`UserSession.CreateSessionId` 在生成并写入新会话之前，以新登录的主体判定 cookie 指向的原会话。撤销不依赖新会话创建成功。
+- 恢复：请求的已认证主体与会话 cookie 的记录主体不符时，先判定、撤销，再照旧清除会话 cookie。原会话已过期时只清 cookie，不判定；匿名请求不撤销。
+
+同一主体重新登录、首次登录（无会话 cookie）、原记录不存在，都不撤销任何东西。同一请求内对同一原会话至多撤销一次。
+
+**已知限制：** 每次登录都开始一个新会话，同一主体重新登录（例如 `prompt=login`、`max_age` 或强制重新认证）后，会话 cookie 指向新会话；此后另一用户登录只撤销这个新会话，此前会话绑定的授权不在撤销范围内。
+
+### 撤销什么
+
+对原会话标识依次调用 `AuthorizationCodeStore.RemoveAuthorizationCodesBySession`、`RefreshTokenStore.RemoveRefreshTokensBySession`、`ReferenceTokenStore.RemoveReferenceTokensBySession` 与 `PersistedGrantStore.RemoveAll`（只设 `SessionId` 的过滤），每个 store 各一次。原会话之外的会话不受影响；会话存储中的原会话记录不删除；用户同意（`UserConsentStore`）不受影响。会话标识为空时绝不调用任何删除。
+
+- 开关开启后，新建的 refresh token 记下签发它的会话（`RefreshToken.SessionId`，取自同次签发的 access token 的 `sid`）；轮换（见上节）的后继继承它，所以轮换后的 refresh token 同样随会话撤销。由于 refresh 请求沿用 refresh token 的会话，开关开启后经 refresh 换出的 access token 也带 `sid`。带 `sid` 的 access token 在 wicket 自身的校验路径（userinfo、内省）中受 server-side session 协调约束：会话记录过期或不存在时被判无效。因此开关开启后，即便是 `offline_access` 的 refresh token，换出的 access token 也只在其签发会话存续期间能通过这些端点。
+- **开关开启之前签发的 refresh token 不带会话标识，不会被按会话撤销。**
+- 已签发的 JWT access token 不撤销，在到期前仍然有效。
+- 在该浏览器会话中批准的设备授权流（device flow），其换出的 refresh token 同样带该会话标识，随会话一并撤销。
+- 已批准但尚未兑换的设备码不撤销：`DeviceFlowStore` 没有按会话删除的方法。
+
+### 失败语义
+
+- 四个 store 互不短路：某个 store 删除失败，其余照样调用；所有错误以 `errors.Join` 汇总，记一条 Warn 日志（点名失败的 store 与错误类型）。
+- 读取原会话失败（`session.ErrSessionNotFound` 之外的错误）记 Warn，不撤销。
+- 撤销或读取失败都不阻断新用户登录，不改变 `CreateSessionId` 的返回值。
+- 成功时记一条 Info 日志，含各 store 删除条数与原记录主体。日志不含会话标识全值（只记前 6 个字符）、任何句柄或令牌值。
+
 ## 支持的授权类型（Grant Types）
 
 | Grant Type | 说明 |
