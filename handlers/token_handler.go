@@ -14,6 +14,7 @@ import (
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/clientassertion"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/dpop"
 	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/responses"
 	responses_models "github.com/gonewx/wicket/responses/models"
@@ -34,6 +35,9 @@ type TokenHandler struct {
 	generator        responses.TokenResponseGenerator
 	options          *config_options.WicketOptions
 	logger           *slog.Logger
+
+	// dpop is set by SetDPoP; nil leaves the DPoP header unread.
+	dpop *tokenDPoP
 }
 
 // NewTokenHandler builds a token handler that holds no options. It does not
@@ -84,6 +88,18 @@ func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 		return results.NewBadRequestResult(wicket.TokenErrorsInvalidRequest, "").Execute(w, r)
 	}
 
+	// Every stateless check of a DPoP proof runs before anything changes
+	// state, the registration of a client assertion included.
+	var proof *dpop.Proof
+	if h.dpop != nil {
+		accepted, err := h.dpop.verifyProof(r)
+		if err != nil {
+			h.logProofRejection(err.Error())
+			return writeInvalidDPoPProof(w, r)
+		}
+		proof = accepted
+	}
+
 	clientResult := h.clientValidator.Validate(r)
 	if clientResult != nil && errors.Is(clientResult.Error, clientassertion.ErrAuthenticationUnavailable) {
 		writeClientAuthenticationUnavailable(w)
@@ -99,7 +115,20 @@ func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 		return results.NewTokenErrorResult(response).Execute(w, r)
 	}
 
-	validation, err := h.requestValidator.ValidateRequest(r.Context(), r.Form, clientResult)
+	// The proof identifier is registered once the client is known and
+	// before any grant is redeemed; the proof key thumbprint then travels
+	// down the context to the validator and the token services.
+	ctx := r.Context()
+	if h.dpop != nil {
+		if written, err := h.enforceAndRegister(w, r, clientResult.Client, proof); written || err != nil {
+			return err
+		}
+		if proof != nil {
+			ctx = dpop.WithProof(ctx, proof.Thumbprint)
+		}
+	}
+
+	validation, err := h.requestValidator.ValidateRequest(ctx, r.Form, clientResult)
 	if err != nil {
 		return fmt.Errorf("validate token request: %w", err)
 	}
@@ -113,7 +142,7 @@ func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 		return results.NewTokenErrorResult(response).Execute(w, r)
 	}
 
-	response, err := h.generator.Handle(r.Context(), validation)
+	response, err := h.generator.Handle(ctx, validation)
 	if err != nil {
 		// Prefer failing to the client: a recognized standard token error is
 		// written as a 400 error response; an unrecognized error cannot be
@@ -126,6 +155,9 @@ func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("create token response: %w", err)
 	}
 
+	if proof != nil {
+		response.TokenType = wicket.TokenResponseTypesDPoP
+	}
 	return results.NewTokenResult(response).Execute(w, r)
 }
 

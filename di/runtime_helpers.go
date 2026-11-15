@@ -10,9 +10,11 @@ import (
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket/accessor"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/dpop"
 	"github.com/gonewx/wicket/handlers"
 	"github.com/gonewx/wicket/hosting"
 	models_contexts "github.com/gonewx/wicket/models/contexts"
+	"github.com/gonewx/wicket/replay"
 	"github.com/gonewx/wicket/responses"
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/storage"
@@ -89,13 +91,24 @@ func newAuthorizeCallbackHandlerFromProvider(p godi.Provider) *handlers.Authoriz
 }
 
 func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
-	return handlers.NewTokenHandlerWithOptions(
+	handler := handlers.NewTokenHandlerWithOptions(
 		withClientCredentialsAuthentication(p, withCertificateBoundAccessTokens(p, clientAuthenticatorFromProvider(p))),
 		godi.GetRequired[validators.TokenRequestValidator](p),
 		godi.GetRequired[responses.TokenResponseGenerator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
+	// The replay registry is resolved only while DPoP is enabled.
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.DPoPEnabled() {
+		options := cfg.DPoPOptions()
+		handler.SetDPoP(
+			dpop.NewVerifier(options),
+			godi.GetRequired[replay.Registry](p),
+			options,
+			godi.GetRequired[services.SystemClock](p),
+		)
+	}
+	return handler
 }
 
 func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler {
@@ -125,6 +138,9 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 	}
 	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.PushedAuthorizationRequestsEnabled() {
 		handler.ServePushedAuthorization(cfg.PushedAuthorizationRequestsOptions().RequireForAllClients)
+	}
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.DPoPEnabled() {
+		handler.ServeDPoP(cfg.DPoPOptions().SigningAlgorithms)
 	}
 	return handler
 }

@@ -48,6 +48,8 @@ type RefreshToken struct {
 	/// The resource gaps. Null indicates there was no authorization step, thus no restrictions.
 	/// Non-null means there was an authorization step, and subsequent requested resource gaps must be in the original list.
 	AuthorizedResourceGaps []string
+
+	RefreshTokenProofBinding
 }
 
 func NewRefreshToken() *RefreshToken {

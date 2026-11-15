@@ -80,6 +80,10 @@ func (v ClientConfigurationValidator) Validate(context *validators_contexts.Clie
 	}
 	if message := validatePushedAuthorizationMetadata(v.features, context.Client); message != "" {
 		context.SetError(message)
+		return
+	}
+	if message := validateDPoPMetadata(v.features, context.Client); message != "" {
+		context.SetError(message)
 	}
 }
 

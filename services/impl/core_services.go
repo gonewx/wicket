@@ -20,6 +20,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/dpop"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/models/messages"
@@ -683,7 +684,8 @@ func (s *TokenService) identitySigningAlgorithm(ctx context.Context, request *re
 func (s *TokenService) CreateSecurityToken(ctx context.Context, token *storage_models.Token) (string, error) {
 	// Every access token is bound here, the one exit all of them share,
 	// including the access token a refresh request reissues unchanged: the
-	// binding always follows the certificate of the current request.
+	// binding always follows the certificate and the DPoP proof of the
+	// current request.
 	if token.Type == wicket.TokenTypesAccessToken && s.confirmation != nil {
 		confirmation, err := s.confirmation.Confirmation(ctx, s.request, token.ClientId)
 		if err != nil {
@@ -814,6 +816,13 @@ func (s *RefreshTokenService) CreateRefreshToken(ctx context.Context, request *r
 	token.AuthorizedScopes = request.AuthorizedScopes
 	token.AuthorizedResourceGaps = request.AuthorizedResourceGaps
 	token.SetAccessToken(request.AccessToken, request.RequestedResourceGap)
+	// The refresh token of a public client is bound to the key of the DPoP
+	// proof it was issued with, once and for good: a stolen token cannot be
+	// redeemed without that key. A confidential client authenticates every
+	// redemption and its refresh token stays unbound.
+	if !request.Client.RequireClientSecret {
+		token.DPoPKeyThumbprint = dpop.ProofThumbprint(ctx)
+	}
 	handle, err := s.handles.Generate()
 	if err != nil {
 		return "", fmt.Errorf("create refresh token: generate handle: %w", err)

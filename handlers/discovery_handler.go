@@ -36,6 +36,11 @@ type DiscoveryHandler struct {
 	// pushedAuthorization is what the assembly declared about pushed
 	// authorization requests, see ServePushedAuthorization.
 	pushedAuthorization discoveryPushedAuthorization
+
+	// servesDPoP is set once the assembly declared DPoP enabled, and
+	// dpopSigningAlgorithms holds the proof signature algorithms it accepts.
+	servesDPoP            bool
+	dpopSigningAlgorithms []string
 }
 
 // NewDiscoveryHandler builds the discovery handler from the generator and the
@@ -89,6 +94,7 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 		settleMutualTlsAdvertisement(document, h.options)
 	}
 	settlePushedAuthorizationAdvertisement(document, baseUrl, h.options, h.assembly, h.pushedAuthorization)
+	settleDPoPAdvertisement(document, h.servesDPoP, h.dpopSigningAlgorithms, h.logger)
 
 	return results.NewDiscoveryDocumentResult(document, h.options.Discovery.ResponseCacheInterval).Execute(w, r)
 }

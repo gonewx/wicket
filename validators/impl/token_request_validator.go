@@ -470,6 +470,9 @@ func (s *TokenRequestValidator) validateRefreshTokenRequest(ctx context.Context,
 	}
 
 	s.validatedRequest.RefreshToken = result.RefreshToken
+	if !refreshTokenProofBindingHolds(ctx, s.validatedRequest.RefreshToken) {
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
+	}
 	s.validatedRequest.RefreshTokenHandle = refreshTokenHandle
 	s.validatedRequest.Subject = result.RefreshToken.Subject
 	s.validatedRequest.SessionId = result.RefreshToken.SessionId

@@ -74,6 +74,7 @@ type Client struct {
 	Properties                            map[string]string
 	ClientAuthenticationMetadata
 	ClientPushedAuthorizationMetadata
+	ClientDPoPMetadata
 }
 
 func NewClient() *Client {
