@@ -13,6 +13,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/clientassertion"
 	"github.com/gonewx/wicket/clientcert"
+	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/dp"
 	"github.com/gonewx/wicket/dpop"
 	"github.com/gonewx/wicket/keymgmt"
@@ -126,6 +127,13 @@ type ServerConfig struct {
 	pushedAuthorizationProtectorOnce          sync.Once
 	pushedAuthorizationProtector              dp.DataProtector
 	pushedAuthorizationProtectorErr           error
+
+	// High security profile, see high_security_profile.go. The bound
+	// options are the materialized WicketOptions values Freeze applies the
+	// profile to.
+	highSecurityProfileEnabled   bool
+	highSecurityProfileOptionsMu sync.Mutex
+	highSecurityProfileOptions   []*config_options.WicketOptions
 }
 
 func NewServerConfig() *ServerConfig {
@@ -284,6 +292,7 @@ func (c *ServerConfig) AllowInMemoryFallback() {
 
 func (c *ServerConfig) Freeze() {
 	c.frozen = true
+	c.requireHighSecurityProfile()
 	c.requirePrivateKeyJwtOptions()
 	c.requireDPoPOptions()
 	c.requireDPoPNonceKeySeam()

@@ -33,8 +33,9 @@ func (c *ServerConfig) DPoPEnabled() bool {
 }
 
 // DPoPOptions returns a copy of the declared options with every unset field
-// replaced by its default. It returns the zero value while DPoP is not
-// enabled.
+// replaced by its default. While the high security profile is enabled, the
+// signing algorithms are narrowed to PS256 and ES256 and may end up empty.
+// It returns the zero value while DPoP is not enabled.
 func (c *ServerConfig) DPoPOptions() dpop.Options {
 	if !c.DPoPEnabled() {
 		return dpop.Options{}
@@ -54,6 +55,9 @@ func (c *ServerConfig) DPoPOptions() dpop.Options {
 	}
 	if options.NonceLifetime == 0 {
 		options.NonceLifetime = defaults.NonceLifetime
+	}
+	if c.HighSecurityProfileEnabled() {
+		options.SigningAlgorithms = highSecurityProfileAlgorithms(options.SigningAlgorithms)
 	}
 	return options
 }

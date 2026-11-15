@@ -147,6 +147,8 @@ type Root struct {
 	st_Ptr_WicketOptions                                      uint8
 	f_Ptr_PersistentGrantOptions                              *options.PersistentGrantOptions
 	st_Ptr_PersistentGrantOptions                             uint8
+	f_PostConfigureOptions__options_WicketOptions             options2.PostConfigureOptions[*options.WicketOptions]
+	st_PostConfigureOptions__options_WicketOptions            uint8
 	f_lazyPersistedGrantStore                                 storage.PersistedGrantStore
 	st_lazyPersistedGrantStore                                uint8
 	f_lazyDeviceFlowStore                                     storage.DeviceFlowStore
@@ -252,6 +254,7 @@ func NewRoot() (root *Root, err error) {
 	r.get_ValidateOptions__cookies_AuthenticationOptions__2()
 	r.get_Ptr_WicketOptions()
 	r.get_Ptr_PersistentGrantOptions()
+	r.get_PostConfigureOptions__options_WicketOptions()
 	r.get_lazyPersistedGrantStore()
 	r.get_lazyDeviceFlowStore()
 	r.get_lazyBackchannelAuthenticationRequestStore()
@@ -1294,6 +1297,28 @@ func (r *Root) get_Ptr_PersistentGrantOptions() *options.PersistentGrantOptions 
 	r.f_Ptr_PersistentGrantOptions = v
 	r.disp.TrackAny(v)
 	r.st_Ptr_PersistentGrantOptions = 2
+	return v
+}
+
+func (r *Root) get_PostConfigureOptions__options_WicketOptions() options2.PostConfigureOptions[*options.WicketOptions] {
+	if r.st_PostConfigureOptions__options_WicketOptions == 2 {
+		return r.f_PostConfigureOptions__options_WicketOptions
+	}
+	if r.st_PostConfigureOptions__options_WicketOptions == 1 {
+		panic(godi.CircularDependencyError("PostConfigureOptions__options_WicketOptions"))
+	}
+	r.st_PostConfigureOptions__options_WicketOptions = 1
+	defer func() {
+		if r.st_PostConfigureOptions__options_WicketOptions != 2 {
+			r.st_PostConfigureOptions__options_WicketOptions = 0
+		}
+	}()
+	v := (func(p godi.Provider) options2.PostConfigureOptions[*options.WicketOptions] {
+		return highSecurityProfileOptionsBinding{config: godi.GetRequired[*ServerConfig](p)}
+	})(r)
+	r.f_PostConfigureOptions__options_WicketOptions = v
+	r.disp.TrackAny(v)
+	r.st_PostConfigureOptions__options_WicketOptions = 2
 	return v
 }
 
@@ -2900,6 +2925,10 @@ func (r *Root) Ptr_PersistentGrantOptions() *options.PersistentGrantOptions {
 	return r.get_Ptr_PersistentGrantOptions()
 }
 
+func (r *Root) PostConfigureOptions__options_WicketOptions() options2.PostConfigureOptions[*options.WicketOptions] {
+	return r.get_PostConfigureOptions__options_WicketOptions()
+}
+
 func (r *Root) lazyPersistedGrantStore() storage.PersistedGrantStore {
 	return r.get_lazyPersistedGrantStore()
 }
@@ -3173,6 +3202,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewSlice_SigningCredentialStore()
 	case reflect.TypeFor[[]storage.ValidationKeysStore]():
 		return r.NewSlice_ValidationKeysStore()
+	case reflect.TypeFor[options2.PostConfigureOptions[*options.WicketOptions]]():
+		return r.get_PostConfigureOptions__options_WicketOptions()
 	case reflect.TypeFor[storage.ClientStore]():
 		return r.NewClientStore()
 	case reflect.TypeFor[services.CorsPolicyService]():
@@ -3488,6 +3519,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[[]storage.SigningCredentialStore]():
 		return true
 	case reflect.TypeFor[[]storage.ValidationKeysStore]():
+		return true
+	case reflect.TypeFor[options2.PostConfigureOptions[*options.WicketOptions]]():
 		return true
 	case reflect.TypeFor[storage.ClientStore]():
 		return true
@@ -3862,6 +3895,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewSlice_SigningCredentialStore()}
 		case reflect.TypeFor[[]storage.ValidationKeysStore]():
 			return []any{r.NewSlice_ValidationKeysStore()}
+		case reflect.TypeFor[options2.PostConfigureOptions[*options.WicketOptions]]():
+			return []any{r.get_PostConfigureOptions__options_WicketOptions()}
 		case reflect.TypeFor[storage.ClientStore]():
 			return []any{r.NewClientStore()}
 		case reflect.TypeFor[services.CorsPolicyService]():
@@ -4238,6 +4273,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewSlice_SigningCredentialStore()
 	case reflect.TypeFor[[]storage.ValidationKeysStore]():
 		return s.NewSlice_ValidationKeysStore()
+	case reflect.TypeFor[options2.PostConfigureOptions[*options.WicketOptions]]():
+		return s.root.get_PostConfigureOptions__options_WicketOptions()
 	case reflect.TypeFor[storage.ClientStore]():
 		return s.NewClientStore()
 	case reflect.TypeFor[services.CorsPolicyService]():
@@ -4553,6 +4590,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 	case reflect.TypeFor[[]storage.SigningCredentialStore]():
 		return true
 	case reflect.TypeFor[[]storage.ValidationKeysStore]():
+		return true
+	case reflect.TypeFor[options2.PostConfigureOptions[*options.WicketOptions]]():
 		return true
 	case reflect.TypeFor[storage.ClientStore]():
 		return true
@@ -4906,6 +4945,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewSlice_SigningCredentialStore()}
 		case reflect.TypeFor[[]storage.ValidationKeysStore]():
 			return []any{s.NewSlice_ValidationKeysStore()}
+		case reflect.TypeFor[options2.PostConfigureOptions[*options.WicketOptions]]():
+			return []any{s.root.get_PostConfigureOptions__options_WicketOptions()}
 		case reflect.TypeFor[storage.ClientStore]():
 			return []any{s.NewClientStore()}
 		case reflect.TypeFor[services.CorsPolicyService]():
@@ -6320,6 +6361,10 @@ func (s *scope) Ptr_WicketOptions() *options.WicketOptions { return s.root.get_P
 
 func (s *scope) Ptr_PersistentGrantOptions() *options.PersistentGrantOptions {
 	return s.root.get_Ptr_PersistentGrantOptions()
+}
+
+func (s *scope) PostConfigureOptions__options_WicketOptions() options2.PostConfigureOptions[*options.WicketOptions] {
+	return s.root.get_PostConfigureOptions__options_WicketOptions()
 }
 
 func (s *scope) lazyPersistedGrantStore() storage.PersistedGrantStore {
