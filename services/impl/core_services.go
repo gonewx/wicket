@@ -938,6 +938,12 @@ func (s *RefreshTokenService) ValidateRefreshToken(ctx context.Context, handle s
 		result.Error = s.refuseConsumed(ctx, handle, token, client)
 		return result
 	}
+	// A refresh token is bound to the client it was issued to (RFC 6749
+	// §6); to any other client it does not exist.
+	if client == nil || token.ClientId != client.ClientId {
+		result.Error = fmt.Errorf("refresh token issued to another client: %w", storage.ErrNotFound)
+		return result
+	}
 	result.RefreshToken = token
 	result.Client = client
 	result.Subject = token.Subject

@@ -24,6 +24,7 @@
 - [API 端点](./api-contracts.md)
 - [外部认证提供者配置指南](./external-providers-guide.md)
 - [存储持久化接入指南](./storage-persistence-guide.md) — 宿主如何装配持久化 store（含 PostgreSQL 适配器）
+- [FAPI 2.0 Security Profile conformance 自测记录](./conformance/fapi2-security-profile.md) — 以 OpenID Foundation conformance suite 5.3.4 对高安全档位测试宿主的一轮自测结果
 
 ## 现有文档
 

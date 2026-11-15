@@ -198,6 +198,7 @@ func validateRefreshExchange(t *testing.T, authorizedResources []string, tokenRe
 	refreshStore := storage_impl.NewRefreshTokenStore()
 	clock := &resourceClock{now: time.Date(2026, 7, 8, 9, 0, 0, 0, time.UTC)}
 	refresh := storage_models.NewRefreshToken()
+	refresh.ClientId = client.ClientId
 	refresh.AuthorizedScopes = []string{"orders.read", "payments.read"}
 	refresh.AuthorizedResourceGaps = authorizedResources
 	handle := "resource-refresh"
