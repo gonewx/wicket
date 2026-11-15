@@ -82,6 +82,18 @@ func (s *RefreshTokenService) rotate(ctx context.Context, request *responses_mod
 		consumed.RotatedTo = handle
 	}
 	if err := s.store.UpdateRefreshToken(ctx, request.Handle, &consumed, expected); err != nil {
+		if !errors.Is(err, storage.ErrVersionConflict) && !errors.Is(err, storage.ErrNotFound) &&
+			s.consumedInto(ctx, request.Handle, consumed.RotatedTo) {
+			// The store reported a failure for a write it applied: the
+			// redeemed token now links to the successor, so the successor
+			// is the client's only valid token and is answered.
+			if s.logger != nil {
+				s.logger.Warn("Refresh token store reported a failure for a consumption it applied; answering the successor",
+					slog.String("errorType", fmt.Sprintf("%T", err)),
+				)
+			}
+			return handle, nil
+		}
 		s.removeQuietly(ctx, handle, "successor")
 		// A concurrent redemption that removed the record has consumed it
 		// as surely as one that updated it.
@@ -96,6 +108,19 @@ func (s *RefreshTokenService) rotate(ctx context.Context, request *responses_mod
 		s.removeQuietly(ctx, request.Handle, "redeemed")
 	}
 	return handle, nil
+}
+
+// consumedInto reports whether the record under handle is consumed with a
+// link to successor, which only the redemption that stored successor writes.
+// Only a marking consumption writes the link; under a removing one the
+// record cannot be told apart from one consumed by a concurrent redemption,
+// so it reports false.
+func (s *RefreshTokenService) consumedInto(ctx context.Context, handle string, successor string) bool {
+	if successor == "" {
+		return false
+	}
+	token, err := s.store.GetRefreshToken(ctx, handle)
+	return err == nil && token.ConsumedTime != nil && token.RotatedTo == successor
 }
 
 // successorOf returns the record stored under a new handle: everything the
@@ -123,22 +148,42 @@ func successorOf(redeemed *storage_models.RefreshToken) *storage_models.RefreshT
 // whoever holds the token without the key cannot revoke the chain of the
 // client holding it. The result wraps storage.ErrNotFound, so the token
 // endpoint answers invalid_grant, unless the revocation failed on the store:
-// that error does not wrap it.
+// that error does not wrap it. Once revoked, the replayed token is unlinked,
+// so presenting it again is refused without a second walk.
 func (s *RefreshTokenService) refuseConsumed(ctx context.Context, handle string, token *storage_models.RefreshToken, client *storage_models.Client) error {
 	if client != nil && client.ClientId == token.ClientId && token.RotatedTo != "" && s.clock != nil &&
 		(token.DPoPKeyThumbprint == "" || dpop.ProofThumbprint(ctx) == token.DPoPKeyThumbprint) {
+		if err := s.revokeFrom(ctx, handle, token.RotatedTo); err != nil {
+			return fmt.Errorf("revoke refresh tokens issued after a replayed one: %w", err)
+		}
 		if s.logger != nil {
 			attributes := []any{slog.String("clientId", token.ClientId)}
 			if token.SessionId != "" {
 				attributes = append(attributes, slog.String("sessionId", token.SessionId))
 			}
-			s.logger.Warn("Consumed refresh token presented again; revoking the refresh tokens issued after it", attributes...)
+			s.logger.Warn("Consumed refresh token presented again by its client; the refresh tokens issued after it are revoked", attributes...)
 		}
-		if err := s.revokeFrom(ctx, handle, token.RotatedTo); err != nil {
-			return fmt.Errorf("revoke refresh tokens issued after a replayed one: %w", err)
-		}
+		s.unlinkReplayed(ctx, handle, token)
 	}
 	return fmt.Errorf("refresh token already consumed: %w", storage.ErrNotFound)
+}
+
+// unlinkReplayed drops the link of a replayed token once the tokens down it
+// are revoked, so that presenting it again is refused without walking the
+// chain a second time. The link is only a shortcut at this point: a failed
+// write is logged, a lost race (another replay unlinked or removed it) is not.
+func (s *RefreshTokenService) unlinkReplayed(ctx context.Context, handle string, token *storage_models.RefreshToken) {
+	unlinked := *token
+	unlinked.RotatedTo = ""
+	err := s.store.UpdateRefreshToken(ctx, handle, &unlinked, token.Version)
+	if err == nil || errors.Is(err, storage.ErrVersionConflict) || errors.Is(err, storage.ErrNotFound) {
+		return
+	}
+	if s.logger != nil {
+		s.logger.Warn("Replayed refresh token could not be unlinked after revocation",
+			slog.String("errorType", fmt.Sprintf("%T", err)),
+		)
+	}
 }
 
 // revokeFrom walks the link from the replayed token (under replayed) starting
