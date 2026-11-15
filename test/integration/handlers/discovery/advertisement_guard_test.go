@@ -6,6 +6,7 @@ package discovery
 import (
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -181,32 +182,70 @@ func TestDiscoveryAdvertisementMatchesTheAssembly(t *testing.T) {
 			scope := pipeline.Root.CreateScope()
 			t.Cleanup(func() { _ = scope.Close() })
 
-			guard := &advertisementGuard{
-				pipeline: pipeline,
-				scope:    scope,
-				document: fetchDiscoveryDocument(t, pipeline),
-			}
+			configuration := fetchDiscoveryDocument(t, pipeline)
+			metadata := fetchMetadataDocument(t, pipeline, wicket.ProtocolRoutePathsAuthorizationServerMetadata)
 
-			t.Run("every advertised endpoint is routed", func(t *testing.T) {
-				assertEndpointsRouted(t, guard)
+			t.Run("both documents carry the same keys and values", func(t *testing.T) {
+				assertDocumentsAgree(t, configuration, metadata)
 			})
-			t.Run("every advertised capability has evidence", func(t *testing.T) {
-				assertCapabilitiesBacked(t, guard)
-			})
-			t.Run("advertised lists agree with the assembly", func(t *testing.T) {
-				assertListsConsistent(t, guard)
-			})
-			t.Run("every registered route is advertised", func(t *testing.T) {
-				assertRegisteredRoutesAdvertised(t, guard)
-			})
+
+			documents := []struct {
+				name     string
+				document map[string]any
+			}{
+				{name: "openid configuration", document: configuration},
+				{name: "authorization server metadata", document: metadata},
+			}
+			for _, document := range documents {
+				t.Run(document.name, func(t *testing.T) {
+					guard := &advertisementGuard{
+						pipeline: pipeline,
+						scope:    scope,
+						document: document.document,
+					}
+
+					t.Run("every advertised endpoint is routed", func(t *testing.T) {
+						assertEndpointsRouted(t, guard)
+					})
+					t.Run("every advertised capability has evidence", func(t *testing.T) {
+						assertCapabilitiesBacked(t, guard)
+					})
+					t.Run("advertised lists agree with the assembly", func(t *testing.T) {
+						assertListsConsistent(t, guard)
+					})
+					t.Run("every registered route is advertised", func(t *testing.T) {
+						assertRegisteredRoutesAdvertised(t, guard)
+					})
+				})
+			}
 		})
+	}
+}
+
+// assertDocumentsAgree requires the authorization server metadata document
+// to carry exactly the keys of the OpenID Provider configuration, each with
+// the same value.
+func assertDocumentsAgree(t *testing.T, configuration, metadata map[string]any) {
+	t.Helper()
+
+	configurationKeys := slices.Sorted(maps.Keys(configuration))
+	metadataKeys := slices.Sorted(maps.Keys(metadata))
+	require.Equal(t, configurationKeys, metadataKeys, "the two documents carry different keys")
+	for _, key := range configurationKeys {
+		require.Equalf(t, configuration[key], metadata[key], "%s differs between the two documents", key)
 	}
 }
 
 func fetchDiscoveryDocument(t *testing.T, pipeline *integration_common.WicketPipeline) map[string]any {
 	t.Helper()
 
-	response, err := pipeline.TestServer.Client().Get(pipeline.TestServer.URL + integration_common.DiscoveryEndpoint)
+	return fetchMetadataDocument(t, pipeline, integration_common.DiscoveryEndpoint)
+}
+
+func fetchMetadataDocument(t *testing.T, pipeline *integration_common.WicketPipeline, path string) map[string]any {
+	t.Helper()
+
+	response, err := pipeline.TestServer.Client().Get(pipeline.TestServer.URL + path)
 	require.NoError(t, err)
 	defer response.Body.Close()
 	require.Equal(t, http.StatusOK, response.StatusCode)
@@ -329,9 +368,11 @@ func assertListsConsistent(t *testing.T, guard *advertisementGuard) {
 }
 
 // unadvertisedRoutes are registered routes that no discovery key describes:
-// the discovery document itself and the interaction callbacks.
+// the discovery document, the authorization server metadata document and the
+// interaction callbacks.
 var unadvertisedRoutes = []string{
 	wicket.ProtocolRoutePathsDiscoveryConfiguration,
+	wicket.ProtocolRoutePathsAuthorizationServerMetadata,
 	"/" + wicket.ProtocolRoutePathsAuthorizeCallback,
 	"/" + wicket.ProtocolRoutePathsEndSessionCallback,
 }
