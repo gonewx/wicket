@@ -6,6 +6,8 @@ package storagetest
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -194,6 +196,81 @@ func RunRefreshTokenStoreSuite(t *testing.T, newStore func() storage.RefreshToke
 		err := store.UpdateRefreshToken(context.Background(), "handle-1", newRefreshToken("client-a"), 1)
 		if !errors.Is(err, storage.ErrVersionConflict) {
 			t.Fatalf("replay update error = %v, want ErrVersionConflict", err)
+		}
+	})
+	// Derived from: https://www.rfc-editor.org/rfc/rfc9700#section-4.14.2
+	// A rotated refresh token is kept marked as consumed together with the
+	// handle issued in its place, so a later replay can be traced to the
+	// tokens issued after it. Both fields must survive the round trip.
+	cfg.mayCase(t, "ConsumedMarkRoundTrips", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreRefreshToken(context.Background(), "handle-1", newRefreshToken("client-a")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		consumed := newRefreshToken("client-a")
+		consumedAt := fixedNow.Add(90 * time.Second)
+		consumed.ConsumedTime = &consumedAt
+		consumed.RotatedTo = "handle-2"
+		if err := store.UpdateRefreshToken(context.Background(), "handle-1", consumed, 1); err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		got, err := store.GetRefreshToken(context.Background(), "handle-1")
+		if err != nil {
+			t.Fatalf("Get after update: %v", err)
+		}
+		if got.ConsumedTime == nil || !got.ConsumedTime.Equal(consumedAt) {
+			t.Fatalf("ConsumedTime = %v, want %v", got.ConsumedTime, consumedAt)
+		}
+		if got.RotatedTo != "handle-2" {
+			t.Fatalf("RotatedTo = %q, want %q", got.RotatedTo, "handle-2")
+		}
+	})
+	// Derived from: https://www.rfc-editor.org/rfc/rfc9700#section-4.14.2
+	// and the one-time rule that a single versioned write decides who
+	// redeems a token: concurrent updates under the same expected version
+	// succeed exactly once, every other one fails with ErrVersionConflict.
+	cfg.mayCase(t, "ConcurrentUpdateSucceedsOnce", func(t *testing.T) {
+		t.Parallel()
+		const writers = 16
+		store := newStore()
+		if err := store.StoreRefreshToken(context.Background(), "handle-1", newRefreshToken("client-a")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		start := make(chan struct{})
+		results := make(chan error, writers)
+		var wg sync.WaitGroup
+		for i := range writers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				update := newRefreshToken("client-a")
+				update.RotatedTo = fmt.Sprintf("handle-%d", i+2)
+				<-start
+				results <- store.UpdateRefreshToken(context.Background(), "handle-1", update, 1)
+			}()
+		}
+		close(start)
+		wg.Wait()
+		close(results)
+		succeeded := 0
+		for err := range results {
+			switch {
+			case err == nil:
+				succeeded++
+			case !errors.Is(err, storage.ErrVersionConflict):
+				t.Fatalf("losing update error = %v, want ErrVersionConflict", err)
+			}
+		}
+		if succeeded != 1 {
+			t.Fatalf("%d concurrent updates succeeded, want exactly 1", succeeded)
+		}
+		got, err := store.GetRefreshToken(context.Background(), "handle-1")
+		if err != nil {
+			t.Fatalf("Get after updates: %v", err)
+		}
+		if got.Version != 2 {
+			t.Fatalf("stored Version = %d, want 2", got.Version)
 		}
 	})
 	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {

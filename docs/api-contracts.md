@@ -359,6 +359,43 @@ mux.HandleFunc("/portal/start", func(w http.ResponseWriter, r *http.Request) {
 
 前三类 client 错误可用 `extensions.IsClientRejected` 与基础设施故障区分。
 
+## refresh token 的消费处置
+
+client 的 `RefreshTokenUsage` 为 `wicket.TokenUsageOneTimeOnly`（`models.NewClient()` 的默认值）时，宿主可以声明 refresh token 兑换后如何处置。默认不变：换发原地更新同一条记录、响应返回原句柄，原句柄可反复兑换。
+
+### 配置
+
+```go
+cfg := root.ServerConfig()
+cfg.SetRefreshTokenConsumption(services.RefreshTokenMarkedOnRedemption)
+cfg.Freeze()
+```
+
+| 取值（`services.RefreshTokenConsumption`） | 兑换后 |
+|------|------|
+| `RefreshTokenKeptOnRedemption`（零值，默认） | 原地更新，返回原句柄 |
+| `RefreshTokenRemovedOnRedemption` | 签发新句柄，删除旧记录 |
+| `RefreshTokenMarkedOnRedemption` | 签发新句柄，旧记录保留、标记为已消费（`RefreshToken.ConsumedTime`）并记下新句柄（`RefreshToken.RotatedTo`，内嵌 `models.RefreshTokenRotation`） |
+
+- `SetRefreshTokenConsumption` 须在 `Freeze()` 之前调用，之后调用或传入上表之外的值都会 panic，消息点名该方法。`RefreshTokenConsumption()` 查询当前声明。宿主级开关，没有 client 级设置，没有 discovery 键与之对应。
+- 只作用于 `OneTimeOnly` 的 client；`TokenUsageReUse` 的 client 在任何取值下都原地更新、返回原句柄。
+- 组合根在每次解析 `services.RefreshTokenService` 时读取声明，调用 `(*services/impl.RefreshTokenService).SetConsumption(consumption, clock, logger)`。
+
+### 轮换
+
+- 新句柄的记录继承旧记录的全部授权内容：subject、scope、resource、`SessionId`、`CreationTime`、`Lifetime`、DPoP 绑定（`DPoPKeyThumbprint`）以及本次换发的 access token。绝对寿命不因轮换延长；绑定到 DPoP 密钥的 refresh token 轮换后仍绑定同一密钥。
+- 写入顺序：先存新记录，再以兑换时读到的版本号更新旧记录（`UpdateRefreshToken` 的 `expectedVersion`）。存新记录失败时旧 token 原封不动，响应 5xx，client 可重试。
+- 并发兑换同一句柄恰一个成功；其余得 `invalid_grant`，并移除各自预写的新记录（移除失败只记日志）。
+- 删除模式下，旧记录先被标记为已消费、再删除；删除失败只记日志，留下的已消费记录出示时同样被拒。
+
+### 已消费 token 再次出示（RFC 9700 §4.14.2）
+
+- `ConsumedTime` 非空的记录在任何声明下（含切回默认后）出示，都返回 `invalid_grant`；例外是下文的沿链撤销遇到存储故障时返回 5xx。
+- 出示方 client 与记录的 `ClientId` 相同时视为重放：沿 `RotatedTo` 链找到第一个仍有效的 refresh token，将其标记为已消费（不写 `RotatedTo`），迫使合法 client 重新授权。绑定了 DPoP 密钥（`DPoPKeyThumbprint` 非空）的记录，只有在请求带该密钥的 proof 时才触发撤销，否则只得 `invalid_grant`。每次撤销记一条 Warn 日志（client id，有会话时含 session id，不含句柄）。链上已签发的 access token（含 reference token）不撤销，也不按 subject 或 client 批量撤销。链遍历不限长度，遇到链接成环即停止；同一句柄连续 8 次版本冲突视为存储故障，返回 5xx。
+- 其他 client 出示只得 `invalid_grant`，不触发撤销。
+- 删除模式下旧记录已不存在，重放只得 `invalid_grant`，无法沿链撤销。
+- 撤销时遇到存储故障（缺失与版本冲突之外的错误）以 5xx 返回，不伪装成 `invalid_grant`。
+
 ## 支持的授权类型（Grant Types）
 
 | Grant Type | 说明 |

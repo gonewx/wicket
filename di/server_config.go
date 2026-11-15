@@ -103,6 +103,10 @@ type ServerConfig struct {
 	// requested_acr.go.
 	requestedAcrRequired bool
 
+	// refreshTokenConsumption is what happens to a redeemed one-time
+	// refresh token, see refresh_token_consumption.go.
+	refreshTokenConsumption services.RefreshTokenConsumption
+
 	// accountCreationUrl is the host's account creation page, see
 	// account_creation.go. Empty means account creation is not offered.
 	accountCreationUrl string
