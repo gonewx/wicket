@@ -239,6 +239,8 @@ reference access token 也在须回收之列：client 配置 `AccessTokenType=Re
 
 启用 DPoP 时另有一点，适用于任何自备的 `RefreshTokenStore`：须持久化并往返 `RefreshToken.DPoPKeyThumbprint`（DPoP proof 密钥指纹，见 [API 契约 · DPoP](./api-contracts.md#dpoprfc-9449)）。public client 带 DPoP proof 获得的 refresh token 靠这个字段绑定到 proof 密钥；适配器丢失它，绑定即静默失效，持有被窃 refresh token 的一方无需私钥就能兑换。契约测试套件目前不检查这一点，自备适配器须自行确认。同理，自备 client store 须往返 `Client.RequireDPoP`，丢失它会使按 client 强制 DPoP 静默失效。自备 `AuthorizationCodeStore` 须往返 `AuthorizationCode.DPoPKeyThumbprint`（authorize 请求 `dpop_jkt` 预绑定的指纹，见 [API 契约 · `dpop_jkt` 预绑定](./api-contracts.md#dpop_jkt-预绑定rfc-9449-10)）；丢失它，预绑定静默失效，截获授权码的一方可用自己的密钥兑换。契约测试套件同样不检查这一字段。DPoP 服务端 nonce 无状态，不需要任何存储。
 
+自备 client store 还须往返 `Client.InitiateLoginUri`（client 登记的登录发起端点，见 [API 契约 · 第三方发起登录](./api-contracts.md#第三方发起登录openid-connect-core-4)）：丢失它，`thirdpartylogin.Initiate` 对该 client 返回「未登记」错误，宿主无法再发起它的第三方登录。wicket 自带的 client 编解码（`storage.EncodeClient` / `DecodeClient`）已包含该字段。契约测试套件目前不检查这一字段，自备适配器须自行确认往返。
+
 ### 释放资源
 
 适配器持有的连接池在 `Root.Close()` 路径上释放：

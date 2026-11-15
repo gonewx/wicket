@@ -75,6 +75,7 @@ type Client struct {
 	ClientAuthenticationMetadata
 	ClientPushedAuthorizationMetadata
 	ClientDPoPMetadata
+	ClientThirdPartyLoginMetadata
 }
 
 func NewClient() *Client {
