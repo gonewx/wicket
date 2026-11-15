@@ -153,6 +153,7 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.DPoPEnabled() {
 		handler.ServeDPoP(cfg.DPoPOptions().SigningAlgorithms)
 	}
+	handler.ServeSignedIntrospection(godi.GetRequired[services.KeyMaterialService](p))
 	return handler
 }
 
@@ -180,13 +181,19 @@ func newBackchannelAuthenticationHandlerFromProvider(p godi.Provider) *handlers.
 }
 
 func newIntrospectionHandlerFromProvider(p godi.Provider) *handlers.IntrospectionHandler {
-	return handlers.NewIntrospectionHandlerWithOptions(
+	handler := handlers.NewIntrospectionHandlerWithOptions(
 		apiAuthenticatorFromProvider(p),
 		godi.GetRequired[validators.IntrospectionRequestValidator](p),
 		godi.GetRequired[responses.IntrospectionResponseGenerator](p),
 		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
+	handler.ServeSignedResponses(
+		godi.GetRequired[services.KeyMaterialService](p),
+		godi.GetRequired[services.IssuerNameService](p),
+		godi.GetRequired[services.SystemClock](p),
+	)
+	return handler
 }
 
 func newTokenRevocationHandlerFromProvider(p godi.Provider) *handlers.TokenRevocationHandler {

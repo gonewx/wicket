@@ -23,12 +23,23 @@ import (
 // A handler that holds options enforces Endpoints.EnableIntrospectionEndpoint:
 // while the switch is off it answers 404 to every request. A handler without
 // options does not look at the switch and always serves.
+//
+// A resource server that asks for application/token-introspection+jwt in the
+// Accept header receives the introspection result as a signed JWT (RFC 9701)
+// once the handler was given signing material through ServeSignedResponses;
+// the composition root always does so. A handler built directly with
+// NewIntrospectionHandler or NewIntrospectionHandlerWithOptions and never
+// given that material answers with JSON, which RFC 9701 permits for a server
+// that does not support signed responses.
 type IntrospectionHandler struct {
 	apiValidator     validators.ApiSecretValidator
 	requestValidator validators.IntrospectionRequestValidator
 	generator        responses.IntrospectionResponseGenerator
 	options          *config_options.WicketOptions
 	logger           *slog.Logger
+
+	// signing is set by ServeSignedResponses; nil answers with JSON only.
+	signing *introspectionSigning
 }
 
 // NewIntrospectionHandler builds an introspection handler that holds no
@@ -99,5 +110,17 @@ func (h *IntrospectionHandler) Process(w http.ResponseWriter, r *http.Request) e
 		return results.NewBadRequestResult(validationResult.Error, validationResult.Description).Execute(w, r)
 	}
 
-	return results.NewIntrospectionResult(h.generator.Handle(r.Context(), validationResult)).Execute(w, r)
+	introspection := h.generator.Handle(r.Context(), validationResult)
+	if h.signing != nil && acceptsIntrospectionJwt(r.Header.Values("Accept")) {
+		audience := ""
+		if validationResult.Api != nil {
+			audience = validationResult.Api.Name
+		}
+		signed, err := h.signing.sign(r.Context(), audience, introspection)
+		if err != nil {
+			return err
+		}
+		return results.NewIntrospectionJwtResult(signed).Execute(w, r)
+	}
+	return results.NewIntrospectionResult(introspection).Execute(w, r)
 }
