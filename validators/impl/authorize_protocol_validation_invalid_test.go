@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/validators"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
@@ -400,7 +401,7 @@ func TestAuthorizeProtocolValidationInvalid(t *testing.T) {
 			validator, err := createAuthorizeRequestValidator()
 			r.NoError(err)
 
-			resp := validator.Validate(context.Background(), tc.parameters(), nil)
+			resp := validator.Validate(context.Background(), tc.parameters(), nil, validators.AuthorizeRequestPhaseEntry)
 			tc.expected(r, resp)
 
 		})

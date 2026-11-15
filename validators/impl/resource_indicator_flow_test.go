@@ -19,6 +19,7 @@ import (
 	storage_impl "github.com/gonewx/wicket/storage/impl"
 	"github.com/gonewx/wicket/storage/memory"
 	storage_models "github.com/gonewx/wicket/storage/models"
+	"github.com/gonewx/wicket/validators"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
@@ -76,7 +77,7 @@ func TestAuthorizeRequestValidatorResourceIndicatorTable(t *testing.T) {
 				values.Add(wicket.AuthorizeRequestResource, resource)
 			}
 
-			result := validator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous())
+			result := validator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous(), validators.AuthorizeRequestPhaseEntry)
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}

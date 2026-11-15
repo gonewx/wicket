@@ -17,6 +17,7 @@ import (
 	"github.com/gonewx/wicket"
 	config_options "github.com/gonewx/wicket/config/options"
 	"github.com/gonewx/wicket/hosting"
+	"github.com/gonewx/wicket/pushedauth"
 	"github.com/gonewx/wicket/services"
 	integration_common "github.com/gonewx/wicket/test/integration/common"
 	"github.com/gonewx/wicket/validators"
@@ -115,8 +116,16 @@ func TestDiscoveryAdvertisementMatchesTheAssembly(t *testing.T) {
 	assemblies := []struct {
 		name      string
 		configure func(*config_options.WicketOptions)
+		// declare runs on the pipeline before it is initialized.
+		declare func(*integration_common.WicketPipeline)
 	}{
 		{name: "default assembly"},
+		{
+			name: "pushed authorization enabled",
+			declare: func(p *integration_common.WicketPipeline) {
+				p.EnablePushedAuthorization(pushedauth.Options{RequireForAllClients: true})
+			},
+		},
 		{
 			name: "every switch on",
 			configure: func(o *config_options.WicketOptions) {
@@ -140,7 +149,11 @@ func TestDiscoveryAdvertisementMatchesTheAssembly(t *testing.T) {
 		t.Run(assembly.name, func(t *testing.T) {
 			t.Parallel()
 
-			pipeline := newDiscoveryPipeline()
+			pipeline := integration_common.NewWicketPipeline()
+			if assembly.declare != nil {
+				assembly.declare(pipeline)
+			}
+			pipeline.Initialize()
 			t.Cleanup(pipeline.TestServer.Close)
 			if assembly.configure != nil {
 				assembly.configure(pipeline.Options)
@@ -293,11 +306,13 @@ var unadvertisedRoutes = []string{
 func assertRegisteredRoutesAdvertised(t *testing.T, guard *advertisementGuard) {
 	t.Helper()
 
-	mtlsAliasRoutes := []string{
+	featureGatedRoutes := []string{
 		"/" + wicket.ProtocolRoutePathsMtlsToken,
 		"/" + wicket.ProtocolRoutePathsMtlsRevocation,
 		"/" + wicket.ProtocolRoutePathsMtlsIntrospection,
 		"/" + wicket.ProtocolRoutePathsMtlsDeviceAuthorization,
+		"/" + wicket.ProtocolRoutePathsPushedAuthorization,
+		"/" + wicket.ProtocolRoutePathsMtlsPushedAuthorization,
 	}
 
 	advertisedUrls := map[string]struct{}{}
@@ -325,12 +340,13 @@ func assertRegisteredRoutesAdvertised(t *testing.T, guard *advertisementGuard) {
 		if slices.ContainsFunc(unadvertisedRoutes, func(path string) bool { return strings.EqualFold(path, endpoint.Path) }) {
 			continue
 		}
-		// The mtls alias routes are registered with the root container and
-		// yield no handler until the host enables mutual TLS client
-		// authentication; the request then falls through to the next handler,
-		// so this assembly does not serve them. Only these four routes are
-		// exempted, and only while they yield no handler.
-		if slices.Contains(mtlsAliasRoutes, endpoint.Path) {
+		// The mtls alias routes and the pushed authorization routes are
+		// registered with the root container and yield no handler until the
+		// host enables mutual TLS client authentication or pushed
+		// authorization requests; the request then falls through to the next
+		// handler, so this assembly does not serve them. Only these routes
+		// are exempted, and only while they yield no handler.
+		if slices.Contains(featureGatedRoutes, endpoint.Path) {
 			if handler, err := endpoint.Handler(guard.scope); err == nil && handler == nil {
 				continue
 			}

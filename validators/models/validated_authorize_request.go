@@ -43,6 +43,7 @@ type ValidatedAuthorizeRequest struct {
 	CodeChallengeMethod                   string
 	RequestObjectValues                   []*claims.Claim
 	RequestObject                         string
+	PushedAuthorizationRequestValues
 }
 
 func NewValidatedAuthorizeRequest() *ValidatedAuthorizeRequest {

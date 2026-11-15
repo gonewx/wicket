@@ -83,6 +83,12 @@ func NewAuthorizeCallbackHandlerWithOptions(
 	}
 }
 
+// SetPushedAuthorizationConsumer installs the consumer of pushed
+// authorization requests of an assembly with pushed authorization enabled.
+func (h *AuthorizeCallbackHandler) SetPushedAuthorizationConsumer(consumer PushedAuthorizationConsumer) {
+	h.base.pushed = consumer
+}
+
 func (h *AuthorizeCallbackHandler) Process(w http.ResponseWriter, r *http.Request) error {
 	// A switched-off endpoint answers as if it did not exist, whatever the
 	// request looks like, and before anything of the request is read.
@@ -111,14 +117,14 @@ func (h *AuthorizeCallbackHandler) result(r *http.Request) (endpointResult, erro
 		return nil, fmt.Errorf("read consent message: %w", err)
 	}
 
-	validation := h.base.validate(r.Context(), values)
+	validation := h.base.validate(r.Context(), values, validators.AuthorizeRequestPhaseInteractionReturn)
 
 	if message != nil && message.Data == nil {
 		// The consent message exists but carries no answer: the callback cannot
 		// complete, so it fails to the error page and the empty message is
 		// discarded.
 		_ = h.consent.Delete(r.Context(), key)
-		return h.base.errorResult(validation.ValidatedRequest, wicket.AuthorizeErrorsInvalidRequest, ""), nil
+		return h.base.pushedErrorResult(r.Context(), validation.ValidatedRequest, wicket.AuthorizeErrorsInvalidRequest, "")
 	}
 
 	var answer *messages.ConsentResponse

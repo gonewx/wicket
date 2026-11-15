@@ -15,6 +15,7 @@ import (
 	"github.com/gonewx/wicket/clientcert"
 	"github.com/gonewx/wicket/dp"
 	"github.com/gonewx/wicket/keymgmt"
+	"github.com/gonewx/wicket/pushedauth"
 	"github.com/gonewx/wicket/replay"
 	"github.com/gonewx/wicket/services"
 	services_impl "github.com/gonewx/wicket/services/impl"
@@ -97,6 +98,10 @@ type ServerConfig struct {
 	pushedAuthorizationRequestStoreOnce       sync.Once
 	pushedAuthorizationRequestStore           storage.PushedAuthorizationRequestStore
 	pushedAuthorizationDataProtectionProvider dp.DataProtectionProvider
+	pushedAuthorizationOptions                pushedauth.Options
+	pushedAuthorizationProtectorOnce          sync.Once
+	pushedAuthorizationProtector              dp.DataProtector
+	pushedAuthorizationProtectorErr           error
 }
 
 func NewServerConfig() *ServerConfig {

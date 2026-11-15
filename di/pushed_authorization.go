@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/gonewx/wicket/dp"
+	"github.com/gonewx/wicket/pushedauth"
 	services_impl "github.com/gonewx/wicket/services/impl"
 	"github.com/gonewx/wicket/storage"
 )
@@ -133,4 +134,70 @@ func (c *ServerConfig) requirePushedAuthorizationDataProtectionSeam() {
 	if isDefaultDataProtectionProvider(c.pushedAuthorizationDataProtectionProvider) {
 		panic(fmt.Sprintf("store seam %q injected by host with the default %T, which only encodes; inject a provider that protects pushed authorization payloads", pushedAuthorizationDataProtectionSeamName, c.pushedAuthorizationDataProtectionProvider))
 	}
+}
+
+// EnablePushedAuthorizationRequests enables pushed authorization requests
+// (RFC 9126) with options. It is the only switch of the feature: the pushed
+// authorization request endpoint and its mutual TLS alias are routed, the
+// authorize endpoint resolves pushed request_uri values, and discovery
+// advertises the endpoint, all only once it was called. Both pushed
+// authorization seams become required. It panics after Freeze and for an
+// option with a negative duration.
+func (c *ServerConfig) EnablePushedAuthorizationRequests(options pushedauth.Options) {
+	if c.frozen {
+		panic("EnablePushedAuthorizationRequests must not be called after Freeze")
+	}
+	if err := options.Validate(); err != nil {
+		panic(err.Error())
+	}
+	c.pushedAuthorizationOptions = options
+	c.enablePushedAuthorization()
+}
+
+// PushedAuthorizationRequestsEnabled reports whether pushed authorization
+// requests were enabled with EnablePushedAuthorizationRequests.
+func (c *ServerConfig) PushedAuthorizationRequestsEnabled() bool {
+	return c.pushedAuthorizationRequired()
+}
+
+// PushedAuthorizationRequestsOptions returns the declared options with every
+// zero duration replaced by its default. It returns the zero value while the
+// feature is not enabled. The clock is returned as declared.
+func (c *ServerConfig) PushedAuthorizationRequestsOptions() pushedauth.Options {
+	if !c.PushedAuthorizationRequestsEnabled() {
+		return pushedauth.Options{}
+	}
+	return c.pushedAuthorizationOptions.WithDefaults()
+}
+
+// pushedAuthorizationProtectorOnceForFeature returns the protector of the
+// enabled feature, created on the first call and kept afterwards.
+func (c *ServerConfig) pushedAuthorizationProtectorOnceForFeature() (dp.DataProtector, error) {
+	if !c.pushedAuthorizationRequired() {
+		return c.pushedAuthorizationProtectorForFeature()
+	}
+	c.pushedAuthorizationProtectorOnce.Do(func() {
+		c.pushedAuthorizationProtector, c.pushedAuthorizationProtectorErr = c.pushedAuthorizationProtectorForFeature()
+	})
+	return c.pushedAuthorizationProtector, c.pushedAuthorizationProtectorErr
+}
+
+// pushedAuthorizationService builds the pushed authorization service of the
+// enabled feature over the host's seams, which are materialized once, and
+// clients, the client store of the resolving scope. A nil clock in the
+// declared options is replaced by clock.
+func (c *ServerConfig) pushedAuthorizationService(clients storage.ClientStore, clock pushedauth.Clock) (*pushedauth.Service, error) {
+	store, err := c.pushedAuthorizationRequestStoreForFeature()
+	if err != nil {
+		return nil, err
+	}
+	protector, err := c.pushedAuthorizationProtectorOnceForFeature()
+	if err != nil {
+		return nil, err
+	}
+	options := c.pushedAuthorizationOptions
+	if options.Clock == nil {
+		options.Clock = clock
+	}
+	return pushedauth.NewService(store, protector, clients, options)
 }

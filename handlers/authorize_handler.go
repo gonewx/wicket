@@ -68,6 +68,12 @@ func NewAuthorizeHandlerWithOptions(
 	}
 }
 
+// SetPushedAuthorizationConsumer installs the consumer of pushed
+// authorization requests of an assembly with pushed authorization enabled.
+func (h *AuthorizeHandler) SetPushedAuthorizationConsumer(consumer PushedAuthorizationConsumer) {
+	h.base.pushed = consumer
+}
+
 func (h *AuthorizeHandler) Process(w http.ResponseWriter, r *http.Request) error {
 	// A switched-off endpoint answers as if it did not exist, whatever the
 	// request looks like, and before anything of the request is read.
@@ -88,7 +94,7 @@ func (h *AuthorizeHandler) result(r *http.Request) (endpointResult, error) {
 	if !ok {
 		return results.NewStatusCodeResult(http.StatusUnsupportedMediaType), nil
 	}
-	return h.base.dispatch(r.Context(), h.base.validate(r.Context(), values), nil)
+	return h.base.dispatch(r.Context(), h.base.validate(r.Context(), values, validators.AuthorizeRequestPhaseEntry), nil)
 }
 
 // gatherAuthorizeParameters reads parameters from the query string for GET and

@@ -18,6 +18,7 @@ import (
 	"github.com/gonewx/wicket/storage/memory"
 	storage_models "github.com/gonewx/wicket/storage/models"
 	test_common "github.com/gonewx/wicket/test/common"
+	"github.com/gonewx/wicket/validators"
 	validators_mock "github.com/gonewx/wicket/validators/mock"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -126,7 +127,7 @@ func TestAuthorizeResourceParameterRules(t *testing.T) {
 			t.Parallel()
 
 			validator, values := tt.arrange(t)
-			result := validator.Validate(context.Background(), values, nil)
+			result := validator.Validate(context.Background(), values, nil, validators.AuthorizeRequestPhaseEntry)
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}

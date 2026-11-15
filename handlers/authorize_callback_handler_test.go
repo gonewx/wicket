@@ -5,6 +5,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -210,5 +211,51 @@ func TestAuthorizeCallbackHandlerRecoverParameters(t *testing.T) {
 		url.Values{wicket.AuthorizationParamsStoreMessageStoreIdParameterName: {stored.Encode()}}.Encode()
 	if got := handler.recoverParameters(httptest.NewRequest(http.MethodGet, target, nil)); got.Encode() != stored.Encode() {
 		t.Fatalf("recovered with handle = %q, want stored %q", got.Encode(), stored.Encode())
+	}
+}
+
+// The empty consent answer branch answers the client, so it consumes the
+// pushed request the callback resumed.
+func TestAuthorizeCallbackHandlerEmptyConsentConsumesPushedRequest(t *testing.T) {
+	t.Parallel()
+
+	for name, tt := range map[string]struct {
+		consumeErr error
+		wantErr    bool
+	}{
+		"consumed once":          {},
+		"infrastructure failure": {consumeErr: errors.New("boom"), wantErr: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			subject := callbackSubject(t)
+			req, values := callbackRequest()
+			store := newFakeConsentMessageStore()
+			_ = store.Write(context.Background(), consentRequestKey(subject, values), &messages.Message[*messages.ConsentResponse]{})
+
+			handler := newCallbackHandler(subject, responses_models.NewInteractionResponse(), store)
+			handler.base.validator = &fakeAuthorizeRequestValidator{result: validators_models.NewAuthorizeRequestValidationResult(pushedRequest())}
+			consumer := &recordingConsumer{err: tt.consumeErr}
+			handler.SetPushedAuthorizationConsumer(consumer)
+
+			result, err := handler.result(req)
+			if len(consumer.calls) != 1 || consumer.calls[0] != consumptionTestURI+"|some-client" {
+				t.Fatalf("consumed %v, want once", consumer.calls)
+			}
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("result = %T, nil; want an error", result)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("result: %v", err)
+			}
+			authorizeResult, ok := result.(*results.AuthorizeResult)
+			if !ok || authorizeResult.Response.Error == nil {
+				t.Fatalf("result = %#v, want an error authorize result", result)
+			}
+		})
 	}
 }

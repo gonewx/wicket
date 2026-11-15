@@ -56,7 +56,7 @@ func responseFromProvider(p godi.Provider) http.ResponseWriter {
 }
 
 func newAuthorizeHandlerFromProvider(p godi.Provider) *handlers.AuthorizeHandler {
-	return handlers.NewAuthorizeHandlerWithOptions(
+	handler := handlers.NewAuthorizeHandlerWithOptions(
 		godi.GetRequired[validators.AuthorizeRequestValidator](p),
 		godi.GetRequired[responses.AuthorizeInteractionResponseGenerator](p),
 		godi.GetRequired[responses.AuthorizeResponseGenerator](p),
@@ -64,11 +64,15 @@ func newAuthorizeHandlerFromProvider(p godi.Provider) *handlers.AuthorizeHandler
 		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.PushedAuthorizationRequestsEnabled() {
+		handler.SetPushedAuthorizationConsumer(pushedAuthorizationFromProvider(p))
+	}
+	return handler
 }
 
 func newAuthorizeCallbackHandlerFromProvider(p godi.Provider) *handlers.AuthorizeCallbackHandler {
 	parameters, _ := godi.Get[storage.AuthorizationParametersMessageStore](p)
-	return handlers.NewAuthorizeCallbackHandlerWithOptions(
+	handler := handlers.NewAuthorizeCallbackHandlerWithOptions(
 		godi.GetRequired[validators.AuthorizeRequestValidator](p),
 		godi.GetRequired[responses.AuthorizeInteractionResponseGenerator](p),
 		godi.GetRequired[responses.AuthorizeResponseGenerator](p),
@@ -78,6 +82,10 @@ func newAuthorizeCallbackHandlerFromProvider(p godi.Provider) *handlers.Authoriz
 		godi.GetRequired[*config_options.WicketOptions](p),
 		godi.GetRequired[*slog.Logger](p),
 	)
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.PushedAuthorizationRequestsEnabled() {
+		handler.SetPushedAuthorizationConsumer(pushedAuthorizationFromProvider(p))
+	}
+	return handler
 }
 
 func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
@@ -114,6 +122,9 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 	}
 	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.AsymmetricRequestObjectsRequired() {
 		handler.ServeAsymmetricRequestObjectsOnly()
+	}
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.PushedAuthorizationRequestsEnabled() {
+		handler.ServePushedAuthorization(cfg.PushedAuthorizationRequestsOptions().RequireForAllClients)
 	}
 	return handler
 }

@@ -37,6 +37,7 @@ type AuthorizeRequestValidator struct {
 	// httpContextAccessor     accessor.HttpContextAccessor
 	userSession     services.UserSession
 	customValidator validators.CustomAuthorizeRequestValidator
+	pushed          *AuthorizeRequestPushedStage
 }
 
 func NewAuthorizeRequestValidator(
@@ -68,12 +69,18 @@ func NewAuthorizeRequestValidator(
 	return v
 }
 
+// SetPushedAuthorization installs the pushed authorization stage of an
+// assembly with pushed authorization requests enabled.
+func (v *AuthorizeRequestValidator) SetPushedAuthorization(stage *AuthorizeRequestPushedStage) {
+	v.pushed = stage
+}
+
 func responseTypeEqualityComparer() *ResponseTypeEqualityComparer {
 	return &ResponseTypeEqualityComparer{}
 }
 
 func (v *AuthorizeRequestValidator) Validate(ctx context.Context, values url.Values,
-	subject *claimspkg.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult {
+	subject *claimspkg.ClaimsPrincipal, phase validators.AuthorizeRequestPhase) *validators_models.AuthorizeRequestValidationResult {
 	v.logger.Debug("Start authorize request protocol validation")
 
 	if subject == nil {
@@ -91,6 +98,11 @@ func (v *AuthorizeRequestValidator) Validate(ctx context.Context, values url.Val
 	var err error
 	// client_id must always be present on the request
 	result := v.loadClient(ctx, request)
+	if result.Error != nil {
+		return result
+	}
+	result, settle := v.pushed.Bind(ctx, request, phase)
+	defer settle()
 	if result.Error != nil {
 		return result
 	}

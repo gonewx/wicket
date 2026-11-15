@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/validators"
 )
 
 func TestAuthorizeClientRuleValidation(t *testing.T) {
@@ -181,7 +182,7 @@ func TestAuthorizeClientRuleValidation(t *testing.T) {
 				values.Set(wicket.AuthorizeRequestNonce, tt.nonce)
 			}
 
-			result := validator.Validate(context.Background(), values, nil)
+			result := validator.Validate(context.Background(), values, nil, validators.AuthorizeRequestPhaseEntry)
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}
