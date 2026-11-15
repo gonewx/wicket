@@ -29,12 +29,29 @@ type DPoPChallengeResult struct {
 	// separated in the algs parameter; the parameter is left out when it
 	// is empty.
 	Algorithms []string
+	// Nonce, when not empty, is sent in the DPoP-Nonce header as the
+	// server nonce the next proof has to carry (RFC 9449 section 8).
+	Nonce string
+	// withoutError leaves the error and error_description parameters out,
+	// for a request that presented no access token (RFC 6750 section 3.1).
+	withoutError bool
 }
 
 // NewDPoPChallengeResult returns the challenge for err. A nil err stands for
 // invalid_token.
 func NewDPoPChallengeResult(err error, description string, algorithms []string) *DPoPChallengeResult {
 	return &DPoPChallengeResult{Error: err, ErrorDescription: description, Algorithms: algorithms}
+}
+
+// NewDPoPAlgorithmsChallengeResult returns the 401 challenge answering a
+// request that presented no access token: a single WWW-Authenticate field
+//
+//	DPoP algs="<algorithms>"
+//
+// carrying no error parameter; the algs parameter is left out when
+// algorithms is empty.
+func NewDPoPAlgorithmsChallengeResult(algorithms []string) *DPoPChallengeResult {
+	return &DPoPChallengeResult{Algorithms: algorithms, withoutError: true}
 }
 
 // Execute writes the challenge. invalid_dpop_proof answers 401; any other
@@ -59,21 +76,28 @@ func (r *DPoPChallengeResult) Execute(w http.ResponseWriter, _ *http.Request) er
 		}
 	}
 
-	var challenge strings.Builder
-	challenge.WriteString(wicket.AuthenticationSchemesAuthorizationHeaderDPoP)
-	challenge.WriteString(` error=`)
-	challenge.WriteString(quotedString(code.Error()))
-	if description != "" {
-		challenge.WriteString(`, error_description=`)
-		challenge.WriteString(quotedString(description))
+	var parameters []string
+	if r.withoutError {
+		status = http.StatusUnauthorized
+	} else {
+		parameters = append(parameters, `error=`+quotedString(code.Error()))
+		if description != "" {
+			parameters = append(parameters, `error_description=`+quotedString(description))
+		}
 	}
 	if len(r.Algorithms) > 0 {
-		challenge.WriteString(`, algs=`)
-		challenge.WriteString(quotedString(strings.Join(r.Algorithms, " ")))
+		parameters = append(parameters, `algs=`+quotedString(strings.Join(r.Algorithms, " ")))
+	}
+	challenge := wicket.AuthenticationSchemesAuthorizationHeaderDPoP
+	if len(parameters) > 0 {
+		challenge += " " + strings.Join(parameters, ", ")
 	}
 
-	w.Header().Set("WWW-Authenticate", challenge.String())
+	w.Header().Set("WWW-Authenticate", challenge)
 	w.Header().Set("Cache-Control", "no-store")
+	if r.Nonce != "" {
+		w.Header().Set(wicket.DPoPNonceHeaderName, r.Nonce)
+	}
 	w.WriteHeader(status)
 	return nil
 }

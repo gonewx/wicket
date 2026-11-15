@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/gonewx/wicket"
@@ -80,6 +81,78 @@ func TestDPoPChallengeResultOnTheWire(t *testing.T) {
 			}
 			if got := response.Header.Values("WWW-Authenticate"); len(got) != 1 || got[0] != tc.wantHeader {
 				t.Fatalf("WWW-Authenticate = %q, want %q", got, tc.wantHeader)
+			}
+			if got := response.Header.Values("Cache-Control"); len(got) != 1 || got[0] != "no-store" {
+				t.Fatalf("Cache-Control = %q", got)
+			}
+			if len(body) != 0 {
+				t.Fatalf("body = %q, want none", body)
+			}
+		})
+	}
+}
+
+func TestDPoPChallengeResultNonceAndAlgorithmsOnlyOnTheWire(t *testing.T) {
+	t.Parallel()
+	nonceChallenge := NewDPoPChallengeResult(wicket.TokenErrorsUseDPoPNonce, "DPoP proof must carry the server nonce", []string{"ES256"})
+	nonceChallenge.Nonce = "fresh-nonce"
+	bareWithNonce := NewDPoPAlgorithmsChallengeResult([]string{"ES256", "PS256"})
+	bareWithNonce.Nonce = "another-nonce"
+	cases := map[string]struct {
+		result     *DPoPChallengeResult
+		wantStatus int
+		wantHeader string
+		wantNonce  []string
+	}{
+		"use nonce with a nonce": {
+			result: nonceChallenge, wantStatus: http.StatusUnauthorized,
+			wantHeader: `DPoP error="use_dpop_nonce", error_description="DPoP proof must carry the server nonce", algs="ES256"`,
+			wantNonce:  []string{"fresh-nonce"},
+		},
+		"no error parameter": {
+			result: NewDPoPAlgorithmsChallengeResult([]string{"ES256", "PS256"}), wantStatus: http.StatusUnauthorized,
+			wantHeader: `DPoP algs="ES256 PS256"`,
+		},
+		"no error parameter with a nonce": {
+			result: bareWithNonce, wantStatus: http.StatusUnauthorized,
+			wantHeader: `DPoP algs="ES256 PS256"`, wantNonce: []string{"another-nonce"},
+		},
+		"no parameter at all": {
+			result: NewDPoPAlgorithmsChallengeResult(nil), wantStatus: http.StatusUnauthorized,
+			wantHeader: `DPoP`,
+		},
+		"error without a nonce sends no nonce header": {
+			result: NewDPoPChallengeResult(wicket.TokenErrorsInvalidDPoPProof, "", []string{"ES256"}), wantStatus: http.StatusUnauthorized,
+			wantHeader: `DPoP error="invalid_dpop_proof", algs="ES256"`,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if err := tc.result.Execute(w, r); err != nil {
+					t.Errorf("Execute: %v", err)
+				}
+			}))
+			defer server.Close()
+
+			response, err := http.Get(server.URL)
+			if err != nil {
+				t.Fatalf("GET: %v", err)
+			}
+			defer response.Body.Close()
+			body, err := io.ReadAll(response.Body)
+			if err != nil {
+				t.Fatalf("read body: %v", err)
+			}
+			if response.StatusCode != tc.wantStatus {
+				t.Fatalf("status = %d, want %d", response.StatusCode, tc.wantStatus)
+			}
+			if got := response.Header.Values("WWW-Authenticate"); len(got) != 1 || got[0] != tc.wantHeader {
+				t.Fatalf("WWW-Authenticate = %q, want %q", got, tc.wantHeader)
+			}
+			if got := response.Header.Values(wicket.DPoPNonceHeaderName); !slices.Equal(got, tc.wantNonce) {
+				t.Fatalf("DPoP-Nonce = %q, want %q", got, tc.wantNonce)
 			}
 			if got := response.Header.Values("Cache-Control"); len(got) != 1 || got[0] != "no-store" {
 				t.Fatalf("Cache-Control = %q", got)

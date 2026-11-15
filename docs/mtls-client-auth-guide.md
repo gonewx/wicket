@@ -129,7 +129,7 @@ server.TLSConfig = &tls.Config{
 - **userinfo**：携带 `cnf.x5t#S256` 的 token 必须随同一证书出示，否则 401 `invalid_token`，不说明原因；`cnf` 不是对象、`x5t#S256` 不是非空字符串、或出现多个 `cnf` 一律按不一致拒绝。不带 `cnf` 的 token 行为不变。userinfo 响应本身不含 `cnf`。证书来源与 token 端点相同（`SetClientCertificateSource` 注入的来源或 TLS 连接）。`cnf` 同时含 DPoP 的 `jkt` 时，token 还必须以 `DPoP` 方案带匹配的 proof 出示，两项绑定都满足才通过；以 Bearer 出示一律拒绝（见 [API 契约 · userinfo 与 introspection](./api-contracts.md#userinfo-与-introspection)）。
 - **userinfo 不在 `mtls_endpoint_aliases` 中**：无论别名是路径形态、独立域名还是子域形态，client 都在主机的 userinfo 路由上访问 userinfo，宿主须在主 userinfo 路由上请求客户端证书（例如 `tls.RequestClientCert`），否则绑定 token 无法通过校验。
 - **introspection**：active 响应对绑定的 JWT 与 reference token 都返回 `cnf`。
-- **JWT Bearer handler（`auth/jwt`）**：设置 `Options.CertificateBindingSource`（形状同 `clientcert.CertificateSource`）后，绑定 token 证书不符或缺失时认证失败（`jwt.ErrCertificateBindingMismatch`），未绑定 token 照常通过；字段为 nil 时与此前一致。
+- **JWT Bearer handler（`auth/jwt`）**：设置 `Options.CertificateBindingSource`（形状同 `clientcert.CertificateSource`）后，绑定 token 证书不符或缺失时认证失败（`jwt.ErrCertificateBindingMismatch`），未绑定 token 照常通过；字段为 nil 时与此前一致。同时设置 `Options.DPoP` 时，`cnf` 兼含 `x5t#S256` 与 `jkt` 的 token 须两项绑定都满足：证书不符先失败（`invalid_token`），且不消耗 proof 的 `jti`（见 [外部提供者指南 · JWT Bearer 的 DPoP 校验](./external-providers-guide.md#dpop-校验rfc-9449)）。
 
 ```go
 opts.CertificateBindingSource = clientcert.ConnectionCertificateSource{}
