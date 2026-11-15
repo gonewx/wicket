@@ -222,3 +222,11 @@ func (h *testCookieAuthenticationHandler) Challenge(properties *auth.Properties)
 func (h *testCookieAuthenticationHandler) Forbid(properties *auth.Properties) error {
 	return nil
 }
+
+// NewCookieAuthenticationHandler returns the cookie authentication handler of
+// the integration pipeline for hosts outside this package, such as the
+// conformance host under test/conformance. The ticket protection caveat above
+// applies.
+func NewCookieAuthenticationHandler(userSession services.UserSession) auth.Handler {
+	return newTestCookieAuthenticationHandler(userSession)
+}

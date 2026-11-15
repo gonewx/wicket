@@ -1,0 +1,655 @@
+{
+  "suite": {
+    "version": "5.3.4",
+    "revision": "daca6ad",
+    "tag": "release-v5.3.4",
+    "image": "registry.gitlab.com/openid/conformance-suite@sha256:2a53917fd8df04a24f09203175295acc73a93fa156726973ad621297692113d6"
+  },
+  "planId": "GjHOsOujSwQL8",
+  "plan": "fapi2-security-profile-final-test-plan",
+  "variant": {
+    "openid": "openid_connect",
+    "client_auth_type": "private_key_jwt",
+    "sender_constrain": "dpop",
+    "fapi_profile": "plain_fapi",
+    "authorization_request_type": "simple",
+    "grant_management": "disabled"
+  },
+  "moduleVariant": {
+    "fapi_request_method": "unsigned",
+    "fapi_response_mode": "plain_response"
+  },
+  "subject": {
+    "wicket": "239170e43bd27c8052e6c31e50664a5d3ebb5c59",
+    "go": "go1.27.0",
+    "host": "test/conformance/fapi2host"
+  },
+  "started": "2026-11-15T19:25:03Z",
+  "finished": "2026-11-15T19:42:18Z",
+  "modules": [
+    {
+      "module": "fapi2-security-profile-final-discovery-end-point-verification",
+      "logId": "cVOvLPD1XLk2u1t",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-happy-flow",
+      "logId": "o61EgTPlmWwpZ9H",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-user-rejects-authentication",
+      "logId": "lzm7uoDgRMm7fN9",
+      "status": "FINISHED",
+      "result": "FAILED",
+      "failures": [
+        "EnsureErrorFromAuthorizationEndpointResponse",
+        "ExpectAccessDeniedErrorFromAuthorizationEndpointDueToUserRejectingRequest"
+      ],
+      "warnings": [
+        "CheckForUnexpectedParametersInErrorResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-authorization-request-without-state-success",
+      "logId": "DNmwwR6Ib0fBfEQ",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-authorization-request-without-nonce-success",
+      "logId": "6Y7demIOa6p5Nqj",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-authorization-request-with-64-char-nonce-success",
+      "logId": "GlYnFnwIOfUWsn9",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-other-scope-order-succeeds",
+      "logId": "ZFaYYDem8ynwVt2",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-test-claims-parameter-identity-claims",
+      "logId": "eFbFvVxn1lObmKL",
+      "status": "FINISHED",
+      "result": "SKIPPED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": [
+        "The test was skipped: The 'claims_parameter_supported' server metadata indicates that it does not support the claims parameter (which is permitted behaviour), so claims behaviour cannot be tested."
+      ]
+    },
+    {
+      "module": "fapi2-security-profile-final-access-token-type-header-case-sensitivity",
+      "logId": "yKFnnEl9YHzQCRv",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-check-dpop-proof-nbf-exp",
+      "logId": "35VSJkz548I2eQ7",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-dpopproof-with-iat-10seconds-before-succeeds",
+      "logId": "mr9k6f5Ni5deEU1",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-dpopproof-with-iat-10seconds-after-succeeds",
+      "logId": "XszRkHD3hoBXNP3",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-mismatched-dpop-jkt-fails",
+      "logId": "I2mYaxWr209vwIa",
+      "status": "FINISHED",
+      "result": "FAILED",
+      "failures": [
+        "EnsurePARInvalidRequestOrInvalidDpopProof"
+      ],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt",
+      "logId": "kd5qWKXqsYiYGma",
+      "status": "FINISHED",
+      "result": "FAILED",
+      "failures": [
+        "CheckTokenEndpointReturnedInvalidRequestGrantOrDPopProofError"
+      ],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-token-endpoint-fails-with-mismatched-dpop-jkt",
+      "logId": "I2nqvzxG61oAoFl",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-dpopproof-at-par-endpoint-binding-success",
+      "logId": "MvR6K1EUvdeLsgv",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-dpop-auth-code-binding-success",
+      "logId": "DGMujzSQa9UGTXE",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-different-nonce-inside-and-outside-request-object",
+      "logId": "xk7PTUJtFN5Qdup",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [
+        "ExpectRequestDifferentNonceInsideAndOutsideErrorPage"
+      ],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-different-state-inside-and-outside-request-object",
+      "logId": "DOFOXuRowbxlOql",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [
+        "ExpectRequestDifferentStateInsideAndOutsideErrorPage"
+      ],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-authorization-request-with-long-nonce",
+      "logId": "JQ5gOTziiK10F4A",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-authorization-request-with-long-state",
+      "logId": "gtU6ZFu5entn2pp",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [
+        "ExpectRequestObjectWithLongStateErrorPage"
+      ],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-state-only-outside-request-object-not-used",
+      "logId": "U4Vpy8JdSrquGMG",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [
+        "ExpectRequestObjectMissingStateErrorPage"
+      ],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-request-object-without-redirect-uri-fails",
+      "logId": "woNpe8TqN0Xp2rc",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-plain-fapi-tolerate-unregistered-redirect-uri",
+      "logId": "9d9EEM9dkyZcAtN",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-unsigned-authorization-request-without-using-par-fails",
+      "logId": "wA3TkKg9tqpE1FJ",
+      "status": "INTERRUPTED",
+      "result": null,
+      "failures": [],
+      "warnings": [],
+      "reviews": [
+        "ExpectAuthorizationRequestWithoutRequestObjectErrorPage"
+      ],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-redirect-uri-in-authorization-request",
+      "logId": "4On9koFOhqSbxs6",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-response-type-code-idtoken-fails",
+      "logId": "XHhh9F53GdGC1nK",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-response-type-token-fails",
+      "logId": "70y1GVgFQkrOVmO",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-client-id-in-token-endpoint",
+      "logId": "E9aaJeNrhapFz5a",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-holder-of-key-required",
+      "logId": "EEKUuaam3PanYmF",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-holder-of-key-required-at-non-alias-token-endpoint",
+      "logId": "DRQIwyh1JYHnttx",
+      "status": "FINISHED",
+      "result": "SKIPPED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": [
+        "The test was skipped: The server does not publish a token endpoint in mtls_endpoint_aliases that differs from token_endpoint, so there is no separate token endpoint to test."
+      ]
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-authorization-code-is-bound-to-client",
+      "logId": "IfrnVcBfzTwZFFw",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-attempt-reuse-authorization-code-after-one-second",
+      "logId": "e5C8jQqWVJTnLHN",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint",
+        "EnsureHttpStatusCodeIs4xx"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-token-endpoint-fails-with-expired-auth-code",
+      "logId": "E9o26QXagh1paIJ",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-signed-client-assertion-with-RS256-fails",
+      "logId": "ONefk6zIJZz7y9p",
+      "status": "FINISHED",
+      "result": "SKIPPED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": [
+        "The test was skipped: This test requires RSA keys to be performed, the alg in client configuration is 'ES256' so this test is being skipped. If your server does not support PS256 then this will not prevent you certifying."
+      ]
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-client-assertion-in-token-endpoint",
+      "logId": "fY9ZfGlRBeklltg",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-client-assertion-with-exp-is-5-minutes-in-past-fails",
+      "logId": "wto9BnnVJR4t9NY",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-client-assertion-with-wrong-aud-fails",
+      "logId": "cGdc59GpxvRicZ5",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-client-assertion-with-no-sub-fails",
+      "logId": "wCpmmEaZsOzsO83",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-invalid-client-assertions-fail",
+      "logId": "kbthjB1l50iOi8V",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-dpop-negative-tests",
+      "logId": "ROG5I8QE42WwncY",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-refresh-token",
+      "logId": "4l5B7lJQyyKPNwh",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-ensure-reused-request-uri-prior-to-auth-completion-succeeds",
+      "logId": "mR8oKP7NVT8xJov",
+      "status": "INTERRUPTED",
+      "result": "FAILED",
+      "failures": [
+        "fapi2-security-profile-final-par-ensure-reused-request-uri-prior-to-auth-completion-succeeds"
+      ],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-attempt-reuse-request_uri",
+      "logId": "13HPrubRd6WfxDc",
+      "status": "INTERRUPTED",
+      "result": "UNKNOWN",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [
+        "ExpectInvalidRequestUriErrorPage"
+      ],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-attempt-to-use-expired-request_uri",
+      "logId": "Era73C4S3wIHL4M",
+      "status": "INTERRUPTED",
+      "result": null,
+      "failures": [],
+      "warnings": [],
+      "reviews": [
+        "ExpectInvalidRequestUriErrorPage"
+      ],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-attempt-to-use-request_uri-for-different-client",
+      "logId": "zeJMiujTMQh9gVl",
+      "status": "INTERRUPTED",
+      "result": null,
+      "failures": [],
+      "warnings": [],
+      "reviews": [
+        "ExpectInvalidRequestUriErrorPage"
+      ],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-authorization-request-containing-request_uri-form-param",
+      "logId": "CX8L1gw2GMpw0n2",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-attempt-invalid-http-method",
+      "logId": "IpVmlFMvrMJ6e8d",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-ensure-pkce-required",
+      "logId": "ho9gO7Brxz1zL8G",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-ensure-pkce-code-verifier-required",
+      "logId": "3LuAh1Xf0qHid4O",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-incorrect-pkce-code-verifier-rejected",
+      "logId": "bQMLJo3g3Jdf5jN",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-plain-pkce-rejected",
+      "logId": "LbbokHudYpgi9K1",
+      "status": "FINISHED",
+      "result": "PASSED",
+      "failures": [],
+      "warnings": [],
+      "reviews": [],
+      "skips": []
+    },
+    {
+      "module": "fapi2-security-profile-final-par-without-duplicate-parameters",
+      "logId": "DQ53tIXrryoryDd",
+      "status": "FINISHED",
+      "result": "WARNING",
+      "failures": [],
+      "warnings": [
+        "ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint"
+      ],
+      "reviews": [],
+      "skips": []
+    }
+  ]
+}

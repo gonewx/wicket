@@ -228,6 +228,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 		"refresh token accepts authorized resource subset": {
 			setup: func(t *testing.T, ctx *resourceTokenValidatorContext) url.Values {
 				refresh := storage_models.NewRefreshToken()
+				refresh.ClientId = ctx.client.ClientId
 				refresh.AuthorizedScopes = []string{"orders.read", "payments.read"}
 				refresh.AuthorizedResourceGaps = []string{resourceOrders, resourcePayments}
 				handle := "resource-refresh"
@@ -248,6 +249,7 @@ func TestTokenRequestValidatorResourceIndicatorTable(t *testing.T) {
 		"refresh token rejects resource when original grant had none": {
 			setup: func(t *testing.T, ctx *resourceTokenValidatorContext) url.Values {
 				refresh := storage_models.NewRefreshToken()
+				refresh.ClientId = ctx.client.ClientId
 				refresh.AuthorizedScopes = []string{"orders.read"}
 				refresh.AuthorizedResourceGaps = []string{}
 				handle := "resource-refresh"

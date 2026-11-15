@@ -578,7 +578,7 @@ const (
 	DiscoveryBackchannelAuthenticationEndpoint                         = "backchannel_authentication_endpoint"
 	DiscoveryClaimTypesSupported                                       = "claim_types_supported"
 	DiscoveryBackchannelAuthenticationRequestSigningAlgValuesSupported = "backchannel_authentication_request_signing_alg_values_supported"
-	DiscoveryClaimsParameterSupported                                  = "claims._parameter_supported"
+	DiscoveryClaimsParameterSupported                                  = "claims_parameter_supported"
 	DiscoveryTokenEndpointAuthenticationMethodsSupported               = "token_endpoint_auth_methods_supported"
 	DiscoveryAuthorizationEndpoint                                     = "authorization_endpoint"
 	DiscoveryDeviceAuthorizationEndpoint                               = "device_authorization_endpoint"
@@ -602,8 +602,8 @@ const (
 	DiscoverySubjectTypesSupported                                     = "subject_types_supported"
 	DiscoveryResponseModesSupported                                    = "response_modes_supported"
 	DiscoveryResponseTypesSupported                                    = "response_types_supported"
-	DiscoveryClaimsSupported                                           = "claims._supported"
-	DiscoveryClaimsLocalesSupported                                    = "claims._locales_supported"
+	DiscoveryClaimsSupported                                           = "claims_supported"
+	DiscoveryClaimsLocalesSupported                                    = "claims_locales_supported"
 	DiscoveryBackchannelUserCodeParameterSupported                     = "backchannel_user_code_parameter_supported"
 )
 
