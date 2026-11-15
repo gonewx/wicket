@@ -4,8 +4,10 @@
 package impl
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"reflect"
 	"strings"
 	"sync"
@@ -38,6 +40,8 @@ type rotationStore struct {
 	updateErr error
 	storeErr  error
 	removeErr error
+	// appliedUpdateErr, when set, is reported by updates the store applied.
+	appliedUpdateErr error
 	// beforeUpdate, when set, runs once before the next update reaches the
 	// store.
 	beforeUpdate func(handle string)
@@ -79,6 +83,7 @@ func (s *rotationStore) GetRefreshToken(ctx context.Context, handle string) (*mo
 func (s *rotationStore) UpdateRefreshToken(ctx context.Context, handle string, token *models.RefreshToken, expectedVersion int) error {
 	s.mu.Lock()
 	err := s.updateErr
+	applied := s.appliedUpdateErr
 	hook := s.beforeUpdate
 	s.beforeUpdate = nil
 	s.mu.Unlock()
@@ -88,7 +93,10 @@ func (s *rotationStore) UpdateRefreshToken(ctx context.Context, handle string, t
 	if err != nil {
 		return err
 	}
-	return s.RefreshTokenStore.UpdateRefreshToken(ctx, handle, token, expectedVersion)
+	if err := s.RefreshTokenStore.UpdateRefreshToken(ctx, handle, token, expectedVersion); err != nil {
+		return err
+	}
+	return applied
 }
 
 func (s *rotationStore) RemoveRefreshToken(ctx context.Context, handle string) error {
@@ -751,4 +759,133 @@ func TestRefreshTokenConsumptionSetterRefusesUndeclaredValues(t *testing.T) {
 			call(NewRefreshTokenService(newRotationStore(), NewHandleGenerationService()))
 		})
 	}
+}
+
+// A store reporting a failure for a consumption it applied answers the
+// successor under the marking consumption, since the redeemed token already
+// links to it; under the removing one the write cannot be attributed, and
+// the redemption fails as before.
+func TestRefreshTokenConsumptionUpdateAppliedDespiteFailure(t *testing.T) {
+	t.Parallel()
+	client := consumptionClient("client-a", wicket.TokenUsageOneTimeOnly)
+	boom := errors.New("store timed out")
+
+	t.Run("marked", func(t *testing.T) {
+		t.Parallel()
+		store := newRotationStore()
+		issueRefreshToken(t, store, "R", client)
+		service := consumptionService(store, services.RefreshTokenMarkedOnRedemption)
+		store.setFault(func(s *rotationStore) { s.appliedUpdateErr = boom })
+		r1, outcome, err := redeem(t, service, "R", client)
+		store.setFault(func(s *rotationStore) { s.appliedUpdateErr = nil })
+		if outcome != outcomeIssued {
+			t.Fatalf("outcome %s (%v), want %s", outcome, err, outcomeIssued)
+		}
+		if consumed := getRefreshToken(t, store, "R"); consumed.ConsumedTime == nil || consumed.RotatedTo != r1 {
+			t.Fatalf("redeemed record: consumed %v, rotated to %q; want consumed into %q", consumed.ConsumedTime, consumed.RotatedTo, r1)
+		}
+		requireIssued(t, service, r1, client)
+	})
+
+	t.Run("removed", func(t *testing.T) {
+		t.Parallel()
+		store := newRotationStore()
+		issueRefreshToken(t, store, "R", client)
+		service := consumptionService(store, services.RefreshTokenRemovedOnRedemption)
+		store.setFault(func(s *rotationStore) { s.appliedUpdateErr = boom })
+		_, outcome, err := redeem(t, service, "R", client)
+		store.setFault(func(s *rotationStore) { s.appliedUpdateErr = nil })
+		if outcome != outcomeServerError || !errors.Is(err, boom) {
+			t.Fatalf("outcome %s (%v), want %s wrapping the store error", outcome, err, outcomeServerError)
+		}
+		for _, handle := range store.storedHandles()[1:] {
+			if _, err := store.GetRefreshToken(context.Background(), handle); !errors.Is(err, storage.ErrNotFound) {
+				t.Fatalf("successor left behind: %v", err)
+			}
+		}
+	})
+}
+
+// Once a replay has revoked the chain, the replayed token no longer links to
+// it: presenting it again is refused without reading the chain.
+func TestRefreshTokenConsumptionReplayIsWalkedOnce(t *testing.T) {
+	t.Parallel()
+	client := consumptionClient("client-a", wicket.TokenUsageOneTimeOnly)
+	store := newRotationStore()
+	issueRefreshToken(t, store, "R", client)
+	service := consumptionService(store, services.RefreshTokenMarkedOnRedemption)
+	r1 := requireIssued(t, service, "R", client)
+	r2 := requireIssued(t, service, r1, client)
+
+	requireRefused(t, service, "R", client)
+	if replayed := getRefreshToken(t, store, "R"); replayed.ConsumedTime == nil || replayed.RotatedTo != "" {
+		t.Fatalf("replayed record: consumed %v, rotated to %q; want consumed and unlinked", replayed.ConsumedTime, replayed.RotatedTo)
+	}
+
+	// A walk would now fail on these reads and answer a server error.
+	boom := errors.New("store unavailable")
+	store.setFault(func(s *rotationStore) {
+		s.getFault[r1] = boom
+		s.getFault[r2] = boom
+	})
+	requireRefused(t, service, "R", client)
+}
+
+// The warnings name the client and session, never a handle.
+func TestRefreshTokenConsumptionWarnings(t *testing.T) {
+	t.Parallel()
+	client := consumptionClient("client-a", wicket.TokenUsageOneTimeOnly)
+	const redeemed = "handle-redeemed-0123456789"
+	logged := func(t *testing.T, consumption services.RefreshTokenConsumption) (*rotationStore, *RefreshTokenService, *bytes.Buffer) {
+		t.Helper()
+		var buffer bytes.Buffer
+		store := newRotationStore()
+		issueRefreshToken(t, store, redeemed, client)
+		service := NewRefreshTokenService(store, NewHandleGenerationService())
+		service.SetConsumption(consumption, consumptionClock{}, slog.New(slog.NewTextHandler(&buffer, nil)))
+		return store, service, &buffer
+	}
+	requireNoHandle := func(t *testing.T, output string, handles ...string) {
+		t.Helper()
+		for _, handle := range handles {
+			if strings.Contains(output, handle) {
+				t.Fatalf("log names handle %q:\n%s", handle, output)
+			}
+		}
+	}
+
+	t.Run("replay", func(t *testing.T) {
+		t.Parallel()
+		_, service, buffer := logged(t, services.RefreshTokenMarkedOnRedemption)
+		r1 := requireIssued(t, service, redeemed, client)
+		r2 := requireIssued(t, service, r1, client)
+		if buffer.Len() != 0 {
+			t.Fatalf("redemptions logged:\n%s", buffer)
+		}
+
+		requireRefused(t, service, redeemed, client)
+		requireRefused(t, service, redeemed, client)
+		output := buffer.String()
+		if lines := strings.Count(output, "\n"); lines != 1 {
+			t.Fatalf("%d records, want one warning for the revocation:\n%s", lines, output)
+		}
+		for _, want := range []string{"level=WARN", "presented again", "clientId=client-a", "sessionId=session-1"} {
+			if !strings.Contains(output, want) {
+				t.Fatalf("warning lacks %q:\n%s", want, output)
+			}
+		}
+		requireNoHandle(t, output, redeemed, r1, r2)
+	})
+
+	t.Run("failed removal", func(t *testing.T) {
+		t.Parallel()
+		store, service, buffer := logged(t, services.RefreshTokenRemovedOnRedemption)
+		store.setFault(func(s *rotationStore) { s.removeErr = errors.New("store unavailable") })
+		r1 := requireIssued(t, service, redeemed, client)
+		output := buffer.String()
+		if strings.Count(output, "\n") != 1 || !strings.Contains(output, "level=WARN") || !strings.Contains(output, "token=redeemed") {
+			t.Fatalf("want one warning for the redeemed record:\n%s", output)
+		}
+		requireNoHandle(t, output, redeemed, r1)
+	})
 }

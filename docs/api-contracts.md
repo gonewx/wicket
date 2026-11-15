@@ -384,14 +384,15 @@ cfg.Freeze()
 ### 轮换
 
 - 新句柄的记录继承旧记录的全部授权内容：subject、scope、resource、`SessionId`、`CreationTime`、`Lifetime`、DPoP 绑定（`DPoPKeyThumbprint`）以及本次换发的 access token。绝对寿命不因轮换延长；绑定到 DPoP 密钥的 refresh token 轮换后仍绑定同一密钥。
-- 写入顺序：先存新记录，再以兑换时读到的版本号更新旧记录（`UpdateRefreshToken` 的 `expectedVersion`）。存新记录失败时旧 token 原封不动，响应 5xx，client 可重试。
+- 写入顺序：先存新记录，再以兑换时读到的版本号更新旧记录（`UpdateRefreshToken` 的 `expectedVersion`）。存新记录失败时旧 token 原封不动，响应 5xx，client 可重试。更新旧记录时 store 报告了冲突与缺失之外的错误：标记模式下先重读旧记录，若它已以本次的新句柄标记为已消费（写入实际已生效），照常返回新句柄；否则移除新记录并响应 5xx。删除模式下无法分辨写入是否生效，一律移除新记录并响应 5xx；若写入其实已生效，旧句柄已被消费，client 须重新授权。
 - 并发兑换同一句柄恰一个成功；其余得 `invalid_grant`，并移除各自预写的新记录（移除失败只记日志）。
 - 删除模式下，旧记录先被标记为已消费、再删除；删除失败只记日志，留下的已消费记录出示时同样被拒。
+- 标记模式下已消费的记录不会随兑换删除：同一授权每兑换一次多留一条，各条继承链首的 `CreationTime` 与 `Lifetime`，到期后与其他过期 refresh token 一样，须由宿主调用该 store 的 `RemoveExpired` 回收（wicket 不自动回收），也随按会话、按 client 删除等既有路径移除。存储容量按"每个授权的兑换次数"估算。
 
 ### 已消费 token 再次出示（RFC 9700 §4.14.2）
 
 - `ConsumedTime` 非空的记录在任何声明下（含切回默认后）出示，都返回 `invalid_grant`；例外是下文的沿链撤销遇到存储故障时返回 5xx。
-- 出示方 client 与记录的 `ClientId` 相同时视为重放：沿 `RotatedTo` 链找到第一个仍有效的 refresh token，将其标记为已消费（不写 `RotatedTo`），迫使合法 client 重新授权。绑定了 DPoP 密钥（`DPoPKeyThumbprint` 非空）的记录，只有在请求带该密钥的 proof 时才触发撤销，否则只得 `invalid_grant`。每次撤销记一条 Warn 日志（client id，有会话时含 session id，不含句柄）。链上已签发的 access token（含 reference token）不撤销，也不按 subject 或 client 批量撤销。链遍历不限长度，遇到链接成环即停止；同一句柄连续 8 次版本冲突视为存储故障，返回 5xx。
+- 出示方 client 与记录的 `ClientId` 相同时视为重放：沿 `RotatedTo` 链找到第一个仍有效的 refresh token，将其标记为已消费（不写 `RotatedTo`），迫使合法 client 重新授权。绑定了 DPoP 密钥（`DPoPKeyThumbprint` 非空）的记录，只有在请求带该密钥的 proof 时才触发撤销，否则只得 `invalid_grant`。每次撤销记一条 Warn 日志（client id，有会话时含 session id，不含句柄）。链上已签发的 access token（含 reference token）不撤销，也不按 subject 或 client 批量撤销。链遍历不限长度，遇到链接成环即停止；同一句柄连续 8 次版本冲突视为存储故障，返回 5xx。撤销完成后，被重放的记录清空 `RotatedTo`，同一句柄再出示只得 `invalid_grant`，不再遍历，也不再记 Warn。
 - 其他 client 出示只得 `invalid_grant`，不触发撤销。
 - 删除模式下旧记录已不存在，重放只得 `invalid_grant`，无法沿链撤销。
 - 撤销时遇到存储故障（缺失与版本冲突之外的错误）以 5xx 返回，不伪装成 `invalid_grant`。
