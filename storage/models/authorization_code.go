@@ -74,6 +74,8 @@ type AuthorizationCode struct {
 	// Gets or sets properties
 	// The properties
 	Properties map[string]string
+
+	AuthorizationCodeProofBinding
 }
 
 func NewAuthorizationCode() *AuthorizationCode {

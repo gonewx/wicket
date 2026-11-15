@@ -2505,6 +2505,9 @@ func (r *Root) NewAuthorizeRequestValidator() validators.AuthorizeRequestValidat
 		if godi.GetRequired[*ServerConfig](p).PushedAuthorizationRequestsEnabled() {
 			validator.SetPushedAuthorization(impl2.NewAuthorizeRequestPushedStage(pushedAuthorizationFromProvider(p)))
 		}
+		if godi.GetRequired[*ServerConfig](p).DPoPEnabled() {
+			validator.SetDPoPKeyBinding()
+		}
 		return validator
 	})(r)
 	r.disp.TrackAny(v)
@@ -5854,6 +5857,9 @@ func (s *scope) NewAuthorizeRequestValidator() validators.AuthorizeRequestValida
 		)
 		if godi.GetRequired[*ServerConfig](p).PushedAuthorizationRequestsEnabled() {
 			validator.SetPushedAuthorization(impl2.NewAuthorizeRequestPushedStage(pushedAuthorizationFromProvider(p)))
+		}
+		if godi.GetRequired[*ServerConfig](p).DPoPEnabled() {
+			validator.SetDPoPKeyBinding()
 		}
 		return validator
 	})(s)

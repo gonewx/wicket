@@ -15,7 +15,9 @@ const dpopFeatureName = "dpop"
 
 // EnableDPoP declares DPoP (RFC 9449) enabled at the token endpoint with the
 // given options. It must be called before Freeze. A repeated call replaces
-// the options. Once enabled, the replay registry seam is required.
+// the options. Once enabled, the replay registry seam is required; with
+// options.RequireNonce, the DPoP nonce key seam is required as well (see
+// SetDPoPNonceKeys).
 func (c *ServerConfig) EnableDPoP(options dpop.Options) {
 	if c.frozen {
 		panic("EnableDPoP must not be called after Freeze")
@@ -49,6 +51,9 @@ func (c *ServerConfig) DPoPOptions() dpop.Options {
 	}
 	if options.ClockSkew == 0 {
 		options.ClockSkew = defaults.ClockSkew
+	}
+	if options.NonceLifetime == 0 {
+		options.NonceLifetime = defaults.NonceLifetime
 	}
 	return options
 }

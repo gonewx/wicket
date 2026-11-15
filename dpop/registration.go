@@ -23,11 +23,15 @@ var (
 )
 
 // RegistrationExpiry returns the instant the registry record of proof may be
-// reclaimed: the later of the last instant the proof is accepted (iat plus
-// the proof lifetime) and now, plus the clock skew.
+// reclaimed: the latest of the last instant the proof is accepted by its iat
+// (iat plus the proof lifetime), the deadline of the server nonce it carried
+// (NonceDeadline, zero without one) and now, plus the clock skew.
 func RegistrationExpiry(proof Proof, options Options, now time.Time) time.Time {
 	options = options.withDefaults()
 	until := proof.IssuedAt.Add(options.ProofLifetime)
+	if proof.NonceDeadline.After(until) {
+		until = proof.NonceDeadline
+	}
 	if now.After(until) {
 		until = now
 	}

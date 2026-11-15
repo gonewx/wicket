@@ -86,6 +86,9 @@ type ServerConfig struct {
 	// DPoP options, see dpop.go. The enablement is recorded in
 	// replayDependentFeatures.
 	dpopOptions dpop.Options
+	// dpopNonceKeys is the DPoP nonce key seam, see dpop_nonce.go. It is
+	// required exactly when DPoP is enabled with RequireNonce.
+	dpopNonceKeys dpop.NonceKeySource
 
 	// Mutual TLS client authentication, see client_certificate.go.
 	clientCertificateEnabled bool
@@ -197,6 +200,12 @@ func (c *ServerConfig) storeSeams() []storeSeam {
 			injected:  func() bool { return c.pushedAuthorizationDataProtectionProvider != nil },
 			condition: c.pushedAuthorizationRequired,
 		},
+		{
+			name:      dpopNonceKeySeamName,
+			category:  storeSeamFeatureRequired,
+			injected:  func() bool { return c.dpopNonceKeys != nil },
+			condition: c.dpopNonceRequired,
+		},
 	}
 }
 
@@ -261,6 +270,7 @@ func (c *ServerConfig) Freeze() {
 	c.frozen = true
 	c.requirePrivateKeyJwtOptions()
 	c.requireDPoPOptions()
+	c.requireDPoPNonceKeySeam()
 	c.requireReplayRegistrySeam()
 	c.requireClientStoreSeam()
 	c.requirePushedAuthorizationDataProtectionSeam()

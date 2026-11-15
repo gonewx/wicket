@@ -118,3 +118,29 @@ func TestRegister(t *testing.T) {
 		}
 	})
 }
+
+func TestRegistrationExpiryWithNonce(t *testing.T) {
+	t.Parallel()
+	options := Options{ProofLifetime: 30 * time.Second, ClockSkew: 10 * time.Second}
+	cases := map[string]struct {
+		deadline time.Time
+		want     time.Time
+	}{
+		"nonce deadline later than iat window": {testNow.Add(4 * time.Minute), testNow.Add(4*time.Minute + 10*time.Second)},
+		"iat window later than nonce deadline": {testNow.Add(10 * time.Second), testNow.Add(40 * time.Second)},
+		"both earlier than now":                {testNow.Add(-time.Minute), testNow.Add(40 * time.Second)},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := RegistrationExpiry(Proof{IssuedAt: testNow, NonceDeadline: tc.deadline}, options, testNow)
+			if !got.Equal(tc.want) {
+				t.Fatalf("expiry %s, want %s", got, tc.want)
+			}
+		})
+	}
+	old := Proof{IssuedAt: testNow.Add(-time.Hour), NonceDeadline: testNow.Add(-time.Minute)}
+	if got := RegistrationExpiry(old, options, testNow); !got.Equal(testNow.Add(10 * time.Second)) {
+		t.Fatalf("now wins: %s", got)
+	}
+}

@@ -226,6 +226,10 @@ func (s *TokenRequestValidator) validateAuthorizationCodeRequest(ctx context.Con
 		s.Logger.Error("Client is trying to use a code from a different client")
 		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
 	}
+	if !authorizationCodeProofBindingHolds(ctx, authZcode) {
+		s.Logger.Error("Authorization code is bound to a DPoP key the request did not prove")
+		return s.invalid(wicket.TokenErrorsInvalidGrant, ""), nil
+	}
 
 	if authZcode.CreationTime.Add(time.Duration(authZcode.Lifetime) * time.Second).Before(s.Clock.Now()) {
 		s.Logger.Error("Authorization code expired", slog.String("code", code))

@@ -233,6 +233,7 @@ func (g *AuthorizeResponseGenerator) createCode(ctx context.Context, req *valida
 	code.Nonce = req.Nonce
 	code.StateHash = stateHash
 	code.WasConsentShown = req.WasConsentShown
+	code.DPoPKeyThumbprint = req.DPoPKeyThumbprint
 
 	return code, nil
 }

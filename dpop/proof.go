@@ -42,6 +42,13 @@ type Proof struct {
 	JwtId string
 	// IssuedAt is the iat claim.
 	IssuedAt time.Time
+	// Nonce is the nonce claim as presented. It is only read while the
+	// options require a server nonce, and "" when the proof carries none.
+	Nonce string
+	// NonceDeadline is the deadline of the server nonce the proof carried,
+	// once that nonce was checked (NonceSealer.Check); zero otherwise. It
+	// extends the registration of the proof identifier.
+	NonceDeadline time.Time
 }
 
 // Verifier runs the stateless checks of a proof.
@@ -65,7 +72,11 @@ func NewVerifier(options Options) *Verifier {
 // that jwk; the claims must carry jti (at most 256 bytes), htm equal to
 // method, htu naming endpoint, and an iat no older than the proof lifetime
 // and no newer than now, both widened by the clock skew. Any failure yields
-// an error matching ErrInvalidProof. The nonce and ath claims are not judged.
+// an error matching ErrInvalidProof. The ath claim is not judged. The nonce
+// claim is only read while the options require a server nonce: it then has
+// to be a non-empty JSON string of at most 512 bytes when present, and is
+// returned as Proof.Nonce for the caller to check against its NonceSealer;
+// its absence is not an error here.
 func (v *Verifier) Verify(values []string, method string, endpoint string, now time.Time) (Proof, error) {
 	if len(values) != 1 {
 		return Proof{}, invalid("not exactly one proof")
@@ -106,11 +117,11 @@ func (v *Verifier) Verify(values []string, method string, endpoint string, now t
 		return Proof{}, invalid("thumbprint")
 	}
 
-	identifier, issuedAt, err := v.checkClaims(payload, method, endpoint, now)
+	claims, err := v.checkClaims(payload, method, endpoint, now)
 	if err != nil {
 		return Proof{}, err
 	}
-	return Proof{Thumbprint: thumbprint, JwtId: identifier, IssuedAt: issuedAt}, nil
+	return Proof{Thumbprint: thumbprint, JwtId: claims.identifier, IssuedAt: claims.issuedAt, Nonce: claims.nonce}, nil
 }
 
 // checkHeader judges the protected header and returns the signature
@@ -194,38 +205,54 @@ func curveFor(algorithm string) elliptic.Curve {
 	}
 }
 
-// checkClaims judges the claims of a verified proof and returns its jti and
-// iat.
-func (v *Verifier) checkClaims(payload []byte, method string, endpoint string, now time.Time) (string, time.Time, error) {
+// proofClaims are the claims an accepted proof contributes.
+type proofClaims struct {
+	identifier string
+	issuedAt   time.Time
+	nonce      string
+}
+
+// checkClaims judges the claims of a verified proof and returns its jti,
+// iat and, while a server nonce is required, its nonce.
+func (v *Verifier) checkClaims(payload []byte, method string, endpoint string, now time.Time) (proofClaims, error) {
 	var claims map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &claims); err != nil || claims == nil {
-		return "", time.Time{}, invalid("payload is not a JSON object")
+		return proofClaims{}, invalid("payload is not a JSON object")
 	}
 
 	identifier, ok := stringMember(claims["jti"])
 	if !ok || identifier == "" || len(identifier) > maxProofIdBytes {
-		return "", time.Time{}, invalid("jti")
+		return proofClaims{}, invalid("jti")
 	}
 	htm, ok := stringMember(claims["htm"])
 	if !ok || htm != method {
-		return "", time.Time{}, invalid("htm")
+		return proofClaims{}, invalid("htm")
 	}
 	htu, ok := stringMember(claims["htu"])
 	if !ok || !sameTarget(htu, endpoint) {
-		return "", time.Time{}, invalid("htu")
+		return proofClaims{}, invalid("htu")
 	}
 	issuedAt, ok := numericDate(claims["iat"])
 	if !ok {
-		return "", time.Time{}, invalid("iat")
+		return proofClaims{}, invalid("iat")
 	}
 	skew := v.options.ClockSkew
 	if issuedAt.Before(now.Add(-v.options.ProofLifetime - skew)) {
-		return "", time.Time{}, invalid("iat too old")
+		return proofClaims{}, invalid("iat too old")
 	}
 	if issuedAt.After(now.Add(skew)) {
-		return "", time.Time{}, invalid("iat in the future")
+		return proofClaims{}, invalid("iat in the future")
 	}
-	return identifier, issuedAt, nil
+	var nonce string
+	if v.options.RequireNonce {
+		if raw, present := claims["nonce"]; present {
+			nonce, ok = stringMember(raw)
+			if !ok || nonce == "" || len(nonce) > maxProofNonceBytes {
+				return proofClaims{}, invalid("nonce")
+			}
+		}
+	}
+	return proofClaims{identifier: identifier, issuedAt: issuedAt, nonce: nonce}, nil
 }
 
 // sameTarget reports whether the htu claim names endpoint. Both are parsed as

@@ -26,3 +26,18 @@ func refreshTokenProofBindingHolds(ctx context.Context, token *storage_models.Re
 	}
 	return subtle.ConstantTimeCompare([]byte(presented), []byte(token.DPoPKeyThumbprint)) == 1
 }
+
+// authorizationCodeProofBindingHolds reports whether an authorization code
+// that was already taken may be redeemed by the current request. A code
+// bound with dpop_jkt is redeemed only when the request presented an
+// accepted proof made with that key; an unbound code is not judged.
+func authorizationCodeProofBindingHolds(ctx context.Context, code *storage_models.AuthorizationCode) bool {
+	if code == nil || code.DPoPKeyThumbprint == "" {
+		return true
+	}
+	presented := dpop.ProofThumbprint(ctx)
+	if presented == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(presented), []byte(code.DPoPKeyThumbprint)) == 1
+}

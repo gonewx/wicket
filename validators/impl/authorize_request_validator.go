@@ -38,6 +38,7 @@ type AuthorizeRequestValidator struct {
 	userSession     services.UserSession
 	customValidator validators.CustomAuthorizeRequestValidator
 	pushed          *AuthorizeRequestPushedStage
+	dpopKeyBinding  bool
 }
 
 func NewAuthorizeRequestValidator(
@@ -612,6 +613,10 @@ func (v *AuthorizeRequestValidator) validateOptionalParameters(request *validato
 	}
 
 	request.PromptModes = utils.Except(request.OriginalPromptModes, request.SuppressedPromptModes)
+
+	if result := v.validateDPoPKeyThumbprint(request); result != nil {
+		return result
+	}
 
 	// check ui locales
 	uilocales := request.Raw.Get(wicket.AuthorizeRequestUiLocales)

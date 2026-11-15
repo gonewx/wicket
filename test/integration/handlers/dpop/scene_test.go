@@ -27,9 +27,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/gonewx/wicket"
+	client_messages "github.com/gonewx/wicket/client/messages"
 	"github.com/gonewx/wicket/clientcert"
 	config_options "github.com/gonewx/wicket/config/options"
 	wicket_dpop "github.com/gonewx/wicket/dpop"
+	"github.com/gonewx/wicket/pushedauth"
 	"github.com/gonewx/wicket/replay"
 	storage_impl "github.com/gonewx/wicket/storage/impl"
 	storage_models "github.com/gonewx/wicket/storage/models"
@@ -183,6 +185,11 @@ type sceneOptions struct {
 	registry replay.Registry
 	// mutualTls also enables mutual TLS client authentication.
 	mutualTls bool
+	// nonceKeys, when set, makes DPoP demand server nonces issued with
+	// these keys.
+	nonceKeys wicket_dpop.NonceKeySource
+	// pushedAuthorization also enables pushed authorization requests.
+	pushedAuthorization bool
 }
 
 func client(id string) *storage_models.Client {
@@ -294,7 +301,15 @@ func newScene(t *testing.T, o sceneOptions) *scene {
 		cfg.SetReplayRegistry(s.registry)
 	}
 	if o.enable {
-		cfg.EnableDPoP(wicket_dpop.Options{SigningAlgorithms: []string{"ES256", "PS256"}})
+		options := wicket_dpop.Options{SigningAlgorithms: []string{"ES256", "PS256"}}
+		if o.nonceKeys != nil {
+			options.RequireNonce = true
+			cfg.SetDPoPNonceKeys(o.nonceKeys)
+		}
+		cfg.EnableDPoP(options)
+	}
+	if o.pushedAuthorization {
+		s.pipeline.EnablePushedAuthorization(pushedauth.Options{})
 	}
 	if o.mutualTls {
 		s.certificate = selfSignedCertificate(t)
@@ -438,18 +453,27 @@ func (s *scene) discovery() map[string]any {
 // issued code.
 func (s *scene) authorizationCode(clientId string) string {
 	s.t.Helper()
+	authorization := s.authorize(clientId, nil)
+	require.NotNil(s.t, authorization)
+	require.NotEmptyf(s.t, authorization.Code(), "error %q", authorization.Error())
+	return authorization.Code()
+}
+
+// authorize runs the authorize endpoint for clientId with the extra
+// parameters and returns the response delivered to the client, or nil
+// when the browser was sent to the error page.
+func (s *scene) authorize(clientId string, extra url.Values) *client_messages.AuthorizeResponse {
+	s.t.Helper()
 	require.NoError(s.t, s.pipeline.Login(subjectId))
-	authorization := s.pipeline.RequestAuthorizationEndpoint(&integration_common.AuthorizeUrl{
+	return s.pipeline.RequestAuthorizationEndpoint(&integration_common.AuthorizeUrl{
 		ClientId:     clientId,
 		ResponseType: "code",
 		Scope:        wicket.StandardScopesOpenId + " " + scopeName + " offline_access",
 		RedirectUri:  redirectUri,
 		State:        "state",
 		Nonce:        "nonce",
+		Extra:        extra,
 	})
-	require.NotNil(s.t, authorization)
-	require.NotEmpty(s.t, authorization.Code())
-	return authorization.Code()
 }
 
 func passwordRequest(clientId string) url.Values {

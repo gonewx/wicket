@@ -107,6 +107,17 @@ func newTokenHandlerFromProvider(p godi.Provider) *handlers.TokenHandler {
 			options,
 			godi.GetRequired[services.SystemClock](p),
 		)
+		// The nonce key seam is resolved only while nonces are required.
+		if options.RequireNonce {
+			keys, err := cfg.dpopNonceKeysForFeature()
+			if err != nil {
+				if logger, ok := godi.Get[*slog.Logger](p); ok && logger != nil {
+					logger.Error("DPoP server nonces are required but cannot be served", slog.String("error", err.Error()))
+				}
+				keys = failingNonceKeys{err: err}
+			}
+			handler.SetDPoPNonces(dpop.NewNonceSealer(keys, options))
+		}
 	}
 	return handler
 }

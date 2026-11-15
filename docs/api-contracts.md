@@ -115,7 +115,7 @@ client 元数据（`models.ClientPushedAuthorizationMetadata`，嵌入 `models.C
 
 ## DPoP（RFC 9449）
 
-client 在 token 请求上用 `DPoP` 请求头出示 proof（用自己私钥签名的 JWT，头部带公钥 `jwk`），签发的 access token 绑定到该公钥（`cnf.jkt`），被窃取后没有私钥就无法使用。默认关闭；本版只覆盖 token 端点（`dpop_jkt` 预绑定、服务端 nonce、userinfo / introspection 贯通与资源端校验另行提供）。
+client 在 token 请求上用 `DPoP` 请求头出示 proof（用自己私钥签名的 JWT，头部带公钥 `jwk`），签发的 access token 绑定到该公钥（`cnf.jkt`），被窃取后没有私钥就无法使用。默认关闭；本版覆盖 token 端点、authorize / PAR 的 `dpop_jkt` 预绑定与可选的服务端 nonce（userinfo / introspection 贯通与资源端校验另行提供）。
 
 ### 启用
 
@@ -132,7 +132,9 @@ cfg.Freeze()
 |------|------|------|
 | `SigningAlgorithms` | `clientassertion.SupportedSigningAlgorithms()`（RS/PS/ES 256/384/512） | 接受的 proof 签名算法，只能是该集合的子集，不得重复；`none` 与 `HS*` 永远不接受 |
 | `ProofLifetime` | 60s | `iat` 之后 proof 仍被接受的时长，上限 10 分钟 |
-| `ClockSkew` | 60s | 判定 `iat` 的时钟偏差容忍，上限 10 分钟 |
+| `ClockSkew` | 60s | 判定 `iat` 与服务端 nonce 的时钟偏差容忍，上限 10 分钟 |
+| `RequireNonce` | false | 要求每个 proof 携带服务端 nonce（见下文"服务端 nonce"）；开启后 nonce 密钥缝为条件必需 |
+| `NonceLifetime` | 5 分钟 | nonce 签发后被接受的时长，不得为负，上限 10 分钟；只在 `RequireNonce` 时起作用 |
 
 client 元数据（`models.ClientDPoPMetadata`，嵌入 `models.Client`）：
 
@@ -144,13 +146,15 @@ client 元数据（`models.ClientDPoPMetadata`，嵌入 `models.Client`）：
 
 启用后 token 端点按以下顺序处理（DPoP 未启用时完全不读 `DPoP` 头）：
 
-1. **proof 无状态校验**（先于客户端认证）。请求带 `DPoP` 头时：只能有一个头字段，值为三段紧凑 JWS；头部 `typ` 为 `dpop+jwt`（大小写不敏感）、`alg` 在配置集合内、`jwk` 为与 `alg` 密钥类型相符的公钥（含私钥成员 `d`/`p`/`q`/`dp`/`dq`/`qi`/`oth`/`k` 即拒绝）、不得出现 `crit`；签名用头部 `jwk` 验证；claims 须有 `jti`（不超过 256 字节）、`htm`（等于请求方法）、`htu`、`iat`（不早于 now − `ProofLifetime` − `ClockSkew`，不晚于 now + `ClockSkew`）。任一不符 → 400 `invalid_dpop_proof`。`nonce` 与 `ath` 本版不校验。
-2. **客户端认证**（既有流程，含 `private_key_jwt` 断言 `jti` 登记）。
-3. **按 client 强制**：client `RequireDPoP` 而请求未带 proof → 400 `invalid_request`，描述 `DPoP proof required`。这一检查需要先知道 client，因此位于断言 `jti` 登记之后：被拒的客户端重试时需要新的断言。
-4. **proof `jti` 登记**：键由 `replay.Key(replay.PurposeDPoPProof(), <proof 公钥指纹>, jti)` 生成，记录过期时刻为 max(`iat` + `ProofLifetime`, now) + `ClockSkew`。重复 → 400 `invalid_dpop_proof`；登记端口的其他任何错误 → 固定 500（`text/plain`，`Cache-Control: no-store`），既不判为重放也不放行。
-5. 授权码原子取出 / refresh token 读取，随后做 refresh token 绑定校验（见下），再签发。
+1. **签发 nonce**（仅 `RequireNonce`，且请求带 `DPoP` 头）：生成新 nonce 写入 `DPoP-Nonce` 响应头，此后无论成功失败响应都带它。
+2. **proof 无状态校验**（先于客户端认证）。请求带 `DPoP` 头时：只能有一个头字段，值为三段紧凑 JWS；头部 `typ` 为 `dpop+jwt`（大小写不敏感）、`alg` 在配置集合内、`jwk` 为与 `alg` 密钥类型相符的公钥（含私钥成员 `d`/`p`/`q`/`dp`/`dq`/`qi`/`oth`/`k` 即拒绝）、不得出现 `crit`；签名用头部 `jwk` 验证；claims 须有 `jti`（不超过 256 字节）、`htm`（等于请求方法）、`htu`、`iat`（不早于 now − `ProofLifetime` − `ClockSkew`，不晚于 now + `ClockSkew`）。任一不符 → 400 `invalid_dpop_proof`。`ath` 本版不校验；`nonce` 只在 `RequireNonce` 时读取（若出现须为非空字符串、不超过 512 字节，否则 `invalid_dpop_proof`），未开启时忽略。
+3. **nonce 质询**（仅 `RequireNonce`）：proof 未带 `nonce`，或 nonce 不被接受（过期、伪造、他面签发、编码损坏）→ 400 `use_dpop_nonce`，带新 `DPoP-Nonce`。质询先于客户端认证与一切登记，不消耗授权码、断言 `jti` 或 proof `jti`，客户端用新 nonce 重做 proof 后可用同一授权码、同一断言重试。
+4. **客户端认证**（既有流程，含 `private_key_jwt` 断言 `jti` 登记）。
+5. **按 client 强制**：client `RequireDPoP` 而请求未带 proof → 400 `invalid_request`，描述 `DPoP proof required`。这一检查需要先知道 client，因此位于断言 `jti` 登记之后：被拒的客户端重试时需要新的断言。
+6. **proof `jti` 登记**：键由 `replay.Key(replay.PurposeDPoPProof(), <proof 公钥指纹>, jti)` 生成，记录过期时刻为 max(`iat` + `ProofLifetime`, nonce 截止时刻, now) + `ClockSkew`（nonce 截止时刻 = nonce 签发时刻 + `NonceLifetime`，未要求 nonce 时不参与）。重复 → 400 `invalid_dpop_proof`；登记端口的其他任何错误 → 固定 500（`text/plain`，`Cache-Control: no-store`），既不判为重放也不放行。
+7. 授权码原子取出 / refresh token 读取，随后做授权码 `dpop_jkt` 比对与 refresh token 绑定校验（见下），再签发。
 
-一切 proof 无状态拒绝都发生在授权码取出之前，所以被拒的授权码可以带合法 proof 再次兑换。
+一切 proof 无状态拒绝（含 nonce 质询）都发生在授权码取出之前，所以被拒的授权码可以带合法 proof 再次兑换。
 
 **`htu` 的期望值**由本次请求推导：请求的基础 URL（scheme 由连接是否为 TLS 决定，host 取请求的 `Host`）加请求路径；mTLS 别名路由各自成立。比较时两侧都解析为 URL，scheme 与 host 按小写比较、去掉默认端口、忽略 query 与 fragment，路径（转义形式）逐字节相等，不做百分号编码规范化。TLS 终止于反向代理时，wicket 看到的 scheme 为 `http`，与 issuer 推导的既有行为一致；这种部署下 client 的 `htu` 需与之一致，或由宿主配置使请求呈现正确的 scheme 与 host。
 
@@ -161,6 +165,34 @@ client 元数据（`models.ClientDPoPMetadata`，嵌入 `models.Client`）：
 - **public client**（`RequireClientSecret` 为 false）带 proof 获得的 refresh token 记录 proof 公钥指纹（`RefreshToken.DPoPKeyThumbprint`，创建时写入、之后不改）。此后兑换必须带同一密钥的 proof，未带或换用其他密钥 → 400 `invalid_grant`，refresh token 记录不被更新。不带 proof 获得的 refresh token 不会被事后绑定。
 - **机密 client** 的 refresh token 不绑定：兑换时带 proof 则新 access token 绑定到本次 proof 的密钥，不带则为 Bearer。
 
+### `dpop_jkt` 预绑定（RFC 9449 §10）
+
+DPoP 启用时，authorize 请求可带 `dpop_jkt`（`wicket.AuthorizeRequestDPoPJkt`）：DPoP 公钥的 RFC 7638 SHA-256 指纹，base64url 无填充（恰好 43 字符，规范编码，解码为 32 字节）。
+
+- 直接请求与经 PAR 推送（推送参数中含 `dpop_jkt`，authorize 用 `request_uri`）效果相同。格式不合法 → `invalid_request`（描述 `Invalid dpop_jkt`）：直接请求显示在错误页，PAR 推送阶段返回 400 `invalid_request`，不签发授权码。
+- 指纹随授权码保存（`AuthorizationCode.DPoPKeyThumbprint`，嵌入 `models.AuthorizationCodeProofBinding`）。兑换时授权码先被原子取出，再比对：请求未带 proof，或 proof 公钥指纹与之不同 → 400 `invalid_grant`，此时授权码已作废，换用正确密钥也不能再兑换。
+- PAR 端点不读 `DPoP` 头：PAR 请求所带的 `DPoP` 头被忽略，既不校验也不派生绑定。经 PAR 预绑定只能用 `dpop_jkt` 参数。
+- DPoP 未启用时 `dpop_jkt` 被忽略：不校验格式、不写入授权码，兑换行为与既有一致。
+
+### 服务端 nonce（RFC 9449 §8）
+
+`dpop.Options.RequireNonce` 开启后，token 端点要求每个 proof 带服务端签发的 `nonce` claim。默认关闭；关闭时 token 端点不发 `DPoP-Nonce`、不读密钥缝，行为与只启用 DPoP 时完全一致。
+
+```go
+keys, err := dpop.NewStaticNonceKeys(dpop.NonceKey{Id: "2026-11", Secret: secret32Bytes})
+cfg.SetDPoPNonceKeys(keys) // nonce 密钥缝，RequireNonce 时为条件必需
+cfg.EnableDPoP(dpop.Options{RequireNonce: true})
+cfg.Freeze()
+```
+
+- **密钥缝**：`ServerConfig.SetDPoPNonceKeys(dpop.NonceKeySource)`，须在 `Freeze()` 之前调用（之后调用 panic），重复调用替换。`RequireNonce` 开启而未注入，或密钥源读取失败、返回的密钥不合法，`Freeze()` panic（文本含 `dpop nonce key`）。`AllowInMemoryFallback()` 不豁免该缝，也没有逐缝回退声明；它与全局 `dp.DataProtectionProvider` 无关。`RequireNonce` 未开启时任何代码路径都不读取该缝。
+- **密钥**：`dpop.NonceKey{Id, Secret}`。`Secret` 至少 32 字节（HMAC-SHA256 密钥）；`Id` 为 1–32 字节的 `[A-Za-z0-9._-]`，且 current 与 previous 之间不得重复。`dpop.ValidateNonceKeys` 做同样的检查；`dpop.NewStaticNonceKeys(current, previous...)` 返回固定密钥源，不合法时返回错误。动态密钥源实现 `NonceKeys() (current, previous, err)`。
+- **格式**：nonce 无状态、自验证，不写任何存储，不经重放登记端口。内容为签发时刻、密钥 id 与 MAC（HMAC-SHA256，域分隔串 `wicket dpop nonce v1`，签发面标识为 `authorization-server <issuer>`），base64url 无填充，最长 99 字符。签发面取 issuer 粒度：主路由与 mTLS 别名只在 issuer 相同时互认 nonce，即配置了 `IssuerUri`，或别名与主路由同源；未配置 `IssuerUri` 而别名用独立主机（`MutualTls.DomainName`）时，issuer 取请求来源，各主机各自签发 nonce，客户端在每个主机上各被质询一次。接受条件：密钥 id 在 current 或 previous 中、MAC 相符、签发面相同、签发时刻不晚于 now + `ClockSkew`、now 不晚于签发时刻 + `NonceLifetime` + `ClockSkew`。nonce 在有效期内可用于多个 proof（每个 proof 的 `jti` 仍各自登记）。
+- **响应头**：`RequireNonce` 开启时，凡请求带 `DPoP` 头，响应（成功、`use_dpop_nonce`、`invalid_dpop_proof` 及其他 400）都带新的 `DPoP-Nonce`（`wicket.DPoPNonceHeaderName`）；请求不带 `DPoP` 头时与既有行为一致，不发该头。nonce 签发或校验所需的密钥源读取失败、返回不合法密钥，或 issuer 无法确定 → 固定 500（同重放登记故障），日志只记错误类型。
+- **多副本与轮换**：所有副本注入同一密钥源；密钥源在每次签发与校验时重新读取，动态实现可热轮换。轮换三步：① 新密钥先作为 previous 部署到全部副本；② 再切为 current；③ 旧密钥在 previous 中保留至少 `NonceLifetime` + `ClockSkew` 后移除。
+- **浏览器客户端**：wicket 不设 CORS 暴露头；浏览器端 JavaScript 要读取 `DPoP-Nonce`，宿主须在自己的 CORS 层加 `Access-Control-Expose-Headers: DPoP-Nonce`。
+- nonce 模式下仍判 `iat` 新鲜度。RFC 9449 没有宣告 nonce 的 discovery 元数据，discovery 不变。
+
 ### 错误码
 
 | 情形 | 错误码 |
@@ -168,8 +200,10 @@ client 元数据（`models.ClientDPoPMetadata`，嵌入 `models.Client`）：
 | proof 无效、`jti` 重放 | `invalid_dpop_proof`（RFC 9449 §5 为 token 端点定义） |
 | client 要求 DPoP 而未带 proof | `invalid_request`（wicket 的选择） |
 | 绑定的 refresh token 未带 proof 或换用其他密钥 | `invalid_grant`（wicket 的选择，不区分两种情形） |
+| 授权码带 `dpop_jkt` 而未带 proof 或换用其他密钥 | `invalid_grant`（授权码已作废） |
+| `RequireNonce` 开启，proof 缺 nonce 或 nonce 不被接受 | `use_dpop_nonce`（RFC 9449 §8），响应带 `DPoP-Nonce` |
 
-本版不发 `DPoP-Nonce` 响应头。
+`DPoP-Nonce` 响应头只在 `RequireNonce` 开启且请求带 `DPoP` 头时发出（见上文"服务端 nonce"）。
 
 ### Discovery
 

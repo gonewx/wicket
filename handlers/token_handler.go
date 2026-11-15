@@ -88,14 +88,15 @@ func (h *TokenHandler) Process(w http.ResponseWriter, r *http.Request) error {
 		return results.NewBadRequestResult(wicket.TokenErrorsInvalidRequest, "").Execute(w, r)
 	}
 
-	// Every stateless check of a DPoP proof runs before anything changes
-	// state, the registration of a client assertion included.
+	// Every stateless DPoP stage, the server nonce challenge included, runs
+	// before anything changes state, the registration of a client
+	// assertion included: a fresh nonce is issued into the response, the
+	// proof is verified, then its nonce is checked.
 	var proof *dpop.Proof
 	if h.dpop != nil {
-		accepted, err := h.dpop.verifyProof(r)
-		if err != nil {
-			h.logProofRejection(err.Error())
-			return writeInvalidDPoPProof(w, r)
+		accepted, written, err := h.dpopStatelessStages(w, r)
+		if written || err != nil {
+			return err
 		}
 		proof = accepted
 	}
