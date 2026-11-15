@@ -77,6 +77,11 @@ func (h *Handler) HandleAuthenticate() (*auth.Result, error) {
 	// If application retrieved token from somewhere else, use that.
 	token = messageReceivedContext.Token
 
+	token, presentation, dpopResult := h.dpopPresentation(r, token)
+	if dpopResult != nil {
+		return dpopResult, nil
+	}
+
 	if strings.TrimSpace(token) == "" {
 		authorization := r.Header.Get("Authorization")
 
@@ -122,6 +127,10 @@ func (h *Handler) HandleAuthenticate() (*auth.Result, error) {
 
 			if err := h.certificateBindingError(r, validatedToken); err != nil {
 				return auth.Fail(err), nil
+			}
+
+			if dpopResult := h.dpopBinding(r, presentation, validatedToken); dpopResult != nil {
+				return dpopResult, nil
 			}
 
 			tokenValidatedContext := NewTokenValidatedContext(r, w, h.Scheme, h.Options)

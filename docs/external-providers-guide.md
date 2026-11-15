@@ -185,6 +185,7 @@ opts.SetAppSecret("your-facebook-app-secret")
 | `ValidateOptions` | `[]jwt.ValidateOption` | — | jwx 验证选项 |
 | `SecurityTokenValidators` | `[]SecurityTokenValidator` | `[SecurityTokenHandler]` | 验证器链 |
 | `BackchannelHttpHandler` | `http.RoundTripper` | — | 自定义 HTTP 传输 |
+| `DPoP` | `*jwt.DPoPValidation` | nil | DPoP 校验（RFC 9449），须由 `jwt.NewDPoPValidation` 构造；nil 关闭，见下文"DPoP 校验" |
 
 ### 集成示例
 
@@ -205,7 +206,63 @@ JWT Handler 支持事件回调（通过 `jwt.Events`）：
 - `OnTokenValidated` — 验证成功后
 - `OnAuthenticationFailed` — 验证失败
 - `OnForbidden` — 403 响应
-- `OnChallenge` — 401 质询
+- `OnChallenge` — 401 质询（`Options.DPoP` 设置时质询由 DPoP 逻辑写出，不触发该事件）
+
+### DPoP 校验（RFC 9449）
+
+默认关闭。开启后 handler 除 `Bearer` 外还接受 `Authorization: DPoP <access token>`，要求请求带一个由 token 绑定密钥（`cnf.jkt`）签名的 `DPoP` proof，被窃取的绑定 token 无法在别处使用。
+
+#### 启用与构造期失败
+
+```go
+v, err := jwt.NewDPoPValidation(jwt.DPoPValidationConfig{
+    Options:  dpop.Options{SigningAlgorithms: []string{"ES256"}},
+    Registry: registry, // 宿主注入；内存实现须显式传 replay.NewMemoryRegistry()
+})
+if err != nil {
+    return err // 装配期失败，早于首个请求
+}
+opts.DPoP = v
+```
+
+- 唯一启用来源是构造函数 `jwt.NewDPoPValidation`；不读 `ServerConfig`、不经容器注册。`Options.DPoP` 为 nil 时 handler 与此前逐字节一致（不识别 `DPoP` 方案，质询仍是裸 401）。
+- `DPoPValidationConfig` 字段：`Options`（`dpop.Options`，零值字段取默认；`RequireNonce` 选择 nonce 模式）、`Registry`（`replay.Registry`，必填，无内存回退）、`NonceKeys`（`dpop.NonceKeySource`）与 `Resource`（nonce 签发面标识），二者仅 nonce 模式必填、其他模式忽略；`RequestUri`（可选，见下文 htu）。
+- 构造期检查，任一失败返回包装 `jwt.ErrInvalidDPoPConfiguration` 的错误、不返回对象：`Options.Validate()` 不过；`Registry` 为 nil；nonce 模式下 `NonceKeys` 为 nil、读取出错、密钥不合法（同 `dpop.ValidateNonceKeys`），或 `Resource` 为空。
+- 不经构造函数得到的对象（如 `&jwt.DPoPValidation{}`）在请求期一律按不可用失败（500），不会按关闭态放行。
+
+#### 新鲜度的两种模式
+
+- **`iat` 模式（默认）**：proof 的 `iat` 不早于 now − `ProofLifetime` − `ClockSkew`、不晚于 now + `ClockSkew`。
+- **nonce 模式（`RequireNonce: true`）**：在 `iat` 检查之外，proof 须带由本资源签发、未过期的 `nonce`。nonce 无状态、自验证，签发面为 `resource-server <Resource>`，与授权服务器的 `authorization-server <issuer>` 互不接受。缺 nonce 或 nonce 不被接受时回 `use_dpop_nonce` 质询，并在 `DPoP-Nonce` 中下发新 nonce，客户端带回重签 proof 即可。nonce 只在 401 质询中下发，成功响应不带。密钥格式、多副本共享与轮换步骤与授权服务器侧相同（见 [API 契约 · 服务端 nonce](./api-contracts.md#服务端-noncerfc-9449-8)）：新密钥先作 previous 部署到全部副本，再切为 current，旧密钥在 previous 中保留至少 `NonceLifetime` + `ClockSkew`。
+
+#### htu 推导
+
+proof 的 `htm` 须等于请求方法，`htu` 须指向本次请求：默认取 `scheme://Host/path`（请求经 TLS 到达时 `https`，否则 `http`；不读 `ServerUrls`），比较时 scheme 与 host 不分大小写、省略默认端口、忽略 query 与 fragment。部署在反向代理后、客户端所见 URL 与 handler 收到的不同时，设置 `RequestUri func(*http.Request) string` 返回客户端所见的 URL。它必须返回客户端所寻址的绝对 URI（`scheme://host/path`）；返回空串或相对路径时每个 proof 都会以 `invalid_dpop_proof` 被拒。
+
+#### 校验顺序与登记
+
+1. 识别方案：`DPoP` 方案名大小写不敏感，后跟一个或多个空格，token 非空且不含空白；`OnMessageReceived` 事件提供的 token 视为以 Bearer 出示。
+2. proof 无状态校验（`(*dpop.Verifier).VerifyForResource`：签名、`typ`、`alg`、`htm`/`htu`、`iat`、`ath`），nonce 模式下再判 nonce。
+3. 既有 validator 链校验 token、既有证书绑定检查（`CertificateBindingSource`）。
+4. 绑定判定：`DPoP` 方案要求 token 带 `cnf.jkt` 且等于 proof 公钥指纹；绑定 token（或 `cnf` 畸形）以 Bearer 出示一律拒绝；未绑定的 Bearer token 照常通过，所带 `DPoP` 头被忽略。开启时，自定义 `SecurityTokenValidator` 产出的非内置 token 读不到 claims，按绑定失败处理。
+5. 经 `Registry` 登记 proof 的 `jti`（键由 `replay.Key` 派生，限定方为 proof 公钥指纹），过期时刻取 `iat` + `ProofLifetime`、nonce 期限（nonce 模式）与 now 中较晚者再加 `ClockSkew`。同一次认证至多登记一次。
+
+DPoP 校验与 token 校验（含证书绑定）的一切拒绝都先于登记，这些被拒请求不消耗 proof 的 `jti`；但 `OnTokenValidated` 事件在登记之后执行，被该事件拒绝（返回 error 或给出失败结果）的请求已消耗 proof 的 `jti`。核心不回收过期记录：宿主定期调用 `Registry.RemoveExpired(ctx, cutoff)`。
+
+#### 错误与质询
+
+认证失败以固定文本的哨兵承载（不包装底层错误文本）：`jwt.ErrDPoPProofRejected`、`jwt.ErrDPoPNonceRequired`、`jwt.ErrDPoPTokenBinding`、`jwt.ErrDPoPMalformedAuthorization`、`jwt.ErrDPoPUnavailable`。开启时 `(*jwt.Handler).HandleChallenge` 按本请求的认证结果写出质询，只有一个 `WWW-Authenticate` 头值，带 `Cache-Control: no-store`，无响应体：
+
+| 认证结果 | 质询 |
+|---|---|
+| 未出示 token | 401 `DPoP algs="…"` |
+| `ErrDPoPProofRejected`（proof 缺失 / 无效 / 重放、`ath` 不符） | 401 `DPoP error="invalid_dpop_proof", algs="…"` |
+| `ErrDPoPNonceRequired`（nonce 缺失 / 无效 / 过期） | 401 `DPoP error="use_dpop_nonce", error_description="DPoP proof must carry the server nonce", algs="…"` + `DPoP-Nonce` |
+| `ErrDPoPMalformedAuthorization` | 400 `DPoP error="invalid_request", algs="…"` |
+| `ErrDPoPUnavailable`（登记端口故障、nonce 密钥源故障、非构造对象） | 500，无 `WWW-Authenticate` |
+| 其余失败（`ErrDPoPTokenBinding`、证书不符、token 无效 / 过期、无可用 validator、事件给出的失败） | 401 `DPoP error="invalid_token", algs="…"` |
+
+`algs` 为 `Options.SigningAlgorithms`（空则取默认算法列表）。nonce 模式下每个 401 质询都带新签发的 `DPoP-Nonce`，签发失败改写为 500。不可用时日志只记最内层错误的类型。质询在 handler 内调用本请求已记忆的认证结果，不会二次登记。浏览器端 JavaScript 读取 `DPoP-Nonce` 需宿主在 CORS 层暴露该头。
 
 ---
 

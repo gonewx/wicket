@@ -100,6 +100,14 @@ type Options struct {
 	// While it is set, a token produced by a custom SecurityTokenValidator (any
 	// SecurityToken other than the built-in handler's) fails authentication.
 	CertificateBindingSource CertificateSource
+
+	// DPoP, when set, makes the handler accept access tokens presented with
+	// the DPoP authorization scheme (RFC 9449 section 7) and refuse DPoP
+	// bound tokens presented as bearer tokens. It has to be made by
+	// NewDPoPValidation; nil disables DPoP validation. While it is set, a
+	// token produced by a custom SecurityTokenValidator (any SecurityToken
+	// other than the built-in handler's) fails authentication.
+	DPoP *DPoPValidation
 }
 
 func NewOptions() *Options {

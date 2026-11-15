@@ -115,7 +115,7 @@ client 元数据（`models.ClientPushedAuthorizationMetadata`，嵌入 `models.C
 
 ## DPoP（RFC 9449）
 
-client 在 token 请求上用 `DPoP` 请求头出示 proof（用自己私钥签名的 JWT，头部带公钥 `jwk`），签发的 access token 绑定到该公钥（`cnf.jkt`），被窃取后没有私钥就无法使用。默认关闭；本版覆盖 token 端点、authorize / PAR 的 `dpop_jkt` 预绑定、可选的服务端 nonce，以及 userinfo / introspection 对绑定 token 的处理（资源端 JWT Bearer handler 的校验另行提供）。
+client 在 token 请求上用 `DPoP` 请求头出示 proof（用自己私钥签名的 JWT，头部带公钥 `jwk`），签发的 access token 绑定到该公钥（`cnf.jkt`），被窃取后没有私钥就无法使用。默认关闭；本版覆盖 token 端点、authorize / PAR 的 `dpop_jkt` 预绑定、可选的服务端 nonce，userinfo / introspection 对绑定 token 的处理，以及资源端 JWT Bearer handler（`auth/jwt`）的 DPoP 校验（见下文"资源端 JWT Bearer handler"与 [外部提供者指南 · JWT Bearer 的 DPoP 校验](./external-providers-guide.md#dpop-校验rfc-9449)）。
 
 ### 启用
 
@@ -238,6 +238,10 @@ DPoP 未启用时 userinfo 不识别 `DPoP` 方案（与此前一致，按缺少
 
 **introspection**：active 响应对绑定的 token 返回 `cnf`（`{"jkt":"<指纹>"}`，与证书绑定并存时同时含 `x5t#S256`），JWT 与 reference token 一致；未绑定 token 不含 `cnf`。响应不含 `token_type`。reference token 的 `cnf` 取自存储副本的 `cnf` claim，按存入的形态原样返回。
 
+### 资源端 JWT Bearer handler
+
+用 wicket 自带 JWT Bearer handler 保护 API 的资源服务器，经 `jwt.NewDPoPValidation(jwt.DPoPValidationConfig{...})` 构造校验对象并挂到 `jwt.Options.DPoP` 上开启；不读 `ServerConfig`、不经容器注册（资源服务器多半不是授权服务器进程）。开启后 handler 接受 `Authorization: DPoP <access token>`，校验 proof（含 `ath`、`htm`/`htu`、`iat`，nonce 模式下另判本资源签发的 nonce）、`cnf.jkt` 匹配与 `jti` 防重放；绑定 token 以 Bearer 出示被拒。错误码与质询头同 userinfo（`invalid_dpop_proof`、`invalid_token`、`invalid_request`），nonce 模式另有 `use_dpop_nonce` 与 `DPoP-Nonce`，未出示 token 时回 `DPoP algs="…"`。详见 [外部提供者指南 · JWT Bearer 的 DPoP 校验](./external-providers-guide.md#dpop-校验rfc-9449)。`Options.DPoP` 为 nil 时 handler 行为与此前完全一致。
+
 ### Discovery
 
 DPoP 启用时 discovery 文档写入 `dpop_signing_alg_values_supported`（配置的算法列表）；未启用时不宣告。该键只由 discovery handler 写入，宿主自定义的同名条目被删除并记录告警。
@@ -265,6 +269,7 @@ DPoP 启用时 discovery 文档写入 `dpop_signing_alg_values_supported`（配�
 | `Facebook` | Facebook OAuth 2.0 |
 | `Bearer`（JWT） | JWT Bearer 令牌 |
 | `DPoP`（userinfo） | DPoP 绑定的 access token，随 `DPoP` proof 出示；仅 DPoP 启用时识别，见上文"userinfo 与 introspection" |
+| `DPoP`（JWT Bearer handler） | 同上，由 `Bearer` scheme 的 JWT handler 在 `jwt.Options.DPoP` 设置时识别，见上文"资源端 JWT Bearer handler" |
 | 动态方案 | 运行时通过 `DynamicProviderOptions` 注册 |
 
 ## Discovery 文档结构
