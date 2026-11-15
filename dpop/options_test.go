@@ -17,7 +17,7 @@ func TestDefaultOptions(t *testing.T) {
 	if !slices.Equal(defaults.SigningAlgorithms, clientassertion.SupportedSigningAlgorithms()) {
 		t.Fatalf("algorithms %v", defaults.SigningAlgorithms)
 	}
-	if defaults.ProofLifetime != 60*time.Second || defaults.ClockSkew != 60*time.Second {
+	if defaults.ProofLifetime != 60*time.Second || defaults.ClockSkew != 60*time.Second || defaults.NonceLifetime != 5*time.Minute || defaults.RequireNonce {
 		t.Fatalf("defaults %+v", defaults)
 	}
 	defaults.SigningAlgorithms[0] = "changed"
@@ -35,7 +35,7 @@ func TestDefaultOptions(t *testing.T) {
 func TestWithDefaults(t *testing.T) {
 	t.Parallel()
 	filled := Options{}.withDefaults()
-	if !slices.Equal(filled.SigningAlgorithms, DefaultOptions().SigningAlgorithms) || filled.ProofLifetime != time.Minute || filled.ClockSkew != time.Minute {
+	if !slices.Equal(filled.SigningAlgorithms, DefaultOptions().SigningAlgorithms) || filled.ProofLifetime != time.Minute || filled.ClockSkew != time.Minute || filled.NonceLifetime != 5*time.Minute {
 		t.Fatalf("filled %+v", filled)
 	}
 	algorithms := []string{"ES256"}
@@ -54,7 +54,10 @@ func TestOptionsValidate(t *testing.T) {
 	}{
 		"zero":                     {Options{}, true},
 		"subset":                   {Options{SigningAlgorithms: []string{"ES256", "PS256"}}, true},
-		"upper bounds":             {Options{ProofLifetime: 10 * time.Minute, ClockSkew: 10 * time.Minute}, true},
+		"upper bounds":             {Options{ProofLifetime: 10 * time.Minute, ClockSkew: 10 * time.Minute, NonceLifetime: 10 * time.Minute}, true},
+		"nonce lifetime negative":  {Options{NonceLifetime: -time.Second}, false},
+		"nonce lifetime too long":  {Options{NonceLifetime: 10*time.Minute + time.Second}, false},
+		"nonce required":           {Options{RequireNonce: true}, true},
 		"none":                     {Options{SigningAlgorithms: []string{"none"}}, false},
 		"symmetric":                {Options{SigningAlgorithms: []string{"HS256"}}, false},
 		"EdDSA":                    {Options{SigningAlgorithms: []string{"EdDSA"}}, false},

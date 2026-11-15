@@ -237,7 +237,7 @@ reference access token 也在须回收之列：client 配置 `AccessTokenType=Re
 - `RefreshTokenStore` 须完整往返 refresh token 内保存的 access token 模型，至少包括 `ClientId` 与 `AccessTokenType`。refresh 换发默认复用该模型：丢失 `AccessTokenType` 会使换发静默签发 JWT，丢失 `ClientId` 会使换发失败。契约测试套件目前不检查这一点。
 - `ReferenceTokenStore.StoreReferenceToken` 失败时，wicket 不把 store 的错误文本写入响应或自身日志（只保留错误身份，可用 `errors.Is` / `errors.As` 取得），故障原因须由 store 在自己一侧记录；句柄是凭据，store 的错误文本与日志不应包含句柄或记录内容。
 
-启用 DPoP 时另有一点，适用于任何自备的 `RefreshTokenStore`：须持久化并往返 `RefreshToken.DPoPKeyThumbprint`（DPoP proof 密钥指纹，见 [API 契约 · DPoP](./api-contracts.md#dpoprfc-9449)）。public client 带 DPoP proof 获得的 refresh token 靠这个字段绑定到 proof 密钥；适配器丢失它，绑定即静默失效，持有被窃 refresh token 的一方无需私钥就能兑换。契约测试套件目前不检查这一点，自备适配器须自行确认。同理，自备 client store 须往返 `Client.RequireDPoP`，丢失它会使按 client 强制 DPoP 静默失效。
+启用 DPoP 时另有一点，适用于任何自备的 `RefreshTokenStore`：须持久化并往返 `RefreshToken.DPoPKeyThumbprint`（DPoP proof 密钥指纹，见 [API 契约 · DPoP](./api-contracts.md#dpoprfc-9449)）。public client 带 DPoP proof 获得的 refresh token 靠这个字段绑定到 proof 密钥；适配器丢失它，绑定即静默失效，持有被窃 refresh token 的一方无需私钥就能兑换。契约测试套件目前不检查这一点，自备适配器须自行确认。同理，自备 client store 须往返 `Client.RequireDPoP`，丢失它会使按 client 强制 DPoP 静默失效。自备 `AuthorizationCodeStore` 须往返 `AuthorizationCode.DPoPKeyThumbprint`（authorize 请求 `dpop_jkt` 预绑定的指纹，见 [API 契约 · `dpop_jkt` 预绑定](./api-contracts.md#dpop_jkt-预绑定rfc-9449-10)）；丢失它，预绑定静默失效，截获授权码的一方可用自己的密钥兑换。契约测试套件同样不检查这一字段。DPoP 服务端 nonce 无状态，不需要任何存储。
 
 ### 释放资源
 

@@ -44,6 +44,7 @@ type ValidatedAuthorizeRequest struct {
 	RequestObjectValues                   []*claims.Claim
 	RequestObject                         string
 	PushedAuthorizationRequestValues
+	AuthorizeRequestProofBinding
 }
 
 func NewValidatedAuthorizeRequest() *ValidatedAuthorizeRequest {

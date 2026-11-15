@@ -417,3 +417,47 @@ func TestVerifyIgnoresNonceAndAth(t *testing.T) {
 		t.Fatalf("verify: %v", err)
 	}
 }
+
+func TestVerifyReadsTheNonceOnlyWhenRequired(t *testing.T) {
+	t.Parallel()
+	key := newEcKey(t, elliptic.P256())
+	proofWith := func(nonce any, present bool) []string {
+		claims := validClaims()
+		if present {
+			claims["nonce"] = nonce
+		}
+		return []string{key.sign(t, "ES256", validHeader(key, "ES256"), claims)}
+	}
+	required := NewVerifier(Options{RequireNonce: true})
+
+	proof, err := required.Verify(proofWith("server-nonce", true), "POST", testEndpoint, testNow)
+	if err != nil || proof.Nonce != "server-nonce" {
+		t.Fatalf("nonce %q err %v", proof.Nonce, err)
+	}
+	proof, err = required.Verify(proofWith(nil, false), "POST", testEndpoint, testNow)
+	if err != nil || proof.Nonce != "" {
+		t.Fatalf("absent nonce: %q err %v", proof.Nonce, err)
+	}
+	if _, err := required.Verify(proofWith(strings.Repeat("n", 512), true), "POST", testEndpoint, testNow); err != nil {
+		t.Fatalf("512 byte nonce: %v", err)
+	}
+	for name, nonce := range map[string]any{
+		"empty":     "",
+		"number":    12,
+		"null":      nil,
+		"object":    map[string]any{},
+		"too long":  strings.Repeat("n", 513),
+		"array":     []any{"n"},
+		"boolean":   true,
+		"long utf8": strings.Repeat("ä", 257),
+	} {
+		if _, err := required.Verify(proofWith(nonce, true), "POST", testEndpoint, testNow); !errors.Is(err, ErrInvalidProof) {
+			t.Fatalf("%s: err %v, want ErrInvalidProof", name, err)
+		}
+	}
+
+	proof, err = NewVerifier(Options{}).Verify(proofWith("server-nonce", true), "POST", testEndpoint, testNow)
+	if err != nil || proof.Nonce != "" {
+		t.Fatalf("nonce read although not required: %q err %v", proof.Nonce, err)
+	}
+}

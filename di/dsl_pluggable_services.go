@@ -207,6 +207,9 @@ func registerPluggableServicesAndValidators() {
 		if godi.GetRequired[*ServerConfig](p).PushedAuthorizationRequestsEnabled() {
 			validator.SetPushedAuthorization(validators_impl.NewAuthorizeRequestPushedStage(pushedAuthorizationFromProvider(p)))
 		}
+		if godi.GetRequired[*ServerConfig](p).DPoPEnabled() {
+			validator.SetDPoPKeyBinding()
+		}
 		return validator
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L280 (TryAddTransient)
