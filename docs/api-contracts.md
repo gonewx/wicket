@@ -537,6 +537,74 @@ cfg.Freeze()
 
 第三项是 client 元数据：`ClientAuthenticationMetadata.TokenEndpointAuthSigningAlgorithms` 为 `private_key_jwt` client 限定断言签名算法，见 [private_key_jwt 接入指南](private-key-jwt-guide.md#按-client-的签名算法白名单)。
 
+## 高安全档位（FAPI 2.0 Security Profile，默认关闭）
+
+`ServerConfig.EnableHighSecurityProfile()` 一个开关把服务端置于面向 FAPI 2.0 Security Profile 的约束组合；查询 `HighSecurityProfileEnabled()`。须在 `Freeze()` 之前调用，之后调用会 panic；重复调用幂等。未开启时任何行为与 discovery 文档都不变。单项收紧仍可独立开启，档位不会关闭任何单项。
+
+```go
+cfg := root.ServerConfig()
+cfg.EnableHighSecurityProfile()
+cfg.EnablePushedAuthorizationRequests(pushedauth.Options{}) // 前置：PAR
+cfg.EnableDPoP(dpop.Options{})                             // 前置：发送方约束（DPoP 或 mTLS）
+cfg.EnablePrivateKeyJwt(clientassertion.Options{})          // 前置：非对称客户端认证（private_key_jwt 或 mTLS）
+cfg.Freeze()
+```
+
+档位不改写宿主在 `ServerConfig` 上声明的特性选项：这些收紧以「单项声明 ∨ 档位」计入 getter 返回的生效值，开关调用顺序不影响结果。例外是 `WicketOptions` 的两个字段：`Freeze` 把 `UseSeeOtherRedirects` 与 `EmitIssuerIdentificationResponseParameter` 置为 true，覆盖宿主显式设置的 false。需要宿主注入缝的特性（PAR、DPoP、`private_key_jwt`、mTLS）档位不代开，也不静默降级。
+
+**装配期前置（`Freeze` 一次汇总全部缺项后 panic，消息以 `high security profile cannot be served: ` 开头）**
+
+| 前置 | 说明 |
+|------|------|
+| PAR 已启用 | `EnablePushedAuthorizationRequests` |
+| 发送方约束 | DPoP 或 mTLS 客户端证书认证至少启用一项 |
+| 非对称客户端认证 | `private_key_jwt` 或 mTLS 客户端证书认证至少启用一项 |
+| `request_uri` 寿命 | PAR 的 `RequestUriLifetime`（取默认值后）< 600 秒 |
+| 算法集非空 | DPoP、`private_key_jwt` 启用时，配置算法与 {PS256, ES256} 的交集非空 |
+| 静态 client 不冲突 | `SetClients` / `SetClientsProvider` 列表中与档位冲突的 client 逐个列出 client_id 与冲突项 |
+
+**生效值**
+
+| 约束 | 生效方式 |
+|------|----------|
+| PAR 对所有 client 必需 | `PushedAuthorizationRequestsOptions().RequireForAllClients` 为 true；未经 PAR 的授权请求按既有路径拒绝 |
+| PAR 必须带 `redirect_uri` | 由既有的授权请求校验满足（行为不变）：任何 PAR 或授权请求缺 `redirect_uri` 都返回 HTTP 400 `invalid_request`，档位不另加检查 |
+| request object 只收非对称签名 | `AsymmetricRequestObjectsRequired()` 为 true，同「收紧选项」 |
+| `client_credentials` 必须认证 | `ClientCredentialsAuthenticationRequired()` 为 true，同「收紧选项」 |
+| 浏览器重定向 303 | `Freeze` 把 `WicketOptions.UseSeeOtherRedirects` 置真 |
+| 授权响应带 `iss` | `Freeze` 把 `WicketOptions.EmitIssuerIdentificationResponseParameter` 置真 |
+| 签名算法 | `PrivateKeyJwtOptions()`、`DPoPOptions()` 的 `SigningAlgorithms` = 配置值 ∩ {PS256, ES256}（保持配置顺序）；client 的 `TokenEndpointAuthSigningAlgorithms` 照旧须落在生效集内 |
+
+`WicketOptions` 在构建根容器时就已物化，早于宿主调用开关；因此档位只在物化时登记该值，303 与 `iss` 两项在 `Freeze` 时置真。
+
+**client 冲突**（`validators/impl.HighSecurityProfileConflicts` 判定，`ClientConfigurationValidator` 在其他检查之后报 `client conflicts with the high security profile: ...`）：
+
+- `TokenEndpointAuthMethod` 不是 `private_key_jwt`、`tls_client_auth`、`self_signed_tls_client_auth`（包括只配共享 secret 的 client 与公开 client）；
+- `RequireDPoP` 与 `TlsClientCertificateBoundAccessTokens` 都未开启；
+- `RequirePkce` 为 false，或 `AllowPlainTextPkce` 为 true；
+- 允许的 grant 含 `password`、`implicit` 或 `hybrid`；
+- `AuthorizationCodeLifetime` > 60；
+- `RequestUriLifetime` ≥ 600；
+- `RedirectUris` 含 `http` 方案，且主机不是 `127.0.0.1` 或 `[::1]` 这两个 IP 字面量（`localhost` 也算冲突）。
+
+冲突处理时机：静态列表在装配期已知，`Freeze` 直接失败；注入的 client store 在装配期无法枚举，沿用 `ValidatingClientStore` 的既有语义，在请求期按无效 client 处理（token 端点与 PAR 端点返回 `invalid_client`，并记日志）。宿主若替换 `ClientConfigurationValidator`，请求期的冲突检查随之失效，由宿主自行负责。
+
+**discovery**（openid-configuration 与 RFC 8414 元数据是同一文档）只删减、不新增未实现的宣告：`require_pushed_authorization_requests` 为 `true`；`code_challenge_methods_supported` 只留 `S256`；`token_endpoint_auth_methods_supported` 只留已启用的非对称方法；`response_types_supported` 只留 `code`；`grant_types_supported` 去掉 `password`、`implicit`；`authorization_response_iss_parameter_supported` 为 `true`；`token_endpoint_auth_signing_alg_values_supported`、`dpop_signing_alg_values_supported` 与生效算法集一致；`request_object_signing_alg_values_supported` 只留非对称算法。
+
+**已满足、无需档位处理**：客户端断言的 `aud` 只接受 issuer 单值（`clientassertion` 的 `soleAudience`）。
+
+**不纳入档位**
+
+| 项 | 理由 |
+|----|------|
+| DPoP 服务端 nonce | FAPI 2.0 为可选（may），宿主可经 `dpop.Options.RequireNonce` 单独开启 |
+| `RequireRequestedAcr()` | FAPI 2.0 未要求 |
+| refresh token 轮换的消费处置（`SetRefreshTokenConsumption`） | FAPI 2.0 一般不要求轮换；档位不开启它，也不拒绝宿主单独开启 |
+| 按会话撤销授权（`SetRevokeGrantsOnSessionSubjectChange`） | 非 FAPI 2.0 要求 |
+| TLS、HSTS、授权端点不支持 CORS | 属宿主网络层 |
+| 服务端自身签名密钥算法、request object 算法收窄到 PS256/ES256 | 暂缓，后续处理 |
+| EdDSA | `clientassertion` 不支持 |
+
 ## 请求/响应模型
 
 ### 令牌请求（Token Endpoint）

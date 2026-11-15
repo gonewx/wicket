@@ -156,6 +156,9 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.AccountCreationUrl() != "" {
 		handler.ServeAccountCreation()
 	}
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.HighSecurityProfileEnabled() {
+		handler.ServeHighSecurityProfile()
+	}
 	handler.ServeSignedIntrospection(godi.GetRequired[services.KeyMaterialService](p))
 	return handler
 }

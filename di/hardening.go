@@ -27,10 +27,11 @@ func (c *ServerConfig) RequireAsymmetricRequestObjects() {
 	c.asymmetricRequestObjectsRequired = true
 }
 
-// AsymmetricRequestObjectsRequired reports whether request objects were
-// declared to require an asymmetric signature.
+// AsymmetricRequestObjectsRequired reports whether request objects require
+// an asymmetric signature: declared so, or the high security profile is
+// enabled.
 func (c *ServerConfig) AsymmetricRequestObjectsRequired() bool {
-	return c != nil && c.asymmetricRequestObjectsRequired
+	return c != nil && (c.asymmetricRequestObjectsRequired || c.HighSecurityProfileEnabled())
 }
 
 // RequireClientCredentialsAuthentication declares that the
@@ -47,9 +48,10 @@ func (c *ServerConfig) RequireClientCredentialsAuthentication() {
 }
 
 // ClientCredentialsAuthenticationRequired reports whether the
-// client_credentials grant was declared to require client authentication.
+// client_credentials grant requires client authentication: declared so, or
+// the high security profile is enabled.
 func (c *ServerConfig) ClientCredentialsAuthenticationRequired() bool {
-	return c != nil && c.clientCredentialsAuthenticationRequired
+	return c != nil && (c.clientCredentialsAuthenticationRequired || c.HighSecurityProfileEnabled())
 }
 
 // PrivateKeyJwtSigningAlgorithms returns a copy of the algorithms the server

@@ -41,8 +41,9 @@ func (c *ServerConfig) PrivateKeyJwtEnabled() bool {
 }
 
 // PrivateKeyJwtOptions returns a copy of the declared options with every
-// unset field replaced by its default. It returns the zero value while the
-// feature is not enabled.
+// unset field replaced by its default. While the high security profile is
+// enabled, the signing algorithms are narrowed to PS256 and ES256 and may end
+// up empty. It returns the zero value while the feature is not enabled.
 func (c *ServerConfig) PrivateKeyJwtOptions() clientassertion.Options {
 	if !c.PrivateKeyJwtEnabled() {
 		return clientassertion.Options{}
@@ -74,6 +75,9 @@ func (c *ServerConfig) PrivateKeyJwtOptions() clientassertion.Options {
 	}
 	if options.JwksMinRefreshInterval == 0 {
 		options.JwksMinRefreshInterval = defaults.JwksMinRefreshInterval
+	}
+	if c.HighSecurityProfileEnabled() {
+		options.SigningAlgorithms = highSecurityProfileAlgorithms(options.SigningAlgorithms)
 	}
 	return options
 }

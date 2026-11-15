@@ -88,6 +88,10 @@ func (v ClientConfigurationValidator) Validate(context *validators_contexts.Clie
 	}
 	if message := validateThirdPartyLoginMetadata(context.Client); message != "" {
 		context.SetError(message)
+		return
+	}
+	if message := validateHighSecurityProfile(v.features, context.Client); message != "" {
+		context.SetError(message)
 	}
 }
 

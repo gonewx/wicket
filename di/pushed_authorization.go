@@ -160,14 +160,26 @@ func (c *ServerConfig) PushedAuthorizationRequestsEnabled() bool {
 	return c.pushedAuthorizationRequired()
 }
 
-// PushedAuthorizationRequestsOptions returns the declared options with every
-// zero duration replaced by its default. It returns the zero value while the
-// feature is not enabled. The clock is returned as declared.
+// PushedAuthorizationRequestsOptions returns the effective options: the
+// declared ones with every zero duration replaced by its default, and
+// RequireForAllClients set while the high security profile is enabled. It
+// returns the zero value while the feature is not enabled. The clock is
+// returned as declared.
 func (c *ServerConfig) PushedAuthorizationRequestsOptions() pushedauth.Options {
 	if !c.PushedAuthorizationRequestsEnabled() {
 		return pushedauth.Options{}
 	}
-	return c.pushedAuthorizationOptions.WithDefaults()
+	return c.effectivePushedAuthorizationOptions().WithDefaults()
+}
+
+// effectivePushedAuthorizationOptions returns the declared options with the
+// tightening of the high security profile folded in, defaults not applied.
+func (c *ServerConfig) effectivePushedAuthorizationOptions() pushedauth.Options {
+	options := c.pushedAuthorizationOptions
+	if c.HighSecurityProfileEnabled() {
+		options.RequireForAllClients = true
+	}
+	return options
 }
 
 // pushedAuthorizationProtectorOnceForFeature returns the protector of the
@@ -195,7 +207,7 @@ func (c *ServerConfig) pushedAuthorizationService(clients storage.ClientStore, c
 	if err != nil {
 		return nil, err
 	}
-	options := c.pushedAuthorizationOptions
+	options := c.effectivePushedAuthorizationOptions()
 	if options.Clock == nil {
 		options.Clock = clock
 	}
