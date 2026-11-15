@@ -43,6 +43,10 @@ type AuthorizeInteractionResponseGenerator struct {
 	// prompt redirects to, see ServeAccountCreation. Empty leaves the create
 	// prompt ignored.
 	accountCreationUrl string
+
+	// requestedAcrRequired enforces the requested acr_values, see
+	// RequireRequestedAcr.
+	requestedAcrRequired bool
 }
 
 func NewAuthorizeInteractionResponseGenerator(
@@ -71,7 +75,9 @@ func NewAuthorizeInteractionResponseGenerator(
 // Handle composes the login and consent stages. Under prompt=none any interaction
 // the stages would demand is turned into the matching standard error instead.
 // A request with the create prompt is first sent to the account creation page
-// while one is served, see ServeAccountCreation.
+// while one is served, see ServeAccountCreation. While the requested acr
+// values are enforced, a session that does not satisfy them is sent to the
+// login page once before the request is refused, see RequireRequestedAcr.
 func (g *AuthorizeInteractionResponseGenerator) Handle(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
 	if creation := g.handleAccountCreation(req); creation != nil {
 		return creation
@@ -85,8 +91,15 @@ func (g *AuthorizeInteractionResponseGenerator) Handle(ctx context.Context, req 
 			return &responses_models.InteractionResponse{Error: wicket.AuthorizeErrorsLoginRequired}
 		}
 	}
-	if login.IsLogin || login.IsError() || login.IsRedirect() {
+	if login.IsLogin {
+		g.handleRequestedAcrLogin(req)
 		return login
+	}
+	if login.IsError() || login.IsRedirect() {
+		return login
+	}
+	if unmet := g.handleRequestedAcr(req); unmet != nil {
+		return unmet
 	}
 
 	result := g.consentHandler(ctx, req, consent)

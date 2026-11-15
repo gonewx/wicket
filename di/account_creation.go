@@ -103,7 +103,8 @@ func authorizeRequestValidatorFromProvider(p godi.Provider) validators.Authorize
 }
 
 // authorizeInteractionResponseGeneratorFromProvider yields the interaction
-// response generator, serving the declared account creation page.
+// response generator, serving the declared account creation page and
+// enforcing the requested acr_values while that option is declared.
 //
 // The generator is built exactly as the core registration builds it; a
 // setter added there must be added here as well.
@@ -119,6 +120,9 @@ func authorizeInteractionResponseGeneratorFromProvider(p godi.Provider) response
 	)
 	if url := accountCreationUrlFromProvider(p); url != "" {
 		generator.ServeAccountCreation(url)
+	}
+	if godi.GetRequired[*ServerConfig](p).RequestedAcrRequired() {
+		generator.RequireRequestedAcr()
 	}
 	return generator
 }
