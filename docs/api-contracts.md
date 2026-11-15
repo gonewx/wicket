@@ -15,7 +15,7 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | Discovery JWKS | `/.well-known/openid-configuration/jwks` | GET | `DiscoveryKeyHandler` | JSON Web Key Set |
 | Authorization Server Metadata | `/.well-known/oauth-authorization-server`（issuer 含路径时其后接该路径） | GET | `AuthorizationServerMetadataHandler` | OAuth 2.0 授权服务器元数据（RFC 8414），见下文「授权服务器元数据（RFC 8414）」 |
 | UserInfo | `/connect/userinfo` | GET/POST | `UserInfoHandler` | 用户信息端点 |
-| Introspection | `/connect/introspect` | POST | `IntrospectionHandler` | 令牌内省 |
+| Introspection | `/connect/introspect` | POST | `IntrospectionHandler` | 令牌内省（RFC 7662）；`Accept` 请求 `application/token-introspection+jwt` 时返回签名 JWT（RFC 9701），见下文「JWT 形式的内省响应（RFC 9701）」 |
 | Revocation | `/connect/revocation` | POST | `TokenRevocationHandler` | 令牌撤销（RFC 7009） |
 | Device Authorization | `/connect/deviceauthorization` | POST | `DeviceAuthorizationHandler` | 设备授权（RFC 8628） |
 | End Session | `/connect/endsession` | GET/POST | `EndSessionHandler` | 登出端点 |
@@ -291,6 +291,7 @@ DPoP 启用时 discovery 文档写入 `dpop_signing_alg_values_supported`（配�
 | `grant_types_supported` 中的 `device_code` | `device_authorization_endpoint` 仍在文档中 |
 | `backchannel_logout_supported` / `backchannel_logout_session_supported` | `BackchannelLogoutService` 实现了 `DeliversBackChannelLogout() bool` 且返回 `true`。默认实现在 `ServerSideSessions.Enabled` 与 `Endpoints.EnableCheckSessionEndpoint` 同时为 `true` 时返回 `true`；默认装配不开启 server-side sessions，因此默认不宣告（另受 generator 既有条件 `EnableEndSessionEndpoint` 约束）。见下文"Back-Channel Logout 发送" |
 | `authorization_response_iss_parameter_supported` | `EmitIssuerIdentificationResponseParameter` 为 `true` |
+| `introspection_signing_alg_values_supported` | 仅由 handler 写入：装配声明了签名内省响应（组合根总是声明），settle 后文档的 `introspection_endpoint` 是本服务 base URL 下的 `connect/introspect` 路由（路径不区分大小写），且 `KeyMaterialService.GetAllSigningCredentials` 至少有一个凭据时，写入全部凭据算法（去重，保持首次出现顺序，与 `id_token_signing_alg_values_supported` 同源）；否则不宣告。宿主同名自定义条目被删除并记录告警。读取凭据失败时 discovery 请求返回错误（中间件既有 5xx） |
 | `tls_client_auth` / `self_signed_tls_client_auth` | 逐个判定：该方法在已注册解析器的 `GetAvailableAuthenticationMethods()` 中 |
 | `tls_client_certificate_bound_access_tokens`、`mtls_endpoint_aliases` | 至少注册了一种 tls 类客户端认证解析器。alias 条目逐条判定：对应主端点仍被宣告，且路径形态（未配置 `MutualTls.DomainName`）的 alias 路径已注册为端点路由（配置了 `DomainName` 的 domain / sub-domain 形态位于其他主机，只看主端点）；删空后整个键移除 |
 | `pushed_authorization_request_endpoint` / `require_pushed_authorization_requests` | 仅由 handler 写入：PAR 已启用且其路由已注册时写入端点 URL 与是否全局强制；否则两键一律移除（宿主同名自定义条目同样被移除）。`mtls_endpoint_aliases` 已宣告且 mTLS 别名路由已注册时追加 PAR 别名（路径形态 `connect/mtls/pushedauthorization`，或按 `MutualTls.DomainName` 的 domain / sub-domain 形态） |
@@ -395,6 +396,18 @@ token=<refresh_token_or_reference_access_token>
 - 以下查找规则只适用于不含 `.` 的令牌。不带 `token_type_hint` 时，先按 reference access token 查找，未找到再按 refresh token 查找。带 hint 时只在该类型中查找：hint 与令牌实际类型不符时不撤销（已知限制，RFC 7009 §2.1 要求扩展到其他类型）。
 - 成功响应为 200、空响应体，带 `Cache-Control: no-store` 等禁止缓存的头。不含 `.` 的未知令牌、已撤销令牌、属于其他客户端的令牌同样返回 200；属于其他客户端的令牌静默不撤销。
 - 请求校验与撤销阶段的存储故障等基础设施错误不按协议错误处理，由中间件统一写出。客户端认证阶段读取客户端存储失败时，按认证失败返回 `invalid_client`。
+
+### JWT 形式的内省响应（RFC 9701）
+
+资源服务器可要求 introspection 端点以签名 JWT 返回内省结果，以便转发给第三方或事后校验来源。
+
+- **请求**：在 `Accept` 请求头中列出 `application/token-introspection+jwt`（`wicket.MediaTypesTokenIntrospectionJwt`）。判定按逗号拆分媒体范围，去掉参数后不区分大小写比较；该项 `q` 为 0（或无法解析）时不算请求，缺省视为 1。`*/*`、`application/*` 等通配不触发 JWT。其他请求（包括无 `Accept`）一律返回与此前完全相同的 JSON。
+- **响应**：200，`Content-Type: application/token-introspection+jwt`，`Cache-Control`/`Pragma` 与 JSON 内省响应相同，body 为紧凑序列化 JWT（无末尾换行）。JOSE 头 `typ` 为 `token-introspection+jwt`（`wicket.JwtTypesTokenIntrospection`），`alg` 为签名凭据的算法，凭据有 key id 时带 `kid`。载荷顶层恰好四个 claim：`iss`（当前 issuer）、`aud`（已认证 API 的名称，字符串）、`iat`（签发时刻，Unix 秒）与 `token_introspection`（`wicket.ClaimTypesTokenIntrospection`，即 JSON 形态的内省对象，原样；非活跃 token 为 `{"active":false}`）。顶层不放 `sub`、`exp`、`jti` 等其他 claim，因此该 JWT 不会被当作访问令牌或 ID token。
+- **签名来源**：`KeyMaterialService.GetSigningCredentials(ctx, nil)`，即 KeyManagement 的统一选择规则，不按 API 的 `AllowedAccessTokenSigningAlgorithms` 限定。签名可用 discovery `jwks_uri` 公布的 JWKS 验证。取不到凭据或签名失败时请求以错误结束（中间件既有 5xx），不回退到 JSON。
+- **错误路径**：开关关闭（404）、非 POST（405）、非表单（415）、表单解析失败（400）、API 认证失败（401）、认证不可用、请求校验失败（400）的响应与此前完全相同，不看 `Accept`。
+- **宣告**：discovery 与授权服务器元数据文档宣告 `introspection_signing_alg_values_supported`，条件见下文「按装配事实过滤」。
+- **装配**：组合根总是为 introspection handler 注入签名依赖（`(*handlers.IntrospectionHandler).ServeSignedResponses`），并为 discovery handler 声明签名内省（`(*handlers.DiscoveryHandler).ServeSignedIntrospection`），无新增开关。以 `handlers.NewIntrospectionHandler` / `NewIntrospectionHandlerWithOptions` 直接构造且未调用 `ServeSignedResponses` 的 handler 对任何请求都返回 JSON（RFC 9701 允许不支持的服务器这样做）。
+- **不支持**：JWT 内省响应的加密（`introspection_encrypted_response_alg` / `_enc`）与资源服务器自选签名算法（`introspection_signed_response_alg`）。
 
 ### 设备授权（Device Authorization Endpoint，RFC 8628）
 

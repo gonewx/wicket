@@ -21,6 +21,7 @@ import (
 	"github.com/gonewx/wicket/models/contexts"
 	"github.com/gonewx/wicket/responses"
 	"github.com/gonewx/wicket/services"
+	"github.com/gonewx/wicket/tokens"
 	"github.com/gonewx/wicket/validators"
 )
 
@@ -78,6 +79,24 @@ type wiringIssuer struct{}
 
 func (wiringIssuer) GetCurrent() string { return wiringBaseUrl }
 
+// wiringKeys lists fixed signing credentials.
+type wiringKeys struct{ credentials []*tokens.SigningCredentials }
+
+func (k wiringKeys) GetSigningCredentials(context.Context, []string) (*tokens.SigningCredentials, error) {
+	if len(k.credentials) == 0 {
+		return nil, nil
+	}
+	return k.credentials[0], nil
+}
+
+func (k wiringKeys) GetAllSigningCredentials(context.Context) ([]*tokens.SigningCredentials, error) {
+	return k.credentials, nil
+}
+
+func (wiringKeys) GetValidationKeys(context.Context) ([]*models.SecurityKeyInfo, error) {
+	return nil, nil
+}
+
 type deliveringBackChannelLogout struct{}
 
 func (deliveringBackChannelLogout) SendLogoutNotificationsAsync(*contexts.LogoutNotificationContext) error {
@@ -125,6 +144,7 @@ func TestDiscoveryHandlerFactoryPassesTheAssemblyFacts(t *testing.T) {
 	provide(provider, options)
 	provide[services.BackchannelLogoutService](provider, deliveringBackChannelLogout{})
 	provide[validators.SecretsListParser](provider, tlsSecretParsers{})
+	provide[services.KeyMaterialService](provider, wiringKeys{})
 	provide(provider, slog.New(slog.DiscardHandler))
 
 	handler := newDiscoveryHandlerFromProvider(provider)
@@ -152,5 +172,45 @@ func TestDiscoveryHandlerFactoryPassesTheAssemblyFacts(t *testing.T) {
 	methods, _ := document[wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported].([]any)
 	if !slices.Contains(methods, any(wicket.EndpointAuthenticationMethodsTlsClientAuth)) {
 		t.Errorf("%s = %v, want %s kept", wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported, methods, wicket.EndpointAuthenticationMethodsTlsClientAuth)
+	}
+}
+
+// TestDiscoveryHandlerFactoryDeclaresSignedIntrospection checks that the
+// composition root factory hands the key material to the discovery handler,
+// which then advertises the introspection signing algorithms.
+func TestDiscoveryHandlerFactoryDeclaresSignedIntrospection(t *testing.T) {
+	t.Parallel()
+
+	provider := &mapProvider{
+		services: map[reflect.Type]any{},
+		lists: map[reflect.Type][]any{
+			reflect.TypeFor[*hosting.Endpoint](): {
+				&hosting.Endpoint{Name: wicket.EndpointNamesIntrospection, Path: "/" + wicket.ProtocolRoutePathsIntrospection},
+			},
+		},
+	}
+	provide[responses.DiscoveryResponseGenerator](provider, wiringGenerator{document: map[string]any{
+		wicket.DiscoveryIntrospectionEndpoint: wiringBaseUrl + "/" + wicket.ProtocolRoutePathsIntrospection,
+	}})
+	provide[services.ServerUrls](provider, wiringServerUrls{})
+	provide[services.IssuerNameService](provider, wiringIssuer{})
+	provide(provider, config_options.NewWicketOptions())
+	provide[services.BackchannelLogoutService](provider, deliveringBackChannelLogout{})
+	provide[validators.SecretsListParser](provider, tlsSecretParsers{})
+	provide[services.KeyMaterialService](provider, wiringKeys{credentials: []*tokens.SigningCredentials{{Algorithm: "PS256"}, {Algorithm: "ES256"}, {Algorithm: "PS256"}}})
+	provide(provider, slog.New(slog.DiscardHandler))
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, wiringBaseUrl+wicket.ProtocolRoutePathsDiscoveryConfiguration, nil)
+	if err := newDiscoveryHandlerFromProvider(provider).Process(recorder, request); err != nil {
+		t.Fatalf("Process: %v", err)
+	}
+	var document map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &document); err != nil {
+		t.Fatalf("unmarshal document: %v", err)
+	}
+	got := document[wicket.DiscoveryIntrospectionSigningAlgValuesSupported]
+	if !reflect.DeepEqual(got, []any{"PS256", "ES256"}) {
+		t.Fatalf("%s = %v, want [PS256 ES256]", wicket.DiscoveryIntrospectionSigningAlgValuesSupported, got)
 	}
 }

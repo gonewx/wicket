@@ -4,6 +4,7 @@
 package discovery
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"maps"
@@ -145,6 +146,12 @@ func TestDiscoveryAdvertisementMatchesTheAssembly(t *testing.T) {
 				cfg := p.Root.ServerConfig()
 				cfg.SetReplayRegistry(replay.NewMemoryRegistry())
 				cfg.EnableDPoP(dpop.Options{SigningAlgorithms: []string{"ES256", "RS256"}})
+			},
+		},
+		{
+			name: "introspection switched off",
+			configure: func(o *config_options.WicketOptions) {
+				o.Endpoints.EnableIntrospectionEndpoint = false
 			},
 		},
 		{
@@ -356,6 +363,30 @@ func assertListsConsistent(t *testing.T, guard *advertisementGuard) {
 		require.Equalf(t, want, dpopAlgorithms, "%s does not list the configured algorithms", wicket.DiscoveryDPoPSigningAlgValuesSupported)
 	}
 
+	// Introspection signing algorithms are advertised exactly while the
+	// introspection endpoint is advertised and signing credentials exist,
+	// and then as the distinct credential algorithms in first-seen order.
+	credentials, err := godi.GetRequired[services.KeyMaterialService](guard.scope).GetAllSigningCredentials(context.Background())
+	require.NoError(t, err)
+	wantIntrospectionAlgorithms := make([]any, 0)
+	for _, credential := range credentials {
+		if !slices.Contains(wantIntrospectionAlgorithms, any(credential.Algorithm)) {
+			wantIntrospectionAlgorithms = append(wantIntrospectionAlgorithms, credential.Algorithm)
+		}
+	}
+	introspectionAlgorithms, introspectionAdvertised := guard.document[wicket.DiscoveryIntrospectionSigningAlgValuesSupported]
+	wantIntrospectionAdvertised := guard.advertised(wicket.DiscoveryIntrospectionEndpoint) && len(wantIntrospectionAlgorithms) > 0
+	require.Equalf(t, wantIntrospectionAdvertised, introspectionAdvertised,
+		"%s advertised = %v, introspection endpoint advertised with signing credentials = %v",
+		wicket.DiscoveryIntrospectionSigningAlgValuesSupported, introspectionAdvertised, wantIntrospectionAdvertised)
+	if introspectionAdvertised {
+		require.Equalf(t, wantIntrospectionAlgorithms, introspectionAlgorithms,
+			"%s does not list the signing credential algorithms", wicket.DiscoveryIntrospectionSigningAlgValuesSupported)
+	}
+	if !guard.options().Endpoints.EnableIntrospectionEndpoint {
+		require.Falsef(t, introspectionAdvertised, "%s advertised while introspection is switched off", wicket.DiscoveryIntrospectionSigningAlgValuesSupported)
+	}
+
 	if methods, ok := guard.document[wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported].([]any); ok {
 		available := guard.authenticationMethods()
 		for _, method := range methods {
@@ -375,6 +406,23 @@ var unadvertisedRoutes = []string{
 	wicket.ProtocolRoutePathsAuthorizationServerMetadata,
 	"/" + wicket.ProtocolRoutePathsAuthorizeCallback,
 	"/" + wicket.ProtocolRoutePathsEndSessionCallback,
+}
+
+// switchedOffRoutes maps the routes covered by an assembly in this table
+// whose endpoint switch can be turned off onto the check reading that switch.
+var switchedOffRoutes = map[string]func(*config_options.WicketOptions) bool{
+	wicket.ProtocolRoutePathsIntrospection: func(o *config_options.WicketOptions) bool {
+		return !o.Endpoints.EnableIntrospectionEndpoint
+	},
+}
+
+func requireNotServed(t *testing.T, guard *advertisementGuard, path string) {
+	t.Helper()
+	response, err := guard.pipeline.TestServer.Client().Post(guard.pipeline.TestServer.URL+path, "application/x-www-form-urlencoded", strings.NewReader(""))
+	require.NoError(t, err)
+	_, _ = io.Copy(io.Discard, response.Body)
+	_ = response.Body.Close()
+	require.Equalf(t, http.StatusNotFound, response.StatusCode, "switched off route %s is still served", path)
 }
 
 func assertRegisteredRoutesAdvertised(t *testing.T, guard *advertisementGuard) {
@@ -424,6 +472,13 @@ func assertRegisteredRoutesAdvertised(t *testing.T, guard *advertisementGuard) {
 			if handler, err := endpoint.Handler(guard.scope); err == nil && handler == nil {
 				continue
 			}
+		}
+		// A route switched off through its endpoint switch answers 404 and
+		// is not served by this assembly; it is exempted only while the
+		// switch is off and the route does answer 404.
+		if switchedOff, gated := switchedOffRoutes[strings.TrimLeft(endpoint.Path, "/")]; gated && switchedOff(guard.options()) {
+			requireNotServed(t, guard, endpoint.Path)
+			continue
 		}
 		want := guard.pipeline.TestServer.URL + endpoint.Path
 		_, ok := advertisedUrls[want]

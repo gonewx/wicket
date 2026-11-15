@@ -41,6 +41,10 @@ type DiscoveryHandler struct {
 	// dpopSigningAlgorithms holds the proof signature algorithms it accepts.
 	servesDPoP            bool
 	dpopSigningAlgorithms []string
+
+	// introspectionSigningKeys is set once the assembly declared signed
+	// introspection responses, see ServeSignedIntrospection.
+	introspectionSigningKeys services.KeyMaterialService
 }
 
 // NewDiscoveryHandler builds the discovery handler from the generator and the
@@ -108,6 +112,9 @@ func (h *DiscoveryHandler) settledDocument(r *http.Request) (map[string]any, err
 	}
 	settlePushedAuthorizationAdvertisement(document, baseUrl, h.options, h.assembly, h.pushedAuthorization)
 	settleDPoPAdvertisement(document, h.servesDPoP, h.dpopSigningAlgorithms, h.logger)
+	if err := settleIntrospectionSigningAdvertisement(r.Context(), document, baseUrl, h.introspectionSigningKeys, h.logger); err != nil {
+		return nil, fmt.Errorf("settle discovery document: %w", err)
+	}
 	return document, nil
 }
 
