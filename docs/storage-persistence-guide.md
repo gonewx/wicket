@@ -1,7 +1,7 @@
 # 存储持久化接入指南
 
-> 状态：**目标形态已落地**。存储端口契约、契约测试套件与注入缝均已定型；首个发布版本 `v0.1.0` 已发布，使用 Go 1.27 工具链时适配器仓即可直接 `require github.com/gonewx/wicket`。
-> 权威约束见 ARCHITECTURE-SPINE（AD-2 至 AD-14；该文档位于开发工作区 `_bmad-output/` 下，不随发布产物分发，适配器作者如需查阅请自开发仓库获取）。
+> 状态：**目标形态已落地**。本文对应 wicket `v0.5.0`，契约套件 `storagetest` / `sessiontest` / `keymgmttest` 为 `2.0.0`（`replaytest` 单独计版本，为 `1.0.0`）；从 `1.1.0` 升级见「升级到契约套件 2.0.0（v0.5.0）」。使用 Go 1.27 工具链时适配器仓即可直接 `require github.com/gonewx/wicket`。
+> 权威约束见 ARCHITECTURE-SPINE（AD-2 至 AD-22；该文档位于开发工作区 `_bmad-output/` 下，不随发布产物分发，适配器作者如需查阅请自开发仓库获取）。
 
 ## 概述
 
@@ -9,7 +9,7 @@ wicket 的存储端口分三族，职责与持久化必要性各不相同：
 
 | 端口族 | 位置 | 存的是什么 | 不持久化的后果 |
 | --- | --- | --- | --- |
-| `storage` | `storage/interfaces.go` | 授权码、refresh token、reference token、用户同意、grant、设备码 | 进程重启后已签发的 refresh token 与 reference access token 全部失效；多副本部署下授权码换令牌随机失败，reference access token 的内省结果随副本而异 |
+| `storage` | `storage/interfaces.go` | 授权码、refresh token、reference token、用户同意、grant、设备码、CIBA 请求；可选的 client 读取与 client 注册、推送授权请求（PAR） | 进程重启后已签发的 refresh token 与 reference access token 全部失效；多副本部署下授权码换令牌随机失败，reference access token 的内省结果随副本而异；推送到一个副本的 `request_uri` 到另一个副本得 `invalid_request_uri`；已注册的 client 重启即丢失 |
 | `session` | `session/` | 服务端会话记录 | 重启即全员登出；多副本下会话不共享 |
 | `keymgmt` | `keymgmt/` | 签名密钥及其轮换状态 | 每次重启换签名密钥，已签发的 JWT 全部验签失败 |
 
@@ -67,6 +67,7 @@ cfg.SetReferenceTokenStore(pgadapter.NewReferenceTokenStore(pool))
 cfg.SetUserConsentStore(pgadapter.NewUserConsentStore(pool))
 cfg.SetPersistedGrantStore(pgadapter.NewPersistedGrantStore(pool))
 cfg.SetDeviceFlowStore(pgadapter.NewDeviceFlowStore(pool))
+cfg.SetBackchannelAuthenticationRequestStore(pgadapter.NewBackchannelAuthenticationRequestStore(pool))
 cfg.SetSessionStore(pgadapter.NewSessionStore(pool))
 cfg.SetKeyRecordStore(pgadapter.NewKeyRecordStore(pool))
 ```
@@ -248,6 +249,8 @@ defer root.Close()
 
 `github.com/gonewx/wicket-pg` 是官方 PostgreSQL 适配器：九个 store 端口已全部实现并随发布版本分发，宿主无需阅读适配器源码即可按本节装配。
 
+> **版本注意：** 其 `v0.1.x` 的 `ConformsTo()` 早于契约套件 2.0.0，在适配器仓发布对应 2.0.0 的版本之前，不能通过 wicket v0.5.0 宿主的相等比较（见「校验适配器合规性」）。v0.5.0 的宿主须等适配器仓发布对应版本，或暂留在与其 `ConformsTo()` 相符的 wicket 版本。
+
 ### 安装
 
 ```bash
@@ -309,7 +312,7 @@ cfg.SetSessionStore(store.NewSessionStore(pool, logger))
 cfg.SetRecordStore(store.NewKeyRecordStore(pool, logger))
 ```
 
-九个 store 均暴露 `ConformsTo()` 版本凭证，可按下节方式校验。过期数据的回收由宿主驱动（store 暴露显式回收入口，如 `RemoveExpired` / `DeleteExpired`），wicket 不自起后台任务（AD-12）。
+九个 store 均暴露 `ConformsTo()` 版本凭证，可按下节方式校验；但对 wicket v0.5.0 而言，`v0.1.x` 的凭证不等于 `storagetest.SuiteVersion`（见本节开头的版本注意）。过期数据的回收由宿主驱动（store 暴露显式回收入口，如 `RemoveExpired` / `DeleteExpired`），wicket 不自起后台任务（AD-12）。
 
 更完整的快速开始见适配器仓 README（`github.com/gonewx/wicket-pg`），表结构与索引设计见该仓的 schema 设计记录（`docs/schema-design-record.md`）。
 
@@ -358,6 +361,31 @@ PAR 存储的契约套件入口为 `storagetest.RunPushedAuthorizationRequestSto
 
 删零条返回 `(0, nil)`，不算错误；参数为空串时不匹配任何记录、返回 `(0, nil)`，不得清掉"字段为空"的记录。不支持事务的介质可以部分完成，但必须返回错误。适配器须把 `client_id` 与会话标识存成可见、可索引的列，不得只藏在序列化载荷里——否则批量删除只能全表扫描并逐条反序列化。`PersistedGrantStore` 继续用 `RemoveAll` 的 `ClientId` / `SessionId` 过滤。
 
+## 升级到契约套件 2.0.0（v0.5.0）
+
+v0.5.0 把一批端口变更合在一个大版本里发出：`storagetest`、`sessiontest`、`keymgmttest` 三套 lockstep 由 `1.1.0` 升至 `2.0.0`。判定依据是本批改了既有接口（四个 store 端口新增方法；`validators.AuthorizeRequestValidator.Validate` 加参数），并新增了收紧既有方法契约的 MUST 用例（单句柄删除对缺失返回 nil），属大版本；`sessiontest` 与 `keymgmttest` 没有用例变化，只因 lockstep 同步，宿主仍只比一个数。wicket 本身不检查 `ConformsTo()`；按相等比较 `ConformsTo()` 与 `SuiteVersion` 的宿主，会在自己的装配校验中拒绝仍返回 `1.1.0` 的适配器。
+
+适配器逐项清单：
+
+1. **既有端口的新增方法。** `AuthorizationCodeStore.TakeAuthorizationCode`（原子取出，见「存储契约要点」）；`RemoveAuthorizationCodesByClient` / `BySession`、`RemoveRefreshTokensByClient` / `BySession`、`RemoveReferenceTokensByClient` / `BySession`、`RemoveUserConsentsByClient`（见「按 client、按会话批量删除」）。
+2. **新端口（按需实现）。** 提供 PAR 时实现 `storage.PushedAuthorizationRequestStore`（见「注入 PAR 存储与 PAR 数据保护」）；提供 client 注册时实现 `storage.ClientRegistrationStore` 并同时实现 `storage.ClientOriginLookup`（见「注入可写 client 注册存储」）；提供 client 读取时，注入 `SetClientStore` 的值须实现 `storage.ClientOriginLookup`，且 client 不存在时返回 `storage.ErrNotFound`（不得返回 `(nil, nil)`），基础设施故障原样返回、不包成 `ErrNotFound`（见「注入可写 client 注册存储」节末的 `FindClientById` 错误语义表）。各端口分别跑 `RunPushedAuthorizationRequestStoreSuite` / `RunClientRegistrationStoreSuite`。
+3. **单句柄删除对缺失返回 nil。** 全部单句柄删除与 `RemoveReferenceTokens` 零匹配都返回 nil（见「删除不存在的句柄返回 nil」）；之前把缺失报成错误的适配器须改。
+4. **可见、可索引字段。** 授权码、refresh token、reference token 的 `client_id` 与会话标识，用户同意的 `client_id`；PAR 记录的 `ClientId` 与三个时间字段；注册记录的 client id、修订号、注册访问令牌摘要与注册时间。载荷（PAR 参数、`*models.Client`）一律只存不透明字节。
+5. **键函数。** PAR 记录的键只经 `storage.PushedAuthorizationRequestKey` 求得，适配器不生成、不解析句柄。
+6. **`ConformsTo()` 改返回 `2.0.0`。** 通过 2.0.0 套件后，每个 `storage` / `session` / `keymgmt` store 类型都改返回 `2.0.0`。
+7. **`replaytest` 不变。** 重放登记适配器继续返回 `replaytest.SuiteVersion`（`1.0.0`），宿主对它单独比较。
+
+宿主侧（不涉及适配器）：client store 缝与 authorization parameters message store 缝为可选缝；PAR 与 client 注册的缝为特性条件必需缝，`AllowInMemoryFallback()` 不豁免；PAR 数据保护缝拒绝默认实现且无回退；`ValidatingClientStore` 对缺失返回 `storage.ErrNotFound`、校验失败返回包 `storage.ErrInvalidClientConfiguration` 的错误；凭证兑换与内省路径据此做存在性闸门。RFC 7592 读时轮换所依赖的「带期望 `Revision` 的更新」语义已在可写 client 端口中交付，轮换本身随后续版本的 RFC 7592 管理端点落地。
+
+## AD-21 约束：为多 issuer 留余地
+
+FR33 的单 issuer 裁决维持不变；本批新端口按以下约束设计，使日后引入 issuer 分区时无须为它们做数据迁移：
+
+- **无全量枚举。** `PushedAuthorizationRequestStore` 与 `ClientRegistrationStore` 都不提供无过滤条件的枚举方法；`ClientOriginLookup` 带 origin 过滤条件，不在此列。适配器不得为方便自行加枚举出口。
+- **PAR 句柄全局唯一随机。** `request_uri` 由核心经 `storage.NewPushedAuthorizationRequestURI()` 以 `crypto/rand` 32 字节生成，不用序号或任何可能在不同 issuer 间重复的自然键；store 只见其摘要键。
+- **`client_id` 全局唯一随机。** 这条义务随核心签发 `client_id` 的特性（动态客户端注册）落地。当前版本核心不生成 `client_id`，`RegisterClient` 接受调用方给出的 id；碰撞（含墓碑）返回 `ErrDuplicateHandle`。
+- **不带 issuer 字段。** `models.PushedAuthorizationRequest` 与 `models.ClientRegistration` 都不携带 issuer 或租户字段，端口方法也不接收这类参数；适配器的 schema 不应预先加入此列。
+
 ## 编写适配器
 
 若要为新介质编写适配器，最低要求：
@@ -390,7 +418,7 @@ godi 建远端托管 → godi 发版 → 进 wicket go.mod → 清 go.work 遗�
 - `go.mod` 已切 `go 1.27` 无 rc directive；首个 tag 不携带 rc。
 - Go 1.27 正式版已发布，`mise.toml` 工具链 pin 已由 release candidate 切至正式版 `1.27.0`。
 
-**PostgreSQL 适配器已实现并发布。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器仓，九个 store 实现、schema 与迁移均已落地并发布 `v0.1.x`，表所有权归该仓；快速开始见上文「PostgreSQL 适配器」节与适配器仓 README。
+**PostgreSQL 适配器已实现并发布。** `github.com/gonewx/wicket-pg`（module `github.com/gonewx/wicket-pg`）为 PostgreSQL 适配器仓，九个 store 实现、schema 与迁移均已落地并发布 `v0.1.x`，表所有权归该仓；快速开始见上文「PostgreSQL 适配器」节与适配器仓 README。其 `v0.1.x` 的 `ConformsTo()` 早于契约套件 2.0.0，在适配器仓发布对应 2.0.0 的版本之前，不能通过 wicket v0.5.0 宿主的相等比较；适配器的跟进属仓外项目。
 
 ## 重放登记适配器
 
@@ -408,7 +436,7 @@ type Registry interface {
 - 端口没有读取、按键删除、枚举操作，也**不看任何时钟**：已登记而未回收的键，不论其过期时刻是否已过，一律判重复。
 - 键由 `replay.Key` 生成（64 个小写十六进制字符的摘要），适配器按字节精确比较，存储中不出现原始 `jti`。`replay.ErrDuplicateHandle` 是 `replay` 包自有的值，与 `storage.ErrDuplicateHandle` 不是同一个；适配器只需 import `replay`。
 
-**当前状态：** 这条注入缝只在依赖它的特性启用时才是必需的，而当前版本还没有任何特性启用它（由后续版本引入）。在此之前它不参与 `Freeze()` 校验，wicket 也不会读取它；现有装配无须任何改动。
+**当前状态：** 这条注入缝只在依赖它的特性启用时才是必需的。自 v0.4.0 起，`private_key_jwt` 客户端认证（`ServerConfig.EnablePrivateKeyJwt`）依赖它：启用后未注入即 `Freeze()` 失败。未启用任何依赖特性时它不参与 `Freeze()` 校验，wicket 也不会读取它，现有装配无须改动。
 
 ### 注入与回退
 
