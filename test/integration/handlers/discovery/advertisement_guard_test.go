@@ -149,6 +149,21 @@ func TestDiscoveryAdvertisementMatchesTheAssembly(t *testing.T) {
 			},
 		},
 		{
+			name: "account creation configured",
+			declare: func(p *integration_common.WicketPipeline) {
+				p.Root.ServerConfig().SetAccountCreationUrl("/custom")
+			},
+		},
+		{
+			name: "account creation configured with authorize switched off",
+			declare: func(p *integration_common.WicketPipeline) {
+				p.Root.ServerConfig().SetAccountCreationUrl("/custom")
+			},
+			configure: func(o *config_options.WicketOptions) {
+				o.Endpoints.EnableAuthorizeEndpoint = false
+			},
+		},
+		{
 			name: "introspection switched off",
 			configure: func(o *config_options.WicketOptions) {
 				o.Endpoints.EnableIntrospectionEndpoint = false
@@ -387,6 +402,19 @@ func assertListsConsistent(t *testing.T, guard *advertisementGuard) {
 		require.Falsef(t, introspectionAdvertised, "%s advertised while introspection is switched off", wicket.DiscoveryIntrospectionSigningAlgValuesSupported)
 	}
 
+	// The supported prompt values are advertised exactly while account
+	// creation is configured and the authorization endpoint is advertised,
+	// and then as the known prompt values followed by create.
+	promptValues, promptValuesAdvertised := guard.document[wicket.DiscoveryPromptValuesSupported]
+	wantPromptValuesAdvertised := guard.serverConfig().AccountCreationUrl() != "" && guard.advertised(wicket.DiscoveryAuthorizationEndpoint)
+	require.Equalf(t, wantPromptValuesAdvertised, promptValuesAdvertised,
+		"%s advertised = %v, account creation configured with the authorization endpoint advertised = %v",
+		wicket.DiscoveryPromptValuesSupported, promptValuesAdvertised, wantPromptValuesAdvertised)
+	if promptValuesAdvertised {
+		require.Equalf(t, []any{"none", "login", "consent", "select_account", "create"}, promptValues,
+			"%s does not list the supported prompt values", wicket.DiscoveryPromptValuesSupported)
+	}
+
 	if methods, ok := guard.document[wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported].([]any); ok {
 		available := guard.authenticationMethods()
 		for _, method := range methods {
@@ -411,6 +439,9 @@ var unadvertisedRoutes = []string{
 // switchedOffRoutes maps the routes covered by an assembly in this table
 // whose endpoint switch can be turned off onto the check reading that switch.
 var switchedOffRoutes = map[string]func(*config_options.WicketOptions) bool{
+	wicket.ProtocolRoutePathsAuthorize: func(o *config_options.WicketOptions) bool {
+		return !o.Endpoints.EnableAuthorizeEndpoint
+	},
 	wicket.ProtocolRoutePathsIntrospection: func(o *config_options.WicketOptions) bool {
 		return !o.Endpoints.EnableIntrospectionEndpoint
 	},

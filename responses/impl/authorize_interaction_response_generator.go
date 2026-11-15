@@ -38,6 +38,11 @@ type AuthorizeInteractionResponseGenerator struct {
 	// contribute a custom interaction result, which Handle then classifies.
 	loginHandler   func(context.Context, *validators_models.ValidatedAuthorizeRequest) *responses_models.InteractionResponse
 	consentHandler func(context.Context, *validators_models.ValidatedAuthorizeRequest, *messages.ConsentResponse) *responses_models.InteractionResponse
+
+	// accountCreationUrl is the host's account creation page the create
+	// prompt redirects to, see ServeAccountCreation. Empty leaves the create
+	// prompt ignored.
+	accountCreationUrl string
 }
 
 func NewAuthorizeInteractionResponseGenerator(
@@ -65,7 +70,12 @@ func NewAuthorizeInteractionResponseGenerator(
 
 // Handle composes the login and consent stages. Under prompt=none any interaction
 // the stages would demand is turned into the matching standard error instead.
+// A request with the create prompt is first sent to the account creation page
+// while one is served, see ServeAccountCreation.
 func (g *AuthorizeInteractionResponseGenerator) Handle(ctx context.Context, req *validators_models.ValidatedAuthorizeRequest, consent *messages.ConsentResponse) *responses_models.InteractionResponse {
+	if creation := g.handleAccountCreation(req); creation != nil {
+		return creation
+	}
 	login := g.loginHandler(ctx, req)
 	if promptNone(req) {
 		if login.IsRedirect() {

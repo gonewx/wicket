@@ -2641,6 +2641,18 @@ func (r *Root) NewReturnUrlParser() services.ReturnUrlParser {
 	return v
 }
 
+func (r *Root) NewAuthorizeRequestValidator__2() validators.AuthorizeRequestValidator {
+	v := (authorizeRequestValidatorFromProvider)(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
+func (r *Root) NewAuthorizeInteractionResponseGenerator__2() responses.AuthorizeInteractionResponseGenerator {
+	v := (authorizeInteractionResponseGeneratorFromProvider)(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
 func (r *Root) NewPtr_PushedAuthorizationRequestHandler() *handlers.PushedAuthorizationRequestHandler {
 	v := (newPushedAuthorizationRequestHandlerFromProvider)(r)
 	r.disp.TrackAny(v)
@@ -3103,7 +3115,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[responses.IntrospectionResponseGenerator]():
 		return r.NewIntrospectionResponseGenerator()
 	case reflect.TypeFor[responses.AuthorizeInteractionResponseGenerator]():
-		return r.NewAuthorizeInteractionResponseGenerator()
+		return r.NewAuthorizeInteractionResponseGenerator__2()
 	case reflect.TypeFor[responses.AuthorizeResponseGenerator]():
 		return r.NewAuthorizeResponseGenerator()
 	case reflect.TypeFor[responses.DiscoveryResponseGenerator]():
@@ -3227,7 +3239,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[validators.TokenRevocationRequestValidator]():
 		return r.NewTokenRevocationRequestValidator()
 	case reflect.TypeFor[validators.AuthorizeRequestValidator]():
-		return r.NewAuthorizeRequestValidator()
+		return r.NewAuthorizeRequestValidator__2()
 	case reflect.TypeFor[validators.EndSessionRequestValidator]():
 		return r.NewEndSessionRequestValidator()
 	case reflect.TypeFor[validators.TokenRequestValidator]():
@@ -3792,7 +3804,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[responses.IntrospectionResponseGenerator]():
 			return []any{r.NewIntrospectionResponseGenerator()}
 		case reflect.TypeFor[responses.AuthorizeInteractionResponseGenerator]():
-			return []any{r.NewAuthorizeInteractionResponseGenerator()}
+			return []any{r.NewAuthorizeInteractionResponseGenerator(), r.NewAuthorizeInteractionResponseGenerator__2()}
 		case reflect.TypeFor[responses.AuthorizeResponseGenerator]():
 			return []any{r.NewAuthorizeResponseGenerator()}
 		case reflect.TypeFor[responses.DiscoveryResponseGenerator]():
@@ -3916,7 +3928,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[validators.TokenRevocationRequestValidator]():
 			return []any{r.NewTokenRevocationRequestValidator()}
 		case reflect.TypeFor[validators.AuthorizeRequestValidator]():
-			return []any{r.NewAuthorizeRequestValidator()}
+			return []any{r.NewAuthorizeRequestValidator(), r.NewAuthorizeRequestValidator__2()}
 		case reflect.TypeFor[validators.EndSessionRequestValidator]():
 			return []any{r.NewEndSessionRequestValidator()}
 		case reflect.TypeFor[validators.TokenRequestValidator]():
@@ -4166,7 +4178,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[responses.IntrospectionResponseGenerator]():
 		return s.NewIntrospectionResponseGenerator()
 	case reflect.TypeFor[responses.AuthorizeInteractionResponseGenerator]():
-		return s.NewAuthorizeInteractionResponseGenerator()
+		return s.NewAuthorizeInteractionResponseGenerator__2()
 	case reflect.TypeFor[responses.AuthorizeResponseGenerator]():
 		return s.NewAuthorizeResponseGenerator()
 	case reflect.TypeFor[responses.DiscoveryResponseGenerator]():
@@ -4290,7 +4302,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[validators.TokenRevocationRequestValidator]():
 		return s.NewTokenRevocationRequestValidator()
 	case reflect.TypeFor[validators.AuthorizeRequestValidator]():
-		return s.NewAuthorizeRequestValidator()
+		return s.NewAuthorizeRequestValidator__2()
 	case reflect.TypeFor[validators.EndSessionRequestValidator]():
 		return s.NewEndSessionRequestValidator()
 	case reflect.TypeFor[validators.TokenRequestValidator]():
@@ -4834,7 +4846,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[responses.IntrospectionResponseGenerator]():
 			return []any{s.NewIntrospectionResponseGenerator()}
 		case reflect.TypeFor[responses.AuthorizeInteractionResponseGenerator]():
-			return []any{s.NewAuthorizeInteractionResponseGenerator()}
+			return []any{s.NewAuthorizeInteractionResponseGenerator(), s.NewAuthorizeInteractionResponseGenerator__2()}
 		case reflect.TypeFor[responses.AuthorizeResponseGenerator]():
 			return []any{s.NewAuthorizeResponseGenerator()}
 		case reflect.TypeFor[responses.DiscoveryResponseGenerator]():
@@ -4958,7 +4970,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[validators.TokenRevocationRequestValidator]():
 			return []any{s.NewTokenRevocationRequestValidator()}
 		case reflect.TypeFor[validators.AuthorizeRequestValidator]():
-			return []any{s.NewAuthorizeRequestValidator()}
+			return []any{s.NewAuthorizeRequestValidator(), s.NewAuthorizeRequestValidator__2()}
 		case reflect.TypeFor[validators.EndSessionRequestValidator]():
 			return []any{s.NewEndSessionRequestValidator()}
 		case reflect.TypeFor[validators.TokenRequestValidator]():
@@ -6012,6 +6024,18 @@ func (s *scope) NewReturnUrlParser() services.ReturnUrlParser {
 			godi.GetRequired[*ServerConfig](p).AuthorizationParametersMessageStore(),
 		)
 	})(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewAuthorizeRequestValidator__2() validators.AuthorizeRequestValidator {
+	v := (authorizeRequestValidatorFromProvider)(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewAuthorizeInteractionResponseGenerator__2() responses.AuthorizeInteractionResponseGenerator {
+	v := (authorizeInteractionResponseGeneratorFromProvider)(s)
 	s.disp.TrackAny(v)
 	return v
 }

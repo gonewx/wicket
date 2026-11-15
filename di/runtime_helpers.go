@@ -153,6 +153,9 @@ func newDiscoveryHandlerFromProvider(p godi.Provider) *handlers.DiscoveryHandler
 	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.DPoPEnabled() {
 		handler.ServeDPoP(cfg.DPoPOptions().SigningAlgorithms)
 	}
+	if cfg, ok := godi.Get[*ServerConfig](p); ok && cfg.AccountCreationUrl() != "" {
+		handler.ServeAccountCreation()
+	}
 	handler.ServeSignedIntrospection(godi.GetRequired[services.KeyMaterialService](p))
 	return handler
 }
