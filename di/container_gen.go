@@ -2564,7 +2564,7 @@ func (r *Root) NewEndSessionRequestValidator() validators.EndSessionRequestValid
 }
 
 func (r *Root) NewTokenRequestValidator() validators.TokenRequestValidator {
-	return impl2.NewTokenRequestValidator(r.get_Ptr_WicketOptions(), r.NewIssuerNameService(), r.get_lazyAuthorizationCodeStore(), r.NewPtr_ExtensionGrantValidator(), r.NewCustomTokenRequestValidator(), r.NewResourceValidator(), r.NewResourceStore(), r.NewRefreshTokenService(), r.NewResourceOwnerPasswordValidator(), r.NewProfileService(), r.NewDeviceCodeValidator(), r.NewBackchannelAuthenticationRequestIdValidator(), r.get_SystemClock(), r.get_Ptr_Logger())
+	return impl2.NewTokenRequestValidator(r.get_Ptr_WicketOptions(), r.NewIssuerNameService(), r.get_lazyAuthorizationCodeStore(), r.NewPtr_ExtensionGrantValidator(), r.NewCustomTokenRequestValidator(), r.NewResourceValidator(), r.NewResourceStore(), r.NewRefreshTokenService__2(), r.NewResourceOwnerPasswordValidator(), r.NewProfileService(), r.NewDeviceCodeValidator(), r.NewBackchannelAuthenticationRequestIdValidator(), r.get_SystemClock(), r.get_Ptr_Logger())
 }
 
 func (r *Root) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
@@ -2655,6 +2655,12 @@ func (r *Root) NewAuthorizeInteractionResponseGenerator__2() responses.Authorize
 
 func (r *Root) NewPtr_PushedAuthorizationRequestHandler() *handlers.PushedAuthorizationRequestHandler {
 	v := (newPushedAuthorizationRequestHandlerFromProvider)(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
+func (r *Root) NewRefreshTokenService__2() services.RefreshTokenService {
+	v := (refreshTokenServiceFromProvider)(r)
 	r.disp.TrackAny(v)
 	return v
 }
@@ -3201,7 +3207,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[services.ClaimsService]():
 		return r.NewClaimsService()
 	case reflect.TypeFor[services.RefreshTokenService]():
-		return r.NewRefreshTokenService()
+		return r.NewRefreshTokenService__2()
 	case reflect.TypeFor[services.DeviceFlowCodeService]():
 		return r.NewDeviceFlowCodeService()
 	case reflect.TypeFor[services.ConsentService]():
@@ -3890,7 +3896,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[services.ClaimsService]():
 			return []any{r.NewClaimsService()}
 		case reflect.TypeFor[services.RefreshTokenService]():
-			return []any{r.NewRefreshTokenService()}
+			return []any{r.NewRefreshTokenService(), r.NewRefreshTokenService__2()}
 		case reflect.TypeFor[services.DeviceFlowCodeService]():
 			return []any{r.NewDeviceFlowCodeService()}
 		case reflect.TypeFor[services.ConsentService]():
@@ -4264,7 +4270,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[services.ClaimsService]():
 		return s.NewClaimsService()
 	case reflect.TypeFor[services.RefreshTokenService]():
-		return s.NewRefreshTokenService()
+		return s.NewRefreshTokenService__2()
 	case reflect.TypeFor[services.DeviceFlowCodeService]():
 		return s.NewDeviceFlowCodeService()
 	case reflect.TypeFor[services.ConsentService]():
@@ -4932,7 +4938,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[services.ClaimsService]():
 			return []any{s.NewClaimsService()}
 		case reflect.TypeFor[services.RefreshTokenService]():
-			return []any{s.NewRefreshTokenService()}
+			return []any{s.NewRefreshTokenService(), s.NewRefreshTokenService__2()}
 		case reflect.TypeFor[services.DeviceFlowCodeService]():
 			return []any{s.NewDeviceFlowCodeService()}
 		case reflect.TypeFor[services.ConsentService]():
@@ -5951,7 +5957,7 @@ func (s *scope) NewEndSessionRequestValidator() validators.EndSessionRequestVali
 }
 
 func (s *scope) NewTokenRequestValidator() validators.TokenRequestValidator {
-	return impl2.NewTokenRequestValidator(s.root.get_Ptr_WicketOptions(), s.NewIssuerNameService(), s.root.get_lazyAuthorizationCodeStore(), s.NewPtr_ExtensionGrantValidator(), s.NewCustomTokenRequestValidator(), s.NewResourceValidator(), s.NewResourceStore(), s.NewRefreshTokenService(), s.NewResourceOwnerPasswordValidator(), s.NewProfileService(), s.NewDeviceCodeValidator(), s.NewBackchannelAuthenticationRequestIdValidator(), s.root.get_SystemClock(), s.root.get_Ptr_Logger())
+	return impl2.NewTokenRequestValidator(s.root.get_Ptr_WicketOptions(), s.NewIssuerNameService(), s.root.get_lazyAuthorizationCodeStore(), s.NewPtr_ExtensionGrantValidator(), s.NewCustomTokenRequestValidator(), s.NewResourceValidator(), s.NewResourceStore(), s.NewRefreshTokenService__2(), s.NewResourceOwnerPasswordValidator(), s.NewProfileService(), s.NewDeviceCodeValidator(), s.NewBackchannelAuthenticationRequestIdValidator(), s.root.get_SystemClock(), s.root.get_Ptr_Logger())
 }
 
 func (s *scope) NewStrictRedirectUriValidator() validators.RedirectUriValidator {
@@ -6042,6 +6048,12 @@ func (s *scope) NewAuthorizeInteractionResponseGenerator__2() responses.Authoriz
 
 func (s *scope) NewPtr_PushedAuthorizationRequestHandler() *handlers.PushedAuthorizationRequestHandler {
 	v := (newPushedAuthorizationRequestHandlerFromProvider)(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewRefreshTokenService__2() services.RefreshTokenService {
+	v := (refreshTokenServiceFromProvider)(s)
 	s.disp.TrackAny(v)
 	return v
 }

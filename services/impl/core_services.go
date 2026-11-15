@@ -802,6 +802,12 @@ func (s *TokenService) createReferenceToken(ctx context.Context, token *storage_
 type RefreshTokenService struct {
 	store   storage.RefreshTokenStore
 	handles services.HandleGenerationService
+
+	// Consumption of one-time refresh tokens, see SetConsumption and
+	// refresh_token_rotation.go. The zero value updates in place.
+	consumption services.RefreshTokenConsumption
+	clock       services.SystemClock
+	logger      *slog.Logger
 }
 
 func NewRefreshTokenService(store storage.RefreshTokenStore, handles services.HandleGenerationService) *RefreshTokenService {
@@ -834,6 +840,9 @@ func (s *RefreshTokenService) CreateRefreshToken(ctx context.Context, request *r
 }
 
 func (s *RefreshTokenService) UpdateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenUpdateRequest) (string, error) {
+	if s.rotates(request) {
+		return s.rotate(ctx, request)
+	}
 	expected := 0
 	if request.RefreshToken != nil {
 		expected = request.RefreshToken.Version
@@ -853,6 +862,10 @@ func (s *RefreshTokenService) ValidateRefreshToken(ctx context.Context, handle s
 			return result
 		}
 		result.Error = fmt.Errorf("validate refresh token: %w", err)
+		return result
+	}
+	if token.ConsumedTime != nil {
+		result.Error = s.refuseConsumed(ctx, handle, token, client)
 		return result
 	}
 	result.RefreshToken = token

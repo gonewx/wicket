@@ -364,9 +364,9 @@ func copyAuthorizationCode(code *models.AuthorizationCode) *models.Authorization
 }
 
 // copyRefreshToken returns an independent copy of the record: value fields
-// are copied, the access-token map is copied entry by entry, and slice fields
-// get fresh backing arrays. The subject principal is shared by convention (it
-// is treated as immutable).
+// are copied, the access-token map is copied entry by entry, slice fields get
+// fresh backing arrays and the consumed time is copied by value. The subject
+// principal is shared by convention (it is treated as immutable).
 func copyRefreshToken(token *models.RefreshToken) *models.RefreshToken {
 	if token == nil {
 		return nil
@@ -379,6 +379,10 @@ func copyRefreshToken(token *models.RefreshToken) *models.RefreshToken {
 	}
 	out.AuthorizedScopes = copyStrings(token.AuthorizedScopes)
 	out.AuthorizedResourceGaps = copyStrings(token.AuthorizedResourceGaps)
+	if token.ConsumedTime != nil {
+		consumed := *token.ConsumedTime
+		out.ConsumedTime = &consumed
+	}
 	return &out
 }
 

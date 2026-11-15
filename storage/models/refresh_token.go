@@ -50,6 +50,7 @@ type RefreshToken struct {
 	AuthorizedResourceGaps []string
 
 	RefreshTokenProofBinding
+	RefreshTokenRotation
 }
 
 func NewRefreshToken() *RefreshToken {
