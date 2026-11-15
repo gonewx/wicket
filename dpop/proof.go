@@ -78,50 +78,61 @@ func NewVerifier(options Options) *Verifier {
 // returned as Proof.Nonce for the caller to check against its NonceSealer;
 // its absence is not an error here.
 func (v *Verifier) Verify(values []string, method string, endpoint string, now time.Time) (Proof, error) {
+	proof, _, err := v.verify(values, method, endpoint, now)
+	return proof, err
+}
+
+// verify runs every check Verify documents and also returns the decoded
+// claims of the accepted proof, for checks only some callers make.
+func (v *Verifier) verify(values []string, method string, endpoint string, now time.Time) (Proof, map[string]json.RawMessage, error) {
 	if len(values) != 1 {
-		return Proof{}, invalid("not exactly one proof")
+		return Proof{}, nil, invalid("not exactly one proof")
 	}
 	proof := values[0]
 	if proof == "" || len(proof) > maxProofBytes {
-		return Proof{}, invalid("proof size")
+		return Proof{}, nil, invalid("proof size")
 	}
 	segments := strings.Split(proof, ".")
 	if len(segments) != 3 || segments[0] == "" || segments[1] == "" || segments[2] == "" {
-		return Proof{}, invalid("not a compact JWS")
+		return Proof{}, nil, invalid("not a compact JWS")
 	}
 	rawHeader, err := base64.RawURLEncoding.DecodeString(segments[0])
 	if err != nil {
-		return Proof{}, invalid("header encoding")
+		return Proof{}, nil, invalid("header encoding")
 	}
 	if _, err := base64.RawURLEncoding.DecodeString(segments[1]); err != nil {
-		return Proof{}, invalid("payload encoding")
+		return Proof{}, nil, invalid("payload encoding")
 	}
 	if _, err := base64.RawURLEncoding.DecodeString(segments[2]); err != nil {
-		return Proof{}, invalid("signature encoding")
+		return Proof{}, nil, invalid("signature encoding")
 	}
 
 	algorithm, key, err := v.checkHeader(rawHeader)
 	if err != nil {
-		return Proof{}, err
+		return Proof{}, nil, err
 	}
 	publicKey, err := publicKeyFor(algorithm.String(), key)
 	if err != nil {
-		return Proof{}, err
+		return Proof{}, nil, err
 	}
 	payload, err := jws.Verify([]byte(proof), jws.WithKey(algorithm, publicKey))
 	if err != nil {
-		return Proof{}, invalid("signature")
+		return Proof{}, nil, invalid("signature")
 	}
 	thumbprint, err := Thumbprint(key)
 	if err != nil {
-		return Proof{}, invalid("thumbprint")
+		return Proof{}, nil, invalid("thumbprint")
 	}
 
-	claims, err := v.checkClaims(payload, method, endpoint, now)
-	if err != nil {
-		return Proof{}, err
+	var claims map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &claims); err != nil || claims == nil {
+		return Proof{}, nil, invalid("payload is not a JSON object")
 	}
-	return Proof{Thumbprint: thumbprint, JwtId: claims.identifier, IssuedAt: claims.issuedAt, Nonce: claims.nonce}, nil
+	accepted, err := v.checkClaims(claims, method, endpoint, now)
+	if err != nil {
+		return Proof{}, nil, err
+	}
+	return Proof{Thumbprint: thumbprint, JwtId: accepted.identifier, IssuedAt: accepted.issuedAt, Nonce: accepted.nonce}, claims, nil
 }
 
 // checkHeader judges the protected header and returns the signature
@@ -214,12 +225,7 @@ type proofClaims struct {
 
 // checkClaims judges the claims of a verified proof and returns its jti,
 // iat and, while a server nonce is required, its nonce.
-func (v *Verifier) checkClaims(payload []byte, method string, endpoint string, now time.Time) (proofClaims, error) {
-	var claims map[string]json.RawMessage
-	if err := json.Unmarshal(payload, &claims); err != nil || claims == nil {
-		return proofClaims{}, invalid("payload is not a JSON object")
-	}
-
+func (v *Verifier) checkClaims(claims map[string]json.RawMessage, method string, endpoint string, now time.Time) (proofClaims, error) {
 	identifier, ok := stringMember(claims["jti"])
 	if !ok || identifier == "" || len(identifier) > maxProofIdBytes {
 		return proofClaims{}, invalid("jti")

@@ -174,17 +174,17 @@ func (d *tokenDPoP) verifyProof(r *http.Request) (*dpop.Proof, error) {
 	if len(values) == 0 {
 		return nil, nil
 	}
-	proof, err := d.verifier.Verify(values, r.Method, tokenEndpointUri(r), d.clock.Now())
+	proof, err := d.verifier.Verify(values, r.Method, requestEndpointUri(r), d.clock.Now())
 	if err != nil {
 		return nil, err
 	}
 	return &proof, nil
 }
 
-// tokenEndpointUri is the URI the proof's htu claim has to name: the base URL
-// of the request followed by the path it was addressed to, so the main route
-// and its mutual TLS alias each stand for themselves.
-func tokenEndpointUri(r *http.Request) string {
+// requestEndpointUri is the URI the proof's htu claim has to name: the base
+// URL of the request followed by the path it was addressed to, so the main
+// route and its mutual TLS alias each stand for themselves.
+func requestEndpointUri(r *http.Request) string {
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	if scope := hosting.ScopeFrom(r.Context()); scope != nil {
 		if urls, ok := godi.Get[services.ServerUrls](scope); ok && urls != nil {

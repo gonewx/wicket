@@ -16,7 +16,8 @@ import (
 	validators_impl "github.com/gonewx/wicket/validators/impl"
 )
 
-// UserInfoHandler serves the OpenID Connect userinfo endpoint over bearer authentication.
+// UserInfoHandler serves the OpenID Connect userinfo endpoint over bearer
+// authentication and, once SetDPoP was called, DPoP authentication.
 type UserInfoHandler struct {
 	bearerValidator  *validators_impl.BearerTokenUsageValidator
 	requestValidator validators.UserInfoRequestValidator
@@ -24,6 +25,8 @@ type UserInfoHandler struct {
 	options          *config_options.WicketOptions
 	logger           *slog.Logger
 	certificates     ClientCertificateSource
+	// dpop is set by SetDPoP; nil leaves the DPoP scheme unrecognized.
+	dpop *userInfoDPoP
 }
 
 func NewUserInfoHandler(
@@ -50,6 +53,12 @@ func (h *UserInfoHandler) Process(w http.ResponseWriter, r *http.Request) error 
 		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
 	}
 
+	if h.dpop != nil {
+		if token, found, malformed := dpopAuthorization(r); found {
+			return h.processDPoP(w, r, token, malformed)
+		}
+	}
+
 	usage, err := h.bearerValidator.Validate(r)
 	if err != nil {
 		return results.NewProtectedResourceErrorResult(wicket.ProtectedResourceErrorsInvalidRequest, "").Execute(w, r)
@@ -66,6 +75,9 @@ func (h *UserInfoHandler) Process(w http.ResponseWriter, r *http.Request) error 
 		return results.NewProtectedResourceErrorResult(validationResult.Error, validationResult.Description).Execute(w, r)
 	}
 	if validationResult.TokenValidationResult != nil {
+		if written, err := h.rejectBoundBearer(w, r, validationResult.TokenValidationResult.Claims); written {
+			return err
+		}
 		if err := h.checkCertificateBinding(r, validationResult.TokenValidationResult.Claims); err != nil {
 			return results.NewProtectedResourceErrorResult(wicket.ProtectedResourceErrorsInvalidToken, "").Execute(w, r)
 		}

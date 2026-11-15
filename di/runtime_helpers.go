@@ -223,6 +223,16 @@ func newUserInfoHandlerFromProvider(p godi.Provider) *handlers.UserInfoHandler {
 	// same source as the token endpoint.
 	if cfg, ok := godi.Get[*ServerConfig](p); ok {
 		handler.SetClientCertificateSource(cfg.ClientCertificateSource())
+		// The replay registry is resolved only while DPoP is enabled.
+		if cfg.DPoPEnabled() {
+			options := cfg.DPoPOptions()
+			handler.SetDPoP(
+				dpop.NewVerifier(options),
+				godi.GetRequired[replay.Registry](p),
+				options,
+				godi.GetRequired[services.SystemClock](p),
+			)
+		}
 	}
 	return handler
 }
