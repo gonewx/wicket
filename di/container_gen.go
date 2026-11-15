@@ -171,6 +171,10 @@ type Root struct {
 	st_lazyUserConsentStore                                   uint8
 	f_lazySessionStore                                        session.Store
 	st_lazySessionStore                                       uint8
+	f_Ptr_Endpoint__18                                        *hosting.Endpoint
+	st_Ptr_Endpoint__18                                       uint8
+	f_Ptr_Endpoint__19                                        *hosting.Endpoint
+	st_Ptr_Endpoint__19                                       uint8
 	f_Ptr_Config                                              *wechatverify.Config
 	st_Ptr_Config                                             uint8
 	f_DefaultHttpContextAccessor                              accessor.HttpContextAccessor
@@ -256,6 +260,8 @@ func NewRoot() (root *Root, err error) {
 	r.get_lazyReferenceTokenStore()
 	r.get_lazyUserConsentStore()
 	r.get_lazySessionStore()
+	r.get_Ptr_Endpoint__18()
+	r.get_Ptr_Endpoint__19()
 	r.get_Ptr_Config()
 	return r, nil
 }
@@ -1566,6 +1572,50 @@ func (r *Root) get_lazySessionStore() session.Store {
 	return v
 }
 
+func (r *Root) get_Ptr_Endpoint__18() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__18 == 2 {
+		return r.f_Ptr_Endpoint__18
+	}
+	if r.st_Ptr_Endpoint__18 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__18"))
+	}
+	r.st_Ptr_Endpoint__18 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__18 != 2 {
+			r.st_Ptr_Endpoint__18 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesPushedAuthorizationRequest, wicket.ProtocolRoutePathsPushedAuthorization, pushedAuthorizationEndpointHandler)
+	})(r)
+	r.f_Ptr_Endpoint__18 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__18 = 2
+	return v
+}
+
+func (r *Root) get_Ptr_Endpoint__19() *hosting.Endpoint {
+	if r.st_Ptr_Endpoint__19 == 2 {
+		return r.f_Ptr_Endpoint__19
+	}
+	if r.st_Ptr_Endpoint__19 == 1 {
+		panic(godi.CircularDependencyError("Ptr_Endpoint__19"))
+	}
+	r.st_Ptr_Endpoint__19 = 1
+	defer func() {
+		if r.st_Ptr_Endpoint__19 != 2 {
+			r.st_Ptr_Endpoint__19 = 0
+		}
+	}()
+	v := (func(p godi.Provider) *hosting.Endpoint {
+		return newEndpoint(wicket.EndpointNamesPushedAuthorizationRequest, wicket.ProtocolRoutePathsMtlsPushedAuthorization, pushedAuthorizationMtlsEndpointHandler)
+	})(r)
+	r.f_Ptr_Endpoint__19 = v
+	r.disp.TrackAny(v)
+	r.st_Ptr_Endpoint__19 = 2
+	return v
+}
+
 func (r *Root) get_Ptr_Config() *wechatverify.Config {
 	if r.st_Ptr_Config == 2 {
 		return r.f_Ptr_Config
@@ -2440,7 +2490,7 @@ func (r *Root) NewTokenRevocationRequestValidator() validators.TokenRevocationRe
 
 func (r *Root) NewAuthorizeRequestValidator() validators.AuthorizeRequestValidator {
 	v := (func(p godi.Provider) validators.AuthorizeRequestValidator {
-		return impl2.NewAuthorizeRequestValidator(
+		validator := impl2.NewAuthorizeRequestValidator(
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[*options.WicketOptions](p),
 			godi.GetRequired[services.IssuerNameService](p),
@@ -2452,6 +2502,10 @@ func (r *Root) NewAuthorizeRequestValidator() validators.AuthorizeRequestValidat
 			userSessionFromProvider(p),
 			godi.GetRequired[validators.CustomAuthorizeRequestValidator](p),
 		)
+		if godi.GetRequired[*ServerConfig](p).PushedAuthorizationRequestsEnabled() {
+			validator.SetPushedAuthorization(impl2.NewAuthorizeRequestPushedStage(pushedAuthorizationFromProvider(p)))
+		}
+		return validator
 	})(r)
 	r.disp.TrackAny(v)
 	return v
@@ -2547,6 +2601,12 @@ func (r *Root) NewReturnUrlParser() services.ReturnUrlParser {
 			godi.GetRequired[*ServerConfig](p).AuthorizationParametersMessageStore(),
 		)
 	})(r)
+	r.disp.TrackAny(v)
+	return v
+}
+
+func (r *Root) NewPtr_PushedAuthorizationRequestHandler() *handlers.PushedAuthorizationRequestHandler {
+	v := (newPushedAuthorizationRequestHandlerFromProvider)(r)
 	r.disp.TrackAny(v)
 	return v
 }
@@ -2798,6 +2858,10 @@ func (r *Root) lazyUserConsentStore() storage.UserConsentStore { return r.get_la
 
 func (r *Root) lazySessionStore() session.Store { return r.get_lazySessionStore() }
 
+func (r *Root) Ptr_Endpoint__18() *hosting.Endpoint { return r.get_Ptr_Endpoint__18() }
+
+func (r *Root) Ptr_Endpoint__19() *hosting.Endpoint { return r.get_Ptr_Endpoint__19() }
+
 func (r *Root) Ptr_Config() *wechatverify.Config { return r.get_Ptr_Config() }
 
 func (r *Root) DefaultHttpContextAccessor() accessor.HttpContextAccessor {
@@ -2865,7 +2929,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[validators.SecretParser]():
 		return r.NewPostBodySecretParser()
 	case reflect.TypeFor[*hosting.Endpoint]():
-		return r.get_Ptr_Endpoint__17()
+		return r.get_Ptr_Endpoint__19()
 	case reflect.TypeFor[services.SystemClock]():
 		return r.get_SystemClock()
 	case reflect.TypeFor[*ServerConfig]():
@@ -3156,6 +3220,8 @@ func (r *Root) GetService(t reflect.Type) any {
 		return r.NewApiSecretValidator()
 	case reflect.TypeFor[services.ReturnUrlParser]():
 		return r.NewReturnUrlParser()
+	case reflect.TypeFor[*handlers.PushedAuthorizationRequestHandler]():
+		return r.NewPtr_PushedAuthorizationRequestHandler()
 	case reflect.TypeFor[*wechatverify.Config]():
 		return r.get_Ptr_Config()
 	}
@@ -3468,6 +3534,8 @@ func (r *Root) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[services.ReturnUrlParser]():
 		return true
+	case reflect.TypeFor[*handlers.PushedAuthorizationRequestHandler]():
+		return true
 	case reflect.TypeFor[*wechatverify.Config]():
 		return true
 	}
@@ -3546,7 +3614,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[validators.SecretParser]():
 			return []any{r.NewSecretParser(), r.NewSecretParser__2(), r.NewSecretParser__3(), r.NewBasicAuthenticationSecretParser(), r.NewPostBodySecretParser()}
 		case reflect.TypeFor[*hosting.Endpoint]():
-			return []any{r.get_Ptr_Endpoint(), r.get_Ptr_Endpoint__2(), r.get_Ptr_Endpoint__3(), r.get_Ptr_Endpoint__4(), r.get_Ptr_Endpoint__5(), r.get_Ptr_Endpoint__6(), r.get_Ptr_Endpoint__7(), r.get_Ptr_Endpoint__8(), r.get_Ptr_Endpoint__9(), r.get_Ptr_Endpoint__10(), r.get_Ptr_Endpoint__11(), r.get_Ptr_Endpoint__12(), r.get_Ptr_Endpoint__13(), r.get_Ptr_Endpoint__14(), r.get_Ptr_Endpoint__15(), r.get_Ptr_Endpoint__16(), r.get_Ptr_Endpoint__17()}
+			return []any{r.get_Ptr_Endpoint(), r.get_Ptr_Endpoint__2(), r.get_Ptr_Endpoint__3(), r.get_Ptr_Endpoint__4(), r.get_Ptr_Endpoint__5(), r.get_Ptr_Endpoint__6(), r.get_Ptr_Endpoint__7(), r.get_Ptr_Endpoint__8(), r.get_Ptr_Endpoint__9(), r.get_Ptr_Endpoint__10(), r.get_Ptr_Endpoint__11(), r.get_Ptr_Endpoint__12(), r.get_Ptr_Endpoint__13(), r.get_Ptr_Endpoint__14(), r.get_Ptr_Endpoint__15(), r.get_Ptr_Endpoint__16(), r.get_Ptr_Endpoint__17(), r.get_Ptr_Endpoint__18(), r.get_Ptr_Endpoint__19()}
 		case reflect.TypeFor[services.SystemClock]():
 			return []any{r.get_SystemClock()}
 		case reflect.TypeFor[*ServerConfig]():
@@ -3837,6 +3905,8 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{r.NewApiSecretValidator()}
 		case reflect.TypeFor[services.ReturnUrlParser]():
 			return []any{r.NewReturnUrlParser()}
+		case reflect.TypeFor[*handlers.PushedAuthorizationRequestHandler]():
+			return []any{r.NewPtr_PushedAuthorizationRequestHandler()}
 		case reflect.TypeFor[*wechatverify.Config]():
 			return []any{r.get_Ptr_Config()}
 		}
@@ -3916,7 +3986,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[validators.SecretParser]():
 		return s.NewPostBodySecretParser()
 	case reflect.TypeFor[*hosting.Endpoint]():
-		return s.root.get_Ptr_Endpoint__17()
+		return s.root.get_Ptr_Endpoint__19()
 	case reflect.TypeFor[services.SystemClock]():
 		return s.root.get_SystemClock()
 	case reflect.TypeFor[*ServerConfig]():
@@ -4207,6 +4277,8 @@ func (s *scope) GetService(t reflect.Type) any {
 		return s.NewApiSecretValidator()
 	case reflect.TypeFor[services.ReturnUrlParser]():
 		return s.NewReturnUrlParser()
+	case reflect.TypeFor[*handlers.PushedAuthorizationRequestHandler]():
+		return s.NewPtr_PushedAuthorizationRequestHandler()
 	case reflect.TypeFor[*wechatverify.Config]():
 		return s.root.get_Ptr_Config()
 	}
@@ -4519,6 +4591,8 @@ func (s *scope) IsService(t reflect.Type) bool {
 		return true
 	case reflect.TypeFor[services.ReturnUrlParser]():
 		return true
+	case reflect.TypeFor[*handlers.PushedAuthorizationRequestHandler]():
+		return true
 	case reflect.TypeFor[*wechatverify.Config]():
 		return true
 	}
@@ -4576,7 +4650,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[validators.SecretParser]():
 			return []any{s.NewSecretParser(), s.NewSecretParser__2(), s.NewSecretParser__3(), s.NewBasicAuthenticationSecretParser(), s.NewPostBodySecretParser()}
 		case reflect.TypeFor[*hosting.Endpoint]():
-			return []any{s.root.get_Ptr_Endpoint(), s.root.get_Ptr_Endpoint__2(), s.root.get_Ptr_Endpoint__3(), s.root.get_Ptr_Endpoint__4(), s.root.get_Ptr_Endpoint__5(), s.root.get_Ptr_Endpoint__6(), s.root.get_Ptr_Endpoint__7(), s.root.get_Ptr_Endpoint__8(), s.root.get_Ptr_Endpoint__9(), s.root.get_Ptr_Endpoint__10(), s.root.get_Ptr_Endpoint__11(), s.root.get_Ptr_Endpoint__12(), s.root.get_Ptr_Endpoint__13(), s.root.get_Ptr_Endpoint__14(), s.root.get_Ptr_Endpoint__15(), s.root.get_Ptr_Endpoint__16(), s.root.get_Ptr_Endpoint__17()}
+			return []any{s.root.get_Ptr_Endpoint(), s.root.get_Ptr_Endpoint__2(), s.root.get_Ptr_Endpoint__3(), s.root.get_Ptr_Endpoint__4(), s.root.get_Ptr_Endpoint__5(), s.root.get_Ptr_Endpoint__6(), s.root.get_Ptr_Endpoint__7(), s.root.get_Ptr_Endpoint__8(), s.root.get_Ptr_Endpoint__9(), s.root.get_Ptr_Endpoint__10(), s.root.get_Ptr_Endpoint__11(), s.root.get_Ptr_Endpoint__12(), s.root.get_Ptr_Endpoint__13(), s.root.get_Ptr_Endpoint__14(), s.root.get_Ptr_Endpoint__15(), s.root.get_Ptr_Endpoint__16(), s.root.get_Ptr_Endpoint__17(), s.root.get_Ptr_Endpoint__18(), s.root.get_Ptr_Endpoint__19()}
 		case reflect.TypeFor[services.SystemClock]():
 			return []any{s.root.get_SystemClock()}
 		case reflect.TypeFor[*ServerConfig]():
@@ -4867,6 +4941,8 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 			return []any{s.NewApiSecretValidator()}
 		case reflect.TypeFor[services.ReturnUrlParser]():
 			return []any{s.NewReturnUrlParser()}
+		case reflect.TypeFor[*handlers.PushedAuthorizationRequestHandler]():
+			return []any{s.NewPtr_PushedAuthorizationRequestHandler()}
 		case reflect.TypeFor[*wechatverify.Config]():
 			return []any{s.root.get_Ptr_Config()}
 		}
@@ -5764,7 +5840,7 @@ func (s *scope) NewTokenRevocationRequestValidator() validators.TokenRevocationR
 
 func (s *scope) NewAuthorizeRequestValidator() validators.AuthorizeRequestValidator {
 	v := (func(p godi.Provider) validators.AuthorizeRequestValidator {
-		return impl2.NewAuthorizeRequestValidator(
+		validator := impl2.NewAuthorizeRequestValidator(
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[*options.WicketOptions](p),
 			godi.GetRequired[services.IssuerNameService](p),
@@ -5776,6 +5852,10 @@ func (s *scope) NewAuthorizeRequestValidator() validators.AuthorizeRequestValida
 			userSessionFromProvider(p),
 			godi.GetRequired[validators.CustomAuthorizeRequestValidator](p),
 		)
+		if godi.GetRequired[*ServerConfig](p).PushedAuthorizationRequestsEnabled() {
+			validator.SetPushedAuthorization(impl2.NewAuthorizeRequestPushedStage(pushedAuthorizationFromProvider(p)))
+		}
+		return validator
 	})(s)
 	s.disp.TrackAny(v)
 	return v
@@ -5871,6 +5951,12 @@ func (s *scope) NewReturnUrlParser() services.ReturnUrlParser {
 			godi.GetRequired[*ServerConfig](p).AuthorizationParametersMessageStore(),
 		)
 	})(s)
+	s.disp.TrackAny(v)
+	return v
+}
+
+func (s *scope) NewPtr_PushedAuthorizationRequestHandler() *handlers.PushedAuthorizationRequestHandler {
+	v := (newPushedAuthorizationRequestHandlerFromProvider)(s)
 	s.disp.TrackAny(v)
 	return v
 }
@@ -6131,6 +6217,10 @@ func (s *scope) lazyUserConsentStore() storage.UserConsentStore {
 }
 
 func (s *scope) lazySessionStore() session.Store { return s.root.get_lazySessionStore() }
+
+func (s *scope) Ptr_Endpoint__18() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__18() }
+
+func (s *scope) Ptr_Endpoint__19() *hosting.Endpoint { return s.root.get_Ptr_Endpoint__19() }
 
 func (s *scope) Ptr_Config() *wechatverify.Config { return s.root.get_Ptr_Config() }
 

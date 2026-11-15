@@ -275,6 +275,8 @@ var generatedDiscoveryKeys = map[string]struct{}{
 // a host entry: only the handler decides whether the key is advertised.
 var handlerWrittenDiscoveryKeys = map[string]struct{}{
 	wicket.DiscoveryTokenEndpointAuthSigningAlgorithmsSupported: {},
+	wicket.DiscoveryPushedAuthorizationRequestEndpoint:          {},
+	wicket.DiscoveryRequirePushedAuthorizationRequests:          {},
 }
 
 func isEndpointKey(key string) bool {

@@ -356,6 +356,8 @@ func newClientRegistration(clientId string) *models.ClientRegistration {
 	client.TokenEndpointAuthMethod = "private_key_jwt"
 	client.JwksUri = "https://" + clientId + ".example/jwks"
 	client.TokenEndpointAuthSigningAlgorithms = []string{"RS256"}
+	client.RequirePushedAuthorizationRequests = true
+	client.RequestUriLifetime = 45
 	if err := client.SetAllowedGrantTypes([]string{wicket.GrantTypeAuthorizationCode, wicket.GrantTypeClientCredentials}); err != nil {
 		panic(err)
 	}

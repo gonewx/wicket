@@ -73,6 +73,7 @@ type Client struct {
 	AllowedCorsOrigins                    []string
 	Properties                            map[string]string
 	ClientAuthenticationMetadata
+	ClientPushedAuthorizationMetadata
 }
 
 func NewClient() *Client {

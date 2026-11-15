@@ -17,6 +17,7 @@ import (
 	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/models/messages"
 	responses_models "github.com/gonewx/wicket/responses/models"
+	"github.com/gonewx/wicket/validators"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
@@ -45,7 +46,7 @@ type fakeAuthorizeRequestValidator struct {
 	result *validators_models.AuthorizeRequestValidationResult
 }
 
-func (v *fakeAuthorizeRequestValidator) Validate(ctx context.Context, values url.Values, subject *claims.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult {
+func (v *fakeAuthorizeRequestValidator) Validate(ctx context.Context, values url.Values, subject *claims.ClaimsPrincipal, phase validators.AuthorizeRequestPhase) *validators_models.AuthorizeRequestValidationResult {
 	return v.result
 }
 

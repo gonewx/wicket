@@ -32,6 +32,10 @@ type DiscoveryHandler struct {
 	// servesClientCertificateAuthentication is set once the assembly
 	// declared mutual TLS client authentication enabled.
 	servesClientCertificateAuthentication bool
+
+	// pushedAuthorization is what the assembly declared about pushed
+	// authorization requests, see ServePushedAuthorization.
+	pushedAuthorization discoveryPushedAuthorization
 }
 
 // NewDiscoveryHandler builds the discovery handler from the generator and the
@@ -84,6 +88,7 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 	if h.servesClientCertificateAuthentication {
 		settleMutualTlsAdvertisement(document, h.options)
 	}
+	settlePushedAuthorizationAdvertisement(document, baseUrl, h.options, h.assembly, h.pushedAuthorization)
 
 	return results.NewDiscoveryDocumentResult(document, h.options.Discovery.ResponseCacheInterval).Execute(w, r)
 }

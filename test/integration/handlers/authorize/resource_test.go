@@ -18,6 +18,7 @@ import (
 	storage_impl "github.com/gonewx/wicket/storage/impl"
 	"github.com/gonewx/wicket/storage/memory"
 	storage_models "github.com/gonewx/wicket/storage/models"
+	"github.com/gonewx/wicket/validators"
 	validators_impl "github.com/gonewx/wicket/validators/impl"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -153,7 +154,7 @@ func validateAuthorize(t *testing.T, responseType string, resources []string) *v
 	for _, resource := range resources {
 		values.Add(wicket.AuthorizeRequestResource, resource)
 	}
-	return validator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous())
+	return validator.Validate(context.Background(), values, claimspkg.ClaimsPrincipalAnonymous(), validators.AuthorizeRequestPhaseEntry)
 }
 
 func validateCodeExchange(t *testing.T, authorizeResources []string, tokenResource string) *validators_models.TokenRequestValidationResult {

@@ -153,6 +153,7 @@ cfg.SetClientRegistrationStore(pgadapter.NewClientRegistrationStore(pool))
 ```go
 cfg.SetPushedAuthorizationRequestStore(pgadapter.NewPushedAuthorizationRequestStore(pool))
 cfg.SetPushedAuthorizationDataProtectionProvider(hostProtectionProvider) // 真正加密/认证的实现
+cfg.EnablePushedAuthorizationRequests(pushedauth.Options{RequestUriLifetime: 90 * time.Second})
 ```
 
 `SetPushedAuthorizationRequestStoreProvider(func() storage.PushedAuthorizationRequestStore)` 为 provider 形态：`Freeze()` 不调用 provider，只检查是否已设置；provider 在特性首次取用存储时调用一次，届时返回 nil 即按未注入报错。
@@ -175,7 +176,7 @@ cfg.SetPushedAuthorizationDataProtectionProvider(hostProtectionProvider) // 真�
 
 PAR 数据保护缝：
 
-- **保护器固定 purpose。** 只经 `provider.Create(storage.PushedAuthorizationRequestPurpose)`（`"wicket.PushedAuthorizationRequest"`）取得，只用于 PAR 载荷。
+- **保护器固定 purpose。** 只经 `provider.Create(storage.PushedAuthorizationRequestPurpose)`（`"wicket.PushedAuthorizationRequest"`）取得，只用于 PAR 载荷与 authorize 签发的进入回执（二者靠内容中的种类标记区分）。
 - **拒绝默认实现。** 默认的 `services/impl.DataProtectionProvider` 只做 base64url 编码，注入到这条缝时 `Freeze()` 必 panic（无论 PAR 是否启用），信息点名该缝。
 - **无回退。** 这条缝没有任何回退声明。
 - **全局绑定不变。** 容器里的 `dp.DataProtectionProvider` 绑定照旧是默认实现，key management 私钥记录与 message cookie 继续用它；PAR 缝不进容器，也不影响它们。
@@ -183,7 +184,8 @@ PAR 数据保护缝：
 注入约束：
 
 - **特性条件必需。** PAR 启用后，两条缝任一未注入即 `Freeze()` panic，信息点名缺失的缝，`AllowInMemoryFallback()` 不豁免；开发环境需要内存存储时显式注入 `memory.NewMemoryPushedAuthorizationRequestStore()`。PAR 未启用时两条缝不校验、不记 WARN，任何代码路径都取不到端口或保护器。
-- **PAR 的公开启用开关随端点一起提供**（后续版本）；本版本只交付端口、缝与契约套件，现有装配行为不变。
+- **启用开关。** 以 `cfg.EnablePushedAuthorizationRequests(pushedauth.Options{...})` 启用（`Freeze()` 之前调用，见 [API 端点 · 推送授权请求](./api-contracts.md#推送授权请求par)），`cfg.PushedAuthorizationRequestsEnabled()` 查询。这是唯一开关：未调用时两条缝不参与校验，端点、discovery 宣告与 authorize 的 PAR 解析都不存在。
+- **回收由宿主驱动。** 核心不清理 PAR 记录：被消费的记录由原子取出删除，过期未用的记录留在存储中，直到宿主定期调用 `RemoveExpired(ctx, cutoff)`（按 `RetentionExpiration` 回收，不会删除仍在交互往返中的记录）。
 - 注入值的生命周期归宿主：容器不关闭它。
 
 适配器用 `storagetest.RunPushedAuthorizationRequestStoreSuite` 验证合规性（见下文「校验适配器合规性」）。

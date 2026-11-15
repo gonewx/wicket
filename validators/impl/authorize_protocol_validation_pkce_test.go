@@ -14,6 +14,7 @@ import (
 
 	"github.com/gonewx/wicket"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/validators"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
@@ -201,7 +202,7 @@ func TestAuthorizeProtocolValidationPkce(t *testing.T) {
 				validator, err := createAuthorizeRequestValidator()
 				r.NoError(err)
 
-				resp := validator.Validate(context.Background(), tc.parameters(clientId), nil)
+				resp := validator.Validate(context.Background(), tc.parameters(clientId), nil, validators.AuthorizeRequestPhaseEntry)
 				tc.expected(r, resp)
 			})
 		}

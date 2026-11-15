@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/validators"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
@@ -226,7 +227,7 @@ func TestAuthorizeProtocolValidationValid(t *testing.T) {
 			validator, err := createAuthorizeRequestValidator()
 			r.NoError(err)
 
-			result := validator.Validate(context.Background(), tc.parameters(), nil)
+			result := validator.Validate(context.Background(), tc.parameters(), nil, validators.AuthorizeRequestPhaseEntry)
 			tc.expected(r, result)
 
 		})
@@ -249,7 +250,7 @@ func TestAuthorizeProtocolValidationValidSuppressedPromt(t *testing.T) {
 		validator, err := createAuthorizeRequestValidator()
 		r.NoError(err)
 
-		result := validator.Validate(context.Background(), values, nil)
+		result := validator.Validate(context.Background(), values, nil, validators.AuthorizeRequestPhaseEntry)
 		r.NoError(result.Error)
 
 		r.ElementsMatch(result.ValidatedRequest.PromptModes, []string{wicket.PromptModesConsent, wicket.PromptModesLogin})
@@ -264,7 +265,7 @@ func TestAuthorizeProtocolValidationValidSuppressedPromt(t *testing.T) {
 		validator, err := createAuthorizeRequestValidator()
 		r.NoError(err)
 
-		result := validator.Validate(context.Background(), values, nil)
+		result := validator.Validate(context.Background(), values, nil, validators.AuthorizeRequestPhaseEntry)
 
 		r.NoError(result.Error)
 		r.ElementsMatch(result.ValidatedRequest.PromptModes, []string{wicket.PromptModesConsent})
@@ -281,7 +282,7 @@ func TestAuthorizeProtocolValidationValidSuppressedPromt(t *testing.T) {
 		validator, err := createAuthorizeRequestValidator()
 		r.NoError(err)
 
-		result := validator.Validate(context.Background(), values, nil)
+		result := validator.Validate(context.Background(), values, nil, validators.AuthorizeRequestPhaseEntry)
 
 		r.NoError(result.Error)
 		r.Empty(result.ValidatedRequest.PromptModes)

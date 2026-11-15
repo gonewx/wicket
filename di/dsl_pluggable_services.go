@@ -192,7 +192,7 @@ func registerPluggableServicesAndValidators() {
 	godi.AddTransient[validators.TokenRevocationRequestValidator, validators_impl.TokenRevocationRequestValidator](&r)
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L282 (TryAddTransient)
 	godi.AddTransientFactory[validators.AuthorizeRequestValidator](&r, func(p godi.Provider) validators.AuthorizeRequestValidator {
-		return validators_impl.NewAuthorizeRequestValidator(
+		validator := validators_impl.NewAuthorizeRequestValidator(
 			godi.GetRequired[*slog.Logger](p),
 			godi.GetRequired[*config_options.WicketOptions](p),
 			godi.GetRequired[services.IssuerNameService](p),
@@ -204,6 +204,10 @@ func registerPluggableServicesAndValidators() {
 			userSessionFromProvider(p),
 			godi.GetRequired[validators.CustomAuthorizeRequestValidator](p),
 		)
+		if godi.GetRequired[*ServerConfig](p).PushedAuthorizationRequestsEnabled() {
+			validator.SetPushedAuthorization(validators_impl.NewAuthorizeRequestPushedStage(pushedAuthorizationFromProvider(p)))
+		}
+		return validator
 	})
 	// From: IdentityServer4/src/IdentityServer/Configuration/DependencyInjection/BuilderExtensions/Core.cs#L280 (TryAddTransient)
 	godi.AddTransientFactory[validators.EndSessionRequestValidator](&r, func(p godi.Provider) validators.EndSessionRequestValidator {

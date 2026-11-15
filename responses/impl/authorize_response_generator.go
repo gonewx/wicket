@@ -168,7 +168,7 @@ func (g *AuthorizeResponseGenerator) createImplicitFlow(ctx context.Context, req
 			ValidatedRequest:         req.ValidatedRequest,
 			Subject:                  req.Subject,
 			ValidatedResources:       req.ValidatedResources,
-			Nonce:                    req.Raw.Get(wicket.AuthorizeRequestNonce),
+			Nonce:                    req.Nonce,
 			IncludeAllIdentityClaims: !req.AccessTokenRequested(),
 			AccessTokenToHash:        accessTokenValue,
 			AuthorizationCodeToHash:  authorizationCode,

@@ -84,7 +84,7 @@ func (p *OidcReturnUrlParser) Parse(ctx context.Context, returnUrl string) (*mes
 	}
 
 	user := userSession.GetUser()
-	result := p.validator.Validate(ctx, parameters, user)
+	result := p.validator.Validate(ctx, parameters, user, validators.AuthorizeRequestPhaseInteractionReturn)
 	if result == nil {
 		p.logger.Debug("No AuthorizationRequest being returned")
 

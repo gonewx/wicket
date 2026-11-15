@@ -13,5 +13,5 @@ import (
 )
 
 type AuthorizeRequestValidator interface {
-	Validate(ctx context.Context, values url.Values, subject *claims.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult
+	Validate(ctx context.Context, values url.Values, subject *claims.ClaimsPrincipal, phase AuthorizeRequestPhase) *validators_models.AuthorizeRequestValidationResult
 }

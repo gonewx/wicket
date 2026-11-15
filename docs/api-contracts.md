@@ -21,6 +21,7 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | End Session Callback | `/connect/endsession/callback` | GET | `EndSessionCallbackHandler` | 登出回调 |
 | Check Session | `/connect/checksession` | GET | `CheckSessionHandler` | 会话状态 iframe |
 | CIBA | `/connect/ciba` | POST | `BackchannelAuthenticationHandler` | 后端通道认证 |
+| Pushed Authorization Request | `/connect/pushedauthorization` | POST | `PushedAuthorizationRequestHandler` | 推送授权请求（RFC 9126），仅在 `EnablePushedAuthorizationRequests` 后路由，见下文「推送授权请求（PAR）」 |
 
 **端点开关（`Endpoints.Enable*`）**：全部已注册端点的 handler 都检查各自的开关，关闭时返回 404（空响应体）；默认值均为 `true`。
 
@@ -44,6 +45,73 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 - 开关关闭时 discovery 文档的变化见下文"Discovery 文档结构"一节"按装配事实过滤"的说明。
 
 > 常量中还定义了 mTLS 路径（`/connect/mtls/*`），但这些端点**尚未提供**：没有注册路由，discovery 也不宣告。端点注册随 handler 落地逐步启用，届时 discovery 自动恢复对应宣告。
+
+PAR 端点不受 `Endpoints.Enable*` 控制（`EndpointsOptions` 没有它的开关）：唯一开关是 `ServerConfig.EnablePushedAuthorizationRequests`。未启用时 `/connect/pushedauthorization` 与 mTLS 别名 `/connect/mtls/pushedauthorization` 的路由不产出 handler，请求落到宿主的下一个 handler（通常 404）；mTLS 别名另需 `EnableClientCertificateAuthentication`。
+
+## 推送授权请求（PAR）
+
+RP 先从后端把授权参数推送给 PAR 端点，换得不透明的 `request_uri`，浏览器只带 `client_id` 与 `request_uri` 访问 authorize（RFC 9126）。默认关闭。
+
+### 启用
+
+```go
+cfg := root.ServerConfig()
+cfg.SetPushedAuthorizationRequestStore(memory.NewMemoryPushedAuthorizationRequestStore())
+cfg.SetPushedAuthorizationDataProtectionProvider(hostProvider) // 不得为默认实现
+cfg.EnablePushedAuthorizationRequests(pushedauth.Options{RequestUriLifetime: 90 * time.Second})
+cfg.Freeze()
+```
+
+`EnablePushedAuthorizationRequests` 在 `Freeze()` 之后调用、或任一时长为负时 panic；`PushedAuthorizationRequestsEnabled()` 查询，`PushedAuthorizationRequestsOptions()` 返回补齐默认值后的选项。启用后两条 PAR 缝为特性条件必需（见[存储持久化接入指南](./storage-persistence-guide.md#注入-par-存储与-par-数据保护)）。
+
+| `pushedauth.Options` 字段 | 默认 | 含义 |
+|------|------|------|
+| `RequestUriLifetime` | 60s | 入口有效期，即推送响应的 `expires_in`；首次访问 authorize 时判定 |
+| `InteractionGracePeriod` | 10min | 交互往返宽限：入口有效期内进入 authorize 的请求，登录 / 同意往返可延续到 入口有效期 + 宽限 |
+| `RequireForAllClients` | false | 全局强制 PAR：所有 client 只能经 PAR `request_uri` 访问 authorize；discovery 宣告 `require_pushed_authorization_requests: true` |
+| `Clock` | 容器的 `services.SystemClock` | 判定时限用的时钟 |
+
+零值时长取默认值。
+
+client 元数据（`models.ClientPushedAuthorizationMetadata`，嵌入 `models.Client`）：
+
+| 字段 | 含义 |
+|------|------|
+| `RequirePushedAuthorizationRequests` | 该 client 只能经 PAR 访问 authorize（RFC 9126 §6）。PAR 未启用时该 client 配置无效：`FindClientById` 返回 `storage.ErrInvalidClientConfiguration` |
+| `RequestUriLifetime` | 该 client 的入口有效期（秒），大于 0 时取代全局值；0 用全局值；负值为配置无效 |
+
+### 端点契约
+
+`POST /connect/pushedauthorization`，`application/x-www-form-urlencoded`，参数只读请求体。
+
+1. 非 POST → 405；非表单 → 415。
+2. 客户端认证与撤销端点同一组合（client secret、`private_key_jwt`、mTLS）。认证基础设施不可用 → 500 固定体；认证失败 → `invalid_client`（带 `Authorization` 头时 401，否则 400）。
+3. 请求体的 `client_id` 与已认证 client 不一致（或出现多个）→ 400 `invalid_request`；缺省时补入。剔除 `client_secret`、`client_assertion`、`client_assertion_type`。
+4. 按 authorize 同等规则校验（`Push` 阶段，含 redirect_uri 预注册、scope、PKCE、`request` 对象）；`request_uri` 出现即 `invalid_request`。失败 → 400 `{"error","error_description"}`（描述为空时省略 `error_description`）；基础设施失败 → 500。
+5. 成功 → **201**，`Content-Type: application/json`，`Cache-Control: no-cache, no-store`：
+
+```json
+{"request_uri": "urn:ietf:params:oauth:request_uri:…", "expires_in": 60}
+```
+
+存储的是剔除认证参数后的原始表单（不是合并 `request` 对象后的结果），载荷经 PAR 数据保护缝保护。
+
+### authorize 端的解析
+
+- `request_uri` 以 `urn:ietf:params:oauth:request_uri:` 开头即按 PAR 句柄解析，**不会**进入 `request_uri` 远程抓取；PAR 未启用时直接 `invalid_request_uri`。
+- 记录缺失、属于其他 client、时限已过或载荷无法还原 → `invalid_request_uri`，记录不消费；存储故障 → `server_error`。
+- 解析成功后，推送的参数作为工作集参与全部后续校验；外层 URL 上的其他参数被忽略。校验后的请求在 `PushedRequestUri` / `PushedParameters`（`validators/models.PushedAuthorizationRequestValues`）中携带展开结果，`Raw`、登录 / 同意的 returnUrl 与 `AuthorizationParametersMessageStore` 中只有 `client_id`、`request_uri`、`par_entry_receipt`（以及 wicket 内部的 `suppressed_prompt`）。因此交互页经 `GetAuthorizationContext` 取得的 `messages.AuthorizationRequest.Parameters` 也只有这组最小参数，不含推送的授权参数；交互页应读取 `AuthorizationRequest` 的类型化字段（`Client`、`RedirectUri`、`PromptModes`、`ValidatedResources` 等），需要原始推送参数的宿主代码改读校验后请求的 `PushedParameters`。
+- **两种时限与进入回执。** 首次进入按入口有效期判定，通过后签发 `par_entry_receipt`（PAR 保护器保护的回执，绑定 `request_uri` 与进入时间）随 returnUrl 往返；callback 与 `OidcReturnUrlParser` 只有带有效回执时才按保留期判定，无回执或回执无效一律按首次进入判定，所以直接访问 callback 绕不过 `expires_in`。
+- **一次性。** 交互往返期间只读取用。authorize 向 client 产出响应（授权码或错误重定向）时，先重新加载 client，再原子取出记录；授权码只在取出成功后签发。并发中落败或 client 已不存在 → `invalid_request`、不签发授权码；取出的其他故障 → 5xx。登录、同意、自定义交互重定向不消费。
+- 未经 PAR 的请求：client 要求 PAR 或 `RequireForAllClients` 时 → `invalid_request`。
+
+### 阶段输入（破坏性签名改动）
+
+`validators.AuthorizeRequestValidator.Validate(ctx, values, subject, phase)` 新增 `phase validators.AuthorizeRequestPhase`：`AuthorizeRequestPhaseEntry`（零值，authorize 端点）、`AuthorizeRequestPhaseInteractionReturn`（authorize callback 与 `OidcReturnUrlParser`）、`AuthorizeRequestPhasePush`（PAR 端点）。validator 不按端点推断阶段。
+
+### 回收
+
+核心不清理过期记录；宿主定期调用 `PushedAuthorizationRequestStore.RemoveExpired(ctx, cutoff)`。
 
 ## 支持的授权类型（Grant Types）
 
@@ -89,6 +157,7 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | `authorization_response_iss_parameter_supported` | `EmitIssuerIdentificationResponseParameter` 为 `true` |
 | `tls_client_auth` / `self_signed_tls_client_auth` | 逐个判定：该方法在已注册解析器的 `GetAvailableAuthenticationMethods()` 中 |
 | `tls_client_certificate_bound_access_tokens`、`mtls_endpoint_aliases` | 至少注册了一种 tls 类客户端认证解析器。alias 条目逐条判定：对应主端点仍被宣告，且路径形态（未配置 `MutualTls.DomainName`）的 alias 路径已注册为端点路由（配置了 `DomainName` 的 domain / sub-domain 形态位于其他主机，只看主端点）；删空后整个键移除 |
+| `pushed_authorization_request_endpoint` / `require_pushed_authorization_requests` | 仅由 handler 写入：PAR 已启用且其路由已注册时写入端点 URL 与是否全局强制；否则两键一律移除（宿主同名自定义条目同样被移除）。`mtls_endpoint_aliases` 已宣告且 mTLS 别名路由已注册时追加 PAR 别名（路径形态 `connect/mtls/pushedauthorization`，或按 `MutualTls.DomainName` 的 domain / sub-domain 形态） |
 
 令牌撤销端点与设备授权端点已注册，`revocation_endpoint`、`device_authorization_endpoint` 以及 `grant_types_supported` 中的 `device_code` 在默认装配下照常输出；`EnableDeviceAuthorizationEndpoint=false` 时后两者不输出；`EnableTokenRevocationEndpoint=false` 时 generator 不输出 `revocation_endpoint`，宿主未配置同名自定义条目时文档中没有该键。授权、令牌、内省、CIBA 四个端点的开关同理，关闭时 generator 不输出下列键，宿主未配置同名自定义条目时文档中没有这些键：`EnableAuthorizeEndpoint=false` 时为 `authorization_endpoint`、`request_parameter_supported`、`request_object_signing_alg_values_supported`，以及 `EnableJwtRequestUri=true` 时才有的 `request_uri_parameter_supported`；`EnableTokenEndpoint=false` 时为 `token_endpoint`；`EnableIntrospectionEndpoint=false` 时为 `introspection_endpoint`；`EnableBackchannelAuthenticationEndpoint=false` 时为 `backchannel_authentication_endpoint`、`backchannel_token_delivery_modes_supported`、`backchannel_user_code_parameter_supported`，以及 `grant_types_supported` 中的 `urn:openid:params:grant-type:ciba`。authorize 或 token 端点关闭后，`response_types_supported`、`response_modes_supported`、`grant_types_supported`、`token_endpoint_auth_methods_supported` 等仍照常输出。`frontchannel_logout_*` 照常输出（不开启 server-side sessions 时 front-channel 通知不会发生，见下文 Back-Channel Logout 的已知限制）。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤，但键名与生成键相同的除外。生成键指 generator 会写入文档的键，其中多数按开关写入：开关打开时 generator 丢弃同名自定义值；开关关闭时 generator 不写该键，同名自定义值会进入文档。两种情况下，这些键下的值一律按上表过滤（列表值无论是 `[]string` 还是从配置解码出的 `[]any` 都逐项判定）。上表按装配事实判定，端点开关不是过滤条件。被过滤撤下的能力，宿主无法借生成键名重新宣告：就端点而言，路径未注册为端点路由时，同名自定义值若指向本服务 base URL 下的该路径（包括宿主在 wicket 端点路由之外自行提供的路径），或不是绝对 URL，照样被撤下，即使自定义值与生成值相同。开关关闭而路由仍已注册时则不被撤下：`EnableTokenRevocationEndpoint=false` 时 generator 不写入 `revocation_endpoint`，端点对任何请求返回 404；宿主此时若以同名自定义条目写入指向本服务撤销路由的值，或任何外部绝对 URL，该值会出现在 discovery 文档中。其中指回本服务撤销路由的情形是已知限制：文档宣告了一个返回 404 的端点，开关关闭时，宿主不应以该键指回本服务的撤销路由。同一已知限制也适用于 `authorization_endpoint`、`token_endpoint`、`introspection_endpoint`、`backchannel_authentication_endpoint`：对应开关关闭而宿主以同名自定义条目指回本服务的对应路由时，条目仍出现在文档中，而该端点返回 404；开关关闭时，宿主不应以这些键指回本服务路由。`request_parameter_supported`、`request_object_signing_alg_values_supported`（authorize 关闭时）与 `backchannel_token_delivery_modes_supported`、`backchannel_user_code_parameter_supported`（CIBA 关闭时）的同名自定义值同样会进入文档。宿主自有的能力请用 generator 从不写入的键名宣告（例如 `registration_endpoint`），这类键只可能来自宿主，原样保留。
 
@@ -117,6 +186,8 @@ cfg.Freeze()
 |------|----------|--------------|
 | `RequireAsymmetricRequestObjects()` | `AsymmetricRequestObjectsRequired()` | `request` 与 `request_uri` 两条路径的 request object 只接受 `RS256/384/512`、`PS256/384/512`、`ES256/384/512` 签名。`HS*`、`none`、头部无法解析、JSON 序列化或多签名一律 `invalid_request_object`。验签只使用 client 登记的非对称密钥：对称（`kty=oct`）密钥在验签前被剔除，所以头部写 `RS256`、实际用对称密钥做 HMAC 的请求同样被拒；只登记了对称密钥的 client 无法再使用 request object。discovery 的 `request_object_signing_alg_values_supported` 只宣告上述九个值（宿主同名自定义值同样过滤），过滤后为空则删除该键。CIBA 的 `request` 参数不在此范围内 |
 | `RequireClientCredentialsAuthentication()` | `ClientCredentialsAuthenticationRequired()` | token 端点上 `grant_type=client_credentials`（请求体或查询串）的请求，只签发给真正认证的 client：`RequireClientSecret=true` 且 secret 正确（implicit-only client 除外）、`private_key_jwt` 断言认证成功，或 tls 类方法以证书认证成功。公开 client（`RequireClientSecret=false`）只带 `client_id` 或带任意 secret 都返回 HTTP 400 `invalid_client`（RFC 6749 §4.4）。其他 grant 与其他端点（撤销、CIBA、设备授权）不受影响 |
+
+强制 PAR 不在上表：它随 PAR 特性启用，经 `pushedauth.Options.RequireForAllClients`（全局）或 client 元数据 `RequirePushedAuthorizationRequests`（按 client）开启，见「推送授权请求（PAR）」。
 
 第三项是 client 元数据：`ClientAuthenticationMetadata.TokenEndpointAuthSigningAlgorithms` 为 `private_key_jwt` client 限定断言签名算法，见 [private_key_jwt 接入指南](private-key-jwt-guide.md#按-client-的签名算法白名单)。
 
@@ -306,6 +377,7 @@ err = interaction.Deny(ctx, userCode)
 | `SigningCredentialStore` | 签名凭据 |
 | `ValidationKeysStore` | 验证密钥 |
 | `AuthorizationParametersMessageStore` | 授权参数跨重定向持久化 |
+| `PushedAuthorizationRequestStore` | 推送授权请求（RFC 9126）；PAR 启用时为特性条件必需缝，过期记录由宿主调用 `RemoveExpired` 回收 |
 
 存储缝分类：`AuthorizationParametersMessageStore` 与 `ClientStore` 为可选缝（未注入时 `Freeze()` 记 WARN、不失败），其余十条为必需缝。
 

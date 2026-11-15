@@ -19,6 +19,7 @@ import (
 	"github.com/gonewx/wicket/models/messages"
 	responses_models "github.com/gonewx/wicket/responses/models"
 	storage_models "github.com/gonewx/wicket/storage/models"
+	"github.com/gonewx/wicket/validators"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
 
@@ -122,7 +123,7 @@ type switchAuthorizeRequestValidator struct {
 	counter *switchCallCounter
 }
 
-func (v *switchAuthorizeRequestValidator) Validate(context.Context, url.Values, *claims.ClaimsPrincipal) *validators_models.AuthorizeRequestValidationResult {
+func (v *switchAuthorizeRequestValidator) Validate(context.Context, url.Values, *claims.ClaimsPrincipal, validators.AuthorizeRequestPhase) *validators_models.AuthorizeRequestValidationResult {
 	v.counter.calls++
 	return validators_models.NewAuthorizeRequestValidationResult(validRequest())
 }

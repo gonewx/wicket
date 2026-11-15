@@ -94,7 +94,7 @@ func TestAuthorizeCustomRuleValidation(t *testing.T) {
 			values.Set(wicket.AuthorizeRequestRedirectUri, "https://server/cb")
 			values.Set(wicket.AuthorizeRequestResponseType, wicket.ResponseTypesCode)
 
-			result := validator.Validate(context.Background(), values, nil)
+			result := validator.Validate(context.Background(), values, nil, validators.AuthorizeRequestPhaseEntry)
 			if !errors.Is(result.Error, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", result.Error, tt.wantErr)
 			}

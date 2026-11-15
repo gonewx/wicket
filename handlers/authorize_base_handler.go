@@ -36,28 +36,33 @@ type authorizeBaseHandler struct {
 	generator   responses.AuthorizeResponseGenerator
 	session     services.UserSession
 	logger      *slog.Logger
+	// pushed consumes the pushed authorization request a response to the
+	// client answers; nil while pushed authorization is not enabled.
+	pushed PushedAuthorizationConsumer
 }
 
 // validate runs protocol validation of the request parameters against the
-// current subject.
-func (h *authorizeBaseHandler) validate(ctx context.Context, values url.Values) *validators_models.AuthorizeRequestValidationResult {
-	return h.validator.Validate(ctx, values, h.session.GetUser())
+// current subject, in the phase the caller declares.
+func (h *authorizeBaseHandler) validate(ctx context.Context, values url.Values, phase validators.AuthorizeRequestPhase) *validators_models.AuthorizeRequestValidationResult {
+	return h.validator.Validate(ctx, values, h.session.GetUser(), phase)
 }
 
 // dispatch maps a validated request plus any consent answer onto the result that
 // expresses the request's next step. Error paths (validation or interaction)
 // take precedence over interaction redirects, which take precedence over issuing
-// the final authorization response.
+// the final authorization response. Every result that answers the client
+// consumes the pushed authorization request it came from, see
+// authorize_pushed_consumption.go.
 func (h *authorizeBaseHandler) dispatch(ctx context.Context, validation *validators_models.AuthorizeRequestValidationResult, consent *messages.ConsentResponse) (endpointResult, error) {
 	if validation.Error != nil {
-		return h.errorResult(validation.ValidatedRequest, validation.Error, validation.Description), nil
+		return h.pushedErrorResult(ctx, validation.ValidatedRequest, validation.Error, validation.Description)
 	}
 
 	request := validation.ValidatedRequest
 	interaction := h.interaction.Handle(ctx, request, consent)
 	switch {
 	case interaction.IsError():
-		return h.errorResult(request, interaction.Error, interaction.ErrorDescription), nil
+		return h.pushedErrorResult(ctx, request, interaction.Error, interaction.ErrorDescription)
 	case interaction.IsLogin:
 		return results.NewLoginPageResult(request), nil
 	case interaction.IsConsent:
@@ -66,12 +71,15 @@ func (h *authorizeBaseHandler) dispatch(ctx context.Context, validation *validat
 		return results.NewCustomRedirectResult(request, interaction.RedirectUrl), nil
 	}
 
+	if refused, err := h.consumePushedBeforeIssue(ctx, request); refused != nil || err != nil {
+		return refused, err
+	}
 	response, err := h.generator.Create(ctx, request)
 	if err != nil {
 		// A generator failure is surfaced to the client through the authorize
 		// result: safe errors return to the client, everything else renders the
 		// error page. This keeps a failed response from being reported as 501.
-		return h.errorResult(request, err, ""), nil
+		return h.pushedErrorResult(ctx, request, err, "")
 	}
 	return results.NewAuthorizeResult(response), nil
 }
