@@ -187,6 +187,8 @@ type Root struct {
 	st_UserSession                                            uint8
 	f_Service                                                 *core.Service
 	st_Service                                                uint8
+	f_UserSession__2                                          services.UserSession
+	st_UserSession__2                                         uint8
 	disp                                                      *runtime.Disposer
 	guard                                                     godi.CloseGuard
 }
@@ -1754,6 +1756,26 @@ func (r *Root) get_Service() *core.Service {
 	return v
 }
 
+func (r *Root) get_UserSession__2() services.UserSession {
+	if r.st_UserSession__2 == 2 {
+		return r.f_UserSession__2
+	}
+	if r.st_UserSession__2 == 1 {
+		panic(godi.CircularDependencyError("UserSession__2"))
+	}
+	r.st_UserSession__2 = 1
+	defer func() {
+		if r.st_UserSession__2 != 2 {
+			r.st_UserSession__2 = 0
+		}
+	}()
+	v := (revokingUserSessionFromProvider)(r)
+	r.f_UserSession__2 = v
+	r.disp.TrackAny(v)
+	r.st_UserSession__2 = 2
+	return v
+}
+
 func (r *Root) NewAuthorizationParametersMessageStore() storage.AuthorizationParametersMessageStore {
 	v := (func(p godi.Provider) storage.AuthorizationParametersMessageStore {
 		return godi.GetRequired[*ServerConfig](p).AuthorizationParametersMessageStore()
@@ -2948,6 +2970,13 @@ func (r *Root) Service() *core.Service {
 	return r.get_Service()
 }
 
+func (r *Root) UserSession__2() services.UserSession {
+	if r.guard.Closed() {
+		panic(godi.ProviderClosedError())
+	}
+	return r.get_UserSession__2()
+}
+
 func (r *Root) Get[T any]() (T, bool) {
 	v := r.GetService(reflect.TypeFor[T]())
 	if v == nil {
@@ -3077,7 +3106,7 @@ func (r *Root) GetService(t reflect.Type) any {
 	case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 		return r.NewOptionsMonitor__jwt_Options()
 	case reflect.TypeFor[services.UserSession]():
-		return r.get_UserSession()
+		return r.get_UserSession__2()
 	case reflect.TypeFor[auth.ClaimsTransformation]():
 		return r.get_NoopClaimsTransformation()
 	case reflect.TypeFor[*core.Service]():
@@ -3766,7 +3795,7 @@ func (r *Root) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 			return []any{r.NewOptionsMonitor__jwt_Options()}
 		case reflect.TypeFor[services.UserSession]():
-			return []any{r.get_UserSession()}
+			return []any{r.get_UserSession(), r.get_UserSession__2()}
 		case reflect.TypeFor[auth.ClaimsTransformation]():
 			return []any{r.get_NoopClaimsTransformation()}
 		case reflect.TypeFor[*core.Service]():
@@ -4024,6 +4053,8 @@ type scope struct {
 	st_UserSession                uint8
 	f_Service                     *core.Service
 	st_Service                    uint8
+	f_UserSession__2              services.UserSession
+	st_UserSession__2             uint8
 	disp                          *runtime.Disposer
 	guard                         godi.CloseGuard
 }
@@ -4140,7 +4171,7 @@ func (s *scope) GetService(t reflect.Type) any {
 	case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 		return s.NewOptionsMonitor__jwt_Options()
 	case reflect.TypeFor[services.UserSession]():
-		return s.get_UserSession()
+		return s.get_UserSession__2()
 	case reflect.TypeFor[auth.ClaimsTransformation]():
 		return s.root.get_NoopClaimsTransformation()
 	case reflect.TypeFor[*core.Service]():
@@ -4808,7 +4839,7 @@ func (s *scope) GetKeyedServices(t reflect.Type, key any) []any {
 		case reflect.TypeFor[options2.OptionsMonitor[*jwt.Options]]():
 			return []any{s.NewOptionsMonitor__jwt_Options()}
 		case reflect.TypeFor[services.UserSession]():
-			return []any{s.get_UserSession()}
+			return []any{s.get_UserSession(), s.get_UserSession__2()}
 		case reflect.TypeFor[auth.ClaimsTransformation]():
 			return []any{s.root.get_NoopClaimsTransformation()}
 		case reflect.TypeFor[*core.Service]():
@@ -5144,6 +5175,26 @@ func (s *scope) get_Service() *core.Service {
 	v := core.NewService(s.NewAuthSchemeProvider(), s.get_HandlerProvider())
 	s.f_Service = v
 	s.st_Service = 2
+	return v
+}
+
+func (s *scope) get_UserSession__2() services.UserSession {
+	if s.st_UserSession__2 == 2 {
+		return s.f_UserSession__2
+	}
+	if s.st_UserSession__2 == 1 {
+		panic(godi.CircularDependencyError("UserSession__2"))
+	}
+	s.st_UserSession__2 = 1
+	defer func() {
+		if s.st_UserSession__2 != 2 {
+			s.st_UserSession__2 = 0
+		}
+	}()
+	v := (revokingUserSessionFromProvider)(s)
+	s.f_UserSession__2 = v
+	s.disp.TrackAny(v)
+	s.st_UserSession__2 = 2
 	return v
 }
 
@@ -6349,6 +6400,13 @@ func (s *scope) Service() *core.Service {
 		panic(godi.ProviderClosedError())
 	}
 	return s.get_Service()
+}
+
+func (s *scope) UserSession__2() services.UserSession {
+	if s.guard.Closed() || s.root.guard.Closed() {
+		panic(godi.ProviderClosedError())
+	}
+	return s.get_UserSession__2()
 }
 
 func (s *scope) Get[T any]() (T, bool) {

@@ -107,6 +107,10 @@ type ServerConfig struct {
 	// refresh token, see refresh_token_consumption.go.
 	refreshTokenConsumption services.RefreshTokenConsumption
 
+	// sessionGrantRevocation revokes the grants of a browser session once
+	// another subject signs in on it, see session_grant_revocation.go.
+	sessionGrantRevocation bool
+
 	// accountCreationUrl is the host's account creation page, see
 	// account_creation.go. Empty means account creation is not offered.
 	accountCreationUrl string
