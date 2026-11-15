@@ -13,6 +13,7 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | Token | `/connect/token` | POST | `TokenHandler` | 令牌端点 |
 | Discovery | `/.well-known/openid-configuration` | GET | `DiscoveryHandler` | OIDC 发现文档 |
 | Discovery JWKS | `/.well-known/openid-configuration/jwks` | GET | `DiscoveryKeyHandler` | JSON Web Key Set |
+| Authorization Server Metadata | `/.well-known/oauth-authorization-server`（issuer 含路径时其后接该路径） | GET | `AuthorizationServerMetadataHandler` | OAuth 2.0 授权服务器元数据（RFC 8414），见下文「授权服务器元数据（RFC 8414）」 |
 | UserInfo | `/connect/userinfo` | GET/POST | `UserInfoHandler` | 用户信息端点 |
 | Introspection | `/connect/introspect` | POST | `IntrospectionHandler` | 令牌内省 |
 | Revocation | `/connect/revocation` | POST | `TokenRevocationHandler` | 令牌撤销（RFC 7009） |
@@ -33,7 +34,7 @@ Wicket 实现标准 OIDC/OAuth 2.0 协议端点，通过 `hosting.EndpointRouter
 | `EnableBackchannelAuthenticationEndpoint` | CIBA |
 | `EnableTokenRevocationEndpoint` | Revocation |
 | `EnableDeviceAuthorizationEndpoint` | Device Authorization |
-| `EnableDiscoveryEndpoint` | Discovery 与 Discovery JWKS |
+| `EnableDiscoveryEndpoint` | Discovery、Discovery JWKS 与 Authorization Server Metadata |
 | `EnableUserInfoEndpoint` | UserInfo |
 | `EnableEndSessionEndpoint` | End Session 与 End Session Callback |
 | `EnableCheckSessionEndpoint` | Check Session |
@@ -297,6 +298,19 @@ DPoP 启用时 discovery 文档写入 `dpop_signing_alg_values_supported`（配�
 令牌撤销端点与设备授权端点已注册，`revocation_endpoint`、`device_authorization_endpoint` 以及 `grant_types_supported` 中的 `device_code` 在默认装配下照常输出；`EnableDeviceAuthorizationEndpoint=false` 时后两者不输出；`EnableTokenRevocationEndpoint=false` 时 generator 不输出 `revocation_endpoint`，宿主未配置同名自定义条目时文档中没有该键。授权、令牌、内省、CIBA 四个端点的开关同理，关闭时 generator 不输出下列键，宿主未配置同名自定义条目时文档中没有这些键：`EnableAuthorizeEndpoint=false` 时为 `authorization_endpoint`、`request_parameter_supported`、`request_object_signing_alg_values_supported`，以及 `EnableJwtRequestUri=true` 时才有的 `request_uri_parameter_supported`；`EnableTokenEndpoint=false` 时为 `token_endpoint`；`EnableIntrospectionEndpoint=false` 时为 `introspection_endpoint`；`EnableBackchannelAuthenticationEndpoint=false` 时为 `backchannel_authentication_endpoint`、`backchannel_token_delivery_modes_supported`、`backchannel_user_code_parameter_supported`，以及 `grant_types_supported` 中的 `urn:openid:params:grant-type:ciba`。authorize 或 token 端点关闭后，`response_types_supported`、`response_modes_supported`、`grant_types_supported`、`token_endpoint_auth_methods_supported` 等仍照常输出。`frontchannel_logout_*` 照常输出（不开启 server-side sessions 时 front-channel 通知不会发生，见下文 Back-Channel Logout 的已知限制）。宿主通过 `Discovery.CustomEntries` 添加的条目不参与过滤，但键名与生成键相同的除外。生成键指 generator 会写入文档的键，其中多数按开关写入：开关打开时 generator 丢弃同名自定义值；开关关闭时 generator 不写该键，同名自定义值会进入文档。两种情况下，这些键下的值一律按上表过滤（列表值无论是 `[]string` 还是从配置解码出的 `[]any` 都逐项判定）。上表按装配事实判定，端点开关不是过滤条件。被过滤撤下的能力，宿主无法借生成键名重新宣告：就端点而言，路径未注册为端点路由时，同名自定义值若指向本服务 base URL 下的该路径（包括宿主在 wicket 端点路由之外自行提供的路径），或不是绝对 URL，照样被撤下，即使自定义值与生成值相同。开关关闭而路由仍已注册时则不被撤下：`EnableTokenRevocationEndpoint=false` 时 generator 不写入 `revocation_endpoint`，端点对任何请求返回 404；宿主此时若以同名自定义条目写入指向本服务撤销路由的值，或任何外部绝对 URL，该值会出现在 discovery 文档中。其中指回本服务撤销路由的情形是已知限制：文档宣告了一个返回 404 的端点，开关关闭时，宿主不应以该键指回本服务的撤销路由。同一已知限制也适用于 `authorization_endpoint`、`token_endpoint`、`introspection_endpoint`、`backchannel_authentication_endpoint`：对应开关关闭而宿主以同名自定义条目指回本服务的对应路由时，条目仍出现在文档中，而该端点返回 404；开关关闭时，宿主不应以这些键指回本服务路由。`request_parameter_supported`、`request_object_signing_alg_values_supported`（authorize 关闭时）与 `backchannel_token_delivery_modes_supported`、`backchannel_user_code_parameter_supported`（CIBA 关闭时）的同名自定义值同样会进入文档。宿主自有的能力请用 generator 从不写入的键名宣告（例如 `registration_endpoint`），这类键只可能来自宿主，原样保留。
 
 `MutualTls.Enabled=true` 且有任何 mTLS 相关值（上表最后两行）被移除时，每生成一次文档记一条 `slog` Warn。
+
+### 授权服务器元数据（RFC 8414）
+
+`AuthorizationServerMetadataHandler` 提供 OAuth 2.0 授权服务器元数据文档，供只实现 OAuth 2.0 的 client 发现端点与能力。
+
+- **同源**：文档由装配中同一个 `DiscoveryHandler` 的同一套生成、过滤与 settle 步骤（每个请求各自生成）产出，与 `/.well-known/openid-configuration` 键集合相同、每个键取值相同（包括 OIDC 专属键；RFC 8414 允许附加元数据）。上文按装配事实过滤的规则同样适用。新路由本身不写进任何文档键。
+- **路径规则**（RFC 8414 §3）：服务路径 = `/.well-known/oauth-authorization-server` + 文档 `issuer` 的转义路径部分（去掉末尾所有 `/`）。issuer 无路径或只有 `/` 时为裸路径。例：issuer `https://as.example/tenant/one/` → `/.well-known/oauth-authorization-server/tenant/one`。`wicket.AuthorizationServerMetadataPath(issuer)` 按同一规则计算，宿主可直接调用。
+- **部署不对称**：issuer 含路径时，AS 元数据位于根下的 `/.well-known/oauth-authorization-server/<issuer 路径>`，而 openid-configuration 仍位于根下的 `/.well-known/openid-configuration`（不在 issuer 路径之下），因此 wicket 前面的代理必须把这两条根路径的 well-known 请求转发给 wicket。
+- **匹配**：前缀按端点路由口径不区分大小写；其后的 issuer 路径按转义形式逐字节比较。
+- **开关与检查顺序**：沿用 `Endpoints.EnableDiscoveryEndpoint`，无独立开关。先检查方法，再检查开关：非 GET 请求一律 405（开关关闭时也是 405），GET 请求在开关关闭时 404。
+- **404**：GET 请求在开关关闭时、或前缀下的路径与服务路径不符（例如 issuer 含路径时访问裸路径，或 issuer 无路径时访问 `…/oauth-authorization-server/x`、`…/oauth-authorization-server/`）时返回 404（空响应体），不落到宿主的下一个 handler。
+- **路由行为变化**：`/.well-known/oauth-authorization-server/` 下任何未被其他路由命中的请求现在都由 wicket 应答（路径不符时 404），不再到达宿主的下一个 handler；宿主在该前缀下自行挂载的路由会被遮盖。
+- **CORS**：路由未加入 `CorsPaths`。
 
 ## 客户端认证方式
 

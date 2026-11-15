@@ -84,10 +84,23 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 		return results.NewStatusCodeResult(http.StatusNotFound).Execute(w, r)
 	}
 
+	document, err := h.settledDocument(r)
+	if err != nil {
+		return err
+	}
+
+	return results.NewDiscoveryDocumentResult(document, h.options.Discovery.ResponseCacheInterval).Execute(w, r)
+}
+
+// settledDocument generates the discovery document for the request and
+// filters and settles it against the running assembly. It is the single
+// source of both the OpenID Provider configuration and the authorization
+// server metadata document.
+func (h *DiscoveryHandler) settledDocument(r *http.Request) (map[string]any, error) {
 	baseUrl := h.urls.BaseUrl()
 	document, err := h.generator.CreateDiscoveryDocument(r.Context(), baseUrl, h.issuer.GetCurrent())
 	if err != nil {
-		return fmt.Errorf("create discovery document: %w", err)
+		return nil, fmt.Errorf("create discovery document: %w", err)
 	}
 	filterDiscoveryAdvertisement(document, baseUrl, h.options, h.assembly, h.logger)
 	if h.servesClientCertificateAuthentication {
@@ -95,8 +108,7 @@ func (h *DiscoveryHandler) Process(w http.ResponseWriter, r *http.Request) error
 	}
 	settlePushedAuthorizationAdvertisement(document, baseUrl, h.options, h.assembly, h.pushedAuthorization)
 	settleDPoPAdvertisement(document, h.servesDPoP, h.dpopSigningAlgorithms, h.logger)
-
-	return results.NewDiscoveryDocumentResult(document, h.options.Discovery.ResponseCacheInterval).Execute(w, r)
+	return document, nil
 }
 
 // SetClientAssertionSigningAlgorithms records the signature algorithms of the

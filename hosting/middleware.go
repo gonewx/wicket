@@ -44,6 +44,13 @@ func (m *Middleware) Use(next http.Handler) http.Handler {
 			return
 		}
 		if handler == nil {
+			handler, err = findAuthorizationServerMetadataHandler(m.router, r)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		if handler == nil {
 			next.ServeHTTP(w, r)
 			return
 		}
