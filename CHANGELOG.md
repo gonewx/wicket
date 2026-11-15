@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Device authorization: the request validator logged the whole request object at error level when it refused a request (wrong protocol type, client without the device code grant, no scope and no allowed scopes, scope too long, identity scope without `openid`). Under a handler that serializes nested values, such as the JSON handler the default logger uses, the record held the request form, so a client authenticating in the request body had its `client_secret` written in plain text, together with the parsed client credential (a shared secret or, for other authentication methods, the presented credential), the client's hashed secrets and the whole options object; the options hold no secrets. The text handler printed the nested request only as a pointer. The records now carry only the client id (and, for the protocol type refusal, the protocol type). The device authorization endpoint has been routable in the default assembly since 0.3.0, so 0.3.0 through 0.6.0 wrote these records; earlier releases wrote them only where a host called the validator itself. Hosts that kept error logs from affected releases should treat the client secrets of device flow clients refused there as exposed, rotate them, and purge the affected log records.
+
 ## [0.6.0] - 2026-11-15
 
 ### Added

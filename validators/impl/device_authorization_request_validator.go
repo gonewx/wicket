@@ -72,13 +72,13 @@ func (v *DeviceAuthorizationRequestValidator) validateClient(request *models.Val
 
 	// check if client protocol type is oidc
 	if request.Client.ProtocolType != wicket.ProtocolTypesOpenIdConnect {
-		v.Logger.Error("Invalid protocol type for OIDC authorize endpoint", slog.String("protocolType", request.Client.ProtocolType), slog.Any("request", request))
+		v.Logger.Error("Invalid protocol type for OIDC authorize endpoint", slog.String("protocolType", request.Client.ProtocolType), slog.String("clientId", request.Client.ClientId))
 		return v.invalid(request, wicket.AuthorizeErrorsUnauthorizedClient, "Invalid protocol")
 	}
 
 	// check if client allows device flow
 	if !utils.Contains(request.Client.AllowedGrantTypes(), wicket.GrantTypeDeviceCode) {
-		v.Logger.Error("Client does not allow device flow", slog.Any("request", request))
+		v.Logger.Error("Client does not allow device flow", slog.String("clientId", request.Client.ClientId))
 		return v.invalid(request, wicket.AuthorizeErrorsUnauthorizedClient, "Client does not allow device flow")
 	}
 
@@ -100,13 +100,13 @@ func (v *DeviceAuthorizationRequestValidator) validateScope(ctx context.Context,
 
 			v.Logger.Debug("Defaulting to: ", slog.String("scopes", scope))
 		} else {
-			v.Logger.Error("No allowed scopes configured for client", slog.Any("request", request))
+			v.Logger.Error("No allowed scopes configured for client", slog.String("clientId", request.Client.ClientId))
 			return v.invalid(request, wicket.AuthorizeErrorsInvalidScope, "")
 		}
 	}
 
 	if len(scope) > v.Options.InputLengthRestrictions.Scope {
-		v.Logger.Error("Scope too long", slog.Any("request", request))
+		v.Logger.Error("Scope too long", slog.String("clientId", request.Client.ClientId))
 		return v.invalid(request, wicket.AuthorizeErrorsInvalidRequest, "Invalid scope")
 	}
 
@@ -138,7 +138,7 @@ func (v *DeviceAuthorizationRequestValidator) validateScope(ctx context.Context,
 	}
 
 	if len(validatedResources.Resources.IdentityResources()) > 0 && !request.IsOpenIdRequest {
-		v.Logger.Error("Identity related scope requests, but no openid scope", slog.Any("request", request))
+		v.Logger.Error("Identity related scope requests, but no openid scope", slog.String("clientId", request.Client.ClientId))
 		return v.invalid(request, wicket.AuthorizeErrorsInvalidScope, "")
 	}
 
