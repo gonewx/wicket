@@ -16,8 +16,11 @@ import (
 
 	"github.com/gonewx/wicket"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/di"
+	"github.com/gonewx/wicket/dpop"
 	"github.com/gonewx/wicket/hosting"
 	"github.com/gonewx/wicket/pushedauth"
+	"github.com/gonewx/wicket/replay"
 	"github.com/gonewx/wicket/services"
 	integration_common "github.com/gonewx/wicket/test/integration/common"
 	"github.com/gonewx/wicket/validators"
@@ -52,6 +55,10 @@ func (g *advertisementGuard) routeRegistered(path string) bool {
 func (g *advertisementGuard) advertised(key string) bool {
 	_, ok := g.document[key]
 	return ok
+}
+
+func (g *advertisementGuard) serverConfig() *di.ServerConfig {
+	return g.pipeline.Root.ServerConfig()
 }
 
 func (g *advertisementGuard) authenticationMethods() []string {
@@ -90,6 +97,11 @@ var capabilityEvidence = map[string]func(*advertisementGuard) bool{
 		return g.routeRegistered(wicket.ProtocolRoutePathsBackchannelAuthentication) &&
 			godi.GetRequired[validators.BackchannelAuthenticationRequestValidator](g.scope) != nil
 	},
+	// dpop_signing_alg_values_supported is a list, never true; its
+	// agreement with the assembly is checked by assertListsConsistent.
+	wicket.DiscoveryDPoPSigningAlgValuesSupported: func(g *advertisementGuard) bool {
+		return g.serverConfig().DPoPEnabled()
+	},
 	wicket.DiscoveryTlsClientCertificateBoundAccessTokens: func(g *advertisementGuard) bool {
 		return slices.ContainsFunc(g.authenticationMethods(), func(method string) bool {
 			return method == wicket.EndpointAuthenticationMethodsTlsClientAuth ||
@@ -124,6 +136,14 @@ func TestDiscoveryAdvertisementMatchesTheAssembly(t *testing.T) {
 			name: "pushed authorization enabled",
 			declare: func(p *integration_common.WicketPipeline) {
 				p.EnablePushedAuthorization(pushedauth.Options{RequireForAllClients: true})
+			},
+		},
+		{
+			name: "dpop enabled",
+			declare: func(p *integration_common.WicketPipeline) {
+				cfg := p.Root.ServerConfig()
+				cfg.SetReplayRegistry(replay.NewMemoryRegistry())
+				cfg.EnableDPoP(dpop.Options{SigningAlgorithms: []string{"ES256", "RS256"}})
 			},
 		},
 		{
@@ -282,6 +302,19 @@ func assertListsConsistent(t *testing.T, guard *advertisementGuard) {
 			require.Truef(t, guard.advertised(wicket.DiscoveryDeviceAuthorizationEndpoint),
 				"%s advertises %s without %s", wicket.DiscoveryGrantTypesSupported, wicket.GrantTypeDeviceCode, wicket.DiscoveryDeviceAuthorizationEndpoint)
 		}
+	}
+
+	// DPoP proof algorithms are advertised exactly while DPoP is enabled,
+	// and then as the configured list.
+	dpopAlgorithms, dpopAdvertised := guard.document[wicket.DiscoveryDPoPSigningAlgValuesSupported]
+	require.Equalf(t, guard.serverConfig().DPoPEnabled(), dpopAdvertised,
+		"%s advertised = %v, DPoP enabled = %v", wicket.DiscoveryDPoPSigningAlgValuesSupported, dpopAdvertised, guard.serverConfig().DPoPEnabled())
+	if dpopAdvertised {
+		want := make([]any, 0)
+		for _, algorithm := range guard.serverConfig().DPoPOptions().SigningAlgorithms {
+			want = append(want, algorithm)
+		}
+		require.Equalf(t, want, dpopAlgorithms, "%s does not list the configured algorithms", wicket.DiscoveryDPoPSigningAlgValuesSupported)
 	}
 
 	if methods, ok := guard.document[wicket.DiscoveryTokenEndpointAuthenticationMethodsSupported].([]any); ok {

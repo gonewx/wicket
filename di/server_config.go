@@ -14,6 +14,7 @@ import (
 	"github.com/gonewx/wicket/clientassertion"
 	"github.com/gonewx/wicket/clientcert"
 	"github.com/gonewx/wicket/dp"
+	"github.com/gonewx/wicket/dpop"
 	"github.com/gonewx/wicket/keymgmt"
 	"github.com/gonewx/wicket/pushedauth"
 	"github.com/gonewx/wicket/replay"
@@ -81,6 +82,10 @@ type ServerConfig struct {
 	replayDependentFeatures             []string
 
 	privateKeyJwtOptions clientassertion.Options
+
+	// DPoP options, see dpop.go. The enablement is recorded in
+	// replayDependentFeatures.
+	dpopOptions dpop.Options
 
 	// Mutual TLS client authentication, see client_certificate.go.
 	clientCertificateEnabled bool
@@ -255,6 +260,7 @@ func (c *ServerConfig) AllowInMemoryFallback() {
 func (c *ServerConfig) Freeze() {
 	c.frozen = true
 	c.requirePrivateKeyJwtOptions()
+	c.requireDPoPOptions()
 	c.requireReplayRegistrySeam()
 	c.requireClientStoreSeam()
 	c.requirePushedAuthorizationDataProtectionSeam()

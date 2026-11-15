@@ -36,4 +36,6 @@ type TokenResponse struct {
 
 	// Gets or sets the custom entries.
 	Custom map[string]any
+
+	TokenResponseTokenType
 }

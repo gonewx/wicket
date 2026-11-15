@@ -277,6 +277,7 @@ var handlerWrittenDiscoveryKeys = map[string]struct{}{
 	wicket.DiscoveryTokenEndpointAuthSigningAlgorithmsSupported: {},
 	wicket.DiscoveryPushedAuthorizationRequestEndpoint:          {},
 	wicket.DiscoveryRequirePushedAuthorizationRequests:          {},
+	wicket.DiscoveryDPoPSigningAlgValuesSupported:               {},
 }
 
 func isEndpointKey(key string) bool {

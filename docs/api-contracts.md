@@ -113,6 +113,68 @@ client 元数据（`models.ClientPushedAuthorizationMetadata`，嵌入 `models.C
 
 核心不清理过期记录；宿主定期调用 `PushedAuthorizationRequestStore.RemoveExpired(ctx, cutoff)`。
 
+## DPoP（RFC 9449）
+
+client 在 token 请求上用 `DPoP` 请求头出示 proof（用自己私钥签名的 JWT，头部带公钥 `jwk`），签发的 access token 绑定到该公钥（`cnf.jkt`），被窃取后没有私钥就无法使用。默认关闭；本版只覆盖 token 端点（`dpop_jkt` 预绑定、服务端 nonce、userinfo / introspection 贯通与资源端校验另行提供）。
+
+### 启用
+
+```go
+cfg := root.ServerConfig()
+cfg.SetReplayRegistry(hostRegistry) // 重放登记端口，启用后为条件必需
+cfg.EnableDPoP(dpop.Options{SigningAlgorithms: []string{"ES256", "PS256"}})
+cfg.Freeze()
+```
+
+`EnableDPoP` 是唯一开关（`EndpointsOptions` 没有对应开关），在 `Freeze()` 之后调用会 panic；`DPoPEnabled()` 查询，`DPoPOptions()` 返回补齐默认值后的选项。启用后重放登记端口缝为特性条件必需（见[存储持久化接入指南](./storage-persistence-guide.md#重放登记适配器)）；选项不合法时 `Freeze()` panic。
+
+| `dpop.Options` 字段 | 默认 | 含义 |
+|------|------|------|
+| `SigningAlgorithms` | `clientassertion.SupportedSigningAlgorithms()`（RS/PS/ES 256/384/512） | 接受的 proof 签名算法，只能是该集合的子集，不得重复；`none` 与 `HS*` 永远不接受 |
+| `ProofLifetime` | 60s | `iat` 之后 proof 仍被接受的时长，上限 10 分钟 |
+| `ClockSkew` | 60s | 判定 `iat` 的时钟偏差容忍，上限 10 分钟 |
+
+client 元数据（`models.ClientDPoPMetadata`，嵌入 `models.Client`）：
+
+| 字段 | 含义 |
+|------|------|
+| `RequireDPoP` | 该 client 的 token 请求必须带 proof（对应 RFC 9449 §5.2 的 `dpop_bound_access_tokens`）。DPoP 未启用、或该 client 同时 `AllowAccessTokensViaBrowser` 时，该 client 配置无效：`FindClientById` 返回 `storage.ErrInvalidClientConfiguration`，token 请求按无效 client 失败，不会降级为 Bearer |
+
+### token 端点契约
+
+启用后 token 端点按以下顺序处理（DPoP 未启用时完全不读 `DPoP` 头）：
+
+1. **proof 无状态校验**（先于客户端认证）。请求带 `DPoP` 头时：只能有一个头字段，值为三段紧凑 JWS；头部 `typ` 为 `dpop+jwt`（大小写不敏感）、`alg` 在配置集合内、`jwk` 为与 `alg` 密钥类型相符的公钥（含私钥成员 `d`/`p`/`q`/`dp`/`dq`/`qi`/`oth`/`k` 即拒绝）、不得出现 `crit`；签名用头部 `jwk` 验证；claims 须有 `jti`（不超过 256 字节）、`htm`（等于请求方法）、`htu`、`iat`（不早于 now − `ProofLifetime` − `ClockSkew`，不晚于 now + `ClockSkew`）。任一不符 → 400 `invalid_dpop_proof`。`nonce` 与 `ath` 本版不校验。
+2. **客户端认证**（既有流程，含 `private_key_jwt` 断言 `jti` 登记）。
+3. **按 client 强制**：client `RequireDPoP` 而请求未带 proof → 400 `invalid_request`，描述 `DPoP proof required`。这一检查需要先知道 client，因此位于断言 `jti` 登记之后：被拒的客户端重试时需要新的断言。
+4. **proof `jti` 登记**：键由 `replay.Key(replay.PurposeDPoPProof(), <proof 公钥指纹>, jti)` 生成，记录过期时刻为 max(`iat` + `ProofLifetime`, now) + `ClockSkew`。重复 → 400 `invalid_dpop_proof`；登记端口的其他任何错误 → 固定 500（`text/plain`，`Cache-Control: no-store`），既不判为重放也不放行。
+5. 授权码原子取出 / refresh token 读取，随后做 refresh token 绑定校验（见下），再签发。
+
+一切 proof 无状态拒绝都发生在授权码取出之前，所以被拒的授权码可以带合法 proof 再次兑换。
+
+**`htu` 的期望值**由本次请求推导：请求的基础 URL（scheme 由连接是否为 TLS 决定，host 取请求的 `Host`）加请求路径；mTLS 别名路由各自成立。比较时两侧都解析为 URL，scheme 与 host 按小写比较、去掉默认端口、忽略 query 与 fragment，路径（转义形式）逐字节相等，不做百分号编码规范化。TLS 终止于反向代理时，wicket 看到的 scheme 为 `http`，与 issuer 推导的既有行为一致；这种部署下 client 的 `htu` 需与之一致，或由宿主配置使请求呈现正确的 scheme 与 host。
+
+### 绑定
+
+- 带合法 proof 签发的 access token 带 `cnf.jkt`（proof 公钥的 RFC 7638 SHA-256 指纹，base64url 无填充）；JWT 写入 payload，reference token 写入存储副本的 `cnf` claim。响应 `token_type` 为 `DPoP`（`wicket.TokenResponseTypesDPoP`）；不带 proof 时与既有行为一致（`Bearer`）。
+- 同时启用 mTLS 证书绑定时，证书绑定 client 带 proof 得到的 `cnf` 同时含 `x5t#S256` 与 `jkt`。
+- **public client**（`RequireClientSecret` 为 false）带 proof 获得的 refresh token 记录 proof 公钥指纹（`RefreshToken.DPoPKeyThumbprint`，创建时写入、之后不改）。此后兑换必须带同一密钥的 proof，未带或换用其他密钥 → 400 `invalid_grant`，refresh token 记录不被更新。不带 proof 获得的 refresh token 不会被事后绑定。
+- **机密 client** 的 refresh token 不绑定：兑换时带 proof 则新 access token 绑定到本次 proof 的密钥，不带则为 Bearer。
+
+### 错误码
+
+| 情形 | 错误码 |
+|------|------|
+| proof 无效、`jti` 重放 | `invalid_dpop_proof`（RFC 9449 §5 为 token 端点定义） |
+| client 要求 DPoP 而未带 proof | `invalid_request`（wicket 的选择） |
+| 绑定的 refresh token 未带 proof 或换用其他密钥 | `invalid_grant`（wicket 的选择，不区分两种情形） |
+
+本版不发 `DPoP-Nonce` 响应头。
+
+### Discovery
+
+DPoP 启用时 discovery 文档写入 `dpop_signing_alg_values_supported`（配置的算法列表）；未启用时不宣告。该键只由 discovery handler 写入，宿主自定义的同名条目被删除并记录告警。
+
 ## 支持的授权类型（Grant Types）
 
 | Grant Type | 说明 |

@@ -9,6 +9,7 @@ import (
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/clientcert"
+	"github.com/gonewx/wicket/dpop"
 	"github.com/gonewx/wicket/hosting"
 	"github.com/gonewx/wicket/services"
 	"github.com/gonewx/wicket/storage"
@@ -129,18 +130,24 @@ func withClientCertificateAuthentication(p godi.Provider, inner validators.Clien
 	)
 }
 
-// accessTokenConfirmationFromProvider yields the access token binder while
-// mutual TLS client authentication is enabled and nil otherwise, in which
-// case the token service leaves every access token unbound as before.
+// accessTokenConfirmationFromProvider yields the access token binder of each
+// enabled binding feature: the certificate binder while mutual TLS client
+// authentication is enabled, the DPoP proof key binder while DPoP is
+// enabled, and both combined while both are. With neither enabled it yields
+// nil, and the token service leaves every access token unbound as before.
 func accessTokenConfirmationFromProvider(p godi.Provider) services.AccessTokenConfirmation {
 	cfg := godi.GetRequired[*ServerConfig](p)
-	if !cfg.ClientCertificateAuthenticationEnabled() {
-		return nil
+	var certificate, proof services.AccessTokenConfirmation
+	if cfg.ClientCertificateAuthenticationEnabled() {
+		certificate = clientcert.NewAccessTokenBinder(
+			godi.GetRequired[storage.ClientStore](p),
+			cfg.ClientCertificateSource(),
+		)
 	}
-	return clientcert.NewAccessTokenBinder(
-		godi.GetRequired[storage.ClientStore](p),
-		cfg.ClientCertificateSource(),
-	)
+	if cfg.DPoPEnabled() {
+		proof = dpop.NewAccessTokenBinder()
+	}
+	return services.CombineAccessTokenConfirmations(certificate, proof)
 }
 
 // withCertificateBoundAccessTokens wraps the token endpoint's client

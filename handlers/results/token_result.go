@@ -30,7 +30,11 @@ func (tr *TokenResult) Execute(w http.ResponseWriter, r *http.Request) error {
 	dto["access_token"] = tr.Response.AccessToken
 	dto["refresh_token"] = tr.Response.RefreshToken
 	dto["expires_in"] = tr.Response.AccessTokenLifetime
-	dto["token_type"] = responses_models.BearerTokenType
+	tokenType := tr.Response.TokenType
+	if tokenType == "" {
+		tokenType = responses_models.BearerTokenType
+	}
+	dto["token_type"] = tokenType
 	dto["scope"] = tr.Response.Scope
 
 	return HttpRespWriteJson(w, dto, "")
