@@ -385,6 +385,7 @@ cfg.Freeze()
 
 - 新句柄的记录继承旧记录的全部授权内容：subject、scope、resource、`SessionId`、`CreationTime`、`Lifetime`、DPoP 绑定（`DPoPKeyThumbprint`）以及本次换发的 access token。绝对寿命不因轮换延长；绑定到 DPoP 密钥的 refresh token 轮换后仍绑定同一密钥。
 - 写入顺序：先存新记录，再以兑换时读到的版本号更新旧记录（`UpdateRefreshToken` 的 `expectedVersion`）。存新记录失败时旧 token 原封不动，响应 5xx，client 可重试。更新旧记录时 store 报告了冲突与缺失之外的错误：标记模式下先重读旧记录，若它已以本次的新句柄标记为已消费（写入实际已生效），照常返回新句柄；否则移除新记录并响应 5xx。删除模式下无法分辨写入是否生效，一律移除新记录并响应 5xx；若写入其实已生效，旧句柄已被消费，client 须重新授权。
+- 已知限制：旧记录在签发 id_token 之前就已更新（轮换在此提交）。此后 id_token 签发失败（签名密钥不可用等基础设施故障）时响应 5xx，client 拿不到新句柄，旧句柄已被消费：删除模式下重试得 `invalid_grant`，标记模式下重试被当作重放并沿链撤销，两种情况 client 都须重新走授权。默认（不轮换）不受影响。
 - 并发兑换同一句柄恰一个成功；其余得 `invalid_grant`，并移除各自预写的新记录（移除失败只记日志）。
 - 删除模式下，旧记录先被标记为已消费、再删除；删除失败只记日志，留下的已消费记录出示时同样被拒。
 - 标记模式下已消费的记录不会随兑换删除：同一授权每兑换一次多留一条，各条继承链首的 `CreationTime` 与 `Lifetime`，到期后与其他过期 refresh token 一样，须由宿主调用该 store 的 `RemoveExpired` 回收（wicket 不自动回收），也随按会话、按 client 删除等既有路径移除。存储容量按"每个授权的兑换次数"估算。
