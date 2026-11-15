@@ -489,6 +489,38 @@ func (s *scene) authorizationCode() string {
 	return code
 }
 
+// TestHighSecurityProfileOverridesExplicitOptions turns 303 redirects and
+// the iss authorization response parameter off explicitly before Freeze:
+// with the profile on, the authorization endpoint still answers 303 with
+// iss and discovery still advertises the parameter.
+func TestHighSecurityProfileOverridesExplicitOptions(t *testing.T) {
+	t.Parallel()
+	s := newScene(t, sceneOptions{configure: func(p *integration_common.WicketPipeline) {
+		options := godi.GetRequired[*config_options.WicketOptions](p.Root)
+		options.UseSeeOtherRedirects = false
+		options.EmitIssuerIdentificationResponseParameter = false
+	}})
+	s.login()
+
+	r := s.push(s.authenticate(fapiClient, authorizationParameters(fapiClient)))
+	if r.status != http.StatusCreated {
+		t.Fatalf("push: status %d body %v", r.status, r.body)
+	}
+	status, location := s.browse(s.authorizeUrl(url.Values{
+		wicket.AuthorizeRequestClientId:   {fapiClient},
+		wicket.AuthorizeRequestRequestUri: {r.field("request_uri")},
+	}))
+	if status != http.StatusSeeOther {
+		t.Fatalf("authorize answered %d, want 303", status)
+	}
+	if location == nil || location.Query().Get("code") == "" || location.Query().Get("iss") != s.issuer {
+		t.Fatalf("authorize redirected to %v, want a code and iss %q", location, s.issuer)
+	}
+	if supported := s.discovery()[wicket.DiscoveryAuthorizationResponseIssParameterSupported]; supported != true {
+		t.Fatalf("authorization_response_iss_parameter_supported %v", supported)
+	}
+}
+
 // TestHighSecurityProfileNarrowsSigningAlgorithms presents an RS256 client
 // assertion and an RS256 DPoP proof, both accepted by the default algorithm
 // sets: the same assembly accepts them with the profile off and refuses them
