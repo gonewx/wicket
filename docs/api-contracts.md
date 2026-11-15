@@ -275,6 +275,41 @@ cfg.Freeze()
 
 已配置且 settle 后文档含 `authorization_endpoint` 时，openid-configuration 与授权服务器元数据宣告 `prompt_values_supported`（`wicket.DiscoveryPromptValuesSupported`）：`["none","login","consent","select_account","create"]`；否则不宣告。该键只由 handler 写入（组合根在已配置时调用 `(*handlers.DiscoveryHandler).ServeAccountCreation()`），宿主同名自定义条目被删除并记录告警（未配置时同样删除）。未配置且宿主没有该自定义条目时，discovery 文档不变。
 
+## 强制满足所请求的 acr（`unmet_authentication_requirements`）
+
+OpenID Connect Core 把 `acr_values` 视为 Voluntary claim：无法满足时 OP 应返回会话当前的 `acr`，所以默认装配照常签发授权码，不比较会话 `acr` 与请求值。宿主可以开启强制：开启后，RP 用 `acr_values` 请求的认证强度得不到满足时，client 会收到 `error=unmet_authentication_requirements`（`wicket.AuthorizeErrorsUnmetAuthenticationRequirements`，见 OpenID Connect Core Error Code unmet_authentication_requirements 1.0 §1），而不是一个静默降级的授权码。
+
+### 开启
+
+```go
+cfg := root.ServerConfig()
+cfg.RequireRequestedAcr()
+cfg.Freeze()
+```
+
+- `RequireRequestedAcr()` 须在 `Freeze()` 之前调用，之后调用会 panic；重复调用幂等。`RequestedAcrRequired()` 查询是否已开启。默认关闭，关闭时行为与以往完全相同。
+- 组合根据此调用 `(*responses/impl.AuthorizeInteractionResponseGenerator).RequireRequestedAcr()`。没有 discovery 键与之对应。
+
+### 判定依据
+
+- 请求值集合取 `acr_values`，去掉以 `idp:`、`tenant:`（`wicket.KnownAcrValuesAll`）开头的值：它们是路由提示，不是认证强度，处理方式不变。
+- 会话 `acr` 取当前登录主体的第一个 `acr` claim（`wicket.JwtClaimTypesAuthenticationContextClassReference`，字符串值），没有时为空串。它由宿主在登录页签发登录会话时写入主体，这是宿主报告认证强度的唯一通道。wicket 不对 acr 排序或映射。
+- 满足的条件：去掉提示前缀后没有请求值，或会话 `acr` 与某个请求值逐字相等。
+
+### authorize 行为（仅在开启时）
+
+- **满足**：照常进入同意判定并签发响应，不经过登录页。
+- **不满足，尚未登录过**：送往登录页（step-up），宿主可借此提升认证强度后重新签发登录会话。跳转前把 `login` 并入 `suppressed_prompt`（与已有值求并、去重、保序），随 returnUrl 往返，作为「本次授权已经过一次交互登录」的标记。未登录用户在请求带 `acr_values` 时同样带上该标记；`prompt=login` 的请求本来就会抑制 `login`。
+- **不满足，已经过登录页**（`suppressed_prompt` 含 `login`）：返回 `unmet_authentication_requirements`，`error_description` 为 `requested acr_values could not be satisfied`。登录页只经过一次。
+- **`prompt=none`**：会话存在但不满足时直接返回 `unmet_authentication_requirements`；没有会话时仍是 `login_required`。
+- 错误投递到 client 的 `redirect_uri`，遵守 response_mode（query、fragment、form_post），带 `state`（以及在开启 `EmitIssuerIdentificationResponseParameter` 且响应带签发者时的 `iss`），不进入错误页。
+- `max_age` 的既有处理不变：会话超龄时强制登录，`prompt=none` 下返回 `login_required`。`claims` 请求参数不受支持，ID token 中 `acr` 的签发不变。
+- PAR：推送的 `acr_values` 同样生效；返回该错误时 `request_uri` 被消费。
+- 强制只作用于 authorize 端点（含经 PAR 推送的请求），不作用于 backchannel authentication（CIBA）。
+- **宿主登录页职责**：登录页须经 `GetAuthorizationContext` 读取 `AuthorizationRequest.AcrValues` 并真正重新认证，签入满足要求的 `acr`；对已登录用户直接跳回 returnUrl 的登录页会让请求以 `unmet_authentication_requirements` 结束。
+- `prompt=create` 的账户创建往返只抑制请求中出现过的 `create`、`login`、`select_account`。单独的 `prompt=create` 不会抑制 `login`：账户创建后 `acr` 仍不满足时照常 step-up 一次，`create` 保持抑制，不会再进注册页。`prompt=create login` 已抑制 `login`，视为已经过交互登录，此时直接返回该错误。
+- client 自行携带 `suppressed_prompt=login` 时不会经过 step-up，不满足即返回该错误，不会因此拿到授权码。
+
 ## 支持的授权类型（Grant Types）
 
 | Grant Type | 说明 |
@@ -365,6 +400,8 @@ cfg.Freeze()
 |------|----------|--------------|
 | `RequireAsymmetricRequestObjects()` | `AsymmetricRequestObjectsRequired()` | `request` 与 `request_uri` 两条路径的 request object 只接受 `RS256/384/512`、`PS256/384/512`、`ES256/384/512` 签名。`HS*`、`none`、头部无法解析、JSON 序列化或多签名一律 `invalid_request_object`。验签只使用 client 登记的非对称密钥：对称（`kty=oct`）密钥在验签前被剔除，所以头部写 `RS256`、实际用对称密钥做 HMAC 的请求同样被拒；只登记了对称密钥的 client 无法再使用 request object。discovery 的 `request_object_signing_alg_values_supported` 只宣告上述九个值（宿主同名自定义值同样过滤），过滤后为空则删除该键。CIBA 的 `request` 参数不在此范围内 |
 | `RequireClientCredentialsAuthentication()` | `ClientCredentialsAuthenticationRequired()` | token 端点上 `grant_type=client_credentials`（请求体或查询串）的请求，只签发给真正认证的 client：`RequireClientSecret=true` 且 secret 正确（implicit-only client 除外）、`private_key_jwt` 断言认证成功，或 tls 类方法以证书认证成功。公开 client（`RequireClientSecret=false`）只带 `client_id` 或带任意 secret 都返回 HTTP 400 `invalid_client`（RFC 6749 §4.4）。其他 grant 与其他端点（撤销、CIBA、设备授权）不受影响 |
+
+强制满足所请求的 acr 同样在 `ServerConfig` 上开启（`RequireRequestedAcr()`），见「强制满足所请求的 acr（`unmet_authentication_requirements`）」。
 
 强制 PAR 不在上表：它随 PAR 特性启用，经 `pushedauth.Options.RequireForAllClients`（全局）或 client 元数据 `RequirePushedAuthorizationRequests`（按 client）开启，见「推送授权请求（PAR）」。
 

@@ -99,6 +99,10 @@ type ServerConfig struct {
 	asymmetricRequestObjectsRequired        bool
 	clientCredentialsAuthenticationRequired bool
 
+	// requestedAcrRequired enforces the requested acr_values, see
+	// requested_acr.go.
+	requestedAcrRequired bool
+
 	// accountCreationUrl is the host's account creation page, see
 	// account_creation.go. Empty means account creation is not offered.
 	accountCreationUrl string

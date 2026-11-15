@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/handlers/results"
 	"github.com/gonewx/wicket/pushedauth"
 	validators_models "github.com/gonewx/wicket/validators/models"
 )
@@ -62,5 +63,15 @@ func (h *authorizeBaseHandler) pushedErrorResult(ctx context.Context, request *v
 			return nil, fmt.Errorf("consume pushed authorization request: %w", consumeErr)
 		}
 	}
-	return h.errorResult(request, err, description), nil
+	result := h.errorResult(request, err, description)
+	if errors.Is(err, wicket.AuthorizeErrorsUnmetAuthenticationRequirements) {
+		// the requested authentication could not be satisfied: the client is
+		// told so at its redirect URI, not through the error page, with the
+		// issuer identification a successful response would carry.
+		if request != nil {
+			result.Response.Issuer = request.IssuerName
+		}
+		return results.NewAuthorizeClientErrorResult(result.Response), nil
+	}
+	return result, nil
 }
