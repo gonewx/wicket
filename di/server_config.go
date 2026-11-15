@@ -281,6 +281,7 @@ func (c *ServerConfig) Freeze() {
 	c.requireDPoPNonceKeySeam()
 	c.requireReplayRegistrySeam()
 	c.requireClientStoreSeam()
+	c.requireClientInitiateLoginUris()
 	c.requirePushedAuthorizationDataProtectionSeam()
 	validateStoreSeams(c.storeSeams(), c.allowInMemoryFallback, c.logger)
 }

@@ -84,6 +84,10 @@ func (v ClientConfigurationValidator) Validate(context *validators_contexts.Clie
 	}
 	if message := validateDPoPMetadata(v.features, context.Client); message != "" {
 		context.SetError(message)
+		return
+	}
+	if message := validateThirdPartyLoginMetadata(context.Client); message != "" {
+		context.SetError(message)
 	}
 }
 

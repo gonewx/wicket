@@ -310,6 +310,55 @@ cfg.Freeze()
 - `prompt=create` 的账户创建往返只抑制请求中出现过的 `create`、`login`、`select_account`。单独的 `prompt=create` 不会抑制 `login`：账户创建后 `acr` 仍不满足时照常 step-up 一次，`create` 保持抑制，不会再进注册页。`prompt=create login` 已抑制 `login`，视为已经过交互登录，此时直接返回该错误。
 - client 自行携带 `suppressed_prompt=login` 时不会经过 step-up，不满足即返回该错误，不会因此拿到授权码。
 
+## 第三方发起登录（OpenID Connect Core §4）
+
+OpenID Connect Core 1.0 §4 允许第三方（门户、OP 侧入口页等）把用户送到 RP 的登录发起端点，由 RP 向 OP 发起认证请求。wicket 不新增协议端点、路由或 discovery 宣告；它在 client 模型上登记该端点，并提供让宿主构造、发起这次跳转的函数（包 `thirdpartylogin`）。
+
+### client 元数据
+
+- `Client.InitiateLoginUri`（内嵌结构 `models.ClientThirdPartyLoginMetadata`）对应 OpenID Connect Dynamic Client Registration 1.0 §2 的 `initiate_login_uri`。空串表示未登记，配置合法。
+- 非空时须能解析（含 query 可解析为参数对）、为绝对 URI、scheme 为 `https`（大小写不敏感）、host 非空（`models.IsAbsoluteHttpsUri`）；不满足即 client 配置无效：经 `storage.ClientStore` 读取返回 `storage.ErrInvalidClientConfiguration`（`extensions.IsClientRejected` 为 true），与其他 client 元数据规则同在 `ClientConfigurationValidator`、同在读路径 fail-closed。该规则不依赖任何特性开关，静态 client 列表与宿主注入的 client store 都适用；没有允许 http 的开关。
+- 装配期：`SetClients` / `SetClientsProvider` 登记的静态 client 列表在 `ServerConfig.Freeze()` 时即被检查，任一 client 的 `InitiateLoginUri` 非空且不满足上述判定即 panic，文本含该 client id（只检查这一字段）。宿主注入的 client store 在装配期不可见，仍由读路径拒绝。
+- 经动态客户端注册读写该元数据暂不支持，由后续版本提供。
+
+### 发起
+
+```go
+mux.HandleFunc("/portal/start", func(w http.ResponseWriter, r *http.Request) {
+	err := thirdpartylogin.Initiate(w, r, "rp-client", thirdpartylogin.Parameters{
+		LoginHint:     "alice@example.com",
+		TargetLinkUri: "https://rp.example/app",
+	})
+	if err != nil {
+		// 响应未被写入，宿主自行处置（错误页、404 等）
+	}
+})
+```
+
+- `thirdpartylogin.Initiate(w, r, clientId, params)` 须在 wicket 请求作用域内运行（宿主 handler 位于 `hosting.ScopeMiddleware` 与 `Server.UseWicket()` 之后）。它经作用域内的 `storage.ClientStore`（即带配置校验的 store）用 `extensions.FindEnabledClientById` 读取 client，`iss` 取自 `services.IssuerNameService.GetCurrent()`，成功时返回 `302 Found`，`Location` 为发起 URL，带 `Cache-Control: no-store`。
+- `thirdpartylogin.BuildInitiationUrl(client, issuer, params)` 是纯构造：在登记 URI 的 query 上设置 `iss`、`login_hint`、`target_link_uri`；登记 URI 自带的其他参数原样保留，这三个同名参数一律被替换，空的可选参数不出现（登记 URI 自带的同名值也被去掉）。query 按 `url.Values.Encode` 排序，例如登记 `https://rp.example/login?tenant=a`、issuer `https://op.example`、hint `alice` 得到 `https://rp.example/login?iss=https%3A%2F%2Fop.example&login_hint=alice&tenant=a`。
+- 只产出 GET 形态；不提供自动提交表单的 POST 形态（Registration §2 要求 RP 同时接受两者）。
+- `iss` 必须是带 host 的 https URL（Core §4 的 MUST）。未配置 `IssuerUri` 时 issuer 取当前请求的 origin，在 http 上运行的开发环境会因此报错；须配置 https 形式的 `IssuerUri` 才能使用发起能力。
+- `target_link_uri` 非空时须为带 host 的绝对 http 或 https URL（scheme 大小写不敏感）；wicket 不限制其 origin。开放重定向防护由 RP 负责：RP 跳转前须自行校验 `target_link_uri`。
+- `login_hint` 可能是邮箱或手机号，该包不写日志，错误文本中也不含它。
+
+### 错误
+
+出错时不写响应（头与正文皆不动），返回可用 `errors.Is` 区分的错误：
+
+| 情形 | 错误 |
+|------|------|
+| 请求不在 wicket 作用域内 | `thirdpartylogin.ErrNoRequestScope` |
+| client 不存在或已停用 | 包装 `storage.ErrNotFound` |
+| client 配置无效（含非 https 的 `InitiateLoginUri`） | 包装 `storage.ErrInvalidClientConfiguration` |
+| client 读取的其他故障 | 原样包装 store 的错误 |
+| client 未登记 `InitiateLoginUri` | `thirdpartylogin.ErrNotRegistered` |
+| 登记值不是绝对 https URI（仅纯构造函数直接收到未经校验的 client 时） | `thirdpartylogin.ErrInvalidInitiateLoginUri` |
+| issuer 不是带 host 的 https URL | `thirdpartylogin.ErrInvalidIssuer` |
+| `target_link_uri` 不是绝对 http 或 https URL | `thirdpartylogin.ErrInvalidTargetLinkUri` |
+
+前三类 client 错误可用 `extensions.IsClientRejected` 与基础设施故障区分。
+
 ## 支持的授权类型（Grant Types）
 
 | Grant Type | 说明 |
