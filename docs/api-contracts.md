@@ -589,7 +589,9 @@ cfg.Freeze()
 - `RequestUriLifetime` ≥ 600；
 - `RedirectUris` 含 `http` 方案，且主机不是 `127.0.0.1` 或 `[::1]` 这两个 IP 字面量（`localhost` 也算冲突）。
 
-冲突处理时机：静态列表在装配期已知，`Freeze` 直接失败；注入的 client store 在装配期无法枚举，沿用 `ValidatingClientStore` 的既有语义，在请求期按无效 client 处理（token 端点与 PAR 端点返回 `invalid_client`，并记日志）。宿主若替换 `ClientConfigurationValidator`，请求期的冲突检查随之失效，由宿主自行负责。
+注意 `storage/models.NewClient()` 的默认 `AuthorizationCodeLifetime` 是 300，开启档位后用默认值构建的 client 都会冲突。最小合规 client：`TokenEndpointAuthMethod` 为 `private_key_jwt`（或一种 tls 方法）、`RequireDPoP`（或 `TlsClientCertificateBoundAccessTokens`）为 true、`AuthorizationCodeLifetime` ≤ 60、允许的 grant 不含 `password`、`implicit`、`hybrid`、`RedirectUris` 用 `https`；`RequirePkce` 与 `AllowPlainTextPkce` 保持默认（true / false）。
+
+冲突处理时机：静态列表在装配期已知，`Freeze` 直接失败，同时报出 `TokenEndpointAuthSigningAlgorithms` 落在收窄后算法集之外的静态 client（`validators/impl.HighSecurityProfileSigningAlgorithmConflict`，与 `ClientConfigurationValidator` 的算法规则相同）；注入的 client store 在装配期无法枚举，沿用 `ValidatingClientStore` 的既有语义，在请求期按无效 client 处理（token 端点与 PAR 端点返回 `invalid_client`，并记日志）。宿主若替换 `ClientConfigurationValidator`，请求期的冲突检查随之失效，由宿主自行负责。
 
 **discovery**（openid-configuration 与 RFC 8414 元数据是同一文档）只删减、不新增未实现的宣告：`require_pushed_authorization_requests` 为 `true`；`code_challenge_methods_supported` 只留 `S256`；`token_endpoint_auth_methods_supported` 只留已启用的非对称方法；`response_types_supported` 只留 `code`；`grant_types_supported` 去掉 `password`、`implicit`；`authorization_response_iss_parameter_supported` 为 `true`；`token_endpoint_auth_signing_alg_values_supported`、`dpop_signing_alg_values_supported` 与生效算法集一致；`request_object_signing_alg_values_supported` 只留非对称算法。
 
