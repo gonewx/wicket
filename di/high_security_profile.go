@@ -111,7 +111,8 @@ func (c *ServerConfig) applyHighSecurityProfileToOptions() {
 // highSecurityProfileDeficiencies lists every prerequisite the enabled
 // profile misses and every conflict of a client of the static list,
 // including token endpoint authentication signing algorithms outside the
-// narrowed set.
+// narrowed set or listed without private_key_jwt (the algorithm rule of the
+// default client configuration validator).
 func (c *ServerConfig) highSecurityProfileDeficiencies() []string {
 	if !c.HighSecurityProfileEnabled() {
 		return nil
