@@ -987,8 +987,10 @@ type RefreshTokenService struct {
 	// Consumption of one-time refresh tokens, see SetConsumption and
 	// refresh_token_rotation.go. The zero value updates in place.
 	consumption services.RefreshTokenConsumption
-	clock       services.SystemClock
-	logger      *slog.Logger
+	// clock also dates refresh token lifetimes, see SetClock and
+	// refresh_token_lifetime.go; without it the wall clock is used.
+	clock  services.SystemClock
+	logger *slog.Logger
 
 	// sessionBound records the issuing browser session on every refresh
 	// token created, see SetSessionBinding.
@@ -1014,6 +1016,9 @@ func (s *RefreshTokenService) CreateRefreshToken(ctx context.Context, request *r
 	token.AuthorizedScopes = request.AuthorizedScopes
 	token.AuthorizedResourceGaps = request.AuthorizedResourceGaps
 	token.SetAccessToken(request.AccessToken, request.RequestedResourceGap)
+	now := s.now()
+	token.CreationTime = now
+	token.Lifetime = refreshTokenLifetime(request.Client, now, now)
 	if s.sessionBound && request.AccessToken != nil {
 		token.SessionId = request.AccessToken.SessionId()
 	}
@@ -1035,6 +1040,9 @@ func (s *RefreshTokenService) CreateRefreshToken(ctx context.Context, request *r
 }
 
 func (s *RefreshTokenService) UpdateRefreshToken(ctx context.Context, request *responses_models.RefreshTokenUpdateRequest) (string, error) {
+	// Extended before either path, so that an update in place and a
+	// rotation both store the extended lifetime.
+	s.extendSlidingLifetime(request)
 	if s.rotates(request) {
 		return s.rotate(ctx, request)
 	}
@@ -1067,6 +1075,14 @@ func (s *RefreshTokenService) ValidateRefreshToken(ctx context.Context, handle s
 	// §6); to any other client it does not exist.
 	if client == nil || token.ClientId != client.ClientId {
 		result.Error = fmt.Errorf("refresh token issued to another client: %w", storage.ErrNotFound)
+		return result
+	}
+	// Expiry is decided here, not by the store, which returns expired
+	// records until the host reclaims them: an expired token does not exist.
+	now := s.now()
+	backfillRefreshTokenLifetime(token, client, now)
+	if refreshTokenExpired(token, now) {
+		result.Error = fmt.Errorf("refresh token expired: %w", storage.ErrNotFound)
 		return result
 	}
 	result.RefreshToken = token

@@ -55,12 +55,12 @@ func client(id string, usage wicket.TokenUsage) *storage_models.Client {
 
 type fixture struct {
 	*integration_common.WicketPipeline
-	store *storage_impl.RefreshTokenStore
+	store storage.RefreshTokenStore
 }
 
-// newFixture starts a pipeline over store; a nil consumption leaves the
-// declaration out.
-func newFixture(t *testing.T, store *storage_impl.RefreshTokenStore, consumption *services.RefreshTokenConsumption) *fixture {
+// newFixture starts a pipeline over store, with the clients above and any
+// further ones; a nil consumption leaves the declaration out.
+func newFixture(t *testing.T, store storage.RefreshTokenStore, consumption *services.RefreshTokenConsumption, clients ...*storage_models.Client) *fixture {
 	t.Helper()
 	pipeline := integration_common.NewWicketPipeline()
 	cfg := pipeline.Root.ServerConfig()
@@ -73,6 +73,7 @@ func newFixture(t *testing.T, store *storage_impl.RefreshTokenStore, consumption
 		client(otherOneTimeClient, wicket.TokenUsageOneTimeOnly),
 		client(reuseClient, wicket.TokenUsageReUse),
 	)
+	pipeline.Clients = append(pipeline.Clients, clients...)
 
 	resource := storage_models.NewApiResource()
 	resource.Name = "api1"

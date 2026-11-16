@@ -124,9 +124,11 @@ func (s *RefreshTokenService) consumedInto(ctx context.Context, handle string, s
 }
 
 // successorOf returns the record stored under a new handle: everything the
-// redeemed token authorizes, its creation time and lifetime (rotation does
-// not extend the absolute lifetime) and its proof binding, but neither the
-// consumption, the link nor the version.
+// redeemed token authorizes, its creation time and lifetime and its proof
+// binding, but neither the consumption, the link nor the version. Under
+// absolute expiration rotation does not extend the lifetime; under sliding
+// expiration the redeemed token already carries the extended lifetime (see
+// extendSlidingLifetime), which the successor and the consumed record share.
 func successorOf(redeemed *storage_models.RefreshToken) *storage_models.RefreshToken {
 	successor := *redeemed
 	successor.AccessTokens = maps.Clone(redeemed.AccessTokens)
