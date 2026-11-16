@@ -407,12 +407,23 @@ cfg.Freeze()
 ```go
 cfg := root.ServerConfig()
 cfg.SetRevokeGrantsOnSessionSubjectChange(true)
+cfg.SetSessionCookieDataProtectionProvider(hostProvider) // 开关开启即必需，不得为默认实现
 cfg.Freeze()
 ```
 
 - `SetRevokeGrantsOnSessionSubjectChange` 须在 `Freeze()` 之前调用，之后调用会 panic，消息点名该方法；`RevokeGrantsOnSessionSubjectChange()` 查询当前声明（nil 的 `*ServerConfig` 报告 `false`）。宿主级开关，没有 client 级设置，没有 discovery 键与之对应。
-- **依赖 server-side sessions**（`WicketOptions.ServerSideSessions.Enabled`）。只有它开启时才有可识别的"浏览器会话"；开关开启而 server-side sessions 关闭时，请求期什么都不做——不读会话 cookie、不撤销，`Freeze()` 也不报错。
-- 组合根在每次解析 `services.UserSession` 时读取声明，开启时为其装上 `(*services/impl.UserSession).SetSessionGrantRevoker(services/impl.NewSessionGrantRevoker(...))`；每次解析 `services.RefreshTokenService` 时调用 `(*services/impl.RefreshTokenService).SetSessionBinding(声明)`。
+- **依赖 server-side sessions**（`WicketOptions.ServerSideSessions.Enabled`）。只有它开启时才有可识别的"浏览器会话"；开关开启而 server-side sessions 关闭时，请求期什么都不做——不读会话 cookie、不撤销。
+- **开关开启即须注入会话 cookie 数据保护 provider**（`ServerConfig.SetSessionCookieDataProtectionProvider`），不论 server-side sessions 是否开启（`Freeze()` 看不到 `WicketOptions`）：开关开启而未注入时 `Freeze()` panic，消息点名 `SetSessionCookieDataProtectionProvider`。注入默认实现 `services/impl.DataProtectionProvider`（只编码、不保护）时，无论开关如何 `Freeze()` 都 panic。该 provider 只用于会话 cookie，以 `di.SessionCookieProtectionPurpose` 创建 protector；容器的 `dp.DataProtectionProvider` 绑定不受影响。开关关闭时请求期不解析该缝（不调用 `Create`）；`Freeze()` 仍拒绝注入的默认实现。`AllowInMemoryFallback()` 不豁免它。`SetSessionCookieDataProtectionProvider` 须在 `Freeze()` 之前调用，之后调用会 panic。宿主 provider 须对载荷做认证（AEAD 或 MAC，不能只编码），且 `Create(purpose)` 须按 purpose 隔离密钥，否则会话 cookie 可被伪造，或被其他用途的受保护载荷冒充。
+- 组合根在每次解析 `services.UserSession` 时读取声明，开启时为其装上 `(*services/impl.UserSession).SetSessionGrantRevoker(services/impl.NewSessionGrantRevoker(...), protector)`；未调用 `Freeze()` 时同样 fail-closed：开关开启而取不到合格 protector（未注入、默认实现、`Create` 返回 nil）时解析即 panic，不降级为不保护。每次解析 `services.RefreshTokenService` 时调用 `(*services/impl.RefreshTokenService).SetSessionBinding(声明)`。
+- 构件路径：`SetSessionGrantRevoker(revoker, protector)` 同时接收撤销器与会话 cookie protector；非 nil 的 revoker 配 nil 的 protector 即 panic；revoker 为 nil 时关闭撤销并忽略 protector。
+
+### 会话 cookie 格式
+
+开关关闭时会话 cookie 的值即会话标识（与此前一致）。开关开启时，会话 cookie 的值为会话标识经宿主 protector `Protect` 后的 base64url（无填充）编码；读会话 cookie 的所有路径（登录、会话恢复、`EnsureSessionIdCookie`）经同一处解码并 `Unprotect`。解码或 `Unprotect` 失败的值——包括明文的会话标识——视同没有会话 cookie：清除 cookie，不撤销、不沿用、不报错。会话标识本身（id_token 与 logout token 的 `sid`、front-channel 登出 URL）不变。
+
+**开启开关后，此前签发的明文会话 cookie 全部失效**（视同无 cookie，下一请求清除），用户的认证 ticket 不受影响，下一次登录生成新会话。轮换 provider 密钥时，旧密钥保护的会话 cookie 同样失效，宿主若要平滑轮换，需由 provider 自身支持旧密钥解保护。
+
+开关开启时 `EnsureSessionIdCookie` 与会话恢复判定一致：记录未过期且请求的已认证主体等于记录主体才采用该会话，否则清除 cookie（它本身不撤销）；开关关闭时行为不变。
 
 ### 何时判定为主体变化
 
@@ -427,7 +438,7 @@ cfg.Freeze()
 
 开关开启且 server-side sessions 开启时，`UserSession.CreateSessionId` 用撤销判定读出的同一条原记录（每次登录只读一次会话存储）判定是否沿用：会话 cookie 指向的记录存在、未过期，且记录主体非空并等于本次登录的主体，即沿用原会话标识，不生成新会话：
 
-- 返回的会话标识（进入 id_token 与 logout token 的 `sid`）与会话 cookie 的值都不变；cookie 重新写出，以刷新 `Max-Age`。会话标识不随重登轮换。
+- 返回的会话标识（进入 id_token 与 logout token 的 `sid`）不变；cookie 重新写出（同一会话标识的受保护句柄，字节是否相同取决于宿主 provider），以刷新 `Max-Age`。会话标识不随重登轮换。
 - 经 `session.Store.UpdateSession` 续期原记录：`Renewed` 置为当前时刻，`Expires` 置为当前时刻加一个会话寿命（`ServerSideSessions.SessionLifetime`）；其他字段保持读出时的值，不删除、不撤销任何东西。
 - 原记录的 `ClientIDs` 成为本次请求的 client 列表，登出通知（front-channel 与 back-channel）覆盖首次登录及此后加入该会话的全部 client。
 - 续期失败时 `CreateSessionId` 返回错误，登录失败（不退回生成新标识）。
@@ -436,7 +447,7 @@ cfg.Freeze()
 
 沿用只为撤销服务：开关关闭时每次登录照旧生成新会话标识，登录不读会话存储；server-side sessions 关闭时没有会话 cookie 与记录可读，行为不变。
 
-会话 cookie 不是认证凭据：沿用要求 cookie 指向的记录主体等于本次已认证的登录主体。预置他人会话 cookie 的浏览器上，登录主体不同，生成新会话（开关开启时并撤销被预置会话的授权）；被种入自己会话标识的浏览器上重登，只是续期自己的会话。
+会话 cookie 不是认证凭据：沿用要求 cookie 指向的记录主体等于本次已认证的登录主体。会话标识对 RP 公开（`sid`），但开关开启时 cookie 值是宿主密钥保护的句柄，不能由公开的 `sid` 构造：持有他人 `sid` 者把自己浏览器的会话 cookie 设为该 `sid` 再登录，cookie 视同不存在，既撤销不了他人会话的授权，也沿用不了他人会话，登录生成新会话。句柄只经 HttpOnly cookie 出现，泄露面等同认证 cookie；持有他人有效句柄的浏览器上换人登录，撤销该会话的授权（正是本功能的语义），同一主体重登只续期自己的会话。
 
 **残余限制：**
 
