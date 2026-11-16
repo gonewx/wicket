@@ -25,9 +25,8 @@ func NewTokenErrorResult(
 // Execute writes the error as RFC 6749 §5.2 describes it: a JSON object
 // with error, error_description when there is one and the custom entries
 // beside them, served as application/json and not cached. A custom entry
-// never replaces error, and replaces error_description only when the core
-// has none. The headers are set before the status is written, since headers
-// set afterwards are not sent.
+// never replaces error or error_description. The headers are set before the
+// status is written, since headers set afterwards are not sent.
 func (ter *TokenErrorResult) Execute(w http.ResponseWriter, r *http.Request) error {
 	dto := make(map[string]interface{}, len(ter.Response.Custom)+2)
 	for key, value := range ter.Response.Custom {
@@ -36,6 +35,8 @@ func (ter *TokenErrorResult) Execute(w http.ResponseWriter, r *http.Request) err
 	dto["error"] = ter.Response.Error.Error()
 	if ter.Response.ErrorDescription != "" {
 		dto["error_description"] = ter.Response.ErrorDescription
+	} else {
+		delete(dto, "error_description")
 	}
 
 	HttpRespSetNoCache(w)

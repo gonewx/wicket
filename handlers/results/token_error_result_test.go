@@ -72,10 +72,14 @@ func TestTokenErrorResultCustomDescription(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
 		coreDescription string
+		custom          any
 		want            string
+		present         bool
 	}{
-		"kept when the core has none": {coreDescription: "", want: "custom description"},
-		"core description wins":       {coreDescription: "code expired", want: "code expired"},
+		"dropped when the core has none":       {coreDescription: "", custom: "custom description"},
+		"empty dropped when the core has none": {coreDescription: "", custom: ""},
+		"non-string dropped":                   {coreDescription: "", custom: 42},
+		"core description wins":                {coreDescription: "code expired", custom: "custom description", want: "code expired", present: true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -83,9 +87,13 @@ func TestTokenErrorResultCustomDescription(t *testing.T) {
 			_, body := executeTokenError(t, &responses_models.TokenErrorResponse{
 				Error:            errors.New("invalid_grant"),
 				ErrorDescription: tc.coreDescription,
-				Custom:           map[string]any{"error_description": "custom description"},
+				Custom:           map[string]any{"error_description": tc.custom, "extra": "kept"},
 			})
-			if body["error_description"] != tc.want || body["error"] != "invalid_grant" {
+			description, present := body["error_description"]
+			if present != tc.present || (present && description != tc.want) {
+				t.Fatalf("error_description in body %v", body)
+			}
+			if body["error"] != "invalid_grant" || body["extra"] != "kept" {
 				t.Fatalf("body %v", body)
 			}
 		})

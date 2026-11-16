@@ -10,7 +10,7 @@
 | Go 版本 | `go1.27.0` |
 | 测试宿主 | [`test/conformance/fapi2host`](../../test/conformance/fapi2host/main.go)（wicket 仓内的测试程序，不是部署模板） |
 
-发布版本包含被测提交之后的提交，内容为：修正测试数据；修正两个导出常量的取值（`claims_locales_supported`、`claims_parameter_supported`），wicket 不把这两个键写入 discovery 文档；token 端点错误响应在核心没有描述时保留扩展提供的 `error_description`（核心有描述时不变）；测试宿主改由常量拼出错误页匹配地址（取值不变）并拒绝以 `/\` 开头的返回地址；`Freeze` 对静态 client 列表增加签名算法检查（`TokenEndpointAuthSigningAlgorithms` 须落在档位收窄后的算法集内，测试宿主的 client 未设该字段，不受影响），并删除回环地址判定中一个不可达的分支（行为不变）。这些改动未经重新运行 suite；本轮各模块的请求都不经过它们改变的分支，本文据此认为记录的结果不受影响。
+发布版本包含被测提交之后的提交，内容为：修正测试数据；修正两个导出常量的取值（`claims_locales_supported`、`claims_parameter_supported`），wicket 不把这两个键写入 discovery 文档；测试宿主改由常量拼出错误页匹配地址（取值不变）并拒绝以 `/\` 开头的返回地址；`Freeze` 对静态 client 列表增加签名算法检查（`TokenEndpointAuthSigningAlgorithms` 须落在档位收窄后的算法集内，测试宿主的 client 未设该字段，不受影响），并删除回环地址判定中一个不可达的分支（行为不变）。这些改动未经重新运行 suite；本轮各模块的请求都不经过它们改变的分支，本文据此认为记录的结果不受影响。
 
 宿主配置要点：
 

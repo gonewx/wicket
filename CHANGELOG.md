@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Token endpoint error responses are now sent as JSON: the headers were set after the status was written, so `Content-Type` and `Cache-Control` were never sent and clients received `text/plain`. They now carry `Content-Type: application/json` and `Cache-Control: no-store` (RFC 6749 §5.2). Entries of `TokenErrorResponse.Custom` sit beside `error` instead of under a `custom` key and never replace `error`, and replace `error_description` only when the core has none; an empty `error_description` is left out.
+- Token endpoint error responses are now sent as JSON: the headers were set after the status was written, so `Content-Type` and `Cache-Control` were never sent and clients received `text/plain`. They now carry `Content-Type: application/json` and `Cache-Control: no-store` (RFC 6749 §5.2). Entries of `TokenErrorResponse.Custom` sit beside `error` instead of under a `custom` key and never replace `error` or `error_description`; an empty `error_description` is left out.
 - Discovery advertises the supported claims under `claims_supported`; the key was misspelt `claims._supported`, and a `CustomEntries` value under `claims_supported` is now handled like any other key the generator writes (filtered). The exported constants `wicket.DiscoveryClaimsLocalesSupported` and `wicket.DiscoveryClaimsParameterSupported` had the same misspelling (`claims._locales_supported`, `claims._parameter_supported`) and now hold `claims_locales_supported` and `claims_parameter_supported`; wicket itself writes neither key.
 
 [0.7.0]: https://github.com/gonewx/wicket/releases/tag/v0.7.0
