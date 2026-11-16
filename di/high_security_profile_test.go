@@ -188,6 +188,19 @@ func TestHighSecurityProfileFreezeRequirements(t *testing.T) {
 			want:   []string{`client "rs256" conflicts with the profile: client lists a token endpoint authentication signing algorithm the server does not accept`},
 			absent: []string{`client "fapi"`},
 		},
+		"static tls client listing ES256": {
+			declare: func(cfg *ServerConfig) {
+				enableHighSecurityPrerequisites(cfg)
+				cfg.EnableClientCertificateAuthentication(clientcert.Options{})
+				tls := compliantProfileClient()
+				tls.ClientId = "tls"
+				tls.TokenEndpointAuthMethod = wicket.EndpointAuthenticationMethodsTlsClientAuth
+				tls.TokenEndpointAuthSigningAlgorithms = []string{"ES256"}
+				cfg.SetClients([]*storage_models.Client{compliantProfileClient(), tls})
+			},
+			want:   []string{`client "tls" conflicts with the profile: `, "does not use private_key_jwt"},
+			absent: []string{`client "fapi"`, "token endpoint authentication method"},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
