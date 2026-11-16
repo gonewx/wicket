@@ -645,7 +645,7 @@ cfg.Freeze()
 
 **已满足、无需档位处理**：客户端断言的 `aud` 只接受 issuer 单值（`clientassertion` 的 `soleAudience`）。
 
-**已知不符合项**：FAPI 2.0 Security Profile 要求使用 DPoP 时支持 RFC 9449 §10.1 的授权码绑定（shall），该节要求同时支持 PAR 与 DPoP 的授权服务器既接受推送参数中的 `dpop_jkt`，也接受 PAR 请求所带的 `DPoP` 头（MUST）。wicket 的 PAR 端点不读 `DPoP` 头（见 DPoP 小节），只支持前者；以 DPoP 作发送方约束开启档位时，这一项不满足。以 mTLS 作发送方约束时不涉及。conformance 自测中 `ensure-mismatched-dpop-jkt-fails` 与 `ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt` 两个模块因此失败（见 [conformance 自测记录](./conformance/fapi2-security-profile.md)）。
+**已知不符合项**：FAPI 2.0 Security Profile 要求使用 DPoP 时支持 RFC 9449 §10.1 的授权码绑定（shall），该节要求同时支持 PAR 与 DPoP 的授权服务器既接受推送参数中的 `dpop_jkt`，也接受 PAR 请求所带的 `DPoP` 头（MUST）。wicket 的 PAR 端点不读 `DPoP` 头（见 DPoP 小节），只支持前者；开启档位且启用了 DPoP 时（档位必须启用 PAR），这一项不满足，即使发送方约束同时启用了 mTLS。未启用 DPoP 时不涉及。conformance 自测中 `ensure-mismatched-dpop-jkt-fails` 与 `ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt` 两个模块因此失败（见 [conformance 自测记录](./conformance/fapi2-security-profile.md)）。
 
 **不纳入档位**
 
