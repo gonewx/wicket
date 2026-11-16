@@ -262,7 +262,7 @@ reference access token 也在须回收之列：client 配置 `AccessTokenType=Re
 
 启用 DPoP 时另有一点，适用于任何自备的 `RefreshTokenStore`：须持久化并往返 `RefreshToken.DPoPKeyThumbprint`（DPoP proof 密钥指纹，见 [API 契约 · DPoP](./api-contracts.md#dpoprfc-9449)）。public client 带 DPoP proof 获得的 refresh token 靠这个字段绑定到 proof 密钥；适配器丢失它，绑定即静默失效，持有被窃 refresh token 的一方无需私钥就能兑换。契约测试套件目前不检查这一点，自备适配器须自行确认。同理，自备 client store 须往返 `Client.RequireDPoP`，丢失它会使按 client 强制 DPoP 静默失效。自备 `AuthorizationCodeStore` 须往返 `AuthorizationCode.DPoPKeyThumbprint`（authorize 请求 `dpop_jkt` 预绑定的指纹，见 [API 契约 · `dpop_jkt` 预绑定](./api-contracts.md#dpop_jkt-预绑定rfc-9449-10)）；丢失它，预绑定静默失效，截获授权码的一方可用自己的密钥兑换。契约测试套件同样不检查这一字段。DPoP 服务端 nonce 无状态，不需要任何存储。
 
-声明了 refresh token 消费处置（`ServerConfig.SetRefreshTokenConsumption`，见 [API 契约 · refresh token 的消费处置](./api-contracts.md#refresh-token-的消费处置)）时，自备的 `RefreshTokenStore` 还须往返 `RefreshToken.ConsumedTime` 与 `RefreshToken.RotatedTo`（内嵌 `models.RefreshTokenRotation`）：丢失前者，已消费的 refresh token 可被再次兑换；丢失后者，重放无法撤销其后签发的 refresh token。一次性由 `UpdateRefreshToken` 的版本比较裁决，同一 `expectedVersion` 的并发更新须恰一个成功。`storagetest` 以两个 MAY 级用例检查这两点（`ConsumedMarkRoundTrips`、`ConcurrentUpdateSucceedsOnce`，以 `storagetest.WithMay(true)` 运行）；MUST 用例未收紧，`SuiteVersion` 仍为 `2.0.0`。标记模式下已消费的记录保留到自身到期（`CreationTime + Lifetime`，滑动方式下为被兑换时延长后的寿命）、由宿主经 `RemoveExpired` 回收，同一授权的记录条数随寿命内的兑换次数增长，容量规划须按此估算。
+声明了 refresh token 消费处置（`ServerConfig.SetRefreshTokenConsumption`，见 [API 契约 · refresh token 的消费处置](./api-contracts.md#refresh-token-的消费处置)）时，自备的 `RefreshTokenStore` 还须往返 `RefreshToken.ConsumedTime` 与 `RefreshToken.RotatedTo`（内嵌 `models.RefreshTokenRotation`）：丢失前者，已消费的 refresh token 可被再次兑换；丢失后者，重放无法撤销其后签发的 refresh token。一次性由 `UpdateRefreshToken` 的版本比较裁决，同一 `expectedVersion` 的并发更新须恰一个成功。`storagetest` 以两个 MAY 级用例检查这两点（`ConsumedMarkRoundTrips`、`ConcurrentUpdateSucceedsOnce`，以 `storagetest.WithMay(true)` 运行）；第三个 MAY 级用例 `LifetimeUpdateRoundTrips` 检查 `UpdateRefreshToken` 写回 `CreationTime` 与 `Lifetime`、`RemoveExpired` 按更新后的值判定（见下文旧记录迁移一节）；MUST 用例未收紧，`SuiteVersion` 仍为 `2.0.0`。标记模式下已消费的记录保留到自身到期（`CreationTime + Lifetime`，滑动方式下为被兑换时延长后的寿命）、由宿主经 `RemoveExpired` 回收，同一授权的记录条数随寿命内的兑换次数增长，容量规划须按此估算。
 
 自备 client store 还须往返 `Client.InitiateLoginUri`（client 登记的登录发起端点，见 [API 契约 · 第三方发起登录](./api-contracts.md#第三方发起登录openid-connect-core-4)）：丢失它，`thirdpartylogin.Initiate` 对该 client 返回「未登记」错误，宿主无法再发起它的第三方登录。wicket 自带的 client 编解码（`storage.EncodeClient` / `DecodeClient`）已包含该字段。契约测试套件目前不检查这一字段，自备适配器须自行确认往返。
 
@@ -287,7 +287,7 @@ reference access token 也在须回收之列：client 配置 `AccessTokenType=Re
 外部适配器另须注意：
 
 - 按 `CreationTime + Lifetime` 派生过期列（如 `expires_at`）的实现，回填时须连同派生列一起更新；零值记录派生出的过期时刻在公元 1 年，会被首次回收删除。SQL 实现可以按 `creation_time` 为零值筛出旧行，在一条 `UPDATE` 里同时写 `creation_time`、`lifetime` 与 `expires_at`。
-- 滑动方式下每次兑换都会改写 `Lifetime`：`UpdateRefreshToken` 须写回 `CreationTime` 与 `Lifetime`，派生过期列须在更新时重算，不能只在插入时计算。
+- 滑动方式下每次兑换都会改写 `Lifetime`：`UpdateRefreshToken` 须写回 `CreationTime` 与 `Lifetime`，派生过期列须在更新时重算，不能只在插入时计算。`storagetest` 的 MAY 级用例 `LifetimeUpdateRoundTrips`（以 `storagetest.WithMay(true)` 运行）检查这一点。
 - `Lifetime` 最大为 `2147483647` 秒（约 68 年），派生列的时间类型须容得下 `CreationTime` 加上这个值。
 
 ### 释放资源
