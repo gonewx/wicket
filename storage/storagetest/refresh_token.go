@@ -263,6 +263,9 @@ func RunRefreshTokenStoreSuite(t *testing.T, newStore func() storage.RefreshToke
 		}
 
 		newExpiry := created.Add(lifetime * time.Second)
+		if !newExpiry.After(oldExpiry) {
+			t.Fatalf("fixture: updated expiry %v is not after the stored expiry %v", newExpiry, oldExpiry)
+		}
 		cutoff := oldExpiry.Add(newExpiry.Sub(oldExpiry) / 2)
 		removed, err := store.RemoveExpired(context.Background(), cutoff)
 		if err != nil {
@@ -274,6 +277,16 @@ func RunRefreshTokenStoreSuite(t *testing.T, newStore func() storage.RefreshToke
 		if _, err := store.GetRefreshToken(context.Background(), "handle-1"); err != nil {
 			t.Fatalf("Get after RemoveExpired: %v", err)
 		}
+
+		removed, err = store.RemoveExpired(context.Background(), newExpiry.Add(time.Second))
+		if err != nil {
+			t.Fatalf("RemoveExpired past the updated expiry: %v", err)
+		}
+		if removed != 1 {
+			t.Fatalf("RemoveExpired past the updated expiry removed %d records, want 1", removed)
+		}
+		_, err = store.GetRefreshToken(context.Background(), "handle-1")
+		expectNotFound(t, err)
 	})
 	// Derived from: https://www.rfc-editor.org/rfc/rfc9700#section-4.14.2
 	// and the one-time rule that a single versioned write decides who
