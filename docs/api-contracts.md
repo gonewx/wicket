@@ -397,7 +397,7 @@ refresh token 签发时记下创建时刻（`RefreshToken.CreationTime`）与按
 - refresh token 绑定到签发它的 client（RFC 6749 §6）：其他 client 出示时视同不存在，返回 `invalid_grant`。
 - 判定顺序：查不到 → 非本 client 出示 → 补记旧记录（见下文）→ 过期。其他 client 出示过期 token 得到与出示任何他人 token 相同的 `invalid_grant`，不透露是否过期。
 - 时钟：服务经 `(*services/impl.RefreshTokenService).SetClock(clock)` 得到时钟时用它，未设置时用墙钟；判过期在任何情况下都生效。`SetClock(nil)` panic。
-- `CreationTime` 为零值的既有记录（v0.6.1 之前签发）：首次成功兑换时补记，`CreationTime` 取当前时刻，`Lifetime` 按 client 当前配置算出，随本次兑换写回；兑换在校验之后失败（scope、resource、DPoP 绑定等）时不写回，记录仍为零值。但在补记之前宿主调用 `RemoveExpired` 会把这类记录当作已过期删除，迁移办法见 [存储持久化指南 · 既有 refresh token 记录的迁移](./storage-persistence-guide.md#既有-refresh-token-记录的迁移)。
+- `CreationTime` 为零值的既有记录（v0.6.1 之前签发）：首次成功兑换时补记，`CreationTime` 取当前时刻，`Lifetime` 按 client 当前配置算出，随本次兑换写回；兑换在请求校验阶段被拒（scope、resource、DPoP 绑定等）时不写回，记录仍为零值。但在补记之前宿主调用 `RemoveExpired` 会把这类记录当作已过期删除，迁移办法见 [存储持久化指南 · 既有 refresh token 记录的迁移](./storage-persistence-guide.md#既有-refresh-token-记录的迁移)。
 
 ### 设备授权（Device Authorization Endpoint，RFC 8628）
 
