@@ -172,7 +172,7 @@ DPoP 启用时，authorize 请求可带 `dpop_jkt`（`wicket.AuthorizeRequestDPo
 
 - 直接请求与经 PAR 推送（推送参数中含 `dpop_jkt`，authorize 用 `request_uri`）效果相同。格式不合法 → `invalid_request`（描述 `Invalid dpop_jkt`）：直接请求显示在错误页，PAR 推送阶段返回 400 `invalid_request`，不签发授权码。
 - 指纹随授权码保存（`AuthorizationCode.DPoPKeyThumbprint`，嵌入 `models.AuthorizationCodeProofBinding`）。兑换时授权码先被原子取出，再比对：请求未带 proof，或 proof 公钥指纹与之不同 → 400 `invalid_grant`，此时授权码已作废，换用正确密钥也不能再兑换。
-- PAR 端点不读 `DPoP` 头：PAR 请求所带的 `DPoP` 头被忽略，既不校验也不派生绑定。经 PAR 预绑定只能用 `dpop_jkt` 参数。
+- PAR 端点不读 `DPoP` 头：PAR 请求所带的 `DPoP` 头被忽略，既不校验也不派生绑定。经 PAR 预绑定只能用 `dpop_jkt` 参数。这不符合 RFC 9449 §10.1：同时支持 PAR 与 DPoP 的授权服务器须两种方式都支持（MUST），见[高安全档位 · 已知不符合项](#高安全档位fapi-20-security-profile默认关闭)。
 - DPoP 未启用时 `dpop_jkt` 被忽略：不校验格式、不写入授权码，兑换行为与既有一致。
 
 ### 服务端 nonce（RFC 9449 §8）
@@ -645,13 +645,15 @@ cfg.Freeze()
 
 **已满足、无需档位处理**：客户端断言的 `aud` 只接受 issuer 单值（`clientassertion` 的 `soleAudience`）。
 
+**已知不符合项**：FAPI 2.0 Security Profile 要求使用 DPoP 时支持 RFC 9449 §10.1 的授权码绑定（shall），该节要求同时支持 PAR 与 DPoP 的授权服务器既接受推送参数中的 `dpop_jkt`，也接受 PAR 请求所带的 `DPoP` 头（MUST）。wicket 的 PAR 端点不读 `DPoP` 头（见 DPoP 小节），只支持前者；以 DPoP 作发送方约束开启档位时，这一项不满足。以 mTLS 作发送方约束时不涉及。conformance 自测中 `ensure-mismatched-dpop-jkt-fails` 与 `ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt` 两个模块因此失败（见 [conformance 自测记录](./conformance/fapi2-security-profile.md)）。
+
 **不纳入档位**
 
 | 项 | 理由 |
 |----|------|
 | DPoP 服务端 nonce | FAPI 2.0 为可选（may），宿主可经 `dpop.Options.RequireNonce` 单独开启 |
 | `RequireRequestedAcr()` | FAPI 2.0 未要求 |
-| refresh token 轮换的消费处置（`SetRefreshTokenConsumption`） | FAPI 2.0 一般不要求轮换；档位不开启它，也不拒绝宿主单独开启 |
+| refresh token 轮换的消费处置（`SetRefreshTokenConsumption`） | FAPI 2.0 要求除特殊情况外不使用 refresh token 轮换（shall not … except in extraordinary circumstances）；档位不开启它，也不拒绝宿主单独开启，开启档位时宿主不应同时开启轮换 |
 | 按会话撤销授权（`SetRevokeGrantsOnSessionSubjectChange`） | 非 FAPI 2.0 要求 |
 | TLS、HSTS、授权端点不支持 CORS | 属宿主网络层 |
 | 服务端自身签名密钥算法、request object 算法收窄到 PS256/ES256 | 暂缓，后续处理 |
