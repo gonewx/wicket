@@ -43,6 +43,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.7.0]: https://github.com/gonewx/wicket/releases/tag/v0.7.0
 
+## [0.6.1] - 2026-11-15
+
+### Added
+
+- `storagetest`: a MAY case for `RefreshTokenStore`, `LifetimeUpdateRoundTrips` (`CreationTime` and `Lifetime` survive an update, and `RemoveExpired` judges the record by the updated values). No MUST case changed; `SuiteVersion` stays `2.0.0`. A host-provided `RefreshTokenStore` has to write `CreationTime` and `Lifetime` back on every update, since the core dates records stored without a creation time and sliding expiration rewrites the lifetime on each redemption.
+
+### Security
+
+- Refresh token redemption is bound to the client the token was issued to: a refresh token presented by any other client is refused with `invalid_grant`, as if it did not exist, and the owning client can still redeem it. Releases 0.1.0 through 0.6.0 did not compare the refresh token's client with the authenticated client, so any authenticated client holding another client's refresh token could redeem it and receive tokens issued to that client. Neither wicket's logs nor its stores identify such a redemption: the success record carries no client id and the tokens issued belong to the owning client. Hosts that issue refresh tokens to more than one client and cannot rule out that a refresh token reached another client should revoke the outstanding refresh tokens of the affected clients (`RefreshTokenStore.RemoveRefreshTokensByClient`); access tokens already issued from them stay valid until they expire.
+
+### Fixed
+
+- Refresh token lifetimes are recorded and enforced. `RefreshTokenService.CreateRefreshToken` never set `CreationTime` or `Lifetime`, and redemption never checked expiry, so in 0.5.0 and 0.6.0 refresh tokens did not expire, while a host calling `RefreshTokenStore.RemoveExpired(now)` as documented removed every refresh token, valid ones included. A refresh token now records its creation time and the lifetime its client grants, and an expired one is refused with `invalid_grant`, as if it did not exist; the record stays until the host reclaims it. Absolute expiration (the `models.NewClient()` default) ends at creation plus `AbsoluteRefreshTokenLifetime`; sliding expiration with a positive `SlidingRefreshTokenLifetime` moves the expiry to the redemption time plus that lifetime on every redemption, capped at creation plus `AbsoluteRefreshTokenLifetime` unless that is 0. A lifetime setting of 0 sets no limit; when nothing limits a token, `Lifetime` is `math.MaxInt32` seconds so that `RemoveExpired` keeps it. `(*services/impl.RefreshTokenService).SetClock(clock)` sets the clock the service dates lifetimes with (nil panics); without one the wall clock is used. It is a method of the concrete service, for services built outside the container; no interface changed.
+  - Upgrade note: the 30-day default absolute lifetime of `models.NewClient()` now takes effect. Clients that relied on refresh tokens never expiring must set `AbsoluteRefreshTokenLifetime` (and, for sliding expiration, `SlidingRefreshTokenLifetime`) to 0 or to the lifetime they want.
+  - Upgrade note: refresh token records issued before 0.6.1 have a zero `CreationTime`. Their first successful redemption after the upgrade dates them (`CreationTime` is set to that moment and `Lifetime` follows the client's current settings) and writes them back; a redemption that fails after validation (scope, resource or DPoP binding, for instance) writes nothing, and the record keeps its zero `CreationTime`, but `RemoveExpired` removes every record still carrying a zero `CreationTime`. Hosts that want to keep outstanding refresh tokens backfill `CreationTime` and `Lifetime` before the first `RemoveExpired` after the upgrade; adapters that derive an expiry column from `CreationTime + Lifetime` update that column with the backfill and recompute it on every `UpdateRefreshToken`, since sliding expiration rewrites `Lifetime` on each redemption. See "既有 refresh token 记录的迁移" in `docs/storage-persistence-guide.md`.
+
+[0.6.1]: https://github.com/gonewx/wicket/releases/tag/v0.6.1
+
 ## [0.6.0] - 2026-11-15
 
 ### Added
