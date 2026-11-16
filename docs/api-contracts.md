@@ -418,12 +418,31 @@ cfg.Freeze()
 
 请求带着会话 cookie，会话存储中该记录存在（已过期的记录也算），记录的主体非空，而新主体非空且与之不同。判定发生在两处，用同一判定：
 
-- 登录：`UserSession.CreateSessionId` 在生成并写入新会话之前，以新登录的主体判定 cookie 指向的原会话。撤销不依赖新会话创建成功。
+- 登录：`UserSession.CreateSessionId` 在生成并写入新会话（或沿用原会话，见下文）之前，以新登录的主体判定 cookie 指向的原会话。撤销不依赖新会话创建成功。
 - 恢复：请求的已认证主体与会话 cookie 的记录主体不符时，先判定、撤销，再照旧清除会话 cookie。原会话已过期时只清 cookie，不判定；匿名请求不撤销。
 
 同一主体重新登录、首次登录（无会话 cookie）、原记录不存在，都不撤销任何东西。同一请求内对同一原会话至多撤销一次。
 
-**已知限制：** 每次登录都开始一个新会话，同一主体重新登录（例如 `prompt=login`、`max_age` 或强制重新认证）后，会话 cookie 指向新会话；此后另一用户登录只撤销这个新会话，此前会话绑定的授权不在撤销范围内。
+### 同一主体重新登录沿用会话
+
+开关开启且 server-side sessions 开启时，`UserSession.CreateSessionId` 用撤销判定读出的同一条原记录（每次登录只读一次会话存储）判定是否沿用：会话 cookie 指向的记录存在、未过期，且记录主体非空并等于本次登录的主体，即沿用原会话标识，不生成新会话：
+
+- 返回的会话标识（进入 id_token 与 logout token 的 `sid`）与会话 cookie 的值都不变；cookie 重新写出，以刷新 `Max-Age`。会话标识不随重登轮换。
+- 经 `session.Store.UpdateSession` 续期原记录：`Renewed` 置为当前时刻，`Expires` 置为当前时刻加一个会话寿命（`ServerSideSessions.SessionLifetime`）；其他字段保持读出时的值，不删除、不撤销任何东西。
+- 原记录的 `ClientIDs` 成为本次请求的 client 列表，登出通知（front-channel 与 back-channel）覆盖首次登录及此后加入该会话的全部 client。
+- 续期失败时 `CreateSessionId` 返回错误，登录失败（不退回生成新标识）。
+
+因此 A 登录、A 重新登录（例如 `prompt=login`、`max_age` 或强制重新认证）、B 再在同一浏览器登录时，A 此前各次登录取得的授权都随该会话撤销。记录不存在、已过期、主体为空或主体不同，以及读取原记录失败（非 `ErrSessionNotFound` 时只记 Warn，只含错误类型）时，照常生成新会话标识。
+
+沿用只为撤销服务：开关关闭时每次登录照旧生成新会话标识，登录不读会话存储；server-side sessions 关闭时没有会话 cookie 与记录可读，行为不变。
+
+会话 cookie 不是认证凭据：沿用要求 cookie 指向的记录主体等于本次已认证的登录主体。预置他人会话 cookie 的浏览器上，登录主体不同，生成新会话（开关开启时并撤销被预置会话的授权）；被种入自己会话标识的浏览器上重登，只是续期自己的会话。
+
+**残余限制：**
+
+- 会话记录过期后（而其 refresh token 仍有效），同一主体重新登录生成新会话；此后另一用户登录只撤销这个新会话，过期会话绑定的授权不在撤销范围内。
+- 续期以整条记录替换（`UpdateSession`），与同一会话上并发的 `AddClientID` 之间存在窄窗口，可能丢失一个 client id。
+- 原记录在读出后、续期前被并发删除时，`UpdateSession` 为 no-op，沿用的标识没有记录；下一请求恢复会话时清除 cookie。
 
 ### 撤销什么
 
