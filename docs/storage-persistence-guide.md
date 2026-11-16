@@ -270,7 +270,7 @@ reference access token 也在须回收之列：client 配置 `AccessTokenType=Re
 
 自 v0.7.0 起（0.6.x 维护线自 v0.6.1 起），refresh token 签发时记下 `CreationTime` 与按 client 配置得出的 `Lifetime`，兑换时由核心判过期（见 [API 契约 · refresh token 寿命](./api-contracts.md#refresh-token-寿命)）。v0.7.0 之前、v0.6.1 以外的版本签发的记录 `CreationTime` 为零值、`Lifetime` 为 0（v0.5.0、v0.6.0 中按文档调用 `RemoveExpired` 会删除全部 refresh token，即由此而来）：
 
-- 首次成功兑换时核心会补记：`CreationTime` 取当前时刻，`Lifetime` 按 client 当前配置算出，随本次兑换写回；兑换在校验之后失败（scope、resource、DPoP 绑定等）时不写回，记录仍为零值。
+- 首次成功兑换时核心会补记：`CreationTime` 取当前时刻，`Lifetime` 按 client 当前配置算出，随本次兑换写回；兑换在请求校验阶段被拒（scope、resource、DPoP 绑定等）时不写回；校验通过后的失败（如签发 ID token 失败）发生在写回之后，补记已生效，记录仍为零值。
 - 但 `RemoveExpired` 的判定式（`CreationTime + Lifetime` 早于 cutoff）把这类记录一律视为已过期。升级后宿主第一次调用 `RefreshTokenStore.RemoveExpired` 就会删除全部未补记的旧记录，持有者只能重新授权。
 
 不想让旧 token 失效的宿主，在升级后第一次回收之前回填旧记录：`CreationTime` 设为回填时刻（或已知的签发时刻），`Lifetime` 按该记录 client 的配置设置（与签发时的算式一致）：
