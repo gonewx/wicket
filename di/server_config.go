@@ -111,6 +111,9 @@ type ServerConfig struct {
 	// sessionGrantRevocation revokes the grants of a browser session once
 	// another subject signs in on it, see session_grant_revocation.go.
 	sessionGrantRevocation bool
+	// sessionCookieDataProtectionProvider protects the session cookie
+	// while sessionGrantRevocation is set, see session_grant_revocation.go.
+	sessionCookieDataProtectionProvider dp.DataProtectionProvider
 
 	// accountCreationUrl is the host's account creation page, see
 	// account_creation.go. Empty means account creation is not offered.
@@ -300,6 +303,7 @@ func (c *ServerConfig) Freeze() {
 	c.requireClientStoreSeam()
 	c.requireClientInitiateLoginUris()
 	c.requirePushedAuthorizationDataProtectionSeam()
+	c.requireSessionCookieDataProtectionSeam()
 	validateStoreSeams(c.storeSeams(), c.allowInMemoryFallback, c.logger)
 }
 

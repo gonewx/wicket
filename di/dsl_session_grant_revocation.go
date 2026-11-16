@@ -34,7 +34,9 @@ func registerSessionGrantRevocation() {
 // revokingUserSessionFromProvider builds the user session exactly as the core
 // registration does. The revocation declaration is read here, per
 // resolution, because the host declares it after the container is built;
-// the stores are resolved only when it is declared.
+// the stores and the session cookie protector are resolved only when it is
+// declared. A declared revocation without a usable session cookie protector
+// panics, whether or not Freeze was called.
 func revokingUserSessionFromProvider(p godi.Provider) services.UserSession {
 	session := services_impl.NewUserSession(
 		godi.GetRequired[accessor.HttpContextAccessor](p),
@@ -46,14 +48,18 @@ func revokingUserSessionFromProvider(p godi.Provider) services.UserSession {
 		godi.GetRequired[auth.SchemeProvider](p),
 		godi.GetRequired[sessionpkg.Store](p),
 	)
-	if godi.GetRequired[*ServerConfig](p).RevokeGrantsOnSessionSubjectChange() {
+	if cfg := godi.GetRequired[*ServerConfig](p); cfg.RevokeGrantsOnSessionSubjectChange() {
+		protector, err := cfg.sessionCookieProtectorForFeature()
+		if err != nil {
+			panic(err.Error())
+		}
 		session.SetSessionGrantRevoker(services_impl.NewSessionGrantRevoker(
 			godi.GetRequired[storage.AuthorizationCodeStore](p),
 			godi.GetRequired[storage.RefreshTokenStore](p),
 			godi.GetRequired[storage.ReferenceTokenStore](p),
 			godi.GetRequired[storage.PersistedGrantStore](p),
 			godi.GetRequired[*slog.Logger](p),
-		))
+		), protector)
 	}
 	return session
 }

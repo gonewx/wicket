@@ -570,10 +570,12 @@ func TestInvalidCallbackDeliversNothing(t *testing.T) {
 
 // newRevokingSessionPipeline is newSessionPipeline with the grants of a
 // browser session revoked once another subject signs in on it, the assembly
-// in which signing the same subject in again continues the session.
+// in which signing the same subject in again continues the session and the
+// session cookie carries the protected session id.
 func newRevokingSessionPipeline(clients ...*storage_models.Client) *integration_common.WicketPipeline {
 	pipeline := integration_common.NewWicketPipeline()
 	pipeline.Root.ServerConfig().SetRevokeGrantsOnSessionSubjectChange(true)
+	pipeline.Root.ServerConfig().SetSessionCookieDataProtectionProvider(integration_common.NewPushedAuthorizationProtection())
 	pipeline.Clients = clients
 	pipeline.IdentityScopes = append(pipeline.IdentityScopes, storage_models.IdentityResourcesOpenId())
 	pipeline.Initialize()

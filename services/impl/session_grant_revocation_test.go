@@ -6,6 +6,9 @@ package impl
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/claims"
+	"github.com/gonewx/wicket/dp"
 	responses_models "github.com/gonewx/wicket/responses/models"
 	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
@@ -187,16 +191,58 @@ func TestSessionGrantRevokerSkipsAStoreItWasNotGiven(t *testing.T) {
 	require.Equal(t, []string{"refresh:" + formerSessionId, "persisted:" + formerSessionId}, stores.calls)
 }
 
+// taggingProtector is an authenticating test protector: the protected form
+// is the payload followed by its HMAC, and a value whose tag does not match
+// fails to unprotect.
+type taggingProtector struct{ key []byte }
+
+func newTaggingProtector() *taggingProtector {
+	return &taggingProtector{key: []byte("wicket session cookie test key")}
+}
+
+func (p *taggingProtector) Create(purpose string) dp.DataProtector {
+	return &taggingProtector{key: append(append([]byte(nil), p.key...), purpose...)}
+}
+
+func (p *taggingProtector) tag(data []byte) []byte {
+	mac := hmac.New(sha256.New, p.key)
+	mac.Write(data)
+	return mac.Sum(nil)
+}
+
+func (p *taggingProtector) Protect(data []byte) []byte {
+	return append(append([]byte(nil), data...), p.tag(data)...)
+}
+
+func (p *taggingProtector) Unprotect(data []byte) ([]byte, error) {
+	if len(data) < sha256.Size {
+		return nil, errors.New("protected value too short")
+	}
+	payload, tag := data[:len(data)-sha256.Size], data[len(data)-sha256.Size:]
+	if !hmac.Equal(tag, p.tag(payload)) {
+		return nil, errors.New("protected value was changed")
+	}
+	return append([]byte(nil), payload...), nil
+}
+
+// protectedSessionCookie is the session cookie value of sessionId under
+// protector.
+func protectedSessionCookie(protector dp.DataProtector, sessionId string) string {
+	return base64.RawURLEncoding.EncodeToString(protector.Protect([]byte(sessionId)))
+}
+
 // revocationFixture is a request-scoped user session whose request carries
-// the session cookie of formerSessionId, recorded for subject alice.
+// the session cookie of formerSessionId, recorded for subject alice. While
+// the revocation is on, the cookie carries the protected session id.
 type revocationFixture struct {
-	stores   *sessionGrantStores
-	sessions *countingSessionStore
-	memory   *sessionpkg.MemoryStore
-	recorder *httptest.ResponseRecorder
-	logs     *bytes.Buffer
-	session  *UserSession
-	clock    *sessionStateClock
+	stores    *sessionGrantStores
+	sessions  *countingSessionStore
+	memory    *sessionpkg.MemoryStore
+	recorder  *httptest.ResponseRecorder
+	logs      *bytes.Buffer
+	session   *UserSession
+	clock     *sessionStateClock
+	protector *taggingProtector
 }
 
 type revocationSetup struct {
@@ -211,6 +257,8 @@ type revocationSetup struct {
 	noRecord bool
 	// readErr fails every session read.
 	readErr error
+	// cookie, when set, is sent as the session cookie value as is.
+	cookie string
 }
 
 func newRevocationFixture(t *testing.T, setup revocationSetup) *revocationFixture {
@@ -234,9 +282,16 @@ func newRevocationFixture(t *testing.T, setup revocationSetup) *revocationFixtur
 	}
 	sessions := &countingSessionStore{Store: base, err: setup.readErr}
 
+	protector := newTaggingProtector()
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	if !setup.noCookie {
+	switch {
+	case setup.noCookie:
+	case setup.cookie != "":
+		request.AddCookie(&http.Cookie{Name: "wicket.session", Value: setup.cookie})
+	case setup.noRevoker:
 		request.AddCookie(&http.Cookie{Name: "wicket.session", Value: formerSessionId})
+	default:
+		request.AddCookie(&http.Cookie{Name: "wicket.session", Value: protectedSessionCookie(protector, formerSessionId)})
 	}
 	recorder := httptest.NewRecorder()
 	us := newSessionUserSession(t, !setup.sessionsDisabled, sessions, &recordingAccessor{req: request, rw: recorder}, clock)
@@ -244,9 +299,24 @@ func newRevocationFixture(t *testing.T, setup revocationSetup) *revocationFixtur
 	us.logger = slog.New(slog.NewTextHandler(logs, nil))
 	stores := &sessionGrantStores{fail: map[string]error{}}
 	if !setup.noRevoker {
-		us.SetSessionGrantRevoker(stores.revoker(logs))
+		us.SetSessionGrantRevoker(stores.revoker(logs), protector)
 	}
-	return &revocationFixture{stores: stores, sessions: sessions, memory: memory, recorder: recorder, logs: logs, session: us, clock: clock}
+	return &revocationFixture{stores: stores, sessions: sessions, memory: memory, recorder: recorder, logs: logs, session: us, clock: clock, protector: protector}
+}
+
+// cookieSessionId returns the session id cookie carries: the cookie value
+// while the revocation is off, the unprotected value while it is on.
+func (f *revocationFixture) cookieSessionId(t *testing.T, cookie *http.Cookie) string {
+	t.Helper()
+	if f.session.revoker == nil {
+		return cookie.Value
+	}
+	protected, err := base64.RawURLEncoding.DecodeString(cookie.Value)
+	require.NoError(t, err, "the session cookie is base64url")
+	sessionId, err := f.protector.Unprotect(protected)
+	require.NoError(t, err, "the session cookie holds a protected session id")
+	require.NotEqual(t, string(sessionId), cookie.Value, "the session cookie does not carry the session id itself")
+	return string(sessionId)
 }
 
 func (f *revocationFixture) sessionCookieCleared() bool {
@@ -294,7 +364,7 @@ func (f *revocationFixture) signInOn(t *testing.T, subject string, continued boo
 	require.Equal(t, subject, record.SubjectID)
 	cookie := f.writtenSessionCookie()
 	require.NotNil(t, cookie, "the session cookie is written")
-	require.Equal(t, created, cookie.Value)
+	require.Equal(t, created, f.cookieSessionId(t, cookie))
 }
 
 func TestUserSessionSignInRevokesTheFormerSubjectsGrants(t *testing.T) {
@@ -608,6 +678,34 @@ func TestUserSessionSignInFailsWhenTheSessionCannotBeRenewed(t *testing.T) {
 	sessions, err := f.memory.GetSessionsBySubjectID(context.Background(), "alice")
 	require.NoError(t, err)
 	require.Len(t, sessions, 1, "no new session is created")
+
+	// A store handing out its own record keeps it unrenewed.
+	shared := &sessionpkg.Record{
+		SessionID: formerSessionId,
+		SubjectID: "alice",
+		Renewed:   f.clock.now,
+		Expires:   f.clock.now.Add(time.Hour),
+	}
+	g := newRevocationFixture(t, revocationSetup{noRecord: true})
+	g.sessions.Store = failingUpdateSessionStore{Store: sharingSessionStore{record: shared}}
+	g.clock.now = g.clock.now.Add(30 * time.Minute)
+	_, err = g.session.CreateSessionId(context.Background(), principalWithSubject("alice"), nil)
+	require.ErrorContains(t, err, "session store read-only")
+	require.Equal(t, f.clock.now, shared.Renewed, "the stored record is not renewed")
+	require.Equal(t, f.clock.now.Add(time.Hour), shared.Expires, "the stored record is not renewed")
+}
+
+// sharingSessionStore hands out its own record instead of a copy.
+type sharingSessionStore struct {
+	sessionpkg.Store
+	record *sessionpkg.Record
+}
+
+func (s sharingSessionStore) GetSession(_ context.Context, sessionID string) (*sessionpkg.Record, error) {
+	if s.record.SessionID != sessionID {
+		return nil, sessionpkg.ErrSessionNotFound
+	}
+	return s.record, nil
 }
 
 func TestSessionContinues(t *testing.T) {
@@ -630,6 +728,166 @@ func TestSessionContinues(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, tc.want, sessionContinues(tc.record, tc.subject, now))
+		})
+	}
+}
+
+func TestSetSessionGrantRevokerRequiresACookieProtector(t *testing.T) {
+	t.Parallel()
+	stores := &sessionGrantStores{}
+	us := &UserSession{}
+
+	require.PanicsWithValue(t, "SetSessionGrantRevoker requires a session cookie protector together with the revoker", func() {
+		us.SetSessionGrantRevoker(stores.revoker(&bytes.Buffer{}), nil)
+	})
+	require.Nil(t, us.revoker, "a revoker without a protector is not installed")
+
+	protector := newTaggingProtector()
+	us.SetSessionGrantRevoker(stores.revoker(&bytes.Buffer{}), protector)
+	require.NotNil(t, us.revoker)
+	require.Same(t, protector, us.cookieProtector)
+
+	us.SetSessionGrantRevoker(nil, protector)
+	require.Nil(t, us.revoker, "nil turns the revocation off")
+	require.Nil(t, us.cookieProtector, "the protector is dropped with the revocation")
+}
+
+// forgedSessionCookies are session cookie values that do not hold a session
+// id protected for the fixture.
+func forgedSessionCookies() map[string]string {
+	return map[string]string{
+		"the plain session id": formerSessionId,
+		// It decodes, so only unprotecting it can refuse it, as for a
+		// plain hex session id.
+		"the encoded plain session id": base64.RawURLEncoding.EncodeToString([]byte(formerSessionId)),
+		"not base64url":                "not*base64url",
+		"protected with another key": protectedSessionCookie(
+			&taggingProtector{key: []byte("another key")}, formerSessionId),
+	}
+}
+
+func TestUserSessionSignInTreatsAForgedSessionCookieAsNone(t *testing.T) {
+	t.Parallel()
+	for name, cookie := range forgedSessionCookies() {
+		for _, subject := range []string{"bob", "alice"} {
+			t.Run(name+"/"+subject, func(t *testing.T) {
+				t.Parallel()
+				f := newRevocationFixture(t, revocationSetup{cookie: cookie})
+
+				f.signInOn(t, subject, false)
+
+				require.Empty(t, f.stores.calls, "a forged session cookie revokes nothing")
+				require.Zero(t, f.sessions.reads, "a forged session cookie names no session")
+				require.True(t, f.sessionCookieCleared(), "the forged session cookie is cleared")
+				record, err := f.memory.GetSession(context.Background(), formerSessionId)
+				require.NoError(t, err)
+				require.Equal(t, f.clock.now.Add(time.Hour), record.Expires, "the named session is not renewed")
+			})
+		}
+	}
+}
+
+func TestUserSessionRestoreTreatsAForgedSessionCookieAsNone(t *testing.T) {
+	t.Parallel()
+	for name, cookie := range forgedSessionCookies() {
+		for _, subject := range []string{"bob", "alice"} {
+			t.Run(name+"/"+subject, func(t *testing.T) {
+				t.Parallel()
+				f := newRevocationFixture(t, revocationSetup{cookie: cookie})
+				f.session.user = principalWithSubject(subject)
+
+				require.Empty(t, f.session.GetSessionId())
+
+				require.Empty(t, f.stores.calls)
+				require.Zero(t, f.sessions.reads)
+				require.True(t, f.sessionCookieCleared())
+			})
+		}
+	}
+}
+
+func TestUserSessionEnsureTreatsAForgedSessionCookieAsNone(t *testing.T) {
+	t.Parallel()
+	for name, cookie := range forgedSessionCookies() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newRevocationFixture(t, revocationSetup{cookie: cookie})
+			f.session.user = principalWithSubject("alice")
+
+			require.NoError(t, f.session.EnsureSessionIdCookie(context.Background()))
+
+			require.Empty(t, f.session.session)
+			require.Empty(t, f.stores.calls)
+			require.Zero(t, f.sessions.reads)
+			require.True(t, f.sessionCookieCleared())
+		})
+	}
+}
+
+func TestUserSessionProtectedSessionCookieRoundTrips(t *testing.T) {
+	t.Parallel()
+	f := newRevocationFixture(t, revocationSetup{noCookie: true})
+	created, err := f.session.CreateSessionId(context.Background(), principalWithSubject("alice"), nil)
+	require.NoError(t, err)
+	written := f.writtenSessionCookie()
+	require.NotNil(t, written)
+	require.NotEqual(t, created, written.Value, "the session cookie does not carry the session id")
+	require.NotContains(t, written.Value, created)
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.AddCookie(&http.Cookie{Name: "wicket.session", Value: written.Value})
+	next := newSessionUserSession(t, true, f.sessions, &recordingAccessor{req: request, rw: httptest.NewRecorder()}, f.clock)
+	next.SetSessionGrantRevoker(f.stores.revoker(f.logs), f.protector)
+	next.user = principalWithSubject("alice")
+
+	require.Equal(t, created, next.GetSessionId())
+}
+
+func TestUserSessionEnsureAdoptsOnlyAsRestoreDoes(t *testing.T) {
+	t.Parallel()
+	clock := newSessionStateClock()
+	expired := func() *sessionpkg.Record {
+		return &sessionpkg.Record{
+			SessionID: formerSessionId,
+			SubjectID: "alice",
+			Expires:   clock.Now().Add(-time.Second),
+			ClientIDs: []string{"client-a"},
+		}
+	}
+	cases := map[string]struct {
+		setup   revocationSetup
+		subject string
+		adopted bool
+	}{
+		"the session's own subject":          {subject: "alice", adopted: true},
+		"another subject":                    {subject: "bob"},
+		"no authenticated user":              {},
+		"an expired session":                 {setup: revocationSetup{record: expired()}, subject: "alice"},
+		"revocation off, the own subject":    {setup: revocationSetup{noRevoker: true}, subject: "alice", adopted: true},
+		"revocation off, another subject":    {setup: revocationSetup{noRevoker: true}, subject: "bob", adopted: true},
+		"revocation off, no user":            {setup: revocationSetup{noRevoker: true}, adopted: true},
+		"revocation off, an expired session": {setup: revocationSetup{noRevoker: true, record: expired()}, subject: "alice", adopted: true},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newRevocationFixture(t, tc.setup)
+			if tc.subject != "" {
+				f.session.user = principalWithSubject(tc.subject)
+			}
+
+			require.NoError(t, f.session.EnsureSessionIdCookie(context.Background()))
+
+			require.Empty(t, f.stores.calls, "ensuring the session cookie revokes nothing")
+			if tc.adopted {
+				require.Equal(t, formerSessionId, f.session.session)
+				require.Equal(t, []string{"client-a"}, f.session.clients)
+				require.False(t, f.sessionCookieCleared())
+			} else {
+				require.Empty(t, f.session.session)
+				require.Empty(t, f.session.clients)
+				require.True(t, f.sessionCookieCleared(), "the session cookie is cleared")
+			}
 		})
 	}
 }

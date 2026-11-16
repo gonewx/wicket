@@ -5,6 +5,7 @@ package impl
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"github.com/gonewx/wicket/auth"
 	"github.com/gonewx/wicket/claims"
 	config_options "github.com/gonewx/wicket/config/options"
+	"github.com/gonewx/wicket/dp"
 	"github.com/gonewx/wicket/dpop"
 	"github.com/gonewx/wicket/extensions"
 	"github.com/gonewx/wicket/models/contexts"
@@ -186,6 +188,9 @@ type UserSession struct {
 	// already revoked, so one request revokes it at most once.
 	revoker        *SessionGrantRevoker
 	revokedSession string
+	// cookieProtector, set together with revoker, protects the session id
+	// the session cookie carries, see SetSessionGrantRevoker.
+	cookieProtector dp.DataProtector
 }
 
 func NewUserSession(
@@ -244,14 +249,20 @@ func (s *UserSession) responseWriter() http.ResponseWriter {
 	return nil
 }
 
+// writeSessionCookie writes the session cookie of sessionID: the session id
+// itself, or its protected form while the revocation is on.
 func (s *UserSession) writeSessionCookie(sessionID string) {
 	w := s.responseWriter()
 	if w == nil {
 		return
 	}
+	value := sessionID
+	if s.cookieProtector != nil {
+		value = base64.RawURLEncoding.EncodeToString(s.cookieProtector.Protect([]byte(sessionID)))
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.cookieName,
-		Value:    sessionID,
+		Value:    value,
 		MaxAge:   int(s.lifetime.Seconds()),
 		HttpOnly: true,
 		Secure:   s.cookieSecure,
@@ -289,13 +300,42 @@ func (s *UserSession) readSessionCookie() string {
 	if err != nil {
 		return ""
 	}
-	return cookie.Value
+	if s.cookieProtector == nil {
+		return cookie.Value
+	}
+	sessionID := s.unprotectSessionCookie(cookie.Value)
+	if sessionID == "" {
+		// A value that is not a protected session id, such as a plain
+		// session id, counts as no session cookie.
+		s.clearSessionCookie()
+	}
+	return sessionID
+}
+
+// unprotectSessionCookie returns the session id protected in value, or ""
+// when value does not hold one.
+func (s *UserSession) unprotectSessionCookie(value string) string {
+	if value == "" {
+		return ""
+	}
+	protected, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return ""
+	}
+	sessionID, err := s.cookieProtector.Unprotect(protected)
+	if err != nil {
+		return ""
+	}
+	return string(sessionID)
 }
 
 // EnsureSessionIdCookie loads the session from the request cookie into internal
 // state when server-side sessions are enabled. If the cookie references a
 // session that is missing or expired, the cookie is cleared and internal state
-// stays empty (graceful degradation, not an error).
+// stays empty (graceful degradation, not an error). While the revocation is on
+// (SetSessionGrantRevoker), the session is adopted only as restore adopts
+// it: the record has not expired and the request's authenticated subject is
+// the record's subject; otherwise the cookie is cleared too.
 func (s *UserSession) EnsureSessionIdCookie(ctx context.Context) error {
 	if !s.enabled || s.store == nil {
 		return nil
@@ -321,10 +361,25 @@ func (s *UserSession) EnsureSessionIdCookie(ctx context.Context) error {
 		s.clearSessionCookie()
 		return nil
 	}
+	if s.revoker != nil && !s.restoredSessionAdoptable(rec) {
+		s.clearSessionCookie()
+		return nil
+	}
 
 	s.session = rec.SessionID
 	s.clients = append([]string(nil), rec.ClientIDs...)
 	return nil
+}
+
+// restoredSessionAdoptable reports whether the session of rec, named by the
+// session cookie, may become this request's session: the record has not
+// expired and the request's authenticated subject is its subject.
+func (s *UserSession) restoredSessionAdoptable(rec *sessionpkg.Record) bool {
+	if s.clock != nil && rec.IsExpired(s.clock.Now()) {
+		return false
+	}
+	subjectId := extensions.GetSubjectIdFromPrincipal(s.GetUser())
+	return subjectId != "" && subjectId == rec.SubjectID
 }
 
 func (s *UserSession) RemoveSessionIdCookie() error {
@@ -392,11 +447,29 @@ func (s *UserSession) restore() {
 // browser session it finds in the session cookie when a different subject
 // signs in on that session: when a session is created, and when a request's
 // authenticated subject does not match the session it carries. It takes
-// effect only while server-side sessions are enabled; nil turns it off.
+// effect only while server-side sessions are enabled; a nil revoker turns it
+// off, and the protector is then ignored.
+//
 // With a revoker set, the same subject signing in again continues the
-// session instead of starting a new one, see CreateSessionId.
-func (s *UserSession) SetSessionGrantRevoker(revoker *SessionGrantRevoker) {
+// session instead of starting a new one (see CreateSessionId), and the
+// session cookie no longer carries the session id, which relying parties
+// learn as sid, but its protected form: protector protects it on every
+// write and unprotects it on every read, and a cookie it cannot unprotect,
+// a plain session id among them, counts as no session cookie and is
+// cleared. EnsureSessionIdCookie then adopts a session only as restore
+// does. A revoker without a protector panics: without one, anybody knowing
+// a sid could make the session cookie name that session.
+func (s *UserSession) SetSessionGrantRevoker(revoker *SessionGrantRevoker, protector dp.DataProtector) {
+	if revoker == nil {
+		s.revoker = nil
+		s.cookieProtector = nil
+		return
+	}
+	if protector == nil {
+		panic("SetSessionGrantRevoker requires a session cookie protector together with the revoker")
+	}
 	s.revoker = revoker
+	s.cookieProtector = protector
 }
 
 // revokeOnSubjectChange revokes the grants of the session sessionID, whose
@@ -452,10 +525,12 @@ func (s *UserSession) revokeBeforeSignIn(ctx context.Context, principal *claims.
 // record exists, has not expired and belongs to the subject signing in: the
 // session id is kept, the record is renewed (Renewed and Expires move forward
 // by one session lifetime, nothing else changes), the cookie is written again
-// with the same value and the clients recorded for the session become this
+// for the same session id and the clients recorded for the session become this
 // instance's clients, so that a later logout notifies them too. A failure to
 // renew the record fails the sign-in. In every other case, and whenever the
 // revocation or server-side sessions are off, a new session id is created.
+// While the revocation is on, the session cookie the request carries names a
+// session only when it holds that session's protected id.
 func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	s.restoreDone = true
 	formerID, former := s.revokeBeforeSignIn(ctx, principal)
@@ -503,16 +578,20 @@ func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.Cla
 // renewSession continues the session sessionID, whose record rec was read for
 // this sign-in, see CreateSessionId.
 func (s *UserSession) renewSession(ctx context.Context, sessionID string, rec *sessionpkg.Record, now time.Time) (string, error) {
-	rec.Renewed = now
-	rec.Expires = now.Add(s.lifetime)
-	if err := s.store.UpdateSession(ctx, rec); err != nil {
+	// The renewal is made on a copy: a store may hand out its own record,
+	// which must stay as it was when the update fails.
+	renewed := *rec
+	renewed.ClientIDs = append([]string(nil), rec.ClientIDs...)
+	renewed.Renewed = now
+	renewed.Expires = now.Add(s.lifetime)
+	if err := s.store.UpdateSession(ctx, &renewed); err != nil {
 		s.session = ""
 		s.user = nil
 		s.clients = nil
 		return "", fmt.Errorf("create session: renew session: %w", err)
 	}
 	s.session = sessionID
-	s.clients = append([]string(nil), rec.ClientIDs...)
+	s.clients = append([]string(nil), renewed.ClientIDs...)
 	s.writeSessionCookie(s.session)
 	return s.session, nil
 }

@@ -7,6 +7,8 @@ package orphanedgrants
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -20,6 +22,8 @@ import (
 
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket"
+	"github.com/gonewx/wicket/di"
+	"github.com/gonewx/wicket/dp"
 	"github.com/gonewx/wicket/services"
 	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
@@ -63,14 +67,21 @@ type fixture struct {
 	*integration_common.WicketPipeline
 	// browsers are two browsers with their own cookie jars.
 	browsers [2]*integration_common.BrowserClient
+	// cookieProtector unprotects the session cookie while the revocation
+	// is declared; nil otherwise.
+	cookieProtector dp.DataProtector
 }
 
 func newFixture(t *testing.T, s setup) *fixture {
 	t.Helper()
 	pipeline := integration_common.NewWicketPipeline()
 	cfg := pipeline.Root.ServerConfig()
+	var cookieProtector dp.DataProtector
 	if s.revoke {
 		cfg.SetRevokeGrantsOnSessionSubjectChange(true)
+		protection := integration_common.NewPushedAuthorizationProtection()
+		cfg.SetSessionCookieDataProtectionProvider(protection)
+		cookieProtector = protection.Create(di.SessionCookieProtectionPurpose)
 	}
 	if s.consumption != nil {
 		cfg.SetRefreshTokenConsumption(*s.consumption)
@@ -125,8 +136,9 @@ func newFixture(t *testing.T, s setup) *fixture {
 	// cookie jar and redirect policy on the client it is given.
 	second := *pipeline.TestServer.Client()
 	return &fixture{
-		WicketPipeline: pipeline,
-		browsers:       [2]*integration_common.BrowserClient{pipeline.BrowserClient, integration_common.NewBrowserClient(&second)},
+		WicketPipeline:  pipeline,
+		browsers:        [2]*integration_common.BrowserClient{pipeline.BrowserClient, integration_common.NewBrowserClient(&second)},
+		cookieProtector: cookieProtector,
 	}
 }
 
@@ -140,6 +152,22 @@ func (f *fixture) sessionCookie(t *testing.T, browser int) string {
 	cookie := f.browsers[browser].GetCookie(f.TestServer.URL, "wicket.session")
 	require.NotNil(t, cookie, "browser %d holds a session cookie", browser)
 	return cookie.Value
+}
+
+// sessionId returns the session id the session cookie of browser names:
+// the cookie value without the revocation, its unprotected value with it.
+func (f *fixture) sessionId(t *testing.T, browser int) string {
+	t.Helper()
+	value := f.sessionCookie(t, browser)
+	if f.cookieProtector == nil {
+		return value
+	}
+	protected, err := base64.RawURLEncoding.DecodeString(value)
+	require.NoError(t, err, "browser %d holds a base64url session cookie", browser)
+	sessionId, err := f.cookieProtector.Unprotect(protected)
+	require.NoError(t, err, "browser %d holds a protected session cookie", browser)
+	require.NotEqual(t, value, string(sessionId), "the session cookie does not carry the session id")
+	return string(sessionId)
 }
 
 func (f *fixture) login(t *testing.T, browser int, subject string) {
@@ -250,11 +278,11 @@ func sharedBrowser(t *testing.T, f *fixture) (first, second, pending string) {
 
 	f.login(t, 1, alice)
 	second = f.refreshToken(t, 1)
-	require.NotEqual(t, f.sessionCookie(t, 0), f.sessionCookie(t, 1), "each browser has its own session")
+	require.NotEqual(t, f.sessionId(t, 0), f.sessionId(t, 1), "each browser has its own session")
 
-	former := f.sessionCookie(t, 0)
+	former := f.sessionId(t, 0)
 	f.login(t, 0, bob)
-	require.NotEqual(t, former, f.sessionCookie(t, 0), "bob signs in on a new session")
+	require.NotEqual(t, former, f.sessionId(t, 0), "bob signs in on a new session")
 	return first, second, pending
 }
 
@@ -353,7 +381,7 @@ func TestPersistedGrantsOfTheFormerSessionAreRevoked(t *testing.T) {
 	grants := godi.GetRequired[storage.PersistedGrantStore](f.Root)
 	ctx := context.Background()
 	now := godi.GetRequired[services.SystemClock](f.Root).Now()
-	for key, session := range map[string]string{"shared": f.sessionCookie(t, 0), "other": f.sessionCookie(t, 1)} {
+	for key, session := range map[string]string{"shared": f.sessionId(t, 0), "other": f.sessionId(t, 1)} {
 		require.NoError(t, grants.Store(ctx, &storage_models.PersistedGrant{
 			Key: key, Type: "test", SubjectId: alice, ClientId: clientId, SessionId: session, CreationTime: now,
 		}))
@@ -419,7 +447,7 @@ func TestAnotherUserSigningInAfterTheSameUserSignedInAgainRevokesTheFirstGrants(
 func TestTheSameUserSigningInAgainKeepsAndRenewsTheSession(t *testing.T) {
 	f := newFixture(t, setup{revoke: true})
 	f.login(t, 0, alice)
-	former := f.sessionCookie(t, 0)
+	former := f.sessionId(t, 0)
 	// The record is made to expire soon, so that its renewal shows.
 	record := f.sessionRecord(t, former)
 	clock := godi.GetRequired[services.SystemClock](f.Root)
@@ -429,7 +457,7 @@ func TestTheSameUserSigningInAgainKeepsAndRenewsTheSession(t *testing.T) {
 
 	f.login(t, 0, alice)
 
-	require.Equal(t, former, f.sessionCookie(t, 0), "the session cookie keeps its value")
+	require.Equal(t, former, f.sessionId(t, 0), "the session cookie keeps naming the session")
 	renewed := f.sessionRecord(t, former)
 	require.False(t, renewed.Expires.Before(signedIn.Add(f.sessionLifetime())), "the session expires one lifetime after the sign-in")
 	require.Equal(t, record.Created, renewed.Created)
@@ -446,15 +474,54 @@ func TestSigningInStartsANewSessionUnlessTheSameUserContinuesIt(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture(t, setup{revoke: true})
 			f.login(t, 0, alice)
-			former := f.sessionCookie(t, 0)
+			former := f.sessionId(t, 0)
 			if tc.expire {
 				f.expireSession(t, former)
 			}
 
 			f.login(t, 0, tc.subject)
 
-			require.NotEqual(t, former, f.sessionCookie(t, 0), "the sign-in starts a new session")
-			require.Equal(t, tc.subject, f.sessionRecord(t, f.sessionCookie(t, 0)).SubjectID)
+			require.NotEqual(t, former, f.sessionId(t, 0), "the sign-in starts a new session")
+			require.Equal(t, tc.subject, f.sessionRecord(t, f.sessionId(t, 0)).SubjectID)
 		})
 	}
+}
+
+// signedIn redeems a fresh code of browser and returns the refresh token
+// and the sid of the identity token.
+func (f *fixture) signedIn(t *testing.T, browser int) (refresh, sid string) {
+	t.Helper()
+	status, body := f.token(t, redeemCode(f.code(t, browser)))
+	require.Equal(t, http.StatusOK, status, "code exchange: %s", body)
+	refresh = gjson.Get(body, "refresh_token").String()
+	require.NotEmpty(t, refresh, "code exchange: %s", body)
+	segments := strings.Split(gjson.Get(body, "id_token").String(), ".")
+	require.Len(t, segments, 3, "code exchange: %s", body)
+	payload, err := base64.RawURLEncoding.DecodeString(segments[1])
+	require.NoError(t, err)
+	var claims struct {
+		Sid string `json:"sid"`
+	}
+	require.NoError(t, json.Unmarshal(payload, &claims))
+	require.NotEmpty(t, claims.Sid, "the identity token carries sid")
+	return refresh, claims.Sid
+}
+
+func TestASessionCookieSetToAnotherUsersSidDoesNotRevokeTheirGrants(t *testing.T) {
+	f := newFixture(t, setup{revoke: true})
+	f.login(t, 0, alice)
+	refresh, sid := f.signedIn(t, 0)
+	require.Equal(t, sid, f.sessionId(t, 0))
+
+	// bob sets the session cookie of his own browser to alice's sid, which
+	// he learnt as a relying party would, and signs in.
+	server, err := url.Parse(f.TestServer.URL)
+	require.NoError(t, err)
+	f.browsers[1].Jar.SetCookies(server, []*http.Cookie{{Name: "wicket.session", Value: sid, Path: "/"}})
+	f.login(t, 1, bob)
+
+	f.redeem(t, refresh)
+	require.NotEqual(t, sid, f.sessionId(t, 1), "bob signs in on a new session")
+	require.Equal(t, bob, f.sessionRecord(t, f.sessionId(t, 1)).SubjectID)
+	require.Equal(t, alice, f.sessionRecord(t, sid).SubjectID, "alice's session is kept")
 }
