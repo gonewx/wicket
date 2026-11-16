@@ -196,6 +196,7 @@ type revocationFixture struct {
 	recorder *httptest.ResponseRecorder
 	logs     *bytes.Buffer
 	session  *UserSession
+	clock    *sessionStateClock
 }
 
 type revocationSetup struct {
@@ -245,7 +246,7 @@ func newRevocationFixture(t *testing.T, setup revocationSetup) *revocationFixtur
 	if !setup.noRevoker {
 		us.SetSessionGrantRevoker(stores.revoker(logs))
 	}
-	return &revocationFixture{stores: stores, sessions: sessions, memory: memory, recorder: recorder, logs: logs, session: us}
+	return &revocationFixture{stores: stores, sessions: sessions, memory: memory, recorder: recorder, logs: logs, session: us, clock: clock}
 }
 
 func (f *revocationFixture) sessionCookieCleared() bool {
@@ -259,27 +260,54 @@ func (f *revocationFixture) sessionCookieCleared() bool {
 	return false
 }
 
+// writtenSessionCookie returns the last session cookie the response sets.
+func (f *revocationFixture) writtenSessionCookie() *http.Cookie {
+	var written *http.Cookie
+	for _, c := range (&http.Response{Header: f.recorder.Header()}).Cookies() {
+		if c.Name == "wicket.session" {
+			written = c
+		}
+	}
+	return written
+}
+
+// signIn signs subject in on a new session.
 func (f *revocationFixture) signIn(t *testing.T, subject string) {
+	t.Helper()
+	f.signInOn(t, subject, false)
+}
+
+// signInOn signs subject in and checks that the sign-in continues the former
+// session when continued is set, and starts a new one otherwise.
+func (f *revocationFixture) signInOn(t *testing.T, subject string, continued bool) {
 	t.Helper()
 	created, err := f.session.CreateSessionId(context.Background(), principalWithSubject(subject), nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, created)
-	require.NotEqual(t, formerSessionId, created)
+	if continued {
+		require.Equal(t, formerSessionId, created, "the sign-in continues the former session")
+	} else {
+		require.NotEqual(t, formerSessionId, created, "the sign-in starts a new session")
+	}
 	record, err := f.memory.GetSession(context.Background(), created)
-	require.NoError(t, err, "the new session is recorded")
+	require.NoError(t, err, "the session is recorded")
 	require.Equal(t, subject, record.SubjectID)
+	cookie := f.writtenSessionCookie()
+	require.NotNil(t, cookie, "the session cookie is written")
+	require.Equal(t, created, cookie.Value)
 }
 
 func TestUserSessionSignInRevokesTheFormerSubjectsGrants(t *testing.T) {
 	t.Parallel()
 	clock := newSessionStateClock()
 	cases := map[string]struct {
-		setup   revocationSetup
-		subject string
-		revoked bool
+		setup     revocationSetup
+		subject   string
+		revoked   bool
+		continued bool
 	}{
 		"another subject signs in":        {subject: "bob", revoked: true},
-		"the same subject signs in again": {subject: "alice"},
+		"the same subject signs in again": {subject: "alice", continued: true},
 		"no former session cookie":        {setup: revocationSetup{noCookie: true}, subject: "bob"},
 		"the former session is unknown":   {setup: revocationSetup{noRecord: true}, subject: "bob"},
 		"the former session has expired": {
@@ -293,9 +321,23 @@ func TestUserSessionSignInRevokesTheFormerSubjectsGrants(t *testing.T) {
 			subject: "bob",
 			revoked: true,
 		},
+		"the same subject's former session has expired": {
+			setup: revocationSetup{record: &sessionpkg.Record{
+				SessionID: formerSessionId,
+				SubjectID: "alice",
+				Created:   clock.Now().Add(-2 * time.Hour),
+				Renewed:   clock.Now().Add(-2 * time.Hour),
+				Expires:   clock.Now().Add(-time.Second),
+			}},
+			subject: "alice",
+		},
 		"the former session names no subject": {
 			setup:   revocationSetup{record: &sessionpkg.Record{SessionID: formerSessionId, Expires: clock.Now().Add(time.Hour)}},
 			subject: "bob",
+		},
+		"the former session names no subject and alice signs in": {
+			setup:   revocationSetup{record: &sessionpkg.Record{SessionID: formerSessionId, SubjectID: "", Expires: clock.Now().Add(time.Hour)}},
+			subject: "alice",
 		},
 		"revocation is off": {setup: revocationSetup{noRevoker: true}, subject: "bob"},
 	}
@@ -304,7 +346,7 @@ func TestUserSessionSignInRevokesTheFormerSubjectsGrants(t *testing.T) {
 			t.Parallel()
 			f := newRevocationFixture(t, tc.setup)
 
-			f.signIn(t, tc.subject)
+			f.signInOn(t, tc.subject, tc.continued)
 
 			if tc.revoked {
 				require.Equal(t, allRemovals(formerSessionId), f.stores.calls)
@@ -342,16 +384,25 @@ func TestUserSessionSignInWithoutRevocationDoesNotReadTheFormerSession(t *testin
 
 func TestUserSessionSignInSurvivesASessionStoreFailure(t *testing.T) {
 	t.Parallel()
-	f := newRevocationFixture(t, revocationSetup{readErr: errors.New("session store unavailable for " + formerSessionId)})
+	for _, subject := range []string{"bob", "alice"} {
+		t.Run(subject, func(t *testing.T) {
+			t.Parallel()
+			f := newRevocationFixture(t, revocationSetup{readErr: errors.New("session store unavailable for " + formerSessionId)})
 
-	created, err := f.session.CreateSessionId(context.Background(), principalWithSubject("bob"), nil)
-	require.NoError(t, err)
-	require.NotEmpty(t, created)
+			created, err := f.session.CreateSessionId(context.Background(), principalWithSubject(subject), nil)
+			require.NoError(t, err)
+			require.NotEmpty(t, created)
+			require.NotEqual(t, formerSessionId, created)
 
-	require.Empty(t, f.stores.calls)
-	require.Contains(t, f.logs.String(), "level=WARN")
-	require.Contains(t, f.logs.String(), "cannot load the former session")
-	require.NotContains(t, f.logs.String(), formerSessionId)
+			require.Empty(t, f.stores.calls)
+			require.Contains(t, f.logs.String(), "level=WARN")
+			require.Contains(t, f.logs.String(), "cannot load the former session")
+			require.NotContains(t, f.logs.String(), formerSessionId)
+			record, err := f.memory.GetSession(context.Background(), formerSessionId)
+			require.NoError(t, err)
+			require.Equal(t, f.clock.now.Add(time.Hour), record.Expires, "the former session is not renewed")
+		})
+	}
 }
 
 // failingCreateSessionStore fails to record new sessions.
@@ -474,6 +525,111 @@ func TestRefreshTokenRecordsItsSessionOnlyWhenBound(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, tc.want, getRefreshToken(t, store, handle).SessionId)
+		})
+	}
+}
+
+func TestUserSessionSameSubjectSignInRenewsTheFormerSession(t *testing.T) {
+	t.Parallel()
+	f := newRevocationFixture(t, revocationSetup{})
+	before, err := f.memory.GetSession(context.Background(), formerSessionId)
+	require.NoError(t, err)
+	f.clock.now = f.clock.now.Add(30 * time.Minute)
+
+	f.signInOn(t, "alice", true)
+
+	require.Empty(t, f.stores.calls, "signing the same subject in again revokes nothing")
+	require.Equal(t, 1, f.sessions.reads, "the former session is read once")
+	after, err := f.memory.GetSession(context.Background(), formerSessionId)
+	require.NoError(t, err)
+	require.Equal(t, f.clock.now, after.Renewed)
+	require.Equal(t, f.clock.now.Add(24*time.Hour), after.Expires)
+	require.Equal(t, before.Created, after.Created)
+	require.Equal(t, before.SubjectID, after.SubjectID)
+	require.Equal(t, before.ClientIDs, after.ClientIDs)
+	cookie := f.writtenSessionCookie()
+	require.Equal(t, int((24 * time.Hour).Seconds()), cookie.MaxAge, "the session cookie is renewed")
+	require.Equal(t, formerSessionId, f.session.GetSessionId())
+	clients, err := f.session.GetClientList()
+	require.NoError(t, err)
+	require.Equal(t, []string{"client-a"}, clients, "the clients of the session carry over")
+}
+
+func TestUserSessionSignInWithoutRevocationNeverContinuesTheSession(t *testing.T) {
+	t.Parallel()
+	for name, setup := range map[string]revocationSetup{
+		"revocation is off":            {noRevoker: true},
+		"server-side sessions are off": {sessionsDisabled: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newRevocationFixture(t, setup)
+
+			created, err := f.session.CreateSessionId(context.Background(), principalWithSubject("alice"), nil)
+			require.NoError(t, err)
+			require.NotEmpty(t, created)
+			require.NotEqual(t, formerSessionId, created)
+
+			require.Zero(t, f.sessions.reads)
+			require.Empty(t, f.stores.calls)
+			record, err := f.memory.GetSession(context.Background(), formerSessionId)
+			require.NoError(t, err)
+			require.Equal(t, f.clock.now.Add(time.Hour), record.Expires, "the former session is not renewed")
+		})
+	}
+}
+
+// failingUpdateSessionStore fails to update session records.
+type failingUpdateSessionStore struct{ sessionpkg.Store }
+
+func (failingUpdateSessionStore) UpdateSession(context.Context, *sessionpkg.Record) error {
+	return errors.New("session store read-only")
+}
+
+func TestUserSessionSignInFailsWhenTheSessionCannotBeRenewed(t *testing.T) {
+	t.Parallel()
+	f := newRevocationFixture(t, revocationSetup{})
+	f.session.user = principalWithSubject("alice")
+	require.Equal(t, formerSessionId, f.session.GetSessionId(), "the session is restored first")
+	f.session.user = nil
+	f.sessions.Store = failingUpdateSessionStore{Store: f.sessions.Store}
+
+	created, err := f.session.CreateSessionId(context.Background(), principalWithSubject("alice"), nil)
+	require.ErrorContains(t, err, "session store read-only")
+	require.Empty(t, created)
+
+	require.Empty(t, f.session.GetSessionId())
+	require.Nil(t, f.session.GetUser())
+	clients, err := f.session.GetClientList()
+	require.NoError(t, err)
+	require.Empty(t, clients, "no clients are left without a session")
+	require.Nil(t, f.writtenSessionCookie(), "no session cookie is written")
+	require.Empty(t, f.stores.calls)
+	sessions, err := f.memory.GetSessionsBySubjectID(context.Background(), "alice")
+	require.NoError(t, err)
+	require.Len(t, sessions, 1, "no new session is created")
+}
+
+func TestSessionContinues(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 15, 9, 0, 0, 0, time.UTC)
+	cases := map[string]struct {
+		record  *sessionpkg.Record
+		subject string
+		want    bool
+	}{
+		"the same subject":                                     {record: &sessionpkg.Record{SubjectID: "alice", Expires: now.Add(time.Minute)}, subject: "alice", want: true},
+		"a session without expiry":                             {record: &sessionpkg.Record{SubjectID: "alice"}, subject: "alice", want: true},
+		"another subject":                                      {record: &sessionpkg.Record{SubjectID: "alice", Expires: now.Add(time.Minute)}, subject: "bob"},
+		"an expired session":                                   {record: &sessionpkg.Record{SubjectID: "alice", Expires: now.Add(-time.Second)}, subject: "alice"},
+		"a session without a subject":                          {record: &sessionpkg.Record{Expires: now.Add(time.Minute)}, subject: ""},
+		"a session without a subject and a subject signing in": {record: &sessionpkg.Record{Expires: now.Add(time.Minute)}, subject: "alice"},
+		"no record":                                            {subject: "alice"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, sessionContinues(tc.record, tc.subject, now))
 		})
 	}
 }

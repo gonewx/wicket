@@ -393,6 +393,8 @@ func (s *UserSession) restore() {
 // signs in on that session: when a session is created, and when a request's
 // authenticated subject does not match the session it carries. It takes
 // effect only while server-side sessions are enabled; nil turns it off.
+// With a revoker set, the same subject signing in again continues the
+// session instead of starting a new one, see CreateSessionId.
 func (s *UserSession) SetSessionGrantRevoker(revoker *SessionGrantRevoker) {
 	s.revoker = revoker
 }
@@ -415,13 +417,19 @@ func (s *UserSession) revokeOnSubjectChange(ctx context.Context, sessionID strin
 // request's session cookie names, before principal signs in. An expired
 // record still counts: its grants may outlive it. A missing record or a
 // store failure revokes nothing; the failure is logged.
-func (s *UserSession) revokeBeforeSignIn(ctx context.Context, principal *claims.ClaimsPrincipal) {
+//
+// It returns the session id the cookie names and the record read for it, so
+// that the caller can decide on the same read whether the sign-in continues
+// that session. The record is nil when nothing was read: the revocation is
+// off, server-side sessions are off, the request carries no session cookie,
+// the record is missing or the read failed.
+func (s *UserSession) revokeBeforeSignIn(ctx context.Context, principal *claims.ClaimsPrincipal) (string, *sessionpkg.Record) {
 	if s.revoker == nil || !s.enabled || s.store == nil {
-		return
+		return "", nil
 	}
 	sessionID := s.readSessionCookie()
 	if sessionID == "" {
-		return
+		return "", nil
 	}
 	rec, err := s.store.GetSession(ctx, sessionID)
 	if err != nil {
@@ -430,15 +438,36 @@ func (s *UserSession) revokeBeforeSignIn(ctx context.Context, principal *claims.
 			// session id it was given.
 			s.logger.Warn("create session: cannot load the former session", slog.String("errorType", fmt.Sprintf("%T", err)))
 		}
-		return
+		return "", nil
 	}
 	s.revokeOnSubjectChange(ctx, sessionID, rec, extensions.GetSubjectIdFromPrincipal(principal))
+	return sessionID, rec
 }
 
+// CreateSessionId establishes the session of principal signing in.
+//
+// While the grants of a browser session are revoked when another subject
+// signs in on it (SetSessionGrantRevoker) and server-side sessions are
+// enabled, a sign-in continues the session the session cookie names when its
+// record exists, has not expired and belongs to the subject signing in: the
+// session id is kept, the record is renewed (Renewed and Expires move forward
+// by one session lifetime, nothing else changes), the cookie is written again
+// with the same value and the clients recorded for the session become this
+// instance's clients, so that a later logout notifies them too. A failure to
+// renew the record fails the sign-in. In every other case, and whenever the
+// revocation or server-side sessions are off, a new session id is created.
 func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.ClaimsPrincipal, properties *auth.Properties) (string, error) {
 	s.restoreDone = true
-	s.revokeBeforeSignIn(ctx, principal)
+	formerID, former := s.revokeBeforeSignIn(ctx, principal)
 	s.user = principal
+
+	if former != nil && s.clock != nil {
+		now := s.clock.Now()
+		if sessionContinues(former, extensions.GetSubjectIdFromPrincipal(principal), now) {
+			return s.renewSession(ctx, formerID, former, now)
+		}
+	}
+
 	sessionId, err := utils.CreateUniqueId(32, utils.Hex)
 	if err != nil {
 		s.user = nil
@@ -468,6 +497,23 @@ func (s *UserSession) CreateSessionId(ctx context.Context, principal *claims.Cla
 		s.writeSessionCookie(s.session)
 	}
 
+	return s.session, nil
+}
+
+// renewSession continues the session sessionID, whose record rec was read for
+// this sign-in, see CreateSessionId.
+func (s *UserSession) renewSession(ctx context.Context, sessionID string, rec *sessionpkg.Record, now time.Time) (string, error) {
+	rec.Renewed = now
+	rec.Expires = now.Add(s.lifetime)
+	if err := s.store.UpdateSession(ctx, rec); err != nil {
+		s.session = ""
+		s.user = nil
+		s.clients = nil
+		return "", fmt.Errorf("create session: renew session: %w", err)
+	}
+	s.session = sessionID
+	s.clients = append([]string(nil), rec.ClientIDs...)
+	s.writeSessionCookie(s.session)
 	return s.session, nil
 }
 

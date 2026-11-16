@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -20,6 +21,7 @@ import (
 	"github.com/gonewx/godi"
 	"github.com/gonewx/wicket"
 	"github.com/gonewx/wicket/services"
+	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
 	storage_impl "github.com/gonewx/wicket/storage/impl"
 	storage_models "github.com/gonewx/wicket/storage/models"
@@ -363,4 +365,96 @@ func TestPersistedGrantsOfTheFormerSessionAreRevoked(t *testing.T) {
 	require.ErrorIs(t, err, storage.ErrNotFound, "the grant of the shared browser's session is removed")
 	_, err = grants.Get(ctx, "other")
 	require.NoError(t, err, "the grant of alice's other session is kept")
+}
+
+// sessionRecord reads the server-side session record of sessionId.
+func (f *fixture) sessionRecord(t *testing.T, sessionId string) *sessionpkg.Record {
+	t.Helper()
+	record, err := godi.GetRequired[sessionpkg.Store](f.Root).GetSession(context.Background(), sessionId)
+	require.NoError(t, err)
+	return record
+}
+
+// expireSession makes the server-side session record of sessionId expire.
+func (f *fixture) expireSession(t *testing.T, sessionId string) {
+	t.Helper()
+	record := f.sessionRecord(t, sessionId)
+	record.Expires = godi.GetRequired[services.SystemClock](f.Root).Now().Add(-time.Second)
+	require.NoError(t, godi.GetRequired[sessionpkg.Store](f.Root).UpdateSession(context.Background(), record))
+}
+
+func (f *fixture) sessionLifetime() time.Duration {
+	if lifetime := f.Options.ServerSideSessions.SessionLifetime; lifetime > 0 {
+		return lifetime
+	}
+	return 14 * 24 * time.Hour
+}
+
+func TestAnotherUserSigningInAfterTheSameUserSignedInAgainRevokesTheFirstGrants(t *testing.T) {
+	for name, tc := range map[string]struct {
+		revoke  bool
+		revoked bool
+	}{
+		"with the declaration":    {revoke: true, revoked: true},
+		"without the declaration": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t, setup{revoke: tc.revoke})
+			f.login(t, 0, alice)
+			first := f.refreshToken(t, 0)
+			f.login(t, 0, alice)
+
+			f.login(t, 0, bob)
+
+			if tc.revoked {
+				f.requireInvalidGrant(t, redeemRefresh(first))
+			} else {
+				f.redeem(t, first)
+			}
+			requireBobSignedIn(t, f)
+		})
+	}
+}
+
+func TestTheSameUserSigningInAgainKeepsAndRenewsTheSession(t *testing.T) {
+	f := newFixture(t, setup{revoke: true})
+	f.login(t, 0, alice)
+	former := f.sessionCookie(t, 0)
+	// The record is made to expire soon, so that its renewal shows.
+	record := f.sessionRecord(t, former)
+	clock := godi.GetRequired[services.SystemClock](f.Root)
+	record.Expires = clock.Now().Add(time.Minute)
+	require.NoError(t, godi.GetRequired[sessionpkg.Store](f.Root).UpdateSession(context.Background(), record))
+	signedIn := clock.Now()
+
+	f.login(t, 0, alice)
+
+	require.Equal(t, former, f.sessionCookie(t, 0), "the session cookie keeps its value")
+	renewed := f.sessionRecord(t, former)
+	require.False(t, renewed.Expires.Before(signedIn.Add(f.sessionLifetime())), "the session expires one lifetime after the sign-in")
+	require.Equal(t, record.Created, renewed.Created)
+}
+
+func TestSigningInStartsANewSessionUnlessTheSameUserContinuesIt(t *testing.T) {
+	for name, tc := range map[string]struct {
+		expire  bool
+		subject string
+	}{
+		"the former session has expired": {expire: true, subject: alice},
+		"another user signs in":          {subject: bob},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t, setup{revoke: true})
+			f.login(t, 0, alice)
+			former := f.sessionCookie(t, 0)
+			if tc.expire {
+				f.expireSession(t, former)
+			}
+
+			f.login(t, 0, tc.subject)
+
+			require.NotEqual(t, former, f.sessionCookie(t, 0), "the sign-in starts a new session")
+			require.Equal(t, tc.subject, f.sessionRecord(t, f.sessionCookie(t, 0)).SubjectID)
+		})
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	sessionpkg "github.com/gonewx/wicket/session"
 	"github.com/gonewx/wicket/storage"
@@ -124,4 +125,12 @@ func sessionIdPrefix(sessionId string) string {
 // new one is another, non-empty subject.
 func sessionSubjectChanged(record *sessionpkg.Record, newSubject string) bool {
 	return record != nil && record.SubjectID != "" && newSubject != "" && record.SubjectID != newSubject
+}
+
+// sessionContinues reports whether signing in newSubject at now continues the
+// session of record instead of starting a new one: the record names a
+// subject, it is newSubject, and the record has not expired. An expired
+// record still counts for sessionSubjectChanged, but is never continued.
+func sessionContinues(record *sessionpkg.Record, newSubject string, now time.Time) bool {
+	return record != nil && record.SubjectID != "" && record.SubjectID == newSubject && !record.IsExpired(now)
 }

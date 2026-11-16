@@ -6,6 +6,7 @@ package backchannellogout
 import (
 	"context"
 	"encoding/json"
+	htmlpkg "html"
 	"io"
 	"mime"
 	"net/http"
@@ -565,4 +566,85 @@ func TestInvalidCallbackDeliversNothing(t *testing.T) {
 	_ = response.Body.Close()
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	require.Empty(t, rp.received())
+}
+
+// newRevokingSessionPipeline is newSessionPipeline with the grants of a
+// browser session revoked once another subject signs in on it, the assembly
+// in which signing the same subject in again continues the session.
+func newRevokingSessionPipeline(clients ...*storage_models.Client) *integration_common.WicketPipeline {
+	pipeline := integration_common.NewWicketPipeline()
+	pipeline.Root.ServerConfig().SetRevokeGrantsOnSessionSubjectChange(true)
+	pipeline.Clients = clients
+	pipeline.IdentityScopes = append(pipeline.IdentityScopes, storage_models.IdentityResourcesOpenId())
+	pipeline.Initialize()
+
+	pipeline.Options.UserInteraction.LogoutUrl = wicket.UIConstantsDefaultRoutePathsLogout
+	pipeline.Root.ServerConfig().SetBackChannelLogoutHttpClient(&http.Client{Timeout: 5 * time.Second})
+	pipeline.Options.ServerSideSessions.Enabled = true
+	pipeline.Options.ServerSideSessions.CookieSecure = false
+	return pipeline
+}
+
+func TestSigningInAgainKeepsTheClientsOfTheSessionNotified(t *testing.T) {
+	first := newRelyingParty(t, http.StatusOK)
+	second := newRelyingParty(t, http.StatusOK)
+	pipeline := newRevokingSessionPipeline(relyingPartyClient("rp1", first), relyingPartyClient("rp2", second))
+	t.Cleanup(pipeline.TestServer.Close)
+
+	require.NoError(t, pipeline.Login("bob"))
+	_, firstClaims := unverifiedClaims(t, issueIdentityToken(t, pipeline, "rp1"))
+	sid, ok := firstClaims["sid"].(string)
+	require.True(t, ok, "identity token issued within a session carries sid")
+	require.NotEmpty(t, sid)
+
+	require.NoError(t, pipeline.Login("bob"))
+	idToken := issueIdentityToken(t, pipeline, "rp2")
+	_, secondClaims := unverifiedClaims(t, idToken)
+	require.Equal(t, sid, secondClaims["sid"], "signing in again continues the session")
+
+	frameUrl := signOut(t, pipeline, idToken)
+	require.NotEmpty(t, frameUrl)
+	loadCallback(t, pipeline, frameUrl)
+
+	for name, rp := range map[string]*relyingParty{"rp1": first, "rp2": second} {
+		tokens := rp.received()
+		require.Len(t, tokens, 1, "%s receives a logout token", name)
+		_, claims := verifiedClaims(t, pipeline, tokens[0])
+		require.Equal(t, sid, claims["sid"], "%s is told the session of the first sign-in", name)
+	}
+}
+
+func TestSigningInAgainKeepsTheFrontChannelClientsOfTheSessionNotified(t *testing.T) {
+	clients := make([]*storage_models.Client, 0, 2)
+	for _, id := range []string{"rp1", "rp2"} {
+		client := relyingPartyClient(id, nil)
+		client.FrontChannelLogoutUri = "https://" + id + "/signout"
+		clients = append(clients, client)
+	}
+	pipeline := newRevokingSessionPipeline(clients...)
+	t.Cleanup(pipeline.TestServer.Close)
+
+	require.NoError(t, pipeline.Login("bob"))
+	_, firstClaims := unverifiedClaims(t, issueIdentityToken(t, pipeline, "rp1"))
+	sid, ok := firstClaims["sid"].(string)
+	require.True(t, ok, "identity token issued within a session carries sid")
+	require.NotEmpty(t, sid)
+
+	require.NoError(t, pipeline.Login("bob"))
+	idToken := issueIdentityToken(t, pipeline, "rp2")
+
+	frameUrl := signOut(t, pipeline, idToken)
+	require.NotEmpty(t, frameUrl)
+	response, err := pipeline.BrowserClient.Get(frameUrl)
+	require.NoError(t, err)
+	html, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, response.StatusCode)
+
+	query := "iss=" + urlpkg.QueryEscape(pipeline.TestServer.URL) + "&sid=" + urlpkg.QueryEscape(sid)
+	for _, id := range []string{"rp1", "rp2"} {
+		require.Contains(t, string(html), htmlpkg.EscapeString("https://"+id+"/signout?"+query),
+			"%s is told the session of the first sign-in", id)
+	}
 }
