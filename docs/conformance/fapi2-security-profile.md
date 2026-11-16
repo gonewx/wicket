@@ -152,7 +152,7 @@ suite 在本地运行，各模块的日志 id 见下文结果表。suite 导出�
 | `ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt` | FINISHED / FAILED | wicket 缺口 | 同一原因：PAR 请求所带 proof 的密钥未用于绑定授权码，token 请求换用另一把 DPoP 密钥时 token 端点仍签发。去向同上。 |
 | `par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` | INTERRUPTED / FAILED | 宿主限制 | 该模块要求首次访问授权端点时停在登录页、不完成登录，再以同一 `request_uri` 重新发起。宿主自动登录，首次访问即完成授权，模块被中断。需以能显示登录页的宿主复测，本轮未完成。 |
 
-第 5 节结果表中，`par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` 的"失败条件"一栏是模块自身的名称：对这个被中断的模块，suite 把失败记在模块名下。suite 记录的中断原因原文为：“The user was authenticated on the initial visit to login page. This must not be attempted until the second visit. If no login was attempted then please delete related cookies or logout from the server before re-running.”
+第 5 节结果表中，`par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` 的"失败条件"一栏是模块自身的名称：对这个被中断的模块，suite 把失败记在模块名下。suite 记录的中断原因原文（日志 id `mR8oKP7NVT8xJov`）为：“The user was authenticated on the initial visit to login page. This must not be attempted until the second visit. If no login was attempted then please delete related cookies or logout from the server before re-running.”
 
 ### 6.2 INTERRUPTED（等待截图评审超时）
 
