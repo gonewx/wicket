@@ -5,7 +5,7 @@
     "tag": "release-v5.3.4",
     "image": "registry.gitlab.com/openid/conformance-suite@sha256:2a53917fd8df04a24f09203175295acc73a93fa156726973ad621297692113d6"
   },
-  "planId": "GjHOsOujSwQL8",
+  "planId": "qtTCXhbPuiGNc",
   "plan": "fapi2-security-profile-final-test-plan",
   "variant": {
     "openid": "openid_connect",
@@ -20,16 +20,16 @@
     "fapi_response_mode": "plain_response"
   },
   "subject": {
-    "wicket": "239170e43bd27c8052e6c31e50664a5d3ebb5c59",
-    "go": "go1.27.0",
+    "wicket": "fbe493f1332afaa5d8ee8fc4187e6656f916fd85",
+    "go": "go1.27.4",
     "host": "test/conformance/fapi2host"
   },
-  "started": "2026-11-15T19:25:03Z",
-  "finished": "2026-11-15T19:42:18Z",
+  "started": "2026-11-16T02:47:12Z",
+  "finished": "2026-11-16T03:04:34Z",
   "modules": [
     {
       "module": "fapi2-security-profile-final-discovery-end-point-verification",
-      "logId": "cVOvLPD1XLk2u1t",
+      "logId": "tkZ4LbC5yI6LFau",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -39,7 +39,7 @@
     },
     {
       "module": "fapi2-security-profile-final-happy-flow",
-      "logId": "o61EgTPlmWwpZ9H",
+      "logId": "fKHuozdZmQLbGcD",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -51,7 +51,7 @@
     },
     {
       "module": "fapi2-security-profile-final-user-rejects-authentication",
-      "logId": "lzm7uoDgRMm7fN9",
+      "logId": "TX5afdzGop9Wz2D",
       "status": "FINISHED",
       "result": "FAILED",
       "failures": [
@@ -66,7 +66,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-authorization-request-without-state-success",
-      "logId": "DNmwwR6Ib0fBfEQ",
+      "logId": "YB6LLKA68qMywIG",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -76,7 +76,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-authorization-request-without-nonce-success",
-      "logId": "6Y7demIOa6p5Nqj",
+      "logId": "r3NwFFLEEfQq1lx",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -88,7 +88,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-authorization-request-with-64-char-nonce-success",
-      "logId": "GlYnFnwIOfUWsn9",
+      "logId": "JMOhQrwQ7gdUPuS",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -100,7 +100,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-other-scope-order-succeeds",
-      "logId": "ZFaYYDem8ynwVt2",
+      "logId": "zro91WIwvr7NnOg",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -112,7 +112,7 @@
     },
     {
       "module": "fapi2-security-profile-final-test-claims-parameter-identity-claims",
-      "logId": "eFbFvVxn1lObmKL",
+      "logId": "fN0jGUgFAwbEs6m",
       "status": "FINISHED",
       "result": "SKIPPED",
       "failures": [],
@@ -124,7 +124,7 @@
     },
     {
       "module": "fapi2-security-profile-final-access-token-type-header-case-sensitivity",
-      "logId": "yKFnnEl9YHzQCRv",
+      "logId": "j4v82hq93AN5apf",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -136,7 +136,7 @@
     },
     {
       "module": "fapi2-security-profile-final-check-dpop-proof-nbf-exp",
-      "logId": "35VSJkz548I2eQ7",
+      "logId": "C0dFio9EVfNZpHM",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -148,7 +148,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-dpopproof-with-iat-10seconds-before-succeeds",
-      "logId": "mr9k6f5Ni5deEU1",
+      "logId": "Uwv3Plq4l1GkRgU",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -160,7 +160,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-dpopproof-with-iat-10seconds-after-succeeds",
-      "logId": "XszRkHD3hoBXNP3",
+      "logId": "NcYh6ZKQfX9N6Gb",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -172,7 +172,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-mismatched-dpop-jkt-fails",
-      "logId": "I2mYaxWr209vwIa",
+      "logId": "dYAkEJjUDzCYUyf",
       "status": "FINISHED",
       "result": "FAILED",
       "failures": [
@@ -184,7 +184,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt",
-      "logId": "kd5qWKXqsYiYGma",
+      "logId": "FYgBJorDa6iN317",
       "status": "FINISHED",
       "result": "FAILED",
       "failures": [
@@ -198,7 +198,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-token-endpoint-fails-with-mismatched-dpop-jkt",
-      "logId": "I2nqvzxG61oAoFl",
+      "logId": "1BzXW6CmIxQhi2Z",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -210,7 +210,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-dpopproof-at-par-endpoint-binding-success",
-      "logId": "MvR6K1EUvdeLsgv",
+      "logId": "eEG5Mf78e7olfIJ",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -222,7 +222,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-dpop-auth-code-binding-success",
-      "logId": "DGMujzSQa9UGTXE",
+      "logId": "wsxk9TJ0PnAKDlk",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -234,7 +234,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-different-nonce-inside-and-outside-request-object",
-      "logId": "xk7PTUJtFN5Qdup",
+      "logId": "Q9BFClitHBazmH4",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -248,7 +248,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-different-state-inside-and-outside-request-object",
-      "logId": "DOFOXuRowbxlOql",
+      "logId": "xMddJpkB1EE76Dx",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -262,7 +262,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-authorization-request-with-long-nonce",
-      "logId": "JQ5gOTziiK10F4A",
+      "logId": "NUnFVctRKp9PgaX",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -272,7 +272,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-authorization-request-with-long-state",
-      "logId": "gtU6ZFu5entn2pp",
+      "logId": "zAsPYfbNBafyMCT",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -286,7 +286,7 @@
     },
     {
       "module": "fapi2-security-profile-final-state-only-outside-request-object-not-used",
-      "logId": "U4Vpy8JdSrquGMG",
+      "logId": "HfezQjUNzoZxyjP",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -298,7 +298,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-request-object-without-redirect-uri-fails",
-      "logId": "woNpe8TqN0Xp2rc",
+      "logId": "gk7dzeGwymIviRz",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -308,7 +308,7 @@
     },
     {
       "module": "fapi2-security-profile-final-plain-fapi-tolerate-unregistered-redirect-uri",
-      "logId": "9d9EEM9dkyZcAtN",
+      "logId": "KWnIWY9Bneo0oJ8",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -318,7 +318,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-unsigned-authorization-request-without-using-par-fails",
-      "logId": "wA3TkKg9tqpE1FJ",
+      "logId": "cb23Xu1jpwiDJHi",
       "status": "INTERRUPTED",
       "result": null,
       "failures": [],
@@ -330,7 +330,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-redirect-uri-in-authorization-request",
-      "logId": "4On9koFOhqSbxs6",
+      "logId": "f6rFXIpOMOqelwQ",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -340,7 +340,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-response-type-code-idtoken-fails",
-      "logId": "XHhh9F53GdGC1nK",
+      "logId": "0CHwAkYyVvTWNqt",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -350,7 +350,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-response-type-token-fails",
-      "logId": "70y1GVgFQkrOVmO",
+      "logId": "E6plfl6E3lduN2z",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -360,7 +360,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-client-id-in-token-endpoint",
-      "logId": "E9aaJeNrhapFz5a",
+      "logId": "JBtxeau5WdQkY8X",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -372,7 +372,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-holder-of-key-required",
-      "logId": "EEKUuaam3PanYmF",
+      "logId": "WS0s2Xl7eb1R449",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -384,7 +384,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-holder-of-key-required-at-non-alias-token-endpoint",
-      "logId": "DRQIwyh1JYHnttx",
+      "logId": "YGZWqigxQYid6y6",
       "status": "FINISHED",
       "result": "SKIPPED",
       "failures": [],
@@ -396,7 +396,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-authorization-code-is-bound-to-client",
-      "logId": "IfrnVcBfzTwZFFw",
+      "logId": "yQiiUSdLvjokO8r",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -408,7 +408,7 @@
     },
     {
       "module": "fapi2-security-profile-final-attempt-reuse-authorization-code-after-one-second",
-      "logId": "e5C8jQqWVJTnLHN",
+      "logId": "LoDvdZY7GaiNuCK",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -421,7 +421,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-token-endpoint-fails-with-expired-auth-code",
-      "logId": "E9o26QXagh1paIJ",
+      "logId": "yzO97exrA26G2dr",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -433,7 +433,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-signed-client-assertion-with-RS256-fails",
-      "logId": "ONefk6zIJZz7y9p",
+      "logId": "zo0s93x9EmxnKWF",
       "status": "FINISHED",
       "result": "SKIPPED",
       "failures": [],
@@ -445,7 +445,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-client-assertion-in-token-endpoint",
-      "logId": "fY9ZfGlRBeklltg",
+      "logId": "tL1XdZ7MZtiEaYy",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -457,7 +457,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-client-assertion-with-exp-is-5-minutes-in-past-fails",
-      "logId": "wto9BnnVJR4t9NY",
+      "logId": "I11XhvoVbUGEat1",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -469,7 +469,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-client-assertion-with-wrong-aud-fails",
-      "logId": "cGdc59GpxvRicZ5",
+      "logId": "CHj6IKe0GrrFUdm",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -481,7 +481,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-client-assertion-with-no-sub-fails",
-      "logId": "wCpmmEaZsOzsO83",
+      "logId": "InSztQZTSEEaXGo",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -493,7 +493,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-invalid-client-assertions-fail",
-      "logId": "kbthjB1l50iOi8V",
+      "logId": "zzYmeU4iu8DjRcv",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -503,7 +503,7 @@
     },
     {
       "module": "fapi2-security-profile-final-dpop-negative-tests",
-      "logId": "ROG5I8QE42WwncY",
+      "logId": "bY60nRDp1qe418K",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -515,7 +515,7 @@
     },
     {
       "module": "fapi2-security-profile-final-refresh-token",
-      "logId": "4l5B7lJQyyKPNwh",
+      "logId": "PYAveQJNAQljzL0",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -527,7 +527,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-ensure-reused-request-uri-prior-to-auth-completion-succeeds",
-      "logId": "mR8oKP7NVT8xJov",
+      "logId": "oPxHA84QnjriVpB",
       "status": "INTERRUPTED",
       "result": "FAILED",
       "failures": [
@@ -539,7 +539,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-attempt-reuse-request_uri",
-      "logId": "13HPrubRd6WfxDc",
+      "logId": "31QgFyP5xxOiDQN",
       "status": "INTERRUPTED",
       "result": "UNKNOWN",
       "failures": [],
@@ -553,7 +553,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-attempt-to-use-expired-request_uri",
-      "logId": "Era73C4S3wIHL4M",
+      "logId": "6q9uCDFOKVuWtK1",
       "status": "INTERRUPTED",
       "result": null,
       "failures": [],
@@ -565,7 +565,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-attempt-to-use-request_uri-for-different-client",
-      "logId": "zeJMiujTMQh9gVl",
+      "logId": "etH5Gi4qs789i3X",
       "status": "INTERRUPTED",
       "result": null,
       "failures": [],
@@ -577,7 +577,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-authorization-request-containing-request_uri-form-param",
-      "logId": "CX8L1gw2GMpw0n2",
+      "logId": "XUjlSOmuFmoO93O",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -587,7 +587,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-attempt-invalid-http-method",
-      "logId": "IpVmlFMvrMJ6e8d",
+      "logId": "RVWb80d0524numX",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -597,7 +597,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-ensure-pkce-required",
-      "logId": "ho9gO7Brxz1zL8G",
+      "logId": "j744IkIUxAROjRC",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -607,7 +607,7 @@
     },
     {
       "module": "fapi2-security-profile-final-ensure-pkce-code-verifier-required",
-      "logId": "3LuAh1Xf0qHid4O",
+      "logId": "brjavPcOC5NWTjB",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -619,7 +619,7 @@
     },
     {
       "module": "fapi2-security-profile-final-incorrect-pkce-code-verifier-rejected",
-      "logId": "bQMLJo3g3Jdf5jN",
+      "logId": "6rEIVVEORebLP9e",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],
@@ -631,7 +631,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-plain-pkce-rejected",
-      "logId": "LbbokHudYpgi9K1",
+      "logId": "J4YU5ujEJb0BRbt",
       "status": "FINISHED",
       "result": "PASSED",
       "failures": [],
@@ -641,7 +641,7 @@
     },
     {
       "module": "fapi2-security-profile-final-par-without-duplicate-parameters",
-      "logId": "DQ53tIXrryoryDd",
+      "logId": "m3mQ7ytDylhMvCs",
       "status": "FINISHED",
       "result": "WARNING",
       "failures": [],

@@ -6,11 +6,11 @@
 
 | 项 | 内容 |
 | --- | --- |
-| wicket 提交 | `239170e43bd27c8052e6c31e50664a5d3ebb5c59` |
-| Go 版本 | `go1.27.0` |
+| wicket 提交 | `fbe493f1332afaa5d8ee8fc4187e6656f916fd85` |
+| Go 版本 | `go1.27.4` |
 | 测试宿主 | [`test/conformance/fapi2host`](../../test/conformance/fapi2host/main.go)（wicket 仓内的测试程序，不是部署模板） |
 
-发布版本包含被测提交之后的提交，内容为：修正测试数据；修正两个导出常量的取值（`claims_locales_supported`、`claims_parameter_supported`），wicket 不把这两个键写入 discovery 文档；测试宿主改由常量拼出错误页匹配地址（取值不变）并拒绝以 `/\` 开头的返回地址；`Freeze` 对静态 client 列表增加签名算法检查（`TokenEndpointAuthSigningAlgorithms` 须落在档位收窄后的算法集内，且只有 `private_key_jwt` 的 client 可以列出；测试宿主的 client 未设该字段，不受影响），并删除回环地址判定中一个不可达的分支（行为不变）。这些改动未经重新运行 suite；本轮各模块的请求都不经过它们改变的分支，本文据此认为记录的结果不受影响。
+本轮在发布候选提交上运行，与 0.7.0 发布的代码一致。此前一轮（plan `GjHOsOujSwQL8`，提交 `239170e43bd27c8052e6c31e50664a5d3ebb5c59`，`go1.27.0`）之后的改动包括：修正测试数据与两个导出常量的取值、`Freeze` 对静态 client 列表的签名算法检查、token 错误响应不再从扩展条目取 `error_description`、同一主体重新登录时沿用会话并保护会话 cookie、refresh token 寿命的记录与执行。两轮的 53 个模块在状态、结果与失败、警告、截图评审、跳过各项条件上逐一相同，只有日志 id 不同。
 
 宿主配置要点：
 
@@ -30,8 +30,8 @@
 | 版本 | 5.3.4（tag `release-v5.3.4`） |
 | revision | `daca6ad2068468d42557ea1152f899cc3ac01a10` |
 | 镜像 | `registry.gitlab.com/openid/conformance-suite@sha256:2a53917fd8df04a24f09203175295acc73a93fa156726973ad621297692113d6` |
-| 运行时间 | 2026-11-15T19:25:03Z – 2026-11-15T19:42:18Z（UTC） |
-| plan id | `GjHOsOujSwQL8` |
+| 运行时间 | 2026-11-16T02:47:12Z – 2026-11-16T03:04:34Z（UTC） |
+| plan id | `qtTCXhbPuiGNc` |
 
 suite 在本地运行，各模块的日志 id 见下文结果表。suite 导出的原始压缩包含测试配置（其中有 client 私钥），因此不归档；仓内只保留剥离了密钥与令牌的逐模块结果。
 
@@ -66,59 +66,59 @@ suite 在本地运行，各模块的日志 id 见下文结果表。suite 导出�
 
 | # | 模块 | suite 日志 id | 状态 | 结果 | 失败条件 | 警告条件 | 截图评审项 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `discovery-end-point-verification` | `cVOvLPD1XLk2u1t` | FINISHED | PASSED | — | — | — |
-| 2 | `happy-flow` | `o61EgTPlmWwpZ9H` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 3 | `user-rejects-authentication` | `lzm7uoDgRMm7fN9` | FINISHED | FAILED | `EnsureErrorFromAuthorizationEndpointResponse`<br>`ExpectAccessDeniedErrorFromAuthorizationEndpointDueToUserRejectingRequest` | `CheckForUnexpectedParametersInErrorResponseFromAuthorizationEndpoint` | — |
-| 4 | `ensure-authorization-request-without-state-success` | `DNmwwR6Ib0fBfEQ` | FINISHED | PASSED | — | — | — |
-| 5 | `ensure-authorization-request-without-nonce-success` | `6Y7demIOa6p5Nqj` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 6 | `ensure-authorization-request-with-64-char-nonce-success` | `GlYnFnwIOfUWsn9` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 7 | `ensure-other-scope-order-succeeds` | `ZFaYYDem8ynwVt2` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 8 | `test-claims-parameter-identity-claims` | `eFbFvVxn1lObmKL` | FINISHED | SKIPPED | — | — | — |
-| 9 | `access-token-type-header-case-sensitivity` | `yKFnnEl9YHzQCRv` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 10 | `check-dpop-proof-nbf-exp` | `35VSJkz548I2eQ7` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 11 | `ensure-dpopproof-with-iat-10seconds-before-succeeds` | `mr9k6f5Ni5deEU1` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 12 | `ensure-dpopproof-with-iat-10seconds-after-succeeds` | `XszRkHD3hoBXNP3` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 13 | `ensure-mismatched-dpop-jkt-fails` | `I2mYaxWr209vwIa` | FINISHED | FAILED | `EnsurePARInvalidRequestOrInvalidDpopProof` | — | — |
-| 14 | `ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt` | `kd5qWKXqsYiYGma` | FINISHED | FAILED | `CheckTokenEndpointReturnedInvalidRequestGrantOrDPopProofError` | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 15 | `ensure-token-endpoint-fails-with-mismatched-dpop-jkt` | `I2nqvzxG61oAoFl` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 16 | `ensure-dpopproof-at-par-endpoint-binding-success` | `MvR6K1EUvdeLsgv` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 17 | `ensure-dpop-auth-code-binding-success` | `DGMujzSQa9UGTXE` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 18 | `ensure-different-nonce-inside-and-outside-request-object` | `xk7PTUJtFN5Qdup` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | `ExpectRequestDifferentNonceInsideAndOutsideErrorPage` |
-| 19 | `ensure-different-state-inside-and-outside-request-object` | `DOFOXuRowbxlOql` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | `ExpectRequestDifferentStateInsideAndOutsideErrorPage` |
-| 20 | `ensure-authorization-request-with-long-nonce` | `JQ5gOTziiK10F4A` | FINISHED | PASSED | — | — | — |
-| 21 | `ensure-authorization-request-with-long-state` | `gtU6ZFu5entn2pp` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | `ExpectRequestObjectWithLongStateErrorPage` |
-| 22 | `state-only-outside-request-object-not-used` | `U4Vpy8JdSrquGMG` | FINISHED | PASSED | — | — | `ExpectRequestObjectMissingStateErrorPage` |
-| 23 | `ensure-request-object-without-redirect-uri-fails` | `woNpe8TqN0Xp2rc` | FINISHED | PASSED | — | — | — |
-| 24 | `plain-fapi-tolerate-unregistered-redirect-uri` | `9d9EEM9dkyZcAtN` | FINISHED | PASSED | — | — | — |
-| 25 | `ensure-unsigned-authorization-request-without-using-par-fails` | `wA3TkKg9tqpE1FJ` | INTERRUPTED | （无） | — | — | `ExpectAuthorizationRequestWithoutRequestObjectErrorPage` |
-| 26 | `ensure-redirect-uri-in-authorization-request` | `4On9koFOhqSbxs6` | FINISHED | PASSED | — | — | — |
-| 27 | `ensure-response-type-code-idtoken-fails` | `XHhh9F53GdGC1nK` | FINISHED | PASSED | — | — | — |
-| 28 | `ensure-response-type-token-fails` | `70y1GVgFQkrOVmO` | FINISHED | PASSED | — | — | — |
-| 29 | `ensure-client-id-in-token-endpoint` | `E9aaJeNrhapFz5a` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 30 | `ensure-holder-of-key-required` | `EEKUuaam3PanYmF` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 31 | `ensure-holder-of-key-required-at-non-alias-token-endpoint` | `DRQIwyh1JYHnttx` | FINISHED | SKIPPED | — | — | — |
-| 32 | `ensure-authorization-code-is-bound-to-client` | `IfrnVcBfzTwZFFw` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 33 | `attempt-reuse-authorization-code-after-one-second` | `e5C8jQqWVJTnLHN` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint`<br>`EnsureHttpStatusCodeIs4xx` | — |
-| 34 | `ensure-token-endpoint-fails-with-expired-auth-code` | `E9o26QXagh1paIJ` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 35 | `ensure-signed-client-assertion-with-RS256-fails` | `ONefk6zIJZz7y9p` | FINISHED | SKIPPED | — | — | — |
-| 36 | `ensure-client-assertion-in-token-endpoint` | `fY9ZfGlRBeklltg` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 37 | `ensure-client-assertion-with-exp-is-5-minutes-in-past-fails` | `wto9BnnVJR4t9NY` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 38 | `ensure-client-assertion-with-wrong-aud-fails` | `cGdc59GpxvRicZ5` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 39 | `ensure-client-assertion-with-no-sub-fails` | `wCpmmEaZsOzsO83` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 40 | `ensure-invalid-client-assertions-fail` | `kbthjB1l50iOi8V` | FINISHED | PASSED | — | — | — |
-| 41 | `dpop-negative-tests` | `ROG5I8QE42WwncY` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 42 | `refresh-token` | `4l5B7lJQyyKPNwh` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 43 | `par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` | `mR8oKP7NVT8xJov` | INTERRUPTED | FAILED | `fapi2-security-profile-final-par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` | — | — |
-| 44 | `par-attempt-reuse-request_uri` | `13HPrubRd6WfxDc` | INTERRUPTED | UNKNOWN | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | `ExpectInvalidRequestUriErrorPage` |
-| 45 | `par-attempt-to-use-expired-request_uri` | `Era73C4S3wIHL4M` | INTERRUPTED | （无） | — | — | `ExpectInvalidRequestUriErrorPage` |
-| 46 | `par-attempt-to-use-request_uri-for-different-client` | `zeJMiujTMQh9gVl` | INTERRUPTED | （无） | — | — | `ExpectInvalidRequestUriErrorPage` |
-| 47 | `par-authorization-request-containing-request_uri-form-param` | `CX8L1gw2GMpw0n2` | FINISHED | PASSED | — | — | — |
-| 48 | `par-attempt-invalid-http-method` | `IpVmlFMvrMJ6e8d` | FINISHED | PASSED | — | — | — |
-| 49 | `par-ensure-pkce-required` | `ho9gO7Brxz1zL8G` | FINISHED | PASSED | — | — | — |
-| 50 | `ensure-pkce-code-verifier-required` | `3LuAh1Xf0qHid4O` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 51 | `incorrect-pkce-code-verifier-rejected` | `bQMLJo3g3Jdf5jN` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
-| 52 | `par-plain-pkce-rejected` | `LbbokHudYpgi9K1` | FINISHED | PASSED | — | — | — |
-| 53 | `par-without-duplicate-parameters` | `DQ53tIXrryoryDd` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 1 | `discovery-end-point-verification` | `tkZ4LbC5yI6LFau` | FINISHED | PASSED | — | — | — |
+| 2 | `happy-flow` | `fKHuozdZmQLbGcD` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 3 | `user-rejects-authentication` | `TX5afdzGop9Wz2D` | FINISHED | FAILED | `EnsureErrorFromAuthorizationEndpointResponse`<br>`ExpectAccessDeniedErrorFromAuthorizationEndpointDueToUserRejectingRequest` | `CheckForUnexpectedParametersInErrorResponseFromAuthorizationEndpoint` | — |
+| 4 | `ensure-authorization-request-without-state-success` | `YB6LLKA68qMywIG` | FINISHED | PASSED | — | — | — |
+| 5 | `ensure-authorization-request-without-nonce-success` | `r3NwFFLEEfQq1lx` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 6 | `ensure-authorization-request-with-64-char-nonce-success` | `JMOhQrwQ7gdUPuS` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 7 | `ensure-other-scope-order-succeeds` | `zro91WIwvr7NnOg` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 8 | `test-claims-parameter-identity-claims` | `fN0jGUgFAwbEs6m` | FINISHED | SKIPPED | — | — | — |
+| 9 | `access-token-type-header-case-sensitivity` | `j4v82hq93AN5apf` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 10 | `check-dpop-proof-nbf-exp` | `C0dFio9EVfNZpHM` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 11 | `ensure-dpopproof-with-iat-10seconds-before-succeeds` | `Uwv3Plq4l1GkRgU` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 12 | `ensure-dpopproof-with-iat-10seconds-after-succeeds` | `NcYh6ZKQfX9N6Gb` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 13 | `ensure-mismatched-dpop-jkt-fails` | `dYAkEJjUDzCYUyf` | FINISHED | FAILED | `EnsurePARInvalidRequestOrInvalidDpopProof` | — | — |
+| 14 | `ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt` | `FYgBJorDa6iN317` | FINISHED | FAILED | `CheckTokenEndpointReturnedInvalidRequestGrantOrDPopProofError` | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 15 | `ensure-token-endpoint-fails-with-mismatched-dpop-jkt` | `1BzXW6CmIxQhi2Z` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 16 | `ensure-dpopproof-at-par-endpoint-binding-success` | `eEG5Mf78e7olfIJ` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 17 | `ensure-dpop-auth-code-binding-success` | `wsxk9TJ0PnAKDlk` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 18 | `ensure-different-nonce-inside-and-outside-request-object` | `Q9BFClitHBazmH4` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | `ExpectRequestDifferentNonceInsideAndOutsideErrorPage` |
+| 19 | `ensure-different-state-inside-and-outside-request-object` | `xMddJpkB1EE76Dx` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | `ExpectRequestDifferentStateInsideAndOutsideErrorPage` |
+| 20 | `ensure-authorization-request-with-long-nonce` | `NUnFVctRKp9PgaX` | FINISHED | PASSED | — | — | — |
+| 21 | `ensure-authorization-request-with-long-state` | `zAsPYfbNBafyMCT` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | `ExpectRequestObjectWithLongStateErrorPage` |
+| 22 | `state-only-outside-request-object-not-used` | `HfezQjUNzoZxyjP` | FINISHED | PASSED | — | — | `ExpectRequestObjectMissingStateErrorPage` |
+| 23 | `ensure-request-object-without-redirect-uri-fails` | `gk7dzeGwymIviRz` | FINISHED | PASSED | — | — | — |
+| 24 | `plain-fapi-tolerate-unregistered-redirect-uri` | `KWnIWY9Bneo0oJ8` | FINISHED | PASSED | — | — | — |
+| 25 | `ensure-unsigned-authorization-request-without-using-par-fails` | `cb23Xu1jpwiDJHi` | INTERRUPTED | （无） | — | — | `ExpectAuthorizationRequestWithoutRequestObjectErrorPage` |
+| 26 | `ensure-redirect-uri-in-authorization-request` | `f6rFXIpOMOqelwQ` | FINISHED | PASSED | — | — | — |
+| 27 | `ensure-response-type-code-idtoken-fails` | `0CHwAkYyVvTWNqt` | FINISHED | PASSED | — | — | — |
+| 28 | `ensure-response-type-token-fails` | `E6plfl6E3lduN2z` | FINISHED | PASSED | — | — | — |
+| 29 | `ensure-client-id-in-token-endpoint` | `JBtxeau5WdQkY8X` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 30 | `ensure-holder-of-key-required` | `WS0s2Xl7eb1R449` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 31 | `ensure-holder-of-key-required-at-non-alias-token-endpoint` | `YGZWqigxQYid6y6` | FINISHED | SKIPPED | — | — | — |
+| 32 | `ensure-authorization-code-is-bound-to-client` | `yQiiUSdLvjokO8r` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 33 | `attempt-reuse-authorization-code-after-one-second` | `LoDvdZY7GaiNuCK` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint`<br>`EnsureHttpStatusCodeIs4xx` | — |
+| 34 | `ensure-token-endpoint-fails-with-expired-auth-code` | `yzO97exrA26G2dr` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 35 | `ensure-signed-client-assertion-with-RS256-fails` | `zo0s93x9EmxnKWF` | FINISHED | SKIPPED | — | — | — |
+| 36 | `ensure-client-assertion-in-token-endpoint` | `tL1XdZ7MZtiEaYy` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 37 | `ensure-client-assertion-with-exp-is-5-minutes-in-past-fails` | `I11XhvoVbUGEat1` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 38 | `ensure-client-assertion-with-wrong-aud-fails` | `CHj6IKe0GrrFUdm` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 39 | `ensure-client-assertion-with-no-sub-fails` | `InSztQZTSEEaXGo` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 40 | `ensure-invalid-client-assertions-fail` | `zzYmeU4iu8DjRcv` | FINISHED | PASSED | — | — | — |
+| 41 | `dpop-negative-tests` | `bY60nRDp1qe418K` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 42 | `refresh-token` | `PYAveQJNAQljzL0` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 43 | `par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` | `oPxHA84QnjriVpB` | INTERRUPTED | FAILED | `fapi2-security-profile-final-par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` | — | — |
+| 44 | `par-attempt-reuse-request_uri` | `31QgFyP5xxOiDQN` | INTERRUPTED | UNKNOWN | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | `ExpectInvalidRequestUriErrorPage` |
+| 45 | `par-attempt-to-use-expired-request_uri` | `6q9uCDFOKVuWtK1` | INTERRUPTED | （无） | — | — | `ExpectInvalidRequestUriErrorPage` |
+| 46 | `par-attempt-to-use-request_uri-for-different-client` | `etH5Gi4qs789i3X` | INTERRUPTED | （无） | — | — | `ExpectInvalidRequestUriErrorPage` |
+| 47 | `par-authorization-request-containing-request_uri-form-param` | `XUjlSOmuFmoO93O` | FINISHED | PASSED | — | — | — |
+| 48 | `par-attempt-invalid-http-method` | `RVWb80d0524numX` | FINISHED | PASSED | — | — | — |
+| 49 | `par-ensure-pkce-required` | `j744IkIUxAROjRC` | FINISHED | PASSED | — | — | — |
+| 50 | `ensure-pkce-code-verifier-required` | `brjavPcOC5NWTjB` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 51 | `incorrect-pkce-code-verifier-rejected` | `6rEIVVEORebLP9e` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
+| 52 | `par-plain-pkce-rejected` | `J4YU5ujEJb0BRbt` | FINISHED | PASSED | — | — | — |
+| 53 | `par-without-duplicate-parameters` | `m3mQ7ytDylhMvCs` | FINISHED | WARNING | — | `ValidateSuccessfulAuthCodeFlowResponseFromAuthorizationEndpoint` | — |
 
 ### 汇总
 
@@ -148,11 +148,11 @@ suite 在本地运行，各模块的日志 id 见下文结果表。suite 导出�
 | 模块 | 状态 / 结果 | 归因 | 说明与去向 |
 | --- | --- | --- | --- |
 | `user-rejects-authentication` | FINISHED / FAILED | 宿主限制 | 该模块要求用户在登录页拒绝授权，期望授权端点返回 `access_denied`。宿主不显示登录表单、自动登录并同意，无法拒绝，授权端点未返回错误。需以能显示登录与拒绝的宿主复测，本轮未完成。 |
-| `ensure-mismatched-dpop-jkt-fails` | FINISHED / FAILED | wicket 缺口 | 期望 PAR 端点在请求的 `DPoP` 头与 `dpop_jkt` 不一致时以 `invalid_request` 或 `invalid_dpop_proof` 拒绝。wicket 的 PAR 端点不读取 `DPoP` 头（RFC 9449 §10.1 允许 PAR 请求携带 DPoP proof，并要求其与 `dpop_jkt` 同时出现时一致）。列为后续改进，尚未排期。 |
+| `ensure-mismatched-dpop-jkt-fails` | FINISHED / FAILED | wicket 缺口 | 期望 PAR 端点在请求的 `DPoP` 头与 `dpop_jkt` 不一致时以 `invalid_request` 或 `invalid_dpop_proof` 拒绝。wicket 的 PAR 端点不读取 `DPoP` 头。RFC 9449 §10.1 要求同时支持 PAR 与 DPoP 的授权服务器两种方式都支持（MUST）：推送参数中的 `dpop_jkt`，以及 PAR 请求所带的 `DPoP` 头（校验 proof，并按其公钥指纹绑定授权码；二者同时出现而不一致时拒绝）；FAPI 2.0 Security Profile 要求使用 DPoP 时支持该节的授权码绑定（shall）。wicket 只支持前者，这是已知的不符合项，列为后续改进。 |
 | `ensure-token-endpoint-fails-with-mismatched-dpop-proof-jkt` | FINISHED / FAILED | wicket 缺口 | 同一原因：PAR 请求所带 proof 的密钥未用于绑定授权码，token 请求换用另一把 DPoP 密钥时 token 端点仍签发。去向同上。 |
 | `par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` | INTERRUPTED / FAILED | 宿主限制 | 该模块要求首次访问授权端点时停在登录页、不完成登录，再以同一 `request_uri` 重新发起。宿主自动登录，首次访问即完成授权，模块被中断。需以能显示登录页的宿主复测，本轮未完成。 |
 
-第 5 节结果表中，`par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` 的"失败条件"一栏是模块自身的名称：对这个被中断的模块，suite 把失败记在模块名下。suite 记录的中断原因原文（日志 id `mR8oKP7NVT8xJov`）为：“The user was authenticated on the initial visit to login page. This must not be attempted until the second visit. If no login was attempted then please delete related cookies or logout from the server before re-running.”
+第 5 节结果表中，`par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` 的"失败条件"一栏是模块自身的名称：对这个被中断的模块，suite 把失败记在模块名下。suite 记录的中断原因原文（日志 id `oPxHA84QnjriVpB`）为：“The user was authenticated on the initial visit to login page. This must not be attempted until the second visit. If no login was attempted then please delete related cookies or logout from the server before re-running.”
 
 ### 6.2 INTERRUPTED（等待截图评审超时）
 
