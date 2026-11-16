@@ -140,3 +140,48 @@ func TestRefreshTokenSlidingExpiryAtTheTokenEndpoint(t *testing.T) {
 		f.requireRefused(t, slidingClient, refresh)
 	})
 }
+
+// makeLegacy rewrites the stored record under handle as a refresh token
+// issued before lifetimes were recorded: no creation time, no lifetime.
+func (f *fixture) makeLegacy(t *testing.T, handle string) {
+	t.Helper()
+	token, err := f.store.GetRefreshToken(context.Background(), handle)
+	require.NoError(t, err)
+	token.CreationTime = time.Time{}
+	token.Lifetime = 0
+	require.NoError(t, f.store.UpdateRefreshToken(context.Background(), handle, token, token.Version))
+}
+
+// requireDated asserts that the record under handle carries a creation time
+// and the default 30-day absolute lifetime of models.NewClient().
+func (f *fixture) requireDated(t *testing.T, handle string) {
+	t.Helper()
+	token, err := f.store.GetRefreshToken(context.Background(), handle)
+	require.NoError(t, err)
+	require.False(t, token.CreationTime.IsZero(), "the redemption did not write the backfilled creation time back")
+	require.Equal(t, 2592000, token.Lifetime)
+}
+
+// A record issued before lifetimes were recorded is dated by its first
+// redemption at the token endpoint, and the dates reach the store: through
+// the update in place, or into the successor of a rotation.
+func TestRefreshTokenLegacyRecordBackfilledAtTheTokenEndpoint(t *testing.T) {
+	t.Run("updated in place", func(t *testing.T) {
+		f := newFixture(t, storage_impl.NewRefreshTokenStore(), nil)
+		refresh := f.issue(t, reuseClient)
+		f.makeLegacy(t, refresh)
+
+		require.Equal(t, refresh, f.redeem(t, reuseClient, refresh))
+		f.requireDated(t, refresh)
+	})
+	t.Run("rotated", func(t *testing.T) {
+		f := newFixture(t, storage_impl.NewRefreshTokenStore(), new(services.RefreshTokenMarkedOnRedemption))
+		refresh := f.issue(t, oneTimeClient)
+		f.makeLegacy(t, refresh)
+
+		rotated := f.redeem(t, oneTimeClient, refresh)
+		require.NotEqual(t, refresh, rotated)
+		f.requireDated(t, rotated)
+		f.requireDated(t, refresh)
+	})
+}
