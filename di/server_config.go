@@ -228,6 +228,12 @@ func (c *ServerConfig) storeSeams() []storeSeam {
 			condition: c.pushedAuthorizationRequired,
 		},
 		{
+			name:      sessionCookieDataProtectionSeamName,
+			category:  storeSeamFeatureRequired,
+			injected:  func() bool { return c.sessionCookieDataProtectionProvider != nil },
+			condition: c.RevokeGrantsOnSessionSubjectChange,
+		},
+		{
 			name:      dpopNonceKeySeamName,
 			category:  storeSeamFeatureRequired,
 			injected:  func() bool { return c.dpopNonceKeys != nil },

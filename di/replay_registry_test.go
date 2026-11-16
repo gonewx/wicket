@@ -50,6 +50,9 @@ var replayOtherSeams = []struct {
 	// Pushed authorization is not enabled here, so neither seam is demanded.
 	{"pushed authorization request store", storeSeamFeatureRequired, func(*ServerConfig) {}},
 	{"pushed authorization data protection", storeSeamFeatureRequired, func(*ServerConfig) {}},
+	// Session grant revocation is not declared here, so the seam is not
+	// demanded.
+	{"session cookie data protection", storeSeamFeatureRequired, func(*ServerConfig) {}},
 	// DPoP server nonces are not required here, so the seam is not demanded.
 	{"dpop nonce key", storeSeamFeatureRequired, func(*ServerConfig) {}},
 }
@@ -573,8 +576,8 @@ func TestReplayRegistryLeavesStoreSeamValidationUnchanged(t *testing.T) {
 			want = append(want, seam.name)
 			wantCategories = append(wantCategories, seam.category.String())
 		}
-		if len(names) != 16 || !slices.Equal(names, want) {
-			t.Fatalf("storeSeams() names = %v, want the 16 names %v", names, want)
+		if len(names) != 17 || !slices.Equal(names, want) {
+			t.Fatalf("storeSeams() names = %v, want the 17 names %v", names, want)
 		}
 		if !slices.Equal(categories, wantCategories) {
 			t.Fatalf("storeSeams() categories = %v, want %v", categories, wantCategories)

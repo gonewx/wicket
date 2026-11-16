@@ -243,7 +243,7 @@ func TestStoreSeamCategories(t *testing.T) {
 			if seam.category != storeSeamOptional {
 				t.Fatalf("seam %q is %v, want optional", seam.name, seam.category)
 			}
-		case "client registration store", "pushed authorization request store", "pushed authorization data protection", "dpop nonce key":
+		case "client registration store", "pushed authorization request store", "pushed authorization data protection", "session cookie data protection", "dpop nonce key":
 			if seam.category != storeSeamFeatureRequired {
 				t.Fatalf("seam %q is %v, want feature-required", seam.name, seam.category)
 			}
@@ -253,8 +253,8 @@ func TestStoreSeamCategories(t *testing.T) {
 			}
 		}
 	}
-	if counts[storeSeamOptional] != 2 || counts[storeSeamRequired] != 10 || counts[storeSeamFeatureRequired] != 4 {
-		t.Fatalf("category counts = %v, want 2 optional, 10 required, 4 feature-required", counts)
+	if counts[storeSeamOptional] != 2 || counts[storeSeamRequired] != 10 || counts[storeSeamFeatureRequired] != 5 {
+		t.Fatalf("category counts = %v, want 2 optional, 10 required, 5 feature-required", counts)
 	}
 }
 
