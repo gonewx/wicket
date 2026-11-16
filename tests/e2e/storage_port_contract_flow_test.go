@@ -50,6 +50,7 @@ func newStoragePortContractFixture(t *testing.T) *storagePortContractFixture {
 	authorizationCodes := storage_impl.NewAuthorizationCodeStore()
 	refreshTokens := storage_impl.NewRefreshTokenStore()
 	refreshService := services_impl.NewRefreshTokenService(refreshTokens, services_impl.NewHandleGenerationService())
+	refreshService.SetClock(clock)
 	backchannelRequests := memory.NewMemoryBackchannelAuthenticationRequestStore()
 
 	return &storagePortContractFixture{
@@ -237,6 +238,7 @@ func TestRefreshTokenValidationFlowE2E(t *testing.T) {
 		fixture := newStoragePortContractFixture(t)
 		handle := fixture.storeRefreshToken(t, fixture.clock.now.Add(-time.Minute), 300)
 		service := services_impl.NewRefreshTokenService(fixture.refreshTokens, services_impl.NewHandleGenerationService())
+		service.SetClock(fixture.clock)
 		result := service.ValidateRefreshToken(context.Background(), handle, fixture.client)
 		if result.Error != nil {
 			t.Fatalf("validate error = %v, want success", result.Error)

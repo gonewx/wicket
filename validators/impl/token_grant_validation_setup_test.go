@@ -126,6 +126,9 @@ func newTokenGrantFixture(t *testing.T, opts ...tokenGrantOption) *tokenGrantFix
 
 	authorizationCodes := storage_impl.NewAuthorizationCodeStore()
 	refreshTokens := storage_impl.NewRefreshTokenStore()
+	clock := fixedTestClock{now: grantValidationTestNow}
+	refreshTokenService := services_impl.NewRefreshTokenService(refreshTokens, services_impl.NewHandleGenerationService())
+	refreshTokenService.SetClock(clock)
 
 	validator := NewTokenRequestValidator(
 		options,
@@ -135,12 +138,12 @@ func newTokenGrantFixture(t *testing.T, opts ...tokenGrantOption) *tokenGrantFix
 		NewCustomTokenRequestValidator(),
 		cfg.resourceValidator,
 		resourceStore,
-		services_impl.NewRefreshTokenService(refreshTokens, services_impl.NewHandleGenerationService()),
+		refreshTokenService,
 		cfg.resourceOwner,
 		cfg.profile,
 		cfg.deviceCodes,
 		nil,
-		fixedTestClock{now: grantValidationTestNow},
+		clock,
 		logger,
 	)
 

@@ -196,6 +196,68 @@ func RunRefreshTokenStoreSuite(t *testing.T, newStore func() storage.RefreshToke
 			t.Fatalf("replay update error = %v, want ErrVersionConflict", err)
 		}
 	})
+	// The core dates a refresh token stored without a creation time on its
+	// first successful redemption, and under sliding expiration rewrites its
+	// lifetime on every redemption; both reach the store through an update.
+	// The update must therefore write CreationTime and Lifetime back, and
+	// RemoveExpired must judge the record by the updated values.
+	cfg.mayCase(t, "LifetimeUpdateRoundTrips", func(t *testing.T) {
+		t.Parallel()
+		store := newStore()
+		if err := store.StoreRefreshToken(context.Background(), "handle-1", newRefreshToken("client-a")); err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		stored, err := store.GetRefreshToken(context.Background(), "handle-1")
+		if err != nil {
+			t.Fatalf("Get after store: %v", err)
+		}
+		oldExpiry := stored.CreationTime.Add(time.Duration(stored.Lifetime) * time.Second)
+
+		created := fixedNow.Add(30 * time.Minute)
+		const lifetime = 7200
+		update := newRefreshToken("client-a")
+		update.CreationTime = created
+		update.Lifetime = lifetime
+		if err := store.UpdateRefreshToken(context.Background(), "handle-1", update, stored.Version); err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		got, err := store.GetRefreshToken(context.Background(), "handle-1")
+		if err != nil {
+			t.Fatalf("Get after update: %v", err)
+		}
+		if !got.CreationTime.Equal(created) {
+			t.Fatalf("CreationTime = %v, want %v", got.CreationTime, created)
+		}
+		if got.Lifetime != lifetime {
+			t.Fatalf("Lifetime = %d, want %d", got.Lifetime, lifetime)
+		}
+
+		newExpiry := created.Add(lifetime * time.Second)
+		if !newExpiry.After(oldExpiry) {
+			t.Fatalf("fixture: updated expiry %v is not after the stored expiry %v", newExpiry, oldExpiry)
+		}
+		cutoff := oldExpiry.Add(newExpiry.Sub(oldExpiry) / 2)
+		removed, err := store.RemoveExpired(context.Background(), cutoff)
+		if err != nil {
+			t.Fatalf("RemoveExpired: %v", err)
+		}
+		if removed != 0 {
+			t.Fatalf("RemoveExpired between the old and the updated expiry removed %d records, want 0", removed)
+		}
+		if _, err := store.GetRefreshToken(context.Background(), "handle-1"); err != nil {
+			t.Fatalf("Get after RemoveExpired: %v", err)
+		}
+
+		removed, err = store.RemoveExpired(context.Background(), newExpiry.Add(time.Second))
+		if err != nil {
+			t.Fatalf("RemoveExpired past the updated expiry: %v", err)
+		}
+		if removed != 1 {
+			t.Fatalf("RemoveExpired past the updated expiry removed %d records, want 1", removed)
+		}
+		_, err = store.GetRefreshToken(context.Background(), "handle-1")
+		expectNotFound(t, err)
+	})
 	mustCase(t, "NoBackgroundGoroutines", func(t *testing.T) {
 		runNoBackgroundGoroutinesCase(t, newStore, func(store storage.RefreshTokenStore) {
 			_ = store.StoreRefreshToken(context.Background(), "handle-1", newRefreshToken("client-a"))
