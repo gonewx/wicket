@@ -46,7 +46,7 @@ Wicket 采用分层服务架构，以 godi 依赖注入组合根为核心装配�
 - `di/inmemory.go` — 内存存储注册扩展
 - `di/key_management.go` — 密钥管理服务注册
 - `di/pluggable_services.go` — 可插拔服务注册
-- `di/lifecycle.go` — 根生命周期（`CleanupExpired`、`Close` 资源释放）
+- `di/lifecycle.go` — 根生命周期（lazy store 构造与 `Close` 资源释放；过期数据的回收由宿主逐 store 调用 `RemoveExpired` / `DeleteExpired`）
 - `di/container_gen.go` — godi-gen 生成物（禁止手编）
 
 **生命周期模型：**

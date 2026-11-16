@@ -209,17 +209,38 @@ client 被删除、禁用或配置失效后，它已签发的凭证随之失效�
 
 ### 驱动清理
 
-wicket **不自起后台 goroutine**（AD-12），过期数据的清理由宿主按自身调度驱动：
+wicket **不自起后台 goroutine**（AD-12），过期数据的清理由宿主按自身调度驱动：逐个调用自己注入的 store 实例的回收入口（`RemoveExpired`，会话 store 为 `DeleteExpired`）。容器不提供统一的清理入口，store 实例从宿主自己装配时持有的变量取得：
 
 ```go
+// 宿主装配时注入的实例，例如 cfg.SetRefreshTokenStore(refreshTokens)。
+type expiredRemover interface {
+    RemoveExpired(ctx context.Context, cutoff time.Time) (int, error)
+}
+removers := map[string]expiredRemover{
+    "refresh_tokens":      refreshTokens,
+    "reference_tokens":    referenceTokens,
+    "authorization_codes": authorizationCodes,
+    "persisted_grants":    persistedGrants,
+    "user_consents":       userConsents,
+    "device_flow":         deviceFlowCodes,
+    "backchannel":         backchannelRequests,
+}
+
 ticker := time.NewTicker(10 * time.Minute)
 defer ticker.Stop()
 for {
     select {
     case <-ticker.C:
         ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-        if err := root.CleanupExpired(ctx); err != nil {
-            logger.Error("cleanup failed", "err", err)
+        now := time.Now()
+        for name, store := range removers {
+            if _, err := store.RemoveExpired(ctx, now); err != nil {
+                logger.Error("cleanup failed", "store", name, "err", err)
+            }
+        }
+        // cfg.SetSessionStore(sessions) 注入的服务端会话 store
+        if _, err := sessions.DeleteExpired(ctx, now); err != nil {
+            logger.Error("cleanup failed", "store", "sessions", "err", err)
         }
         cancel()
     case <-shutdown:
@@ -227,6 +248,8 @@ for {
     }
 }
 ```
+
+只列出宿主实际注入的 store；启用 PAR、DPoP 或 `private_key_jwt` 时，PAR 存储与重放登记（`replay.Registry`）同样按此回收。
 
 清理只回收空间，**不承担正确性**——过期判定始终在 wicket 核心侧完成（AD-3 要素 6）。
 
@@ -238,6 +261,32 @@ reference access token 也在须回收之列：client 配置 `AccessTokenType=Re
 - `ReferenceTokenStore.StoreReferenceToken` 失败时，wicket 不把 store 的错误文本写入响应或自身日志（只保留错误身份，可用 `errors.Is` / `errors.As` 取得），故障原因须由 store 在自己一侧记录；句柄是凭据，store 的错误文本与日志不应包含句柄或记录内容。
 
 启用 DPoP 时另有一点，适用于任何自备的 `RefreshTokenStore`：须持久化并往返 `RefreshToken.DPoPKeyThumbprint`（DPoP proof 密钥指纹，见 [API 契约 · DPoP](./api-contracts.md#dpoprfc-9449)）。public client 带 DPoP proof 获得的 refresh token 靠这个字段绑定到 proof 密钥；适配器丢失它，绑定即静默失效，持有被窃 refresh token 的一方无需私钥就能兑换。契约测试套件目前不检查这一点，自备适配器须自行确认。同理，自备 client store 须往返 `Client.RequireDPoP`，丢失它会使按 client 强制 DPoP 静默失效。自备 `AuthorizationCodeStore` 须往返 `AuthorizationCode.DPoPKeyThumbprint`（authorize 请求 `dpop_jkt` 预绑定的指纹，见 [API 契约 · `dpop_jkt` 预绑定](./api-contracts.md#dpop_jkt-预绑定rfc-9449-10)）；丢失它，预绑定静默失效，截获授权码的一方可用自己的密钥兑换。契约测试套件同样不检查这一字段。DPoP 服务端 nonce 无状态，不需要任何存储。
+
+自备的 `RefreshTokenStore` 还须在 `UpdateRefreshToken` 时写回 `RefreshToken.CreationTime` 与 `RefreshToken.Lifetime`：核心在首次成功兑换时为没有创建时刻的旧记录补记这两个字段，滑动方式下每次兑换都改写 `Lifetime`，两者都经更新写回（见下文旧记录迁移一节）。`storagetest` 以 MAY 级用例 `LifetimeUpdateRoundTrips`（以 `storagetest.WithMay(true)` 运行）检查 `UpdateRefreshToken` 写回 `CreationTime` 与 `Lifetime`、`RemoveExpired` 按更新后的值判定；MUST 用例未收紧，`SuiteVersion` 仍为 `2.0.0`。
+
+### 既有 refresh token 记录的迁移
+
+自 v0.6.1 起，refresh token 签发时记下 `CreationTime` 与按 client 配置得出的 `Lifetime`，兑换时由核心判过期（见 [API 契约 · refresh token 寿命](./api-contracts.md#refresh-token-寿命)）。v0.6.1 之前签发的记录 `CreationTime` 为零值、`Lifetime` 为 0（v0.5.0、v0.6.0 中按文档调用 `RemoveExpired` 会删除全部 refresh token，即由此而来）：
+
+- 首次成功兑换时核心会补记：`CreationTime` 取当前时刻，`Lifetime` 按 client 当前配置算出，随本次兑换写回；兑换在校验之后失败（scope、resource、DPoP 绑定等）时不写回，记录仍为零值。
+- 但 `RemoveExpired` 的判定式（`CreationTime + Lifetime` 早于 cutoff）把这类记录一律视为已过期。升级后宿主第一次调用 `RefreshTokenStore.RemoveExpired` 就会删除全部未补记的旧记录，持有者只能重新授权。
+
+不想让旧 token 失效的宿主，在升级后第一次回收之前回填旧记录：`CreationTime` 设为回填时刻（或已知的签发时刻），`Lifetime` 按该记录 client 的配置设置（与签发时的算式一致）：
+
+| client 配置 | `Lifetime` |
+|------|------|
+| 绝对方式（或滑动方式且 `SlidingRefreshTokenLifetime == 0`），`AbsoluteRefreshTokenLifetime > 0` | `AbsoluteRefreshTokenLifetime` |
+| 滑动方式，`SlidingRefreshTokenLifetime > 0` 且 `AbsoluteRefreshTokenLifetime > 0` | `min(SlidingRefreshTokenLifetime, AbsoluteRefreshTokenLifetime)` |
+| 滑动方式，`SlidingRefreshTokenLifetime > 0` 且 `AbsoluteRefreshTokenLifetime == 0`（不封顶） | `SlidingRefreshTokenLifetime` |
+| 适用的寿命字段都为 0（不限） | `2147483647` |
+
+用 wicket 的接口回填时，读出记录、改这两个字段，再以读到的 `Version` 调 `UpdateRefreshToken`。in-memory store 的记录随进程重启丢失，无需迁移。
+
+外部适配器另须注意：
+
+- 按 `CreationTime + Lifetime` 派生过期列（如 `expires_at`）的实现，回填时须连同派生列一起更新；零值记录派生出的过期时刻在公元 1 年，会被首次回收删除。SQL 实现可以按 `creation_time` 为零值筛出旧行，在一条 `UPDATE` 里同时写 `creation_time`、`lifetime` 与 `expires_at`。
+- 滑动方式下每次兑换都会改写 `Lifetime`：`UpdateRefreshToken` 须写回 `CreationTime` 与 `Lifetime`，派生过期列须在更新时重算，不能只在插入时计算。`storagetest` 的 MAY 级用例 `LifetimeUpdateRoundTrips`（以 `storagetest.WithMay(true)` 运行）检查这一点。
+- `Lifetime` 最大为 `2147483647` 秒（约 68 年），派生列的时间类型须容得下 `CreationTime` 加上这个值。
 
 ### 释放资源
 

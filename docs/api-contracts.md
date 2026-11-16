@@ -382,6 +382,23 @@ token=<refresh_token_or_reference_access_token>
 - 成功响应为 200、空响应体，带 `Cache-Control: no-store` 等禁止缓存的头。不含 `.` 的未知令牌、已撤销令牌、属于其他客户端的令牌同样返回 200；属于其他客户端的令牌静默不撤销。
 - 请求校验与撤销阶段的存储故障等基础设施错误不按协议错误处理，由中间件统一写出。客户端认证阶段读取客户端存储失败时，按认证失败返回 `invalid_client`。
 
+### refresh token 寿命
+
+refresh token 签发时记下创建时刻（`RefreshToken.CreationTime`）与按 client 配置得出的寿命（`RefreshToken.Lifetime`，以秒计，从 `CreationTime` 起算）。兑换时由核心判过期：到期时刻（`CreationTime + Lifetime`）严格早于当前时刻即为过期，等于当前时刻不算，与 store 的 `RemoveExpired` 判定式一致。过期的 token 视同不存在，令牌端点返回 `invalid_grant`；过期记录不在兑换时删除，回收仍由宿主调用 `RemoveExpired`。
+
+| client 配置 | 到期时刻 |
+|------|------|
+| `RefreshTokenExpiration = TokenExpirationAbsolute`（`models.NewClient()` 默认） | 创建时刻 + `AbsoluteRefreshTokenLifetime`（默认 2592000 秒，即 30 天）；兑换不延长 |
+| `TokenExpirationSliding` 且 `SlidingRefreshTokenLifetime > 0` | 签发时为创建时刻 + `SlidingRefreshTokenLifetime`（`AbsoluteRefreshTokenLifetime > 0` 时不超过创建时刻 + `AbsoluteRefreshTokenLifetime`）；每次兑换改写为 min(当前时刻 + `SlidingRefreshTokenLifetime`, 创建时刻 + `AbsoluteRefreshTokenLifetime`)；`AbsoluteRefreshTokenLifetime == 0` 时不封顶 |
+| `TokenExpirationSliding` 且 `SlidingRefreshTokenLifetime == 0` | 同绝对方式 |
+
+- 取值为 0 的寿命字段不设上限。两者都不设上限时记下 `Lifetime = math.MaxInt32`（约 68 年），`RemoveExpired` 不会回收它。
+- 滑动方式下，自创建起经过的时间按整秒向上取整，延长后的寿命不短于滑动窗口，也不超过绝对寿命。
+- refresh token 绑定到签发它的 client（RFC 6749 §6）：其他 client 出示时视同不存在，返回 `invalid_grant`。
+- 判定顺序：查不到 → 非本 client 出示 → 补记旧记录（见下文）→ 过期。其他 client 出示过期 token 得到与出示任何他人 token 相同的 `invalid_grant`，不透露是否过期。
+- 时钟：服务经 `(*services/impl.RefreshTokenService).SetClock(clock)` 得到时钟时用它，未设置时用墙钟；判过期在任何情况下都生效。`SetClock(nil)` panic。
+- `CreationTime` 为零值的既有记录（v0.6.1 之前签发）：首次成功兑换时补记，`CreationTime` 取当前时刻，`Lifetime` 按 client 当前配置算出，随本次兑换写回；兑换在校验之后失败（scope、resource、DPoP 绑定等）时不写回，记录仍为零值。但在补记之前宿主调用 `RemoveExpired` 会把这类记录当作已过期删除，迁移办法见 [存储持久化指南 · 既有 refresh token 记录的迁移](./storage-persistence-guide.md#既有-refresh-token-记录的迁移)。
+
 ### 设备授权（Device Authorization Endpoint，RFC 8628）
 
 ```
@@ -454,7 +471,7 @@ err = interaction.Deny(ctx, userCode)
 - `verification_uri_complete` 中的 user code 未做 URL 编码。
 - 拒绝后的记录不会立即删除，在过期前每次轮询都返回 `access_denied`。
 - 令牌端点按 device_code 查找记录与删除记录不是原子操作，并发轮询可能重复兑换；交互服务的读取—写回同样不是原子操作。
-- 默认的 refresh token 服务不校验 refresh token 的客户端绑定与有效期，设备流签发的 refresh token 同样受影响。
+- v0.6.1 之前，默认的 refresh token 服务不校验 refresh token 的客户端绑定与有效期，设备流签发的 refresh token 同样受影响；自 v0.6.1 起两者在兑换时都会校验，设备流签发的 refresh token 也不例外（见 [refresh token 寿命](#refresh-token-寿命)）。
 - 令牌响应对所有授权类型都写出 `refresh_token` 成员，未签发时为空字符串。
 
 ### Back-Channel Logout 发送（OIDC Back-Channel Logout 1.0）
