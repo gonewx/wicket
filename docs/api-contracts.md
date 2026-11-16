@@ -383,12 +383,13 @@ cfg.Freeze()
 
 ### 轮换
 
-- 新句柄的记录继承旧记录的全部授权内容：subject、scope、resource、`SessionId`、`CreationTime`、`Lifetime`、DPoP 绑定（`DPoPKeyThumbprint`）以及本次换发的 access token。绝对寿命不因轮换延长；绑定到 DPoP 密钥的 refresh token 轮换后仍绑定同一密钥。
+- 新句柄的记录继承旧记录的全部授权内容：subject、scope、resource、`SessionId`、`CreationTime`、`Lifetime`、DPoP 绑定（`DPoPKeyThumbprint`）以及本次换发的 access token。绝对方式下寿命不因轮换延长；滑动方式下本次兑换先按滑动规则延长寿命，新记录与被标记为已消费的旧记录都带延长后的 `Lifetime`（见 [refresh token 寿命](#refresh-token-寿命)）。绑定到 DPoP 密钥的 refresh token 轮换后仍绑定同一密钥。
 - 写入顺序：先存新记录，再以兑换时读到的版本号更新旧记录（`UpdateRefreshToken` 的 `expectedVersion`）。存新记录失败时旧 token 原封不动，响应 5xx，client 可重试。更新旧记录时 store 报告了冲突与缺失之外的错误：标记模式下先重读旧记录，若它已以本次的新句柄标记为已消费（写入实际已生效），照常返回新句柄；否则移除新记录并响应 5xx。删除模式下无法分辨写入是否生效，一律移除新记录并响应 5xx；若写入其实已生效，旧句柄已被消费，client 须重新授权。
 - 已知限制：旧记录在签发 id_token 之前就已更新（轮换在此提交）。此后 id_token 签发失败（签名密钥不可用等基础设施故障）时响应 5xx，client 拿不到新句柄，旧句柄已被消费：删除模式下重试得 `invalid_grant`，标记模式下重试被当作重放并沿链撤销，两种情况 client 都须重新走授权。默认（不轮换）不受影响。
 - 并发兑换同一句柄恰一个成功；其余得 `invalid_grant`，并移除各自预写的新记录（移除失败只记日志）。
 - 删除模式下，旧记录先被标记为已消费、再删除；删除失败只记日志，留下的已消费记录出示时同样被拒。
-- 标记模式下已消费的记录不会随兑换删除：同一授权每兑换一次多留一条，各条继承链首的 `CreationTime` 与 `Lifetime`，到期后与其他过期 refresh token 一样，须由宿主调用该 store 的 `RemoveExpired` 回收（wicket 不自动回收），也随按会话、按 client 删除等既有路径移除。存储容量按"每个授权的兑换次数"估算。
+- 标记模式下已消费的记录不会随兑换删除：同一授权每兑换一次多留一条，各条继承链首的 `CreationTime`，`Lifetime` 为被兑换时的值（绝对方式下即链首的寿命，滑动方式下为该次兑换延长后的寿命）。记录到期后与其他过期 refresh token 一样，须由宿主调用该 store 的 `RemoveExpired` 回收（wicket 不自动回收），也随按会话、按 client 删除等既有路径移除。存储容量按"每个授权在寿命内的兑换次数"估算。
+- 已知限制：已消费记录过期后，只要仍在存储中，原 client 出示时照常按重放处置；一旦被宿主回收，再出示只得 `invalid_grant`，不再沿链撤销。滑动方式下已消费记录与它当时的后继同时到期，此后链上更晚签发的 token 可能仍有效。
 
 ### 已消费 token 再次出示（RFC 9700 §4.14.2）
 
@@ -397,6 +398,22 @@ cfg.Freeze()
 - 其他 client 出示只得 `invalid_grant`，不触发撤销。
 - 删除模式下旧记录已不存在，重放只得 `invalid_grant`，无法沿链撤销。
 - 撤销时遇到存储故障（缺失与版本冲突之外的错误）以 5xx 返回，不伪装成 `invalid_grant`。
+
+## refresh token 寿命
+
+refresh token 签发时记下创建时刻（`RefreshToken.CreationTime`）与按 client 配置得出的寿命（`RefreshToken.Lifetime`，以秒计，从 `CreationTime` 起算）。兑换时由核心判过期：到期时刻（`CreationTime + Lifetime`）严格早于当前时刻即为过期，等于当前时刻不算，与 store 的 `RemoveExpired` 判定式一致。过期的 token 视同不存在，令牌端点返回 `invalid_grant`；过期记录不在兑换时删除，回收仍由宿主调用 `RemoveExpired`。
+
+| client 配置 | 到期时刻 |
+|------|------|
+| `RefreshTokenExpiration = TokenExpirationAbsolute`（`models.NewClient()` 默认） | 创建时刻 + `AbsoluteRefreshTokenLifetime`（默认 2592000 秒，即 30 天）；兑换不延长 |
+| `TokenExpirationSliding` 且 `SlidingRefreshTokenLifetime > 0` | 签发时为创建时刻 + `SlidingRefreshTokenLifetime`（`AbsoluteRefreshTokenLifetime > 0` 时不超过创建时刻 + `AbsoluteRefreshTokenLifetime`）；每次兑换改写为 min(当前时刻 + `SlidingRefreshTokenLifetime`, 创建时刻 + `AbsoluteRefreshTokenLifetime`)；`AbsoluteRefreshTokenLifetime == 0` 时不封顶 |
+| `TokenExpirationSliding` 且 `SlidingRefreshTokenLifetime == 0` | 同绝对方式 |
+
+- 取值为 0 的寿命字段不设上限。两者都不设上限时记下 `Lifetime = math.MaxInt32`（约 68 年），`RemoveExpired` 不会回收它。
+- 滑动方式下，自创建起经过的时间按整秒向上取整，延长后的寿命不短于滑动窗口，也不超过绝对寿命。
+- 判定顺序：查不到 → 已消费（按重放处置，见上节）→ 非本 client 出示 → 过期。其他 client 出示过期 token 得到与出示任何他人 token 相同的 `invalid_grant`，不透露是否过期。
+- 时钟：服务经 `SetConsumption` 或 `(*services/impl.RefreshTokenService).SetClock(clock)` 得到时钟时用它（组合根总会注入），未注入时用墙钟；判过期在任何情况下都生效。`SetClock(nil)` panic。只注入时钟不会开启轮换。
+- `CreationTime` 为零值的既有记录（v0.7.0 之前签发）：首次成功兑换时补记，`CreationTime` 取当前时刻，`Lifetime` 按 client 当前配置算出，随本次兑换写回；兑换在校验之后失败（scope、resource、DPoP 绑定等）时不写回，记录仍为零值。但在补记之前宿主调用 `RemoveExpired` 会把这类记录当作已过期删除，迁移办法见 [存储持久化指南 · 既有 refresh token 记录的迁移](./storage-persistence-guide.md#既有-refresh-token-记录的迁移)。
 
 ## 会话主体变化时撤销原会话授权
 
@@ -780,7 +797,6 @@ err = interaction.Deny(ctx, userCode)
 - `verification_uri_complete` 中的 user code 未做 URL 编码。
 - 拒绝后的记录不会立即删除，在过期前每次轮询都返回 `access_denied`。
 - 令牌端点按 device_code 查找记录与删除记录不是原子操作，并发轮询可能重复兑换；交互服务的读取—写回同样不是原子操作。
-- 默认的 refresh token 服务不校验 refresh token 的客户端绑定与有效期，设备流签发的 refresh token 同样受影响。
 - 令牌响应对所有授权类型都写出 `refresh_token` 成员，未签发时为空字符串。
 
 ### Back-Channel Logout 发送（OIDC Back-Channel Logout 1.0）
